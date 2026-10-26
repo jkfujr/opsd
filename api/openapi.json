@@ -1,0 +1,4789 @@
+{
+  "openapi": "3.0.4",
+  "info": {
+    "title": "OPSD HTTP 契约",
+    "version": "1.0.0",
+    "description": "唯一 HTTP 类型来源。202 仅表示持久受理；写请求不自动重试。旧读数与通信状态分开，普通操作与持续互信分别建模。"
+  },
+  "servers": [
+    {
+      "url": "/api/v1"
+    }
+  ],
+  "security": [
+    {
+      "SessionCookie": []
+    }
+  ],
+  "paths": {
+    "/auth/login": {
+      "post": {
+        "operationId": "login",
+        "summary": "登录",
+        "tags": [
+          "auth"
+        ],
+        "responses": {
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/InvalidRequest"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          },
+          "200": {
+            "description": "请求成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CurrentSession"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "登录尝试过于频繁",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIError"
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginRequest"
+              }
+            }
+          }
+        },
+        "security": []
+      }
+    },
+    "/auth/session": {
+      "get": {
+        "operationId": "getSession",
+        "summary": "读取当前会话",
+        "tags": [
+          "auth"
+        ],
+        "responses": {
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/InvalidRequest"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          },
+          "200": {
+            "description": "请求成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CurrentSession"
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      },
+      "delete": {
+        "operationId": "logout",
+        "summary": "退出当前会话",
+        "tags": [
+          "auth"
+        ],
+        "responses": {
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/InvalidRequest"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          },
+          "204": {
+            "description": "请求成功"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "parameters": [
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/auth/sessions": {
+      "get": {
+        "operationId": "listSessions",
+        "summary": "读取会话",
+        "tags": [
+          "auth"
+        ],
+        "responses": {
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/InvalidRequest"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          },
+          "200": {
+            "description": "请求成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionList"
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/auth/sessions/{id}": {
+      "delete": {
+        "operationId": "revokeSession",
+        "summary": "撤销指定会话",
+        "tags": [
+          "auth"
+        ],
+        "responses": {
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/InvalidRequest"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          },
+          "204": {
+            "description": "请求成功"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/nodes": {
+      "get": {
+        "operationId": "listNodes",
+        "summary": "读取节点",
+        "tags": [
+          "nodes"
+        ],
+        "responses": {
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/InvalidRequest"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          },
+          "200": {
+            "description": "请求成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NodeList"
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/nodes/{id}": {
+      "get": {
+        "operationId": "getNode",
+        "summary": "读取节点详情",
+        "tags": [
+          "nodes"
+        ],
+        "responses": {
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/InvalidRequest"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          },
+          "200": {
+            "description": "请求成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Node"
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        ]
+      },
+      "patch": {
+        "operationId": "renameNode",
+        "summary": "修改节点名称",
+        "tags": [
+          "nodes"
+        ],
+        "responses": {
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/InvalidRequest"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          },
+          "200": {
+            "description": "请求成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Node"
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NodePatch"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/nodes/{id}/revoke": {
+      "post": {
+        "operationId": "revokeNode",
+        "summary": "撤销节点授权",
+        "tags": [
+          "nodes"
+        ],
+        "responses": {
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/InvalidRequest"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          },
+          "200": {
+            "description": "请求成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Node"
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/enrollment-tokens": {
+      "get": {
+        "operationId": "listEnrollmentTokens",
+        "summary": "读取接入码状态",
+        "tags": [
+          "enrollment-tokens"
+        ],
+        "responses": {
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/InvalidRequest"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          },
+          "200": {
+            "description": "请求成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnrollmentTokenList"
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      },
+      "post": {
+        "operationId": "createEnrollmentToken",
+        "summary": "创建接入码",
+        "tags": [
+          "enrollment-tokens"
+        ],
+        "responses": {
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/InvalidRequest"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          },
+          "201": {
+            "description": "请求成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnrollmentTokenCreated"
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "parameters": [
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/enrollment-tokens/{id}": {
+      "delete": {
+        "operationId": "revokeEnrollmentToken",
+        "summary": "撤销接入码",
+        "tags": [
+          "enrollment-tokens"
+        ],
+        "responses": {
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/InvalidRequest"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          },
+          "204": {
+            "description": "请求成功"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/nodes/{id}/public-addresses": {
+      "get": {
+        "operationId": "getPublicAddresses",
+        "summary": "读取节点公网地址",
+        "tags": [
+          "nodes"
+        ],
+        "responses": {
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/InvalidRequest"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          },
+          "200": {
+            "description": "请求成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicAddresses"
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        ]
+      },
+      "patch": {
+        "operationId": "setPublicAddress",
+        "summary": "设置地址族模式或地址",
+        "tags": [
+          "nodes"
+        ],
+        "responses": {
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/InvalidRequest"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          },
+          "200": {
+            "description": "请求成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicAddresses"
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PublicAddressPatch"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/nodes/{id}/public-addresses/refresh": {
+      "post": {
+        "operationId": "refreshPublicAddresses",
+        "summary": "刷新地址观测",
+        "tags": [
+          "nodes"
+        ],
+        "responses": {
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/InvalidRequest"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          },
+          "200": {
+            "description": "请求成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicAddresses"
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PublicAddressRefresh"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/peer-trust": {
+      "get": {
+        "operationId": "getPeerTrust",
+        "summary": "读取节点互信设置",
+        "tags": [
+          "peer-trust"
+        ],
+        "responses": {
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/InvalidRequest"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          },
+          "200": {
+            "description": "请求成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PeerTrustPolicy"
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      },
+      "put": {
+        "operationId": "setPeerTrust",
+        "summary": "设置节点互信",
+        "tags": [
+          "peer-trust"
+        ],
+        "responses": {
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/InvalidRequest"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          },
+          "200": {
+            "description": "请求成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PeerTrustPolicy"
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "parameters": [
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PeerTrustPolicyPatch"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/peer-trust/status": {
+      "get": {
+        "operationId": "getPeerTrustStatus",
+        "summary": "读取互信实际同步状态",
+        "tags": [
+          "peer-trust"
+        ],
+        "responses": {
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/InvalidRequest"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          },
+          "200": {
+            "description": "请求成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PeerTrustStatus"
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/nodes/{id}/firewall": {
+      "get": {
+        "operationId": "readFirewall",
+        "summary": "读取原生防火墙实际状态",
+        "tags": [
+          "nodes"
+        ],
+        "responses": {
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/InvalidRequest"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          },
+          "200": {
+            "description": "请求成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FirewallState"
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          {
+            "name": "family",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/AddressFamily"
+            }
+          },
+          {
+            "name": "scope",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/ConfigScope"
+            }
+          }
+        ]
+      }
+    },
+    "/nodes/{id}/firewall/plans": {
+      "post": {
+        "operationId": "previewFirewallChange",
+        "summary": "预览单项变更",
+        "tags": [
+          "nodes"
+        ],
+        "responses": {
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/InvalidRequest"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          },
+          "201": {
+            "description": "请求成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChangePlan"
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FirewallChange"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/firewall/plans/{id}": {
+      "get": {
+        "operationId": "getFirewallPlan",
+        "summary": "读取不可变预览",
+        "tags": [
+          "firewall"
+        ],
+        "responses": {
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/InvalidRequest"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          },
+          "200": {
+            "description": "请求成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChangePlan"
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        ]
+      }
+    },
+    "/firewall/plans/{id}/apply": {
+      "post": {
+        "operationId": "applyFirewallPlan",
+        "summary": "受理预览并返回原操作",
+        "tags": [
+          "firewall"
+        ],
+        "responses": {
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/InvalidRequest"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          },
+          "202": {
+            "description": "已持久受理，须查询原操作取得实际结果",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Operation"
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/nodes/{id}/containers": {
+      "get": {
+        "operationId": "listContainers",
+        "summary": "读取实时容器",
+        "tags": [
+          "nodes"
+        ],
+        "responses": {
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/InvalidRequest"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          },
+          "200": {
+            "description": "请求成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContainerList"
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        ]
+      }
+    },
+    "/nodes/{id}/containers/{container_id}/actions": {
+      "post": {
+        "operationId": "actOnContainer",
+        "summary": "受理容器动作",
+        "tags": [
+          "nodes"
+        ],
+        "responses": {
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/InvalidRequest"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          },
+          "202": {
+            "description": "已持久受理，须查询原操作取得实际结果",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Operation"
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          {
+            "name": "container_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ContainerAction"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/nodes/{id}/containers/{container_id}/logs": {
+      "get": {
+        "operationId": "readContainerLogs",
+        "summary": "读取或跟随容器日志",
+        "tags": [
+          "nodes"
+        ],
+        "responses": {
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/InvalidRequest"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          },
+          "200": {
+            "description": "断开后不自动补齐；重新读取由用户发起",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          {
+            "name": "container_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          {
+            "name": "follow",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "tail",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 10000,
+              "default": 200
+            }
+          }
+        ]
+      }
+    },
+    "/operations": {
+      "get": {
+        "operationId": "listOperations",
+        "summary": "查询历史或定位原操作",
+        "tags": [
+          "operations"
+        ],
+        "responses": {
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/InvalidRequest"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          },
+          "200": {
+            "description": "请求成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperationList"
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "parameters": [
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50
+            }
+          },
+          {
+            "name": "node_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          {
+            "name": "state",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/OperationState"
+            }
+          },
+          {
+            "name": "plan_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          {
+            "name": "idempotency_key",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        ]
+      }
+    },
+    "/operations/pending": {
+      "get": {
+        "operationId": "listPendingOperations",
+        "summary": "独立读取全部未决操作",
+        "tags": [
+          "operations"
+        ],
+        "responses": {
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/InvalidRequest"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          },
+          "200": {
+            "description": "请求成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PendingOperations"
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "parameters": [
+          {
+            "name": "node_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        ]
+      }
+    },
+    "/operations/{id}": {
+      "get": {
+        "operationId": "getOperation",
+        "summary": "查询原操作",
+        "tags": [
+          "operations"
+        ],
+        "responses": {
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/InvalidRequest"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          },
+          "200": {
+            "description": "请求成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Operation"
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        ]
+      }
+    },
+    "/operations/{id}/confirm": {
+      "post": {
+        "operationId": "confirmOperation",
+        "summary": "确认原操作",
+        "tags": [
+          "operations"
+        ],
+        "responses": {
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/InvalidRequest"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          },
+          "202": {
+            "description": "已持久受理，须查询原操作取得实际结果",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Operation"
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/operations/{id}/recover": {
+      "post": {
+        "operationId": "recoverOperation",
+        "summary": "核对并继续原操作",
+        "tags": [
+          "operations"
+        ],
+        "responses": {
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/InvalidRequest"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          },
+          "202": {
+            "description": "已持久受理，须查询原操作取得实际结果",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Operation"
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/operations/{id}/resolve": {
+      "post": {
+        "operationId": "resolveOperation",
+        "summary": "接受现状并结束为人工处理",
+        "tags": [
+          "operations"
+        ],
+        "responses": {
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/InvalidRequest"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          },
+          "202": {
+            "description": "已持久受理，须查询原操作取得实际结果",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Operation"
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResolveOperation"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/settings/account": {
+      "get": {
+        "operationId": "getAccount",
+        "summary": "读取管理员账号",
+        "tags": [
+          "settings"
+        ],
+        "responses": {
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/InvalidRequest"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          },
+          "200": {
+            "description": "请求成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Account"
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      },
+      "patch": {
+        "operationId": "changeAccount",
+        "summary": "修改账号凭据或安全入口",
+        "tags": [
+          "settings"
+        ],
+        "responses": {
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/InvalidRequest"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          },
+          "200": {
+            "description": "请求成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccountChanged"
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "parameters": [
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AccountChange"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/settings/deployment": {
+      "get": {
+        "operationId": "getDeployment",
+        "summary": "读取部署设置",
+        "tags": [
+          "settings"
+        ],
+        "responses": {
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/InvalidRequest"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          },
+          "200": {
+            "description": "请求成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeploymentConfig"
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/settings/deployment/changes": {
+      "post": {
+        "operationId": "changeDeployment",
+        "summary": "受理部署变更",
+        "tags": [
+          "settings"
+        ],
+        "responses": {
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/InvalidRequest"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          },
+          "202": {
+            "description": "已持久受理，须查询原操作取得实际结果",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Operation"
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "parameters": [
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeploymentChange"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/settings/portainer": {
+      "get": {
+        "operationId": "getPortainer",
+        "summary": "读取集成状态",
+        "tags": [
+          "settings"
+        ],
+        "responses": {
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/InvalidRequest"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          },
+          "200": {
+            "description": "请求成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PortainerSettings"
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      },
+      "put": {
+        "operationId": "configurePortainer",
+        "summary": "接入或新建 Portainer",
+        "tags": [
+          "settings"
+        ],
+        "responses": {
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/InvalidRequest"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          },
+          "202": {
+            "description": "已持久受理，须查询原操作取得实际结果",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Operation"
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "parameters": [
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PortainerChange"
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "operationId": "unbindPortainer",
+        "summary": "解除集成并保留组件数据",
+        "tags": [
+          "settings"
+        ],
+        "responses": {
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/InvalidRequest"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          },
+          "204": {
+            "description": "请求成功"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "parameters": [
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/settings/portainer/bindings": {
+      "get": {
+        "operationId": "listPortainerBindings",
+        "summary": "读取节点环境绑定",
+        "tags": [
+          "settings"
+        ],
+        "responses": {
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/InvalidRequest"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          },
+          "200": {
+            "description": "请求成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PortainerBindings"
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/nodes/{id}/portainer-binding": {
+      "put": {
+        "operationId": "bindPortainerEnvironment",
+        "summary": "绑定节点环境",
+        "tags": [
+          "nodes"
+        ],
+        "responses": {
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/InvalidRequest"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          },
+          "200": {
+            "description": "请求成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PortainerBinding"
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PortainerBindRequest"
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "operationId": "unbindPortainerEnvironment",
+        "summary": "解除节点环境绑定",
+        "tags": [
+          "nodes"
+        ],
+        "responses": {
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/InvalidRequest"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          },
+          "204": {
+            "description": "请求成功"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/settings/portainer/actions": {
+      "post": {
+        "operationId": "actOnPortainer",
+        "summary": "受理托管组件动作",
+        "tags": [
+          "settings"
+        ],
+        "responses": {
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/InvalidRequest"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          },
+          "202": {
+            "description": "已持久受理，须查询原操作取得实际结果",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Operation"
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "parameters": [
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ComponentAction"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/nodes/{id}/firewall/install": {
+      "post": {
+        "operationId": "installFirewall",
+        "summary": "安装但不启用防火墙组件",
+        "tags": [
+          "nodes"
+        ],
+        "responses": {
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/InvalidRequest"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          },
+          "202": {
+            "description": "已持久受理，须查询原操作取得实际结果",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Operation"
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FirewallInstallRequest"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/settings/version": {
+      "get": {
+        "operationId": "getVersion",
+        "summary": "读取版本",
+        "tags": [
+          "settings"
+        ],
+        "responses": {
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/InvalidRequest"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          },
+          "200": {
+            "description": "请求成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VersionInfo"
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/events": {
+      "get": {
+        "operationId": "watchEvents",
+        "summary": "接收查询失效通知",
+        "tags": [
+          "events"
+        ],
+        "responses": {
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/InvalidRequest"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          },
+          "200": {
+            "description": "SSE 仅通知查询失效，载荷采用 QueryInvalidation，不提供历史重放",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/agent/connect": {
+      "get": {
+        "operationId": "connectAgent",
+        "summary": "建立 Noise 加密 WebSocket",
+        "tags": [
+          "agent"
+        ],
+        "responses": {
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/InvalidRequest"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          },
+          "101": {
+            "description": "请求成功"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "security": [],
+        "description": "协议版本 1；握手后才登记或恢复身份。业务、迁移试连、公网地址探测连接各有明确目的，消息类型由独立 Agent 协议包定义。"
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "SessionCookie": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "opsd_session",
+        "description": "HttpOnly、SameSite=Lax，七天绝对有效期；写请求同时校验同源与 CSRF。"
+      }
+    },
+    "schemas": {
+      "AddressFamily": {
+        "type": "string",
+        "enum": [
+          "ipv4",
+          "ipv6"
+        ]
+      },
+      "ConfigScope": {
+        "type": "string",
+        "enum": [
+          "runtime",
+          "permanent",
+          "both"
+        ]
+      },
+      "OperationState": {
+        "type": "string",
+        "enum": [
+          "accepted",
+          "prepared",
+          "applying",
+          "awaiting_confirmation",
+          "reverting",
+          "attention_required",
+          "succeeded",
+          "rejected",
+          "failed",
+          "reverted",
+          "resolved_manually"
+        ]
+      },
+      "Backend": {
+        "type": "string",
+        "enum": [
+          "ufw",
+          "firewalld",
+          "nftables",
+          "none",
+          "conflict"
+        ]
+      },
+      "FieldError": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "field": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "field",
+          "message"
+        ]
+      },
+      "APIError": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "type": "string",
+            "enum": [
+              "invalid_request",
+              "unauthenticated",
+              "forbidden",
+              "csrf_rejected",
+              "conflict",
+              "node_busy",
+              "node_unavailable",
+              "dependency_unavailable",
+              "not_found",
+              "rate_limited",
+              "internal_error"
+            ]
+          },
+          "message": {
+            "type": "string",
+            "description": "简短中文错误信息"
+          },
+          "request_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "fields": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FieldError"
+            }
+          }
+        },
+        "required": [
+          "code",
+          "message",
+          "request_id"
+        ]
+      },
+      "Capability": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "supported": {
+            "type": "boolean"
+          },
+          "reason": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "supported"
+        ]
+      },
+      "Capabilities": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "read": {
+            "$ref": "#/components/schemas/Capability"
+          },
+          "edit_rules": {
+            "$ref": "#/components/schemas/Capability"
+          },
+          "reorder": {
+            "$ref": "#/components/schemas/Capability"
+          },
+          "default_policy": {
+            "$ref": "#/components/schemas/Capability"
+          },
+          "enable": {
+            "$ref": "#/components/schemas/Capability"
+          },
+          "install": {
+            "$ref": "#/components/schemas/Capability"
+          },
+          "docker_ports": {
+            "$ref": "#/components/schemas/Capability"
+          },
+          "peer_trust_host_ipv4": {
+            "$ref": "#/components/schemas/Capability"
+          },
+          "peer_trust_host_ipv6": {
+            "$ref": "#/components/schemas/Capability"
+          },
+          "peer_trust_docker_ipv4": {
+            "$ref": "#/components/schemas/Capability"
+          },
+          "peer_trust_docker_ipv6": {
+            "$ref": "#/components/schemas/Capability"
+          }
+        },
+        "required": [
+          "read",
+          "edit_rules",
+          "reorder",
+          "default_policy",
+          "enable",
+          "install",
+          "docker_ports",
+          "peer_trust_host_ipv4",
+          "peer_trust_host_ipv6",
+          "peer_trust_docker_ipv4",
+          "peer_trust_docker_ipv6"
+        ]
+      },
+      "Session": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "username": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "last_seen_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "remote_address": {
+            "type": "string"
+          },
+          "current": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "username",
+          "created_at",
+          "expires_at",
+          "last_seen_at",
+          "remote_address",
+          "current"
+        ]
+      },
+      "CurrentSession": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "session": {
+            "$ref": "#/components/schemas/Session"
+          },
+          "csrf_token": {
+            "type": "string"
+          },
+          "login_address": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "session",
+          "csrf_token",
+          "login_address"
+        ]
+      },
+      "SessionList": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Session"
+            }
+          }
+        },
+        "required": [
+          "items"
+        ]
+      },
+      "LoginRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "entrance": {
+            "type": "string"
+          },
+          "username": {
+            "type": "string"
+          },
+          "password": {
+            "type": "string",
+            "format": "password",
+            "writeOnly": true
+          }
+        },
+        "required": [
+          "entrance",
+          "username",
+          "password"
+        ]
+      },
+      "Node": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "name": {
+            "type": "string"
+          },
+          "public_key": {
+            "type": "string"
+          },
+          "revoked_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "connected": {
+            "type": "boolean"
+          },
+          "writable": {
+            "type": "boolean"
+          },
+          "last_seen_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "capabilities": {
+            "$ref": "#/components/schemas/Capabilities"
+          },
+          "local": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "public_key",
+          "connected",
+          "writable",
+          "local"
+        ]
+      },
+      "NodeList": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Node"
+            }
+          }
+        },
+        "required": [
+          "items"
+        ]
+      },
+      "NodePatch": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "name"
+        ]
+      },
+      "EnrollmentToken": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "consumed_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "revoked_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "created_at",
+          "expires_at"
+        ]
+      },
+      "EnrollmentTokenCreated": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "token": {
+            "type": "string"
+          },
+          "record": {
+            "$ref": "#/components/schemas/EnrollmentToken"
+          },
+          "control_address": {
+            "type": "string"
+          },
+          "control_public_key": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "token",
+          "record",
+          "control_address",
+          "control_public_key"
+        ]
+      },
+      "EnrollmentTokenList": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EnrollmentToken"
+            }
+          }
+        },
+        "required": [
+          "items"
+        ]
+      },
+      "AddressObservation": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "source": {
+            "type": "string",
+            "enum": [
+              "control",
+              "public_https"
+            ]
+          },
+          "address": {
+            "type": "string"
+          },
+          "observed_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "error": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "source",
+          "observed_at"
+        ]
+      },
+      "PublicAddress": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "family": {
+            "$ref": "#/components/schemas/AddressFamily"
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "auto",
+              "manual",
+              "disabled"
+            ]
+          },
+          "confirmed": {
+            "type": "string"
+          },
+          "confirmed_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "candidates": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AddressObservation"
+            }
+          },
+          "conflict": {
+            "type": "boolean"
+          },
+          "last_error": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "family",
+          "mode",
+          "candidates",
+          "conflict"
+        ]
+      },
+      "PublicAddresses": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "ipv4": {
+            "$ref": "#/components/schemas/PublicAddress"
+          },
+          "ipv6": {
+            "$ref": "#/components/schemas/PublicAddress"
+          }
+        },
+        "required": [
+          "ipv4",
+          "ipv6"
+        ]
+      },
+      "PublicAddressPatch": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "family": {
+            "$ref": "#/components/schemas/AddressFamily"
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "auto",
+              "manual",
+              "disabled"
+            ]
+          },
+          "address": {
+            "type": "string"
+          },
+          "clear": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "family",
+          "mode"
+        ]
+      },
+      "PublicAddressRefresh": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "families": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AddressFamily"
+            }
+          }
+        },
+        "required": [
+          "families"
+        ]
+      },
+      "PeerTrustPolicy": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "revision": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "enabled",
+          "revision"
+        ]
+      },
+      "PeerTrustPolicyPatch": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "enabled"
+        ]
+      },
+      "PeerTrustTarget": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "revision": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "ipv4": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "ipv6": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "revision",
+          "enabled",
+          "ipv4",
+          "ipv6"
+        ]
+      },
+      "PeerTrustScopeResult": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "family": {
+            "$ref": "#/components/schemas/AddressFamily"
+          },
+          "component": {
+            "type": "string",
+            "enum": [
+              "host",
+              "docker"
+            ]
+          },
+          "scope": {
+            "type": "string",
+            "enum": [
+              "runtime",
+              "permanent"
+            ]
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "applied",
+              "failed",
+              "unsupported",
+              "not_applicable",
+              "attention_required"
+            ]
+          },
+          "error": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "family",
+          "component",
+          "scope",
+          "state"
+        ]
+      },
+      "PeerTrustNodeStatus": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "node_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "target_revision": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "received_revision": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "applied_revision": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "results": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PeerTrustScopeResult"
+            }
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "node_id",
+          "target_revision",
+          "received_revision",
+          "applied_revision",
+          "results"
+        ]
+      },
+      "PeerTrustStatus": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "policy": {
+            "$ref": "#/components/schemas/PeerTrustPolicy"
+          },
+          "nodes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PeerTrustNodeStatus"
+            }
+          }
+        },
+        "required": [
+          "policy",
+          "nodes"
+        ]
+      },
+      "NativePosition": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "chain": {
+            "type": "string"
+          },
+          "zone": {
+            "type": "string"
+          },
+          "handle": {
+            "type": "string"
+          },
+          "position": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "priority": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "source_file": {
+            "type": "string"
+          }
+        },
+        "required": []
+      },
+      "RuleSpec": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "family": {
+            "$ref": "#/components/schemas/AddressFamily"
+          },
+          "source": {
+            "type": "string"
+          },
+          "destination": {
+            "type": "string"
+          },
+          "protocol": {
+            "type": "string",
+            "enum": [
+              "any",
+              "tcp",
+              "udp",
+              "icmp",
+              "icmpv6"
+            ]
+          },
+          "port": {
+            "type": "string"
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "allow",
+              "deny",
+              "reject"
+            ]
+          },
+          "comment": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "family",
+          "source",
+          "protocol",
+          "action"
+        ]
+      },
+      "FirewallRule": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "spec": {
+            "$ref": "#/components/schemas/RuleSpec"
+          },
+          "scope": {
+            "$ref": "#/components/schemas/ConfigScope"
+          },
+          "native": {
+            "$ref": "#/components/schemas/NativePosition"
+          },
+          "native_expression": {
+            "type": "string",
+            "description": "只供展示与基线比较，不作为命令执行"
+          },
+          "editable": {
+            "type": "boolean"
+          },
+          "readonly_reason": {
+            "type": "string"
+          },
+          "origin": {
+            "type": "string",
+            "enum": [
+              "native",
+              "opsd_peer_trust"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "scope",
+          "native",
+          "native_expression",
+          "editable",
+          "origin"
+        ]
+      },
+      "DefaultPolicy": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "family": {
+            "$ref": "#/components/schemas/AddressFamily"
+          },
+          "zone": {
+            "type": "string"
+          },
+          "scope": {
+            "$ref": "#/components/schemas/ConfigScope"
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "allow",
+              "deny",
+              "reject"
+            ]
+          },
+          "editable": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "family",
+          "scope",
+          "action",
+          "editable"
+        ]
+      },
+      "ReadError": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "scope": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "scope",
+          "code",
+          "message"
+        ]
+      },
+      "PortTarget": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "host_address": {
+            "type": "string"
+          },
+          "protocol": {
+            "type": "string",
+            "enum": [
+              "tcp",
+              "udp"
+            ]
+          },
+          "port": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 65535
+          }
+        },
+        "required": [
+          "host_address",
+          "protocol",
+          "port"
+        ]
+      },
+      "DockerPortPolicy": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "target": {
+            "$ref": "#/components/schemas/PortTarget"
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "unrestricted",
+              "allow_sources",
+              "deny_sources",
+              "block_all"
+            ]
+          },
+          "sources": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "target",
+          "mode",
+          "sources"
+        ]
+      },
+      "DockerPortState": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "policy": {
+            "$ref": "#/components/schemas/DockerPortPolicy"
+          },
+          "container_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "applied",
+              "missing",
+              "changed",
+              "unknown"
+            ]
+          },
+          "coverage": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PeerTrustScopeResult"
+            }
+          },
+          "peer_trust_exception": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "policy",
+          "container_ids",
+          "state",
+          "coverage",
+          "peer_trust_exception"
+        ]
+      },
+      "FirewallReadRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "family": {
+            "$ref": "#/components/schemas/AddressFamily"
+          },
+          "scope": {
+            "$ref": "#/components/schemas/ConfigScope"
+          }
+        },
+        "required": []
+      },
+      "FirewallState": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "collected_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "complete": {
+            "type": "boolean"
+          },
+          "backend": {
+            "$ref": "#/components/schemas/Backend"
+          },
+          "service_active": {
+            "type": "boolean"
+          },
+          "capabilities": {
+            "$ref": "#/components/schemas/Capabilities"
+          },
+          "rules": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FirewallRule"
+            }
+          },
+          "default_policies": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DefaultPolicy"
+            }
+          },
+          "docker_ports": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DockerPortState"
+            }
+          },
+          "errors": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReadError"
+            }
+          }
+        },
+        "required": [
+          "collected_at",
+          "complete",
+          "backend",
+          "capabilities",
+          "rules",
+          "default_policies",
+          "docker_ports",
+          "errors"
+        ]
+      },
+      "AddRule": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "add_rule"
+            ]
+          },
+          "scope": {
+            "$ref": "#/components/schemas/ConfigScope"
+          },
+          "rule": {
+            "$ref": "#/components/schemas/RuleSpec"
+          },
+          "before_rule_id": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "kind",
+          "scope",
+          "rule"
+        ]
+      },
+      "EditRule": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "edit_rule"
+            ]
+          },
+          "scope": {
+            "$ref": "#/components/schemas/ConfigScope"
+          },
+          "rule_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "rule": {
+            "$ref": "#/components/schemas/RuleSpec"
+          }
+        },
+        "required": [
+          "kind",
+          "scope",
+          "rule_id",
+          "rule"
+        ]
+      },
+      "DeleteRule": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "delete_rule"
+            ]
+          },
+          "scope": {
+            "$ref": "#/components/schemas/ConfigScope"
+          },
+          "rule_id": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "kind",
+          "scope",
+          "rule_id"
+        ]
+      },
+      "MoveRule": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "move_rule"
+            ]
+          },
+          "scope": {
+            "$ref": "#/components/schemas/ConfigScope"
+          },
+          "rule_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "before_rule_id": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "kind",
+          "scope",
+          "rule_id"
+        ]
+      },
+      "SetDefaultPolicy": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "set_default_policy"
+            ]
+          },
+          "scope": {
+            "$ref": "#/components/schemas/ConfigScope"
+          },
+          "family": {
+            "$ref": "#/components/schemas/AddressFamily"
+          },
+          "zone": {
+            "type": "string"
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "allow",
+              "deny",
+              "reject"
+            ]
+          },
+          "reload": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "kind",
+          "scope",
+          "family",
+          "action",
+          "reload"
+        ]
+      },
+      "SetFirewallEnabled": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "set_enabled"
+            ]
+          },
+          "enabled": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "kind",
+          "enabled"
+        ]
+      },
+      "SetDockerPortPolicy": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "set_docker_port_policy"
+            ]
+          },
+          "policy": {
+            "$ref": "#/components/schemas/DockerPortPolicy"
+          }
+        },
+        "required": [
+          "kind",
+          "policy"
+        ]
+      },
+      "FirewallChange": {
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/AddRule"
+          },
+          {
+            "$ref": "#/components/schemas/EditRule"
+          },
+          {
+            "$ref": "#/components/schemas/DeleteRule"
+          },
+          {
+            "$ref": "#/components/schemas/MoveRule"
+          },
+          {
+            "$ref": "#/components/schemas/SetDefaultPolicy"
+          },
+          {
+            "$ref": "#/components/schemas/SetFirewallEnabled"
+          },
+          {
+            "$ref": "#/components/schemas/SetDockerPortPolicy"
+          }
+        ],
+        "discriminator": {
+          "propertyName": "kind",
+          "mapping": {
+            "add_rule": "#/components/schemas/AddRule",
+            "edit_rule": "#/components/schemas/EditRule",
+            "delete_rule": "#/components/schemas/DeleteRule",
+            "move_rule": "#/components/schemas/MoveRule",
+            "set_default_policy": "#/components/schemas/SetDefaultPolicy",
+            "set_enabled": "#/components/schemas/SetFirewallEnabled",
+            "set_docker_port_policy": "#/components/schemas/SetDockerPortPolicy"
+          }
+        }
+      },
+      "PlanBaseline": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "rules": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FirewallRule"
+            }
+          },
+          "default_policies": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DefaultPolicy"
+            }
+          },
+          "docker_ports": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DockerPortState"
+            }
+          },
+          "service_active": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "rules",
+          "default_policies",
+          "docker_ports"
+        ]
+      },
+      "ChangePlan": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "node_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "contract_version": {
+            "type": "integer",
+            "enum": [
+              1
+            ]
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "backend": {
+            "$ref": "#/components/schemas/Backend"
+          },
+          "change": {
+            "$ref": "#/components/schemas/FirewallChange"
+          },
+          "baseline": {
+            "$ref": "#/components/schemas/PlanBaseline"
+          },
+          "affected_scopes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "requires_confirmation": {
+            "type": "boolean"
+          },
+          "executable": {
+            "type": "boolean"
+          },
+          "reasons": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "operation_id": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "id",
+          "node_id",
+          "contract_version",
+          "created_at",
+          "backend",
+          "change",
+          "baseline",
+          "affected_scopes",
+          "requires_confirmation",
+          "executable",
+          "reasons"
+        ]
+      },
+      "Container": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "name": {
+            "type": "string"
+          },
+          "image": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "ports": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PortTarget"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "image",
+          "state",
+          "status",
+          "ports"
+        ]
+      },
+      "ContainerList": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "collected_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "complete": {
+            "type": "boolean"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Container"
+            }
+          },
+          "errors": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReadError"
+            }
+          }
+        },
+        "required": [
+          "collected_at",
+          "complete",
+          "items",
+          "errors"
+        ]
+      },
+      "ContainerAction": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "start",
+              "stop",
+              "restart"
+            ]
+          }
+        },
+        "required": [
+          "action"
+        ]
+      },
+      "ContainerActionTarget": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "container_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "start",
+              "stop",
+              "restart"
+            ]
+          }
+        },
+        "required": [
+          "container_id",
+          "action"
+        ]
+      },
+      "DeploymentConfig": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "listen_address": {
+            "type": "string"
+          },
+          "port": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 65535
+          },
+          "public_address": {
+            "type": "string"
+          },
+          "data_dir": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "listen_address",
+          "port",
+          "public_address",
+          "data_dir"
+        ]
+      },
+      "EntranceChange": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "entrance_change"
+            ]
+          },
+          "config": {
+            "$ref": "#/components/schemas/DeploymentConfig"
+          }
+        },
+        "required": [
+          "kind",
+          "config"
+        ]
+      },
+      "DataDirectoryChange": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "data_directory_change"
+            ]
+          },
+          "data_dir": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "data_dir"
+        ]
+      },
+      "UpgradeChange": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "upgrade"
+            ]
+          },
+          "version": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "version"
+        ]
+      },
+      "DeploymentChange": {
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/EntranceChange"
+          },
+          {
+            "$ref": "#/components/schemas/DataDirectoryChange"
+          },
+          {
+            "$ref": "#/components/schemas/UpgradeChange"
+          }
+        ],
+        "discriminator": {
+          "propertyName": "kind",
+          "mapping": {
+            "entrance_change": "#/components/schemas/EntranceChange",
+            "data_directory_change": "#/components/schemas/DataDirectoryChange",
+            "upgrade": "#/components/schemas/UpgradeChange"
+          }
+        }
+      },
+      "DeploymentProgress": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "phase": {
+            "type": "string",
+            "enum": [
+              "preparing",
+              "awaiting_confirmation",
+              "committed",
+              "cleaning",
+              "finished",
+              "reverting",
+              "attention_required"
+            ]
+          },
+          "decision": {
+            "type": "string",
+            "enum": [
+              "undecided",
+              "commit",
+              "revert"
+            ]
+          },
+          "active_config": {
+            "$ref": "#/components/schemas/DeploymentConfig"
+          },
+          "candidate_config": {
+            "$ref": "#/components/schemas/DeploymentConfig"
+          },
+          "cleanup_complete": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "phase",
+          "decision",
+          "cleanup_complete"
+        ]
+      },
+      "OperationStep": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "completed",
+              "failed",
+              "unknown"
+            ]
+          },
+          "message": {
+            "type": "string"
+          },
+          "observed_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "name",
+          "state"
+        ]
+      },
+      "Operation": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "node_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "executor": {
+            "type": "string",
+            "enum": [
+              "agent",
+              "portainer"
+            ]
+          },
+          "subject": {
+            "type": "string",
+            "enum": [
+              "firewall",
+              "container",
+              "deployment",
+              "component"
+            ]
+          },
+          "state": {
+            "$ref": "#/components/schemas/OperationState"
+          },
+          "revision": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "result_pending_sync": {
+            "type": "boolean"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "confirmation_deadline": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "decision": {
+            "type": "string",
+            "enum": [
+              "undecided",
+              "keep",
+              "revert",
+              "commit"
+            ]
+          },
+          "plan_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "container_action": {
+            "$ref": "#/components/schemas/ContainerActionTarget"
+          },
+          "deployment": {
+            "$ref": "#/components/schemas/DeploymentProgress"
+          },
+          "steps": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OperationStep"
+            }
+          },
+          "error": {
+            "$ref": "#/components/schemas/APIError"
+          },
+          "last_observed_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "node_id",
+          "executor",
+          "subject",
+          "state",
+          "revision",
+          "result_pending_sync",
+          "created_at",
+          "updated_at",
+          "decision",
+          "steps"
+        ]
+      },
+      "OperationList": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Operation"
+            }
+          },
+          "next_cursor": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "items"
+        ]
+      },
+      "PendingOperations": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Operation"
+            }
+          }
+        },
+        "required": [
+          "items"
+        ]
+      },
+      "ResolveOperation": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "accept_current": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          }
+        },
+        "required": [
+          "accept_current"
+        ]
+      },
+      "Account": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "username": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "username"
+        ]
+      },
+      "AccountChange": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "current_password": {
+            "type": "string",
+            "format": "password",
+            "writeOnly": true
+          },
+          "username": {
+            "type": "string"
+          },
+          "password": {
+            "type": "string",
+            "format": "password",
+            "writeOnly": true
+          },
+          "entrance": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "current_password"
+        ]
+      },
+      "AccountChanged": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "login_address": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "login_address"
+        ]
+      },
+      "PortainerSettings": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "configured": {
+            "type": "boolean"
+          },
+          "managed": {
+            "type": "boolean"
+          },
+          "address": {
+            "type": "string"
+          },
+          "connected": {
+            "type": "boolean"
+          },
+          "version": {
+            "type": "string"
+          },
+          "error": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "configured",
+          "managed",
+          "connected"
+        ]
+      },
+      "ConnectPortainer": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "connect"
+            ]
+          },
+          "address": {
+            "type": "string"
+          },
+          "api_token": {
+            "type": "string",
+            "writeOnly": true
+          }
+        },
+        "required": [
+          "kind",
+          "address",
+          "api_token"
+        ]
+      },
+      "CreatePortainer": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "create"
+            ]
+          },
+          "address": {
+            "type": "string"
+          },
+          "admin_username": {
+            "type": "string"
+          },
+          "admin_password": {
+            "type": "string",
+            "writeOnly": true
+          },
+          "version": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "address",
+          "version"
+        ]
+      },
+      "PortainerChange": {
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/ConnectPortainer"
+          },
+          {
+            "$ref": "#/components/schemas/CreatePortainer"
+          }
+        ],
+        "discriminator": {
+          "propertyName": "kind",
+          "mapping": {
+            "connect": "#/components/schemas/ConnectPortainer",
+            "create": "#/components/schemas/CreatePortainer"
+          }
+        }
+      },
+      "PortainerBinding": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "node_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "environment_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "managed_edge": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "node_id",
+          "environment_id",
+          "managed_edge"
+        ]
+      },
+      "PortainerBindings": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PortainerBinding"
+            }
+          }
+        },
+        "required": [
+          "items"
+        ]
+      },
+      "PortainerBindRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "environment_id": {
+            "type": "integer",
+            "format": "int64"
+          }
+        },
+        "required": [
+          "environment_id"
+        ]
+      },
+      "ComponentAction": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "start",
+              "stop",
+              "remove",
+              "upgrade"
+            ]
+          },
+          "version": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "action"
+        ]
+      },
+      "FirewallInstallRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "backend": {
+            "type": "string",
+            "enum": [
+              "ufw",
+              "firewalld",
+              "nftables"
+            ]
+          }
+        },
+        "required": [
+          "backend"
+        ]
+      },
+      "VersionInfo": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "control_version": {
+            "type": "string"
+          },
+          "frontend_version": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "control_version",
+          "frontend_version"
+        ]
+      },
+      "QueryInvalidation": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "resource": {
+            "type": "string",
+            "enum": [
+              "nodes",
+              "firewall",
+              "containers",
+              "operations",
+              "public_addresses",
+              "peer_trust",
+              "settings"
+            ]
+          },
+          "node_id": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "resource"
+        ]
+      }
+    },
+    "responses": {
+      "Unauthorized": {
+        "description": "会话失效",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/APIError"
+            }
+          }
+        }
+      },
+      "Forbidden": {
+        "description": "权限、同源或 CSRF 拒绝",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/APIError"
+            }
+          }
+        }
+      },
+      "NotFound": {
+        "description": "资源或入口不存在",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/APIError"
+            }
+          }
+        }
+      },
+      "Conflict": {
+        "description": "状态冲突或节点写入占用",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/APIError"
+            }
+          }
+        }
+      },
+      "InvalidRequest": {
+        "description": "参数错误",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/APIError"
+            }
+          }
+        }
+      },
+      "Unavailable": {
+        "description": "节点或依赖不可用",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/APIError"
+            }
+          }
+        }
+      },
+      "InternalError": {
+        "description": "内部处理失败",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/APIError"
+            }
+          }
+        }
+      }
+    }
+  }
+}

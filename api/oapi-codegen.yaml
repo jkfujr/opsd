@@ -1,0 +1,24 @@
+package: httpapi
+generate:
+  models: true
+  std-http-server: true
+  strict-server: true
+output: internal/httpapi/api.gen.go
+output-options:
+  skip-prune: true
+  include-operation-ids:
+    - login
+    - logout
+    - getSession
+    - listSessions
+    - revokeSession
+    - listNodes
+    - getNode
+    - renameNode
+    - revokeNode
+    - listEnrollmentTokens
+    - createEnrollmentToken
+    - revokeEnrollmentToken
+    - getAccount
+    - changeAccount
+    - getVersion
