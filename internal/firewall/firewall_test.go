@@ -135,6 +135,127 @@ func TestUFWGlobalEnableStaysReadonly(t *testing.T) {
 	}
 }
 
+func TestUFWRejectsImplicitRuleReplacement(t *testing.T) {
+	for _, field := range []string{"action", "comment"} {
+		t.Run(field, func(t *testing.T) {
+			u := &UFW{Host: ufwFixture(t)}
+			s, err := u.Read(t.Context())
+			if err != nil {
+				t.Fatal(err)
+			}
+			var target protocol.RuleSpec
+			for _, r := range s.Rules {
+				if r.Scope == protocol.Permanent && r.Spec != nil {
+					target = *r.Spec
+					break
+				}
+			}
+			if field == "action" {
+				target.Action = "deny"
+			} else {
+				target.Comment = "修改备注"
+			}
+			change := protocol.FirewallChange{Kind: "add_rule", Scope: protocol.Both, Rule: &target}
+			if _, err := u.Prepare(t.Context(), planFor(s, change)); Code(err) != "conflict" {
+				t.Fatalf("新增不能隐式替换已有规则：%v", err)
+			}
+		})
+	}
+}
+
+func TestUFWNativeCommandSyntax(t *testing.T) {
+	h := ufwFixture(t)
+	previous := h.run
+	var command []string
+	h.run = func(name string, args ...string) ([]byte, error) {
+		if name == "ufw" {
+			command = append([]string{}, args...)
+			return nil, nil
+		}
+		return previous(name, args...)
+	}
+	rule := &protocol.RuleSpec{Family: protocol.IPv4, Source: "192.0.2.0/24", Protocol: "tcp", Port: "49153", Action: "allow"}
+	step := Step{Forward: protocol.FirewallChange{Kind: "add_rule", Rule: rule}}
+	if err := (&UFW{Host: h}).Write(t.Context(), step, false); err != nil {
+		t.Fatal(err)
+	}
+	if len(command) == 0 || command[0] != "allow" {
+		t.Fatalf("新增规则不接受 --force 前缀：%v", command)
+	}
+}
+
+func TestUFWMetadataComments(t *testing.T) {
+	h := ufwFixture(t)
+	h.files["/etc/ufw/user.rules"] = []byte(strings.Replace(string(h.files["/etc/ufw/user.rules"]), "192.0.2.0/24 in\n", "192.0.2.0/24 in comment=6f7073642d636f6e736f6c65\n", 1))
+	u := &UFW{Host: h}
+	s, err := u.Read(t.Context())
+	if err != nil || !s.Capabilities.EditRules.Supported {
+		t.Fatalf("UFW 备注元数据不应造成两侧冲突：%+v %v", s.Capabilities.EditRules, err)
+	}
+	var old protocol.FirewallRule
+	comments := 0
+	for _, r := range s.Rules {
+		if r.Spec != nil && r.Spec.Comment == "opsd-console" {
+			comments++
+			if r.Scope == protocol.Permanent {
+				old = r
+			}
+		}
+	}
+	if comments != 2 {
+		t.Fatal("备注应绑定到同一原生规则的运行与永久读数")
+	}
+	change := protocol.FirewallChange{Kind: "delete_rule", RuleID: old.ID, Scope: protocol.Both}
+	steps, err := u.Prepare(t.Context(), planFor(s, change))
+	if err != nil || len(steps) != 1 || len(steps[0].After.Rules) != 2 {
+		t.Fatalf("带备注规则必须在两侧同时删除：%+v %v", steps, err)
+	}
+	previous := h.run
+	h.run = func(name string, args ...string) ([]byte, error) {
+		v, err := previous(name, args...)
+		return []byte(strings.Replace(string(v), "--dport 22 -j", "--dport 22 -m comment --comment external -j", 1)), err
+	}
+	s, err = u.Read(t.Context())
+	if err != nil || s.Capabilities.EditRules.Supported {
+		t.Fatal("运行规则中的外部备注不能被永久元数据覆盖")
+	}
+}
+
+func TestUFWDefaultInitTemplates(t *testing.T) {
+	h := ufwFixture(t)
+	for _, name := range []string{"before.init", "after.init"} {
+		h.files["/etc/ufw/"+name] = []byte(fmt.Sprintf(`#!/bin/sh
+# UFW 安装生成的空钩子模板。
+set -e
+
+case "$1" in
+start)
+    # 启动钩子为空。
+    ;;
+stop)
+    ;;
+status)
+    ;;
+flush-all)
+    ;;
+*)
+    echo "'$1' not supported"
+    echo "Usage: %s {start|stop|flush-all|status}"
+    ;;
+esac
+`, name))
+	}
+	s, err := (&UFW{Host: h}).Read(t.Context())
+	if err != nil || !s.Capabilities.EditRules.Supported {
+		t.Fatalf("默认空钩子不应阻止编辑：%+v %v", s.Capabilities.EditRules, err)
+	}
+	h.files["/etc/ufw/before.init"] = []byte(strings.Replace(string(h.files["/etc/ufw/before.init"]), "start)\n", "start)\n    iptables -F\n", 1))
+	s, err = (&UFW{Host: h}).Read(t.Context())
+	if err != nil || s.Capabilities.EditRules.Supported {
+		t.Fatalf("加入实际命令的钩子必须只读：%+v %v", s.Capabilities.EditRules, err)
+	}
+}
+
 func TestUFWUnsafeUserConfigurationRemainsReadonly(t *testing.T) {
 	for _, custom := range []string{"tuple", "raw", "script"} {
 		t.Run(custom, func(t *testing.T) {

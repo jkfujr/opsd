@@ -69,6 +69,7 @@ func (u *UFW) Read(ctx context.Context) (protocol.FirewallState, error) {
 			s.DefaultPolicies = append(s.DefaultPolicies, protocol.DefaultPolicy{Family: family, Scope: protocol.Runtime, Action: actualPolicy, Editable: true})
 		}
 	}
+	ufwBindComments(running, permanent)
 	s.Rules = append(running, permanent...)
 	s.Capabilities.Read = allow()
 	s.Capabilities.EditRules = allow()
@@ -86,12 +87,8 @@ func (u *UFW) Read(ctx context.Context) (protocol.FirewallState, error) {
 	}
 	for _, path := range []string{"/etc/ufw/before.init", "/etc/ufw/after.init"} {
 		if data, e := u.Host.Read(path); e == nil {
-			for _, line := range strings.Split(string(data), "\n") {
-				line = strings.TrimSpace(line)
-				if line != "" && !strings.HasPrefix(line, "#") {
-					writeReason = "存在自定义初始化脚本，暂不开放写入"
-					break
-				}
+			if !ufwInitSupported(string(data), strings.TrimPrefix(path, "/etc/ufw/")) {
+				writeReason = "存在自定义初始化脚本，暂不开放写入"
 			}
 		}
 	}
@@ -112,6 +109,64 @@ func (u *UFW) Read(ctx context.Context) (protocol.FirewallState, error) {
 	}
 	bindRuleReferences(&s)
 	return s, nil
+}
+
+func ufwInitSupported(text, name string) bool {
+	lines := []string{}
+	for _, line := range strings.Split(text, "\n") {
+		line = strings.TrimSpace(line)
+		if line != "" && !strings.HasPrefix(line, "#") {
+			lines = append(lines, line)
+		}
+	}
+	if len(lines) == 0 {
+		return true
+	}
+	// 默认模板的四个钩子均为空；任何额外命令仍按自定义脚本处理。
+	expected := `set -e
+case "$1" in
+start)
+;;
+stop)
+;;
+status)
+;;
+flush-all)
+;;
+*)
+echo "'$1' not supported"
+echo "Usage: ` + name + ` {start|stop|flush-all|status}"
+;;
+esac`
+	return strings.Join(lines, "\n") == expected
+}
+
+func ufwBindComments(running, permanent []protocol.FirewallRule) {
+	groups := map[string][]protocol.FirewallRule{}
+	for _, r := range permanent {
+		groups[r.Native.Chain] = append(groups[r.Native.Chain], r)
+	}
+	positions := map[string]int{}
+	for i := range running {
+		r := &running[i]
+		if r.Native.Chain != "ufw-user-input" && r.Native.Chain != "ufw6-user-input" {
+			continue
+		}
+		position := positions[r.Native.Chain]
+		positions[r.Native.Chain]++
+		group := groups[r.Native.Chain]
+		if position >= len(group) || group[position].Spec == nil || r.Spec == nil {
+			continue
+		}
+		// UFW 将备注存入永久元数据；仅在原生条件和顺序吻合时关联备注。
+		expected := *group[position].Spec
+		expected.Comment = ""
+		if specEqual(r.Spec, &expected) {
+			spec := *r.Spec
+			spec.Comment = group[position].Spec.Comment
+			r.Spec = &spec
+		}
+	}
 }
 
 func parseUFWFile(text string, family protocol.AddressFamily, path string) []protocol.FirewallRule {
@@ -159,7 +214,9 @@ func parseUFWFile(text string, family protocol.AddressFamily, path string) []pro
 			if validExtras && validateChange(protocol.FirewallChange{Rule: &spec}) == nil && spec.Protocol != "icmp" && spec.Protocol != "icmpv6" {
 				if len(kernel) == 1 {
 					actual, ok := parseIPTablesRule(kernel[0], family)
-					if ok && specEqual(actual, &spec) {
+					expected := spec
+					expected.Comment = ""
+					if ok && specEqual(actual, &expected) {
 						r.Spec = &spec
 						r.NativeExpression = line
 						r.Editable = true
@@ -345,6 +402,25 @@ func (u *UFW) Prepare(ctx context.Context, p protocol.ChangePlan) ([]Step, error
 		if p.Change.Rule != nil && (p.Change.Rule.Protocol == "icmp" || p.Change.Rule.Protocol == "icmpv6") {
 			return nil, Unsupported("UFW 命令接口不能无损编辑此 ICMP 规则")
 		}
+		var old *protocol.FirewallRule
+		if p.Change.RuleID != "" {
+			old, e = findRule(s, p.Change.RuleID)
+			if e != nil {
+				return nil, e
+			}
+		}
+		// UFW 将同条件的动作或备注变化解释为替换，必须在生成步骤前拒绝隐式覆盖。
+		for _, r := range s.Rules {
+			if r.Scope != protocol.Permanent || old != nil && specEqual(r.Spec, old.Spec) {
+				continue
+			}
+			if old != nil && ufwSameConditions(r.Spec, old.Spec) {
+				return nil, Conflict("原规则的匹配条件不唯一，不能独立修改")
+			}
+			if ufwSameConditions(r.Spec, p.Change.Rule) {
+				return nil, Conflict("已存在相同匹配条件的规则，请编辑原规则")
+			}
+		}
 		steps, e := ruleSteps(s, p, sel, before)
 		if e != nil {
 			return nil, e
@@ -365,12 +441,21 @@ func (u *UFW) Prepare(ctx context.Context, p protocol.ChangePlan) ([]Step, error
 	return nil, Unsupported("UFW 不支持此动作")
 }
 
+func ufwSameConditions(a, b *protocol.RuleSpec) bool {
+	if a == nil || b == nil {
+		return false
+	}
+	value := *a
+	value.Action, value.Comment = b.Action, b.Comment
+	return specEqual(&value, b)
+}
+
 func (u *UFW) Write(ctx context.Context, step Step, reverse bool) error {
 	c, anchor := step.Forward, step.ForwardAnchor
 	if reverse {
 		c, anchor = step.Reverse, step.ReverseAnchor
 	}
-	args := []string{"--force"}
+	args := []string{}
 	switch c.Kind {
 	case "set_default_policy":
 		args = append(args, "default", c.Action, "incoming")
@@ -395,7 +480,7 @@ func (u *UFW) Write(ctx context.Context, step Step, reverse bool) error {
 			if count != 1 {
 				return Conflict("待删除规则不唯一")
 			}
-			args = append(args, "delete")
+			args = append(args, "--force", "delete")
 		} else if anchor != nil {
 			want := *anchor
 			want.Scope = protocol.Permanent
