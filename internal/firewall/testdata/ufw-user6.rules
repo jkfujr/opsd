@@ -1,0 +1,7 @@
+*filter
+:ufw6-user-input - [0:0]
+### RULES ###
+### tuple ### allow tcp 443 ::/0 any 2001:db8::/32 in
+-A ufw6-user-input -s 2001:db8::/32 -p tcp --dport 443 -j ACCEPT
+### END RULES ###
+COMMIT

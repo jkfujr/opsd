@@ -14,7 +14,9 @@ import (
 
 	"github.com/coder/websocket"
 	"github.com/opsd-labs/opsd/internal/buildinfo"
+	"github.com/opsd-labs/opsd/internal/firewall"
 	"github.com/opsd-labs/opsd/internal/identity"
+	"github.com/opsd-labs/opsd/internal/operations"
 	"github.com/opsd-labs/opsd/internal/protocol"
 	"github.com/opsd-labs/opsd/internal/transport"
 )
@@ -30,6 +32,10 @@ func UnsupportedCapabilities() protocol.Capabilities {
 
 // Run 在每次重连时重新加载已持久确认的身份，不依据一次响应丢失重新登记。
 func Run(ctx context.Context, db *sql.DB, ready func()) error {
+	return RunWithServices(ctx, db, ready, NewServices(db))
+}
+
+func RunWithServices(ctx context.Context, db *sql.DB, ready func(), services *Services) error {
 	attempts := 0
 	for {
 		value, err := Load(ctx, db)
@@ -37,7 +43,7 @@ func Run(ctx context.Context, db *sql.DB, ready func()) error {
 			return err
 		}
 		connected := false
-		err = connect(ctx, db, value, func() {
+		err = connect(ctx, db, value, services, func() {
 			attempts = 0
 			connected = true
 			if ready != nil {
@@ -70,7 +76,7 @@ func Run(ctx context.Context, db *sql.DB, ready func()) error {
 	}
 }
 
-func connect(ctx context.Context, db *sql.DB, value Identity, ready func()) error {
+func connect(ctx context.Context, db *sql.DB, value Identity, services *Services, ready func()) error {
 	dialCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	socket, response, err := websocket.Dial(dialCtx, value.ControlURL+"/api/v1/agent/connect", &websocket.DialOptions{HTTPClient: &http.Client{CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}})
 	cancel()
@@ -90,8 +96,18 @@ func connect(ctx context.Context, db *sql.DB, value Identity, ready func()) erro
 		return err
 	}
 	requestID := identity.Random()
+	pending, err := services.Engine.Store.Pending(ctx)
+	if err != nil {
+		return err
+	}
+	capabilities := UnsupportedCapabilities()
+	capCtx, cancelRead := context.WithTimeout(ctx, 5*time.Second)
+	if state, e := services.Engine.Manager.Read(capCtx); e == nil {
+		capabilities = state.Capabilities
+	}
+	cancelRead()
 	registerCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
-	err = channel.Send(registerCtx, protocol.Message{RequestID: requestID, Payload: &protocol.SessionOpen{Hostname: hostname, Purpose: "business", EnrollmentToken: value.EnrollmentToken, AgentVersion: buildinfo.Version, OS: runtime.GOOS, Arch: runtime.GOARCH, Capabilities: UnsupportedCapabilities(), PendingOperationIDs: []string{}}})
+	err = channel.Send(registerCtx, protocol.Message{RequestID: requestID, Payload: &protocol.SessionOpen{Hostname: hostname, Purpose: "business", EnrollmentToken: value.EnrollmentToken, AgentVersion: buildinfo.Version, OS: runtime.GOOS, Arch: runtime.GOARCH, Capabilities: capabilities, PendingOperationIDs: pending}})
 	if err != nil {
 		cancel()
 		return err
@@ -113,9 +129,6 @@ func connect(ctx context.Context, db *sql.DB, value Identity, ready func()) erro
 	}
 	if value.NodeID != "" && value.NodeID != accepted.NodeID {
 		return &PermanentError{Message: "控制端返回了不同节点身份"}
-	}
-	if len(accepted.PendingOperationIDs) != 0 {
-		return &PermanentError{Message: "存在当前版本无法解释的未决操作，已停止接入"}
 	}
 	if _, err := db.ExecContext(ctx, "UPDATE agent_identity SET node_id=?,enrollment_token='' WHERE id=1", accepted.NodeID); err != nil {
 		return err
@@ -149,6 +162,45 @@ func connect(ctx context.Context, db *sql.DB, value Identity, ready func()) erro
 	responseDeadline.Stop()
 	defer responseDeadline.Stop()
 	awaiting := ""
+	statusTicker := time.NewTicker(time.Second)
+	defer statusTicker.Stop()
+	watched := map[string]uint64{}
+	for _, id := range pending {
+		watched[id] = 0
+	}
+	watch := make(chan string, 8)
+	slots := make(chan struct{}, 4)
+	respond := func(message protocol.Message) {
+		defer func() { <-slots }()
+		requestCtx, cancel := context.WithTimeout(readCtx, 30*time.Second)
+		defer cancel()
+		payload, err := services.Handle(requestCtx, message.Payload)
+		if err != nil {
+			code := firewall.Code(err)
+			if errors.Is(err, operations.ErrBusy) {
+				code = "node_busy"
+			}
+			payload = &protocol.RequestFailed{Error: protocol.Error{Code: code, Message: err.Error()}}
+		} else {
+			switch result := payload.(type) {
+			case *protocol.OperationUpdated:
+				select {
+				case watch <- result.Record.ID:
+				default:
+				}
+			case *protocol.OperationReconcileResult:
+				if !operations.Terminal(result.Record.State) {
+					select {
+					case watch <- result.Record.ID:
+					default:
+					}
+				}
+			}
+		}
+		sendCtx, cancelSend := context.WithTimeout(readCtx, 10*time.Second)
+		defer cancelSend()
+		channel.Send(sendCtx, protocol.Message{RequestID: identity.Random(), ReplyTo: message.RequestID, Payload: payload})
+	}
 	for {
 		select {
 		case <-ctx.Done():
@@ -169,11 +221,40 @@ func connect(ctx context.Context, db *sql.DB, value Identity, ready func()) erro
 			case *protocol.RequestFailed:
 				return &PermanentError{Message: body.Error.Message}
 			default:
-				deadline, cancel := context.WithTimeout(ctx, 10*time.Second)
-				err := channel.Send(deadline, protocol.Message{RequestID: identity.Random(), ReplyTo: value.message.RequestID, Payload: &protocol.RequestFailed{Error: protocol.Error{Code: "unsupported_message", Message: "当前版本未实现此消息"}}})
-				cancel()
+				if value.message.ReplyTo != "" {
+					continue
+				}
+				select {
+				case slots <- struct{}{}:
+					go respond(value.message)
+				default:
+					deadline, cancel := context.WithTimeout(ctx, 10*time.Second)
+					err := channel.Send(deadline, protocol.Message{RequestID: identity.Random(), ReplyTo: value.message.RequestID, Payload: &protocol.RequestFailed{Error: protocol.Error{Code: "node_busy", Message: "节点读取请求过多，请稍后重试"}}})
+					cancel()
+					if err != nil {
+						return err
+					}
+				}
+			}
+		case id := <-watch:
+			watched[id] = 0
+		case <-statusTicker.C:
+			for id, revision := range watched {
+				record, err := services.Engine.Record(readCtx, id)
 				if err != nil {
 					return err
+				}
+				if record.Revision != revision {
+					sendCtx, cancel := context.WithTimeout(readCtx, 10*time.Second)
+					err = channel.Send(sendCtx, protocol.Message{RequestID: identity.Random(), Payload: &protocol.OperationUpdated{Record: record}})
+					cancel()
+					if err != nil {
+						return err
+					}
+					watched[id] = record.Revision
+				}
+				if operations.Terminal(record.State) {
+					delete(watched, id)
 				}
 			}
 		case <-ticker.C:

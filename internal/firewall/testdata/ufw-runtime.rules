@@ -1,0 +1,8 @@
+*filter
+:INPUT DROP [0:0]
+:ufw-user-input - [0:0]
+-A INPUT -j ufw-before-input
+-A ufw-before-input -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+-A ufw-user-input -s 192.0.2.0/24 -p tcp -m tcp --dport 22 -j ACCEPT
+-A ufw-user-input -p udp -m udp --dport 53 -j DROP
+COMMIT

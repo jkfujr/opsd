@@ -138,11 +138,33 @@ func (*OperationReconcileResult) isPayload() {}
 const KindOperationConfirm Kind = "operation.confirm"
 
 type OperationConfirm struct {
-	OperationID string `json:"operation_id"`
+	OperationID      string `json:"operation_id"`
+	ExpectedRevision uint64 `json:"expected_revision"`
 }
 
 func (*OperationConfirm) Kind() Kind { return KindOperationConfirm }
 func (*OperationConfirm) isPayload() {}
+
+const KindOperationRecover Kind = "operation.recover"
+
+type OperationRecover struct {
+	OperationID      string `json:"operation_id"`
+	ExpectedRevision uint64 `json:"expected_revision"`
+}
+
+func (*OperationRecover) Kind() Kind { return KindOperationRecover }
+func (*OperationRecover) isPayload() {}
+
+const KindOperationResolve Kind = "operation.resolve"
+
+type OperationResolve struct {
+	OperationID      string `json:"operation_id"`
+	ExpectedRevision uint64 `json:"expected_revision"`
+	AcceptCurrent    bool   `json:"accept_current"`
+}
+
+func (*OperationResolve) Kind() Kind { return KindOperationResolve }
+func (*OperationResolve) isPayload() {}
 
 const KindOperationUpdated Kind = "operation.update"
 

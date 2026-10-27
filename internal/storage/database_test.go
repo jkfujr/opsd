@@ -33,7 +33,7 @@ func TestOpenAndReopen(t *testing.T) {
 						t.Fatal(err)
 					}
 				}
-				if count != 2 || version != 2 || sync != 2 || foreign != 1 || mode != "wal" {
+				if count != 3 || version != 3 || sync != 2 || foreign != 1 || mode != "wal" {
 					t.Fatalf("数据库配置或迁移错误：记录=%d 版本=%d 同步=%d 外键=%d 日志=%s", count, version, sync, foreign, mode)
 				}
 				db.Close()

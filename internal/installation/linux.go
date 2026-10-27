@@ -166,7 +166,7 @@ func LinuxHooks(instancePath, controlSource, agentSource string) Hooks {
 			if err := ControlOwnership(instance, instancePath); err != nil {
 				return err
 			}
-			if err := Command(ctx, "systemctl", "enable", "opsd.service", "opsd-agent.service"); err != nil {
+			if err := Command(ctx, "systemctl", "enable", "opsd.service", "opsd-agent.service", "opsd-recover.service"); err != nil {
 				return err
 			}
 			if err := Command(ctx, "systemctl", "start", "opsd.service"); err != nil {
@@ -225,6 +225,14 @@ func ControlOwnership(instance localstate.Instance, instancePath string) error {
 }
 
 func RegisterAgent(dataDir, binary string) error {
-	unit := "[Unit]\nDescription=OPSD 节点\nAfter=network-online.target\nWants=network-online.target\n\n[Service]\nType=notify\nNotifyAccess=main\nUser=root\nUMask=0077\nExecStart=" + quote(binary) + " run --data-dir " + quote(dataDir) + "\nRestart=on-failure\nRestartSec=3\nRestartPreventExitStatus=2\nTimeoutStartSec=60\n\n[Install]\nWantedBy=multi-user.target\n"
-	return os.WriteFile("/etc/systemd/system/opsd-agent.service", []byte(unit), 0644)
+	unit := "[Unit]\nDescription=OPSD 节点\nAfter=network-online.target opsd-recover.service\nWants=network-online.target opsd-recover.service\n\n[Service]\nType=notify\nNotifyAccess=main\nUser=root\nUMask=0077\nExecStart=" + quote(binary) + " run --data-dir " + quote(dataDir) + "\nRestart=on-failure\nRestartSec=3\nRestartPreventExitStatus=2\nTimeoutStartSec=60\n\n[Install]\nWantedBy=multi-user.target\n"
+	if err := os.WriteFile("/etc/systemd/system/opsd-agent.service", []byte(unit), 0644); err != nil {
+		return err
+	}
+	worker := "[Unit]\nDescription=OPSD 本机操作 %i\nAfter=ufw.service firewalld.service nftables.service\n\n[Service]\nType=exec\nUser=root\nUMask=0077\nExecStart=" + quote(binary) + " execute --data-dir " + quote(dataDir) + " --operation-id %i\nRestart=on-failure\nRestartSec=3\nKillMode=control-group\nTimeoutStopSec=30\n"
+	if err := os.WriteFile("/etc/systemd/system/opsd-operation@.service", []byte(worker), 0644); err != nil {
+		return err
+	}
+	recovery := "[Unit]\nDescription=OPSD 开机操作恢复\nAfter=ufw.service firewalld.service nftables.service\nBefore=opsd-agent.service\n\n[Service]\nType=oneshot\nUser=root\nUMask=0077\nExecStart=" + quote(binary) + " recover --data-dir " + quote(dataDir) + "\nKillMode=control-group\nTimeoutStartSec=infinity\nTimeoutStopSec=30\n\n[Install]\nWantedBy=multi-user.target\n"
+	return os.WriteFile("/etc/systemd/system/opsd-recover.service", []byte(recovery), 0644)
 }

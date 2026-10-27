@@ -22,3 +22,14 @@ output-options:
     - getAccount
     - changeAccount
     - getVersion
+    - readFirewall
+    - previewFirewallChange
+    - getFirewallPlan
+    - applyFirewallPlan
+    - listOperations
+    - listPendingOperations
+    - getOperation
+    - confirmOperation
+    - recoverOperation
+    - resolveOperation
+    - installFirewall

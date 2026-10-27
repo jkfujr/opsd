@@ -1,0 +1,12 @@
+public (active)
+  target: default
+  interfaces: eth0
+  sources:
+  services: ssh
+  ports: 8080/tcp
+  protocols:
+  forward: no
+  masquerade: no
+  rich rules:
+    rule family="ipv4" priority="-10" source address="192.0.2.0/24" port port="443" protocol="tcp" accept
+    rule family="ipv6" source ipset="外部集合" drop

@@ -30,6 +30,10 @@ func newPayload(kind Kind) (Payload, error) {
 		return &OperationReconcileResult{}, nil
 	case KindOperationConfirm:
 		return &OperationConfirm{}, nil
+	case KindOperationRecover:
+		return &OperationRecover{}, nil
+	case KindOperationResolve:
+		return &OperationResolve{}, nil
 	case KindOperationUpdated:
 		return &OperationUpdated{}, nil
 	case KindDeploymentPrepare:

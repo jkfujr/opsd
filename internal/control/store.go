@@ -149,6 +149,10 @@ func (s *Server) nodes(ctx context.Context) ([]httpapi.Node, error) {
 		conn := s.connections[node.Id]
 		node.Connected = conn != nil && !revoked.Valid
 		node.Writable = node.Connected && conn.writable
+		if node.Connected && conn.blocked != "" {
+			reason := conn.blocked
+			node.WriteBlockedReason = &reason
+		}
 		s.mu.Unlock()
 		nodes = append(nodes, node)
 	}

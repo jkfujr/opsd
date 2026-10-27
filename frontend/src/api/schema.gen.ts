@@ -724,6 +724,7 @@ export interface components {
             last_seen_at?: string;
             capabilities?: components["schemas"]["Capabilities"];
             local: boolean;
+            write_blocked_reason?: string;
         };
         NodeList: {
             items: components["schemas"]["Node"][];
@@ -865,6 +866,7 @@ export interface components {
             /** @enum {string} */
             action: "allow" | "deny" | "reject";
             editable: boolean;
+            chain?: string;
         };
         ReadError: {
             scope: string;
@@ -916,6 +918,9 @@ export interface components {
             scope: components["schemas"]["ConfigScope"];
             rule: components["schemas"]["RuleSpec"];
             before_rule_id?: string;
+            zone?: string;
+            chain?: string;
+            priority?: number;
         };
         EditRule: {
             /**
@@ -926,6 +931,9 @@ export interface components {
             scope: components["schemas"]["ConfigScope"];
             rule_id: string;
             rule: components["schemas"]["RuleSpec"];
+            zone?: string;
+            chain?: string;
+            priority?: number;
         };
         DeleteRule: {
             /**
@@ -935,6 +943,8 @@ export interface components {
             kind: "delete_rule";
             scope: components["schemas"]["ConfigScope"];
             rule_id: string;
+            zone?: string;
+            chain?: string;
         };
         MoveRule: {
             /**
@@ -945,6 +955,9 @@ export interface components {
             scope: components["schemas"]["ConfigScope"];
             rule_id: string;
             before_rule_id?: string;
+            zone?: string;
+            chain?: string;
+            priority?: number;
         };
         SetDefaultPolicy: {
             /**
@@ -956,8 +969,9 @@ export interface components {
             family: components["schemas"]["AddressFamily"];
             zone?: string;
             /** @enum {string} */
-            action: "allow" | "deny" | "reject";
+            action: "allow" | "deny" | "reject" | "default";
             reload: boolean;
+            chain?: string;
         };
         SetFirewallEnabled: {
             /**
@@ -1065,7 +1079,7 @@ export interface components {
         OperationStep: {
             name: string;
             /** @enum {string} */
-            state: "pending" | "completed" | "failed" | "unknown";
+            state: "pending" | "applying" | "applied" | "reverting" | "reverted" | "completed" | "failed" | "unknown";
             message?: string;
             /** Format: date-time */
             observed_at?: string;
@@ -1096,6 +1110,8 @@ export interface components {
             error?: components["schemas"]["APIError"];
             /** Format: date-time */
             last_observed_at?: string;
+            /** Format: int64 */
+            confirmation_remaining_seconds?: number;
         };
         OperationList: {
             items: components["schemas"]["Operation"][];
@@ -1107,6 +1123,8 @@ export interface components {
         ResolveOperation: {
             /** @enum {boolean} */
             accept_current: true;
+            /** Format: int64 */
+            expected_revision: number;
         };
         Account: {
             username: string;
@@ -1181,6 +1199,10 @@ export interface components {
             /** @enum {string} */
             resource: "nodes" | "firewall" | "containers" | "operations" | "public_addresses" | "peer_trust" | "settings";
             node_id?: string;
+        };
+        OperationRevision: {
+            /** Format: int64 */
+            expected_revision: number;
         };
     };
     responses: {
@@ -2127,7 +2149,11 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OperationRevision"];
+            };
+        };
         responses: {
             /** @description 已持久受理，须查询原操作取得实际结果 */
             202: {
@@ -2158,7 +2184,11 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OperationRevision"];
+            };
+        };
         responses: {
             /** @description 已持久受理，须查询原操作取得实际结果 */
             202: {

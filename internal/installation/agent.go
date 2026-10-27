@@ -108,7 +108,7 @@ func InstallAgent(ctx context.Context, dataDir, source string, intent AgentInten
 			return false, err
 		}
 	}
-	if err := Command(ctx, "systemctl", "enable", "opsd-agent.service"); err != nil {
+	if err := Command(ctx, "systemctl", "enable", "opsd-agent.service", "opsd-recover.service"); err != nil {
 		return false, err
 	}
 	if err := Command(ctx, "systemctl", "start", "opsd-agent.service"); err != nil {

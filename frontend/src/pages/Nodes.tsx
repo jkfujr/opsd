@@ -9,6 +9,7 @@ import type { components } from '../api/schema.gen';
 import { useSession } from '../auth';
 import { queryClient } from '../state';
 import { Confirm, date, Failure, PageTitle, TextField } from '../ui';
+import { pendingQuery, useOperations } from '../operations';
 
 export const nodesQuery = { queryKey: ['nodes'], queryFn: async ({ signal }: { signal: AbortSignal }) => unwrap(await api.GET('/nodes', { signal })) };
 type Node = components['schemas']['Node'];
@@ -28,11 +29,15 @@ function NodeTable({ nodes, actions }: { nodes: Node[]; actions?: (node: Node) =
 
 export function Home() {
   const query = useQuery(nodesQuery);
+  const pending = useQuery(pendingQuery);
+  const operations = useOperations();
   const nodes = query.data?.items.filter((node) => !node.revoked_at) ?? [];
   const online = nodes.filter((node) => node.connected).length;
   return <>
     <PageTitle>首页</PageTitle>
     <Failure error={query.error} />
+    <Failure error={pending.error} />
+    {pending.data && pending.data.items.length > 0 && <Button variant="outline" className="mb-6" onClick={() => operations.show()}>未决操作 {pending.data.items.length}</Button>}
     {query.isPending ? <p className="text-foreground-muted">加载中…</p> : query.data && <>
       <dl aria-label="节点概览" className="mb-12 grid grid-cols-3 border-y border-border py-6">
         {[['节点', nodes.length], ['在线', online], ['离线', nodes.length - online]].map(([label, count]) => <div key={label} className="border-l border-border px-4 first:border-l-0 first:pl-0 sm:px-8"><dt className="mb-3 text-sm text-foreground-muted">{label}</dt><dd className="text-3xl font-semibold tabular-nums text-foreground-intense sm:text-4xl">{count}</dd></div>)}

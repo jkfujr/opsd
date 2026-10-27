@@ -135,6 +135,19 @@ func validatePayload(payload Payload) error {
 		operationID = body.Record.ID
 	case *OperationConfirm:
 		operationID = body.OperationID
+		if body.ExpectedRevision == 0 {
+			return fmt.Errorf("确认缺少阶段修订号")
+		}
+	case *OperationRecover:
+		operationID = body.OperationID
+		if body.ExpectedRevision == 0 {
+			return fmt.Errorf("重新处理缺少阶段修订号")
+		}
+	case *OperationResolve:
+		operationID = body.OperationID
+		if body.ExpectedRevision == 0 || !body.AcceptCurrent {
+			return fmt.Errorf("人工处理缺少阶段修订号或明确同意")
+		}
 	case *OperationUpdated:
 		operationID = body.Record.ID
 	case *DeploymentPrepare:
@@ -165,7 +178,7 @@ func validatePayload(payload Payload) error {
 	}
 	// 只有上面关联操作的消息需要操作 ID，普通读取与持续策略没有该字段。
 	switch payload.(type) {
-	case *OperationSubmit, *OperationQuery, *OperationQueryResult, *OperationReconcile, *OperationReconcileResult, *OperationConfirm, *OperationUpdated,
+	case *OperationSubmit, *OperationQuery, *OperationQueryResult, *OperationReconcile, *OperationReconcileResult, *OperationConfirm, *OperationRecover, *OperationResolve, *OperationUpdated,
 		*DeploymentPrepare, *DeploymentPrepared, *DeploymentProbe, *DeploymentProbeAccepted, *DeploymentDecisionQuery, *DeploymentDecisionUpdated:
 		if operationID == "" {
 			return fmt.Errorf("消息缺少操作标识")

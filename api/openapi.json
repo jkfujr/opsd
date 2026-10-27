@@ -1707,7 +1707,17 @@
               "type": "string"
             }
           }
-        ]
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OperationRevision"
+              }
+            }
+          }
+        }
       }
     },
     "/operations/{id}/recover": {
@@ -1768,7 +1778,17 @@
               "type": "string"
             }
           }
-        ]
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OperationRevision"
+              }
+            }
+          }
+        }
       }
     },
     "/operations/{id}/resolve": {
@@ -2954,6 +2974,9 @@
           },
           "local": {
             "type": "boolean"
+          },
+          "write_blocked_reason": {
+            "type": "string"
           }
         },
         "required": [
@@ -3495,6 +3518,9 @@
           },
           "editable": {
             "type": "boolean"
+          },
+          "chain": {
+            "type": "string"
           }
         },
         "required": [
@@ -3707,6 +3733,17 @@
           "before_rule_id": {
             "type": "string",
             "minLength": 1
+          },
+          "zone": {
+            "type": "string"
+          },
+          "chain": {
+            "type": "string"
+          },
+          "priority": {
+            "type": "integer",
+            "minimum": -32768,
+            "maximum": 32767
           }
         },
         "required": [
@@ -3734,6 +3771,17 @@
           },
           "rule": {
             "$ref": "#/components/schemas/RuleSpec"
+          },
+          "zone": {
+            "type": "string"
+          },
+          "chain": {
+            "type": "string"
+          },
+          "priority": {
+            "type": "integer",
+            "minimum": -32768,
+            "maximum": 32767
           }
         },
         "required": [
@@ -3759,6 +3807,12 @@
           "rule_id": {
             "type": "string",
             "minLength": 1
+          },
+          "zone": {
+            "type": "string"
+          },
+          "chain": {
+            "type": "string"
           }
         },
         "required": [
@@ -3787,6 +3841,17 @@
           "before_rule_id": {
             "type": "string",
             "minLength": 1
+          },
+          "zone": {
+            "type": "string"
+          },
+          "chain": {
+            "type": "string"
+          },
+          "priority": {
+            "type": "integer",
+            "minimum": -32768,
+            "maximum": 32767
           }
         },
         "required": [
@@ -3819,11 +3884,15 @@
             "enum": [
               "allow",
               "deny",
-              "reject"
+              "reject",
+              "default"
             ]
           },
           "reload": {
             "type": "boolean"
+          },
+          "chain": {
+            "type": "string"
           }
         },
         "required": [
@@ -4270,6 +4339,10 @@
             "type": "string",
             "enum": [
               "pending",
+              "applying",
+              "applied",
+              "reverting",
+              "reverted",
               "completed",
               "failed",
               "unknown"
@@ -4370,6 +4443,11 @@
           "last_observed_at": {
             "type": "string",
             "format": "date-time"
+          },
+          "confirmation_remaining_seconds": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
           }
         },
         "required": [
@@ -4428,10 +4506,16 @@
             "enum": [
               true
             ]
+          },
+          "expected_revision": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
           }
         },
         "required": [
-          "accept_current"
+          "accept_current",
+          "expected_revision"
         ]
       },
       "Account": {
@@ -4711,6 +4795,20 @@
         "required": [
           "resource"
         ]
+      },
+      "OperationRevision": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "expected_revision"
+        ],
+        "properties": {
+          "expected_revision": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          }
+        }
       }
     },
     "responses": {

@@ -33,6 +33,9 @@ type connection struct {
 	channel  *transport.Channel
 	id       string
 	writable bool
+	ready    bool
+	blocked  string
+	calls    *transport.Calls
 }
 
 type subscriber struct {
@@ -53,6 +56,11 @@ type Server struct {
 	failures      map[string][]time.Time
 	inFlight      map[string]int
 	passwordSlots chan struct{}
+	background    context.Context
+	stop          context.CancelFunc
+	workers       sync.WaitGroup
+	closed        bool
+	dispatching   map[string]bool
 }
 
 type sessionContext struct {
@@ -74,7 +82,8 @@ func New(ctx context.Context, db *sql.DB, options Options) (*Server, error) {
 	if err := db.QueryRowContext(ctx, "SELECT entrance FROM account WHERE id=1").Scan(&entrance); err != nil {
 		return nil, err
 	}
-	return &Server{db: db, key: key, options: options, now: options.Now, connections: make(map[string]*connection), subscribers: make(map[*subscriber]struct{}), failures: make(map[string][]time.Time), inFlight: make(map[string]int), passwordSlots: make(chan struct{}, 2)}, nil
+	background, stop := context.WithCancel(context.Background())
+	return &Server{db: db, key: key, options: options, now: options.Now, connections: make(map[string]*connection), subscribers: make(map[*subscriber]struct{}), failures: make(map[string][]time.Time), inFlight: make(map[string]int), passwordSlots: make(chan struct{}, 2), background: background, stop: stop, dispatching: map[string]bool{}}, nil
 }
 
 func (s *Server) Handler() http.Handler {
@@ -207,7 +216,7 @@ func (s *Server) page(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if path != entrance {
-		if path != "/" && path != "/settings" && !strings.HasPrefix(path, "/settings/") {
+		if path != "/" && path != "/firewall" && path != "/settings" && !strings.HasPrefix(path, "/settings/") {
 			http.NotFound(w, r)
 			return
 		}
@@ -230,15 +239,19 @@ func (s *Server) page(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) Close() {
+	s.stop()
 	s.mu.Lock()
-	defer s.mu.Unlock()
+	s.closed = true
 	for _, conn := range s.connections {
+		conn.calls.Close()
 		conn.channel.Close()
 	}
 	for sub := range s.subscribers {
 		close(sub.done)
 		delete(s.subscribers, sub)
 	}
+	s.mu.Unlock()
+	s.workers.Wait()
 }
 
 func (s *Server) notify(event string) {
@@ -248,6 +261,14 @@ func (s *Server) notify(event string) {
 		select {
 		case sub.events <- event:
 		default:
+			select {
+			case <-sub.events:
+			default:
+			}
+			select {
+			case sub.events <- "all":
+			default:
+			}
 		}
 	}
 }

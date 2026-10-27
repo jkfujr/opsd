@@ -91,6 +91,7 @@ type FirewallRule struct {
 type DefaultPolicy struct {
 	Family   AddressFamily `json:"family"`
 	Zone     string        `json:"zone,omitempty"`
+	Chain    string        `json:"chain,omitempty"`
 	Scope    ConfigScope   `json:"scope"`
 	Action   string        `json:"action"`
 	Editable bool          `json:"editable"`
@@ -150,6 +151,8 @@ type FirewallChange struct {
 	BeforeRuleID string            `json:"before_rule_id,omitempty"`
 	Family       AddressFamily     `json:"family,omitempty"`
 	Zone         string            `json:"zone,omitempty"`
+	Chain        string            `json:"chain,omitempty"`
+	Priority     *int              `json:"priority,omitempty"`
 	Action       string            `json:"action,omitempty"`
 	Reload       *bool             `json:"reload,omitempty"`
 	Enabled      *bool             `json:"enabled,omitempty"`
@@ -199,15 +202,16 @@ type OperationStep struct {
 }
 
 type OperationRecord struct {
-	ID                   string              `json:"id"`
-	State                OperationState      `json:"state"`
-	Revision             uint64              `json:"revision"`
-	Decision             string              `json:"decision"`
-	ConfirmationDeadline *time.Time          `json:"confirmation_deadline,omitempty"`
-	Deployment           *DeploymentProgress `json:"deployment,omitempty"`
-	Steps                []OperationStep     `json:"steps"`
-	Error                *Error              `json:"error,omitempty"`
-	LastObservedAt       *time.Time          `json:"last_observed_at,omitempty"`
+	ID                           string              `json:"id"`
+	State                        OperationState      `json:"state"`
+	Revision                     uint64              `json:"revision"`
+	Decision                     string              `json:"decision"`
+	ConfirmationDeadline         *time.Time          `json:"confirmation_deadline,omitempty"`
+	Deployment                   *DeploymentProgress `json:"deployment,omitempty"`
+	Steps                        []OperationStep     `json:"steps"`
+	Error                        *Error              `json:"error,omitempty"`
+	LastObservedAt               *time.Time          `json:"last_observed_at,omitempty"`
+	ConfirmationRemainingSeconds *int64              `json:"confirmation_remaining_seconds,omitempty"`
 }
 
 // OperationAction 的三个载荷互斥，编解码层拒绝不匹配组合。

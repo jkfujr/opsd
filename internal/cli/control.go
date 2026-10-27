@@ -107,7 +107,7 @@ func installControl(args []string) error {
 	if err := installation.RequireLinuxRoot(); err != nil {
 		return err
 	}
-	if err := installation.RefuseUnclaimedServices("/etc/opsd/install.json", "opsd.service", "opsd-agent.service"); err != nil {
+	if err := installation.RefuseUnclaimedServices("/etc/opsd/install.json", "opsd.service", "opsd-agent.service", "opsd-operation@.service", "opsd-recover.service"); err != nil {
 		return err
 	}
 	installation.PrivateFiles()

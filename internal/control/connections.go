@@ -9,6 +9,7 @@ import (
 
 	"github.com/coder/websocket"
 	"github.com/opsd-labs/opsd/internal/identity"
+	"github.com/opsd-labs/opsd/internal/operations"
 	"github.com/opsd-labs/opsd/internal/protocol"
 	"github.com/opsd-labs/opsd/internal/transport"
 )
@@ -54,16 +55,27 @@ func (s *Server) connect(w http.ResponseWriter, r *http.Request) {
 		s.channelError(r.Context(), channel, first.RequestID, code, "节点登记被拒绝")
 		return
 	}
-	conn := &connection{channel: channel, id: identity.Random(), writable: len(open.PendingOperationIDs) == 0}
+	known, err := s.pendingIDs(r.Context(), nodeID)
+	if err != nil {
+		s.lifecycle.Unlock()
+		return
+	}
+	ready := len(open.PendingOperationIDs) == 0 && len(known) == 0
+	conn := &connection{channel: channel, id: identity.Random(), writable: ready, ready: ready, calls: transport.NewCalls()}
+	if !ready {
+		conn.blocked = "正在核对未决操作"
+	}
 	s.mu.Lock()
 	old := s.connections[nodeID]
 	s.connections[nodeID] = conn
 	s.mu.Unlock()
 	if old != nil {
+		old.calls.Close()
 		old.channel.Close()
 	}
 	s.lifecycle.Unlock()
 	defer func() {
+		conn.calls.Close()
 		s.mu.Lock()
 		if s.connections[nodeID] == conn {
 			delete(s.connections, nodeID)
@@ -72,11 +84,14 @@ func (s *Server) connect(w http.ResponseWriter, r *http.Request) {
 		s.notify("nodes")
 	}()
 	ctx, cancel = context.WithTimeout(r.Context(), 10*time.Second)
-	err = channel.Send(ctx, protocol.Message{RequestID: identity.Random(), ReplyTo: first.RequestID, Payload: &protocol.SessionAccepted{NodeID: nodeID, ConnectionID: conn.id, PendingOperationIDs: []string{}, Writable: conn.writable}})
+	err = channel.Send(ctx, protocol.Message{RequestID: identity.Random(), ReplyTo: first.RequestID, Payload: &protocol.SessionAccepted{NodeID: nodeID, ConnectionID: conn.id, PendingOperationIDs: known, Writable: ready}})
 	cancel()
 	s.notify("nodes")
 	if err != nil {
 		return
+	}
+	if !ready {
+		s.spawn(func(ctx context.Context) { s.reconcileConnection(ctx, nodeID, conn, known, open.PendingOperationIDs) })
 	}
 	for {
 		ctx, cancel = context.WithTimeout(r.Context(), 45*time.Second)
@@ -90,6 +105,12 @@ func (s *Server) connect(w http.ResponseWriter, r *http.Request) {
 		s.mu.Unlock()
 		if !active {
 			return
+		}
+		if conn.calls.Deliver(message) {
+			continue
+		}
+		if message.ReplyTo != "" {
+			continue
 		}
 		switch body := message.Payload.(type) {
 		case *protocol.Heartbeat:
@@ -110,6 +131,23 @@ func (s *Server) connect(w http.ResponseWriter, r *http.Request) {
 			cancel()
 			if err != nil {
 				return
+			}
+		case *protocol.OperationUpdated:
+			s.lifecycle.Lock()
+			s.mu.Lock()
+			active = s.connections[nodeID] == conn
+			s.mu.Unlock()
+			if active {
+				err = s.saveRecord(r.Context(), nodeID, body.Record)
+			}
+			s.lifecycle.Unlock()
+			if !active || err != nil {
+				return
+			}
+			s.updateWritable(r.Context(), nodeID, conn)
+			s.notify("operations")
+			if operations.Terminal(body.Record.State) {
+				s.notify("firewall")
 			}
 		default:
 			s.channelError(r.Context(), channel, message.RequestID, "unsupported_message", "当前版本未实现此消息")

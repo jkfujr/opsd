@@ -622,20 +622,32 @@ func (e OperationState) Valid() bool {
 
 // Defines values for OperationStepState.
 const (
+	OperationStepStateApplied   OperationStepState = "applied"
+	OperationStepStateApplying  OperationStepState = "applying"
 	OperationStepStateCompleted OperationStepState = "completed"
 	OperationStepStateFailed    OperationStepState = "failed"
 	OperationStepStatePending   OperationStepState = "pending"
+	OperationStepStateReverted  OperationStepState = "reverted"
+	OperationStepStateReverting OperationStepState = "reverting"
 	OperationStepStateUnknown   OperationStepState = "unknown"
 )
 
 // Valid indicates whether the value is a known member of the OperationStepState enum.
 func (e OperationStepState) Valid() bool {
 	switch e {
+	case OperationStepStateApplied:
+		return true
+	case OperationStepStateApplying:
+		return true
 	case OperationStepStateCompleted:
 		return true
 	case OperationStepStateFailed:
 		return true
 	case OperationStepStatePending:
+		return true
+	case OperationStepStateReverted:
+		return true
+	case OperationStepStateReverting:
 		return true
 	case OperationStepStateUnknown:
 		return true
@@ -868,15 +880,18 @@ func (e RuleSpecProtocol) Valid() bool {
 
 // Defines values for SetDefaultPolicyAction.
 const (
-	SetDefaultPolicyActionAllow  SetDefaultPolicyAction = "allow"
-	SetDefaultPolicyActionDeny   SetDefaultPolicyAction = "deny"
-	SetDefaultPolicyActionReject SetDefaultPolicyAction = "reject"
+	SetDefaultPolicyActionAllow   SetDefaultPolicyAction = "allow"
+	SetDefaultPolicyActionDefault SetDefaultPolicyAction = "default"
+	SetDefaultPolicyActionDeny    SetDefaultPolicyAction = "deny"
+	SetDefaultPolicyActionReject  SetDefaultPolicyAction = "reject"
 )
 
 // Valid indicates whether the value is a known member of the SetDefaultPolicyAction enum.
 func (e SetDefaultPolicyAction) Valid() bool {
 	switch e {
 	case SetDefaultPolicyActionAllow:
+		return true
+	case SetDefaultPolicyActionDefault:
 		return true
 	case SetDefaultPolicyActionDeny:
 		return true
@@ -981,9 +996,12 @@ type AccountChanged struct {
 // AddRule defines model for AddRule.
 type AddRule struct {
 	BeforeRuleId *string     `json:"before_rule_id,omitempty"`
+	Chain        *string     `json:"chain,omitempty"`
 	Kind         AddRuleKind `json:"kind"`
+	Priority     *int        `json:"priority,omitempty"`
 	Rule         RuleSpec    `json:"rule"`
 	Scope        ConfigScope `json:"scope"`
+	Zone         *string     `json:"zone,omitempty"`
 }
 
 // AddRuleKind defines model for AddRule.Kind.
@@ -1134,6 +1152,7 @@ type DataDirectoryChangeKind string
 // DefaultPolicy defines model for DefaultPolicy.
 type DefaultPolicy struct {
 	Action   DefaultPolicyAction `json:"action"`
+	Chain    *string             `json:"chain,omitempty"`
 	Editable bool                `json:"editable"`
 	Family   AddressFamily       `json:"family"`
 	Scope    ConfigScope         `json:"scope"`
@@ -1145,9 +1164,11 @@ type DefaultPolicyAction string
 
 // DeleteRule defines model for DeleteRule.
 type DeleteRule struct {
+	Chain  *string        `json:"chain,omitempty"`
 	Kind   DeleteRuleKind `json:"kind"`
 	RuleId string         `json:"rule_id"`
 	Scope  ConfigScope    `json:"scope"`
+	Zone   *string        `json:"zone,omitempty"`
 }
 
 // DeleteRuleKind defines model for DeleteRule.Kind.
@@ -1205,10 +1226,13 @@ type DockerPortStateState string
 
 // EditRule defines model for EditRule.
 type EditRule struct {
-	Kind   EditRuleKind `json:"kind"`
-	Rule   RuleSpec     `json:"rule"`
-	RuleId string       `json:"rule_id"`
-	Scope  ConfigScope  `json:"scope"`
+	Chain    *string      `json:"chain,omitempty"`
+	Kind     EditRuleKind `json:"kind"`
+	Priority *int         `json:"priority,omitempty"`
+	Rule     RuleSpec     `json:"rule"`
+	RuleId   string       `json:"rule_id"`
+	Scope    ConfigScope  `json:"scope"`
+	Zone     *string      `json:"zone,omitempty"`
 }
 
 // EditRuleKind defines model for EditRule.Kind.
@@ -1310,9 +1334,12 @@ type LoginRequest struct {
 // MoveRule defines model for MoveRule.
 type MoveRule struct {
 	BeforeRuleId *string      `json:"before_rule_id,omitempty"`
+	Chain        *string      `json:"chain,omitempty"`
 	Kind         MoveRuleKind `json:"kind"`
+	Priority     *int         `json:"priority,omitempty"`
 	RuleId       string       `json:"rule_id"`
 	Scope        ConfigScope  `json:"scope"`
+	Zone         *string      `json:"zone,omitempty"`
 }
 
 // MoveRuleKind defines model for MoveRule.Kind.
@@ -1330,15 +1357,16 @@ type NativePosition struct {
 
 // Node defines model for Node.
 type Node struct {
-	Capabilities *Capabilities `json:"capabilities,omitempty"`
-	Connected    bool          `json:"connected"`
-	Id           string        `json:"id"`
-	LastSeenAt   *time.Time    `json:"last_seen_at,omitempty"`
-	Local        bool          `json:"local"`
-	Name         string        `json:"name"`
-	PublicKey    string        `json:"public_key"`
-	RevokedAt    *time.Time    `json:"revoked_at,omitempty"`
-	Writable     bool          `json:"writable"`
+	Capabilities       *Capabilities `json:"capabilities,omitempty"`
+	Connected          bool          `json:"connected"`
+	Id                 string        `json:"id"`
+	LastSeenAt         *time.Time    `json:"last_seen_at,omitempty"`
+	Local              bool          `json:"local"`
+	Name               string        `json:"name"`
+	PublicKey          string        `json:"public_key"`
+	RevokedAt          *time.Time    `json:"revoked_at,omitempty"`
+	Writable           bool          `json:"writable"`
+	WriteBlockedReason *string       `json:"write_blocked_reason,omitempty"`
 }
 
 // NodeList defines model for NodeList.
@@ -1353,23 +1381,24 @@ type NodePatch struct {
 
 // Operation defines model for Operation.
 type Operation struct {
-	ConfirmationDeadline *time.Time             `json:"confirmation_deadline,omitempty"`
-	ContainerAction      *ContainerActionTarget `json:"container_action,omitempty"`
-	CreatedAt            time.Time              `json:"created_at"`
-	Decision             OperationDecision      `json:"decision"`
-	Deployment           *DeploymentProgress    `json:"deployment,omitempty"`
-	Error                *APIError              `json:"error,omitempty"`
-	Executor             OperationExecutor      `json:"executor"`
-	Id                   string                 `json:"id"`
-	LastObservedAt       *time.Time             `json:"last_observed_at,omitempty"`
-	NodeId               string                 `json:"node_id"`
-	PlanId               *string                `json:"plan_id,omitempty"`
-	ResultPendingSync    bool                   `json:"result_pending_sync"`
-	Revision             int64                  `json:"revision"`
-	State                OperationState         `json:"state"`
-	Steps                []OperationStep        `json:"steps"`
-	Subject              OperationSubject       `json:"subject"`
-	UpdatedAt            time.Time              `json:"updated_at"`
+	ConfirmationDeadline         *time.Time             `json:"confirmation_deadline,omitempty"`
+	ConfirmationRemainingSeconds *int64                 `json:"confirmation_remaining_seconds,omitempty"`
+	ContainerAction              *ContainerActionTarget `json:"container_action,omitempty"`
+	CreatedAt                    time.Time              `json:"created_at"`
+	Decision                     OperationDecision      `json:"decision"`
+	Deployment                   *DeploymentProgress    `json:"deployment,omitempty"`
+	Error                        *APIError              `json:"error,omitempty"`
+	Executor                     OperationExecutor      `json:"executor"`
+	Id                           string                 `json:"id"`
+	LastObservedAt               *time.Time             `json:"last_observed_at,omitempty"`
+	NodeId                       string                 `json:"node_id"`
+	PlanId                       *string                `json:"plan_id,omitempty"`
+	ResultPendingSync            bool                   `json:"result_pending_sync"`
+	Revision                     int64                  `json:"revision"`
+	State                        OperationState         `json:"state"`
+	Steps                        []OperationStep        `json:"steps"`
+	Subject                      OperationSubject       `json:"subject"`
+	UpdatedAt                    time.Time              `json:"updated_at"`
 }
 
 // OperationDecision defines model for Operation.Decision.
@@ -1385,6 +1414,11 @@ type OperationSubject string
 type OperationList struct {
 	Items      []Operation `json:"items"`
 	NextCursor *string     `json:"next_cursor,omitempty"`
+}
+
+// OperationRevision defines model for OperationRevision.
+type OperationRevision struct {
+	ExpectedRevision int64 `json:"expected_revision"`
 }
 
 // OperationState defines model for OperationState.
@@ -1563,7 +1597,8 @@ type ReadError struct {
 
 // ResolveOperation defines model for ResolveOperation.
 type ResolveOperation struct {
-	AcceptCurrent ResolveOperationAcceptCurrent `json:"accept_current"`
+	AcceptCurrent    ResolveOperationAcceptCurrent `json:"accept_current"`
+	ExpectedRevision int64                         `json:"expected_revision"`
 }
 
 // ResolveOperationAcceptCurrent defines model for ResolveOperation.AcceptCurrent.
@@ -1605,6 +1640,7 @@ type SessionList struct {
 // SetDefaultPolicy defines model for SetDefaultPolicy.
 type SetDefaultPolicy struct {
 	Action SetDefaultPolicyAction `json:"action"`
+	Chain  *string                `json:"chain,omitempty"`
 	Family AddressFamily          `json:"family"`
 	Kind   SetDefaultPolicyKind   `json:"kind"`
 	Reload bool                   `json:"reload"`
@@ -1692,13 +1728,65 @@ type RevokeEnrollmentTokenParams struct {
 	XCSRFToken string `json:"X-CSRF-Token"`
 }
 
+// ApplyFirewallPlanParams defines parameters for ApplyFirewallPlan.
+type ApplyFirewallPlanParams struct {
+	XCSRFToken string `json:"X-CSRF-Token"`
+}
+
 // RenameNodeParams defines parameters for RenameNode.
 type RenameNodeParams struct {
 	XCSRFToken string `json:"X-CSRF-Token"`
 }
 
+// ReadFirewallParams defines parameters for ReadFirewall.
+type ReadFirewallParams struct {
+	Family *AddressFamily `form:"family,omitempty" json:"family,omitempty"`
+	Scope  *ConfigScope   `form:"scope,omitempty" json:"scope,omitempty"`
+}
+
+// InstallFirewallParams defines parameters for InstallFirewall.
+type InstallFirewallParams struct {
+	XCSRFToken     string `json:"X-CSRF-Token"`
+	IdempotencyKey string `json:"Idempotency-Key"`
+}
+
+// PreviewFirewallChangeParams defines parameters for PreviewFirewallChange.
+type PreviewFirewallChangeParams struct {
+	XCSRFToken string `json:"X-CSRF-Token"`
+}
+
 // RevokeNodeParams defines parameters for RevokeNode.
 type RevokeNodeParams struct {
+	XCSRFToken string `json:"X-CSRF-Token"`
+}
+
+// ListOperationsParams defines parameters for ListOperations.
+type ListOperationsParams struct {
+	Cursor         *string         `form:"cursor,omitempty" json:"cursor,omitempty"`
+	Limit          *int            `form:"limit,omitempty" json:"limit,omitempty"`
+	NodeId         *string         `form:"node_id,omitempty" json:"node_id,omitempty"`
+	State          *OperationState `form:"state,omitempty" json:"state,omitempty"`
+	PlanId         *string         `form:"plan_id,omitempty" json:"plan_id,omitempty"`
+	IdempotencyKey *string         `form:"idempotency_key,omitempty" json:"idempotency_key,omitempty"`
+}
+
+// ListPendingOperationsParams defines parameters for ListPendingOperations.
+type ListPendingOperationsParams struct {
+	NodeId *string `form:"node_id,omitempty" json:"node_id,omitempty"`
+}
+
+// ConfirmOperationParams defines parameters for ConfirmOperation.
+type ConfirmOperationParams struct {
+	XCSRFToken string `json:"X-CSRF-Token"`
+}
+
+// RecoverOperationParams defines parameters for RecoverOperation.
+type RecoverOperationParams struct {
+	XCSRFToken string `json:"X-CSRF-Token"`
+}
+
+// ResolveOperationParams defines parameters for ResolveOperation.
+type ResolveOperationParams struct {
 	XCSRFToken string `json:"X-CSRF-Token"`
 }
 
@@ -1712,6 +1800,21 @@ type LoginJSONRequestBody = LoginRequest
 
 // RenameNodeJSONRequestBody defines body for RenameNode for application/json ContentType.
 type RenameNodeJSONRequestBody = NodePatch
+
+// InstallFirewallJSONRequestBody defines body for InstallFirewall for application/json ContentType.
+type InstallFirewallJSONRequestBody = FirewallInstallRequest
+
+// PreviewFirewallChangeJSONRequestBody defines body for PreviewFirewallChange for application/json ContentType.
+type PreviewFirewallChangeJSONRequestBody = FirewallChange
+
+// ConfirmOperationJSONRequestBody defines body for ConfirmOperation for application/json ContentType.
+type ConfirmOperationJSONRequestBody = OperationRevision
+
+// RecoverOperationJSONRequestBody defines body for RecoverOperation for application/json ContentType.
+type RecoverOperationJSONRequestBody = OperationRevision
+
+// ResolveOperationJSONRequestBody defines body for ResolveOperation for application/json ContentType.
+type ResolveOperationJSONRequestBody = ResolveOperation
 
 // ChangeAccountJSONRequestBody defines body for ChangeAccount for application/json ContentType.
 type ChangeAccountJSONRequestBody = AccountChange
@@ -2261,6 +2364,12 @@ type ServerInterface interface {
 	// RevokeEnrollmentToken 撤销接入码
 	// (DELETE /enrollment-tokens/{id})
 	RevokeEnrollmentToken(w http.ResponseWriter, r *http.Request, id string, params RevokeEnrollmentTokenParams)
+	// GetFirewallPlan 读取不可变预览
+	// (GET /firewall/plans/{id})
+	GetFirewallPlan(w http.ResponseWriter, r *http.Request, id string)
+	// ApplyFirewallPlan 受理预览并返回原操作
+	// (POST /firewall/plans/{id}/apply)
+	ApplyFirewallPlan(w http.ResponseWriter, r *http.Request, id string, params ApplyFirewallPlanParams)
 	// ListNodes 读取节点
 	// (GET /nodes)
 	ListNodes(w http.ResponseWriter, r *http.Request)
@@ -2270,9 +2379,36 @@ type ServerInterface interface {
 	// RenameNode 修改节点名称
 	// (PATCH /nodes/{id})
 	RenameNode(w http.ResponseWriter, r *http.Request, id string, params RenameNodeParams)
+	// ReadFirewall 读取原生防火墙实际状态
+	// (GET /nodes/{id}/firewall)
+	ReadFirewall(w http.ResponseWriter, r *http.Request, id string, params ReadFirewallParams)
+	// InstallFirewall 安装但不启用防火墙组件
+	// (POST /nodes/{id}/firewall/install)
+	InstallFirewall(w http.ResponseWriter, r *http.Request, id string, params InstallFirewallParams)
+	// PreviewFirewallChange 预览单项变更
+	// (POST /nodes/{id}/firewall/plans)
+	PreviewFirewallChange(w http.ResponseWriter, r *http.Request, id string, params PreviewFirewallChangeParams)
 	// RevokeNode 撤销节点授权
 	// (POST /nodes/{id}/revoke)
 	RevokeNode(w http.ResponseWriter, r *http.Request, id string, params RevokeNodeParams)
+	// ListOperations 查询历史或定位原操作
+	// (GET /operations)
+	ListOperations(w http.ResponseWriter, r *http.Request, params ListOperationsParams)
+	// ListPendingOperations 独立读取全部未决操作
+	// (GET /operations/pending)
+	ListPendingOperations(w http.ResponseWriter, r *http.Request, params ListPendingOperationsParams)
+	// GetOperation 查询原操作
+	// (GET /operations/{id})
+	GetOperation(w http.ResponseWriter, r *http.Request, id string)
+	// ConfirmOperation 确认原操作
+	// (POST /operations/{id}/confirm)
+	ConfirmOperation(w http.ResponseWriter, r *http.Request, id string, params ConfirmOperationParams)
+	// RecoverOperation 核对并继续原操作
+	// (POST /operations/{id}/recover)
+	RecoverOperation(w http.ResponseWriter, r *http.Request, id string, params RecoverOperationParams)
+	// ResolveOperation 接受现状并结束为人工处理
+	// (POST /operations/{id}/resolve)
+	ResolveOperation(w http.ResponseWriter, r *http.Request, id string, params ResolveOperationParams)
 	// GetAccount 读取管理员账号
 	// (GET /settings/account)
 	GetAccount(w http.ResponseWriter, r *http.Request)
@@ -2547,6 +2683,86 @@ func (siw *ServerInterfaceWrapper) RevokeEnrollmentToken(w http.ResponseWriter, 
 	handler.ServeHTTP(w, r)
 }
 
+// GetFirewallPlan operation middleware
+func (siw *ServerInterfaceWrapper) GetFirewallPlan(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetFirewallPlan(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ApplyFirewallPlan operation middleware
+func (siw *ServerInterfaceWrapper) ApplyFirewallPlan(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ApplyFirewallPlanParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "X-CSRF-Token" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-CSRF-Token")]; found {
+		var XCSRFToken string
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "X-CSRF-Token", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "X-CSRF-Token", valueList[0], &XCSRFToken, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-CSRF-Token", Err: err})
+			return
+		}
+
+		params.XCSRFToken = XCSRFToken
+
+	} else {
+		err := fmt.Errorf("Header parameter X-CSRF-Token is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "X-CSRF-Token", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ApplyFirewallPlan(w, r, id, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // ListNodes operation middleware
 func (siw *ServerInterfaceWrapper) ListNodes(w http.ResponseWriter, r *http.Request) {
 
@@ -2641,6 +2857,192 @@ func (siw *ServerInterfaceWrapper) RenameNode(w http.ResponseWriter, r *http.Req
 	handler.ServeHTTP(w, r)
 }
 
+// ReadFirewall operation middleware
+func (siw *ServerInterfaceWrapper) ReadFirewall(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ReadFirewallParams
+
+	// ------------- Optional query parameter "family" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "family", r.URL.Query(), &params.Family, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "family"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "family", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "scope" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "scope", r.URL.Query(), &params.Scope, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "scope"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "scope", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ReadFirewall(w, r, id, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// InstallFirewall operation middleware
+func (siw *ServerInterfaceWrapper) InstallFirewall(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params InstallFirewallParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "X-CSRF-Token" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-CSRF-Token")]; found {
+		var XCSRFToken string
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "X-CSRF-Token", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "X-CSRF-Token", valueList[0], &XCSRFToken, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-CSRF-Token", Err: err})
+			return
+		}
+
+		params.XCSRFToken = XCSRFToken
+
+	} else {
+		err := fmt.Errorf("Header parameter X-CSRF-Token is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "X-CSRF-Token", Err: err})
+		return
+	}
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey string
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.InstallFirewall(w, r, id, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// PreviewFirewallChange operation middleware
+func (siw *ServerInterfaceWrapper) PreviewFirewallChange(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params PreviewFirewallChangeParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "X-CSRF-Token" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-CSRF-Token")]; found {
+		var XCSRFToken string
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "X-CSRF-Token", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "X-CSRF-Token", valueList[0], &XCSRFToken, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-CSRF-Token", Err: err})
+			return
+		}
+
+		params.XCSRFToken = XCSRFToken
+
+	} else {
+		err := fmt.Errorf("Header parameter X-CSRF-Token is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "X-CSRF-Token", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PreviewFirewallChange(w, r, id, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // RevokeNode operation middleware
 func (siw *ServerInterfaceWrapper) RevokeNode(w http.ResponseWriter, r *http.Request) {
 
@@ -2686,6 +3088,325 @@ func (siw *ServerInterfaceWrapper) RevokeNode(w http.ResponseWriter, r *http.Req
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.RevokeNode(w, r, id, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListOperations operation middleware
+func (siw *ServerInterfaceWrapper) ListOperations(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListOperationsParams
+
+	// ------------- Optional query parameter "cursor" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "cursor", r.URL.Query(), &params.Cursor, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "cursor"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "cursor", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "node_id" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "node_id", r.URL.Query(), &params.NodeId, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "node_id"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "node_id", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "state" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "state", r.URL.Query(), &params.State, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "state"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "state", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "plan_id" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "plan_id", r.URL.Query(), &params.PlanId, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "plan_id"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "plan_id", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "idempotency_key" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "idempotency_key", r.URL.Query(), &params.IdempotencyKey, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "idempotency_key"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "idempotency_key", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListOperations(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListPendingOperations operation middleware
+func (siw *ServerInterfaceWrapper) ListPendingOperations(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListPendingOperationsParams
+
+	// ------------- Optional query parameter "node_id" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "node_id", r.URL.Query(), &params.NodeId, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "node_id"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "node_id", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListPendingOperations(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetOperation operation middleware
+func (siw *ServerInterfaceWrapper) GetOperation(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetOperation(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ConfirmOperation operation middleware
+func (siw *ServerInterfaceWrapper) ConfirmOperation(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ConfirmOperationParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "X-CSRF-Token" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-CSRF-Token")]; found {
+		var XCSRFToken string
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "X-CSRF-Token", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "X-CSRF-Token", valueList[0], &XCSRFToken, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-CSRF-Token", Err: err})
+			return
+		}
+
+		params.XCSRFToken = XCSRFToken
+
+	} else {
+		err := fmt.Errorf("Header parameter X-CSRF-Token is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "X-CSRF-Token", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ConfirmOperation(w, r, id, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// RecoverOperation operation middleware
+func (siw *ServerInterfaceWrapper) RecoverOperation(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params RecoverOperationParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "X-CSRF-Token" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-CSRF-Token")]; found {
+		var XCSRFToken string
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "X-CSRF-Token", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "X-CSRF-Token", valueList[0], &XCSRFToken, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-CSRF-Token", Err: err})
+			return
+		}
+
+		params.XCSRFToken = XCSRFToken
+
+	} else {
+		err := fmt.Errorf("Header parameter X-CSRF-Token is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "X-CSRF-Token", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RecoverOperation(w, r, id, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ResolveOperation operation middleware
+func (siw *ServerInterfaceWrapper) ResolveOperation(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ResolveOperationParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "X-CSRF-Token" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-CSRF-Token")]; found {
+		var XCSRFToken string
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "X-CSRF-Token", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "X-CSRF-Token", valueList[0], &XCSRFToken, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-CSRF-Token", Err: err})
+			return
+		}
+
+		params.XCSRFToken = XCSRFToken
+
+	} else {
+		err := fmt.Errorf("Header parameter X-CSRF-Token is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "X-CSRF-Token", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ResolveOperation(w, r, id, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -2896,10 +3617,21 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/enrollment-tokens", wrapper.ListEnrollmentTokens)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/enrollment-tokens", wrapper.CreateEnrollmentToken)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/enrollment-tokens/{id}", wrapper.RevokeEnrollmentToken)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/firewall/plans/{id}", wrapper.GetFirewallPlan)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/firewall/plans/{id}/apply", wrapper.ApplyFirewallPlan)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/nodes", wrapper.ListNodes)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/nodes/{id}", wrapper.GetNode)
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/nodes/{id}", wrapper.RenameNode)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/nodes/{id}/firewall", wrapper.ReadFirewall)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/nodes/{id}/firewall/install", wrapper.InstallFirewall)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/nodes/{id}/firewall/plans", wrapper.PreviewFirewallChange)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/nodes/{id}/revoke", wrapper.RevokeNode)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/operations", wrapper.ListOperations)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/operations/pending", wrapper.ListPendingOperations)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/operations/{id}", wrapper.GetOperation)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/operations/{id}/confirm", wrapper.ConfirmOperation)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/operations/{id}/recover", wrapper.RecoverOperation)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/operations/{id}/resolve", wrapper.ResolveOperation)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/settings/account", wrapper.GetAccount)
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/settings/account", wrapper.ChangeAccount)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/settings/version", wrapper.GetVersion)
@@ -3876,6 +4608,247 @@ func (response RevokeEnrollmentToken503JSONResponse) VisitRevokeEnrollmentTokenR
 	return err
 }
 
+type GetFirewallPlanRequestObject struct {
+	Id string `json:"id"`
+}
+
+type GetFirewallPlanResponseObject interface {
+	VisitGetFirewallPlanResponse(w http.ResponseWriter) error
+}
+
+type GetFirewallPlan200JSONResponse ChangePlan
+
+func (response GetFirewallPlan200JSONResponse) VisitGetFirewallPlanResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetFirewallPlan401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response GetFirewallPlan401JSONResponse) VisitGetFirewallPlanResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetFirewallPlan403JSONResponse struct{ ForbiddenJSONResponse }
+
+func (response GetFirewallPlan403JSONResponse) VisitGetFirewallPlanResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetFirewallPlan404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response GetFirewallPlan404JSONResponse) VisitGetFirewallPlanResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetFirewallPlan409JSONResponse struct{ ConflictJSONResponse }
+
+func (response GetFirewallPlan409JSONResponse) VisitGetFirewallPlanResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetFirewallPlan422JSONResponse struct{ InvalidRequestJSONResponse }
+
+func (response GetFirewallPlan422JSONResponse) VisitGetFirewallPlanResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetFirewallPlan500JSONResponse struct{ InternalErrorJSONResponse }
+
+func (response GetFirewallPlan500JSONResponse) VisitGetFirewallPlanResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetFirewallPlan503JSONResponse struct{ UnavailableJSONResponse }
+
+func (response GetFirewallPlan503JSONResponse) VisitGetFirewallPlanResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(503)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ApplyFirewallPlanRequestObject struct {
+	Id     string `json:"id"`
+	Params ApplyFirewallPlanParams
+}
+
+type ApplyFirewallPlanResponseObject interface {
+	VisitApplyFirewallPlanResponse(w http.ResponseWriter) error
+}
+
+type ApplyFirewallPlan202JSONResponse Operation
+
+func (response ApplyFirewallPlan202JSONResponse) VisitApplyFirewallPlanResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(202)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ApplyFirewallPlan401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response ApplyFirewallPlan401JSONResponse) VisitApplyFirewallPlanResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ApplyFirewallPlan403JSONResponse struct{ ForbiddenJSONResponse }
+
+func (response ApplyFirewallPlan403JSONResponse) VisitApplyFirewallPlanResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ApplyFirewallPlan404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response ApplyFirewallPlan404JSONResponse) VisitApplyFirewallPlanResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ApplyFirewallPlan409JSONResponse struct{ ConflictJSONResponse }
+
+func (response ApplyFirewallPlan409JSONResponse) VisitApplyFirewallPlanResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ApplyFirewallPlan422JSONResponse struct{ InvalidRequestJSONResponse }
+
+func (response ApplyFirewallPlan422JSONResponse) VisitApplyFirewallPlanResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ApplyFirewallPlan500JSONResponse struct{ InternalErrorJSONResponse }
+
+func (response ApplyFirewallPlan500JSONResponse) VisitApplyFirewallPlanResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ApplyFirewallPlan503JSONResponse struct{ UnavailableJSONResponse }
+
+func (response ApplyFirewallPlan503JSONResponse) VisitApplyFirewallPlanResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(503)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type ListNodesRequestObject struct {
 }
 
@@ -4237,6 +5210,371 @@ func (response RenameNode503JSONResponse) VisitRenameNodeResponse(w http.Respons
 	return err
 }
 
+type ReadFirewallRequestObject struct {
+	Id     string `json:"id"`
+	Params ReadFirewallParams
+}
+
+type ReadFirewallResponseObject interface {
+	VisitReadFirewallResponse(w http.ResponseWriter) error
+}
+
+type ReadFirewall200JSONResponse FirewallState
+
+func (response ReadFirewall200JSONResponse) VisitReadFirewallResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ReadFirewall401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response ReadFirewall401JSONResponse) VisitReadFirewallResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ReadFirewall403JSONResponse struct{ ForbiddenJSONResponse }
+
+func (response ReadFirewall403JSONResponse) VisitReadFirewallResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ReadFirewall404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response ReadFirewall404JSONResponse) VisitReadFirewallResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ReadFirewall409JSONResponse struct{ ConflictJSONResponse }
+
+func (response ReadFirewall409JSONResponse) VisitReadFirewallResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ReadFirewall422JSONResponse struct{ InvalidRequestJSONResponse }
+
+func (response ReadFirewall422JSONResponse) VisitReadFirewallResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ReadFirewall500JSONResponse struct{ InternalErrorJSONResponse }
+
+func (response ReadFirewall500JSONResponse) VisitReadFirewallResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ReadFirewall503JSONResponse struct{ UnavailableJSONResponse }
+
+func (response ReadFirewall503JSONResponse) VisitReadFirewallResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(503)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type InstallFirewallRequestObject struct {
+	Id     string `json:"id"`
+	Params InstallFirewallParams
+	Body   *InstallFirewallJSONRequestBody
+}
+
+type InstallFirewallResponseObject interface {
+	VisitInstallFirewallResponse(w http.ResponseWriter) error
+}
+
+type InstallFirewall202JSONResponse Operation
+
+func (response InstallFirewall202JSONResponse) VisitInstallFirewallResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(202)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type InstallFirewall401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response InstallFirewall401JSONResponse) VisitInstallFirewallResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type InstallFirewall403JSONResponse struct{ ForbiddenJSONResponse }
+
+func (response InstallFirewall403JSONResponse) VisitInstallFirewallResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type InstallFirewall404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response InstallFirewall404JSONResponse) VisitInstallFirewallResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type InstallFirewall409JSONResponse struct{ ConflictJSONResponse }
+
+func (response InstallFirewall409JSONResponse) VisitInstallFirewallResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type InstallFirewall422JSONResponse struct{ InvalidRequestJSONResponse }
+
+func (response InstallFirewall422JSONResponse) VisitInstallFirewallResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type InstallFirewall500JSONResponse struct{ InternalErrorJSONResponse }
+
+func (response InstallFirewall500JSONResponse) VisitInstallFirewallResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type InstallFirewall503JSONResponse struct{ UnavailableJSONResponse }
+
+func (response InstallFirewall503JSONResponse) VisitInstallFirewallResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(503)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PreviewFirewallChangeRequestObject struct {
+	Id     string `json:"id"`
+	Params PreviewFirewallChangeParams
+	Body   *PreviewFirewallChangeJSONRequestBody
+}
+
+type PreviewFirewallChangeResponseObject interface {
+	VisitPreviewFirewallChangeResponse(w http.ResponseWriter) error
+}
+
+type PreviewFirewallChange201JSONResponse ChangePlan
+
+func (response PreviewFirewallChange201JSONResponse) VisitPreviewFirewallChangeResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PreviewFirewallChange401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response PreviewFirewallChange401JSONResponse) VisitPreviewFirewallChangeResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PreviewFirewallChange403JSONResponse struct{ ForbiddenJSONResponse }
+
+func (response PreviewFirewallChange403JSONResponse) VisitPreviewFirewallChangeResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PreviewFirewallChange404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response PreviewFirewallChange404JSONResponse) VisitPreviewFirewallChangeResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PreviewFirewallChange409JSONResponse struct{ ConflictJSONResponse }
+
+func (response PreviewFirewallChange409JSONResponse) VisitPreviewFirewallChangeResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PreviewFirewallChange422JSONResponse struct{ InvalidRequestJSONResponse }
+
+func (response PreviewFirewallChange422JSONResponse) VisitPreviewFirewallChangeResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PreviewFirewallChange500JSONResponse struct{ InternalErrorJSONResponse }
+
+func (response PreviewFirewallChange500JSONResponse) VisitPreviewFirewallChangeResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PreviewFirewallChange503JSONResponse struct{ UnavailableJSONResponse }
+
+func (response PreviewFirewallChange503JSONResponse) VisitPreviewFirewallChangeResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(503)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type RevokeNodeRequestObject struct {
 	Id     string `json:"id"`
 	Params RevokeNodeParams
@@ -4347,6 +5685,732 @@ func (response RevokeNode500JSONResponse) VisitRevokeNodeResponse(w http.Respons
 type RevokeNode503JSONResponse struct{ UnavailableJSONResponse }
 
 func (response RevokeNode503JSONResponse) VisitRevokeNodeResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(503)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListOperationsRequestObject struct {
+	Params ListOperationsParams
+}
+
+type ListOperationsResponseObject interface {
+	VisitListOperationsResponse(w http.ResponseWriter) error
+}
+
+type ListOperations200JSONResponse OperationList
+
+func (response ListOperations200JSONResponse) VisitListOperationsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListOperations401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response ListOperations401JSONResponse) VisitListOperationsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListOperations403JSONResponse struct{ ForbiddenJSONResponse }
+
+func (response ListOperations403JSONResponse) VisitListOperationsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListOperations404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response ListOperations404JSONResponse) VisitListOperationsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListOperations409JSONResponse struct{ ConflictJSONResponse }
+
+func (response ListOperations409JSONResponse) VisitListOperationsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListOperations422JSONResponse struct{ InvalidRequestJSONResponse }
+
+func (response ListOperations422JSONResponse) VisitListOperationsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListOperations500JSONResponse struct{ InternalErrorJSONResponse }
+
+func (response ListOperations500JSONResponse) VisitListOperationsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListOperations503JSONResponse struct{ UnavailableJSONResponse }
+
+func (response ListOperations503JSONResponse) VisitListOperationsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(503)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListPendingOperationsRequestObject struct {
+	Params ListPendingOperationsParams
+}
+
+type ListPendingOperationsResponseObject interface {
+	VisitListPendingOperationsResponse(w http.ResponseWriter) error
+}
+
+type ListPendingOperations200JSONResponse PendingOperations
+
+func (response ListPendingOperations200JSONResponse) VisitListPendingOperationsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListPendingOperations401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response ListPendingOperations401JSONResponse) VisitListPendingOperationsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListPendingOperations403JSONResponse struct{ ForbiddenJSONResponse }
+
+func (response ListPendingOperations403JSONResponse) VisitListPendingOperationsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListPendingOperations404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response ListPendingOperations404JSONResponse) VisitListPendingOperationsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListPendingOperations409JSONResponse struct{ ConflictJSONResponse }
+
+func (response ListPendingOperations409JSONResponse) VisitListPendingOperationsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListPendingOperations422JSONResponse struct{ InvalidRequestJSONResponse }
+
+func (response ListPendingOperations422JSONResponse) VisitListPendingOperationsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListPendingOperations500JSONResponse struct{ InternalErrorJSONResponse }
+
+func (response ListPendingOperations500JSONResponse) VisitListPendingOperationsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListPendingOperations503JSONResponse struct{ UnavailableJSONResponse }
+
+func (response ListPendingOperations503JSONResponse) VisitListPendingOperationsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(503)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetOperationRequestObject struct {
+	Id string `json:"id"`
+}
+
+type GetOperationResponseObject interface {
+	VisitGetOperationResponse(w http.ResponseWriter) error
+}
+
+type GetOperation200JSONResponse Operation
+
+func (response GetOperation200JSONResponse) VisitGetOperationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetOperation401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response GetOperation401JSONResponse) VisitGetOperationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetOperation403JSONResponse struct{ ForbiddenJSONResponse }
+
+func (response GetOperation403JSONResponse) VisitGetOperationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetOperation404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response GetOperation404JSONResponse) VisitGetOperationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetOperation409JSONResponse struct{ ConflictJSONResponse }
+
+func (response GetOperation409JSONResponse) VisitGetOperationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetOperation422JSONResponse struct{ InvalidRequestJSONResponse }
+
+func (response GetOperation422JSONResponse) VisitGetOperationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetOperation500JSONResponse struct{ InternalErrorJSONResponse }
+
+func (response GetOperation500JSONResponse) VisitGetOperationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetOperation503JSONResponse struct{ UnavailableJSONResponse }
+
+func (response GetOperation503JSONResponse) VisitGetOperationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(503)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ConfirmOperationRequestObject struct {
+	Id     string `json:"id"`
+	Params ConfirmOperationParams
+	Body   *ConfirmOperationJSONRequestBody
+}
+
+type ConfirmOperationResponseObject interface {
+	VisitConfirmOperationResponse(w http.ResponseWriter) error
+}
+
+type ConfirmOperation202JSONResponse Operation
+
+func (response ConfirmOperation202JSONResponse) VisitConfirmOperationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(202)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ConfirmOperation401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response ConfirmOperation401JSONResponse) VisitConfirmOperationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ConfirmOperation403JSONResponse struct{ ForbiddenJSONResponse }
+
+func (response ConfirmOperation403JSONResponse) VisitConfirmOperationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ConfirmOperation404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response ConfirmOperation404JSONResponse) VisitConfirmOperationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ConfirmOperation409JSONResponse struct{ ConflictJSONResponse }
+
+func (response ConfirmOperation409JSONResponse) VisitConfirmOperationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ConfirmOperation422JSONResponse struct{ InvalidRequestJSONResponse }
+
+func (response ConfirmOperation422JSONResponse) VisitConfirmOperationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ConfirmOperation500JSONResponse struct{ InternalErrorJSONResponse }
+
+func (response ConfirmOperation500JSONResponse) VisitConfirmOperationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ConfirmOperation503JSONResponse struct{ UnavailableJSONResponse }
+
+func (response ConfirmOperation503JSONResponse) VisitConfirmOperationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(503)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RecoverOperationRequestObject struct {
+	Id     string `json:"id"`
+	Params RecoverOperationParams
+	Body   *RecoverOperationJSONRequestBody
+}
+
+type RecoverOperationResponseObject interface {
+	VisitRecoverOperationResponse(w http.ResponseWriter) error
+}
+
+type RecoverOperation202JSONResponse Operation
+
+func (response RecoverOperation202JSONResponse) VisitRecoverOperationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(202)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RecoverOperation401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response RecoverOperation401JSONResponse) VisitRecoverOperationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RecoverOperation403JSONResponse struct{ ForbiddenJSONResponse }
+
+func (response RecoverOperation403JSONResponse) VisitRecoverOperationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RecoverOperation404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response RecoverOperation404JSONResponse) VisitRecoverOperationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RecoverOperation409JSONResponse struct{ ConflictJSONResponse }
+
+func (response RecoverOperation409JSONResponse) VisitRecoverOperationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RecoverOperation422JSONResponse struct{ InvalidRequestJSONResponse }
+
+func (response RecoverOperation422JSONResponse) VisitRecoverOperationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RecoverOperation500JSONResponse struct{ InternalErrorJSONResponse }
+
+func (response RecoverOperation500JSONResponse) VisitRecoverOperationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RecoverOperation503JSONResponse struct{ UnavailableJSONResponse }
+
+func (response RecoverOperation503JSONResponse) VisitRecoverOperationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(503)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ResolveOperationRequestObject struct {
+	Id     string `json:"id"`
+	Params ResolveOperationParams
+	Body   *ResolveOperationJSONRequestBody
+}
+
+type ResolveOperationResponseObject interface {
+	VisitResolveOperationResponse(w http.ResponseWriter) error
+}
+
+type ResolveOperation202JSONResponse Operation
+
+func (response ResolveOperation202JSONResponse) VisitResolveOperationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(202)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ResolveOperation401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response ResolveOperation401JSONResponse) VisitResolveOperationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ResolveOperation403JSONResponse struct{ ForbiddenJSONResponse }
+
+func (response ResolveOperation403JSONResponse) VisitResolveOperationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ResolveOperation404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response ResolveOperation404JSONResponse) VisitResolveOperationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ResolveOperation409JSONResponse struct{ ConflictJSONResponse }
+
+func (response ResolveOperation409JSONResponse) VisitResolveOperationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ResolveOperation422JSONResponse struct{ InvalidRequestJSONResponse }
+
+func (response ResolveOperation422JSONResponse) VisitResolveOperationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ResolveOperation500JSONResponse struct{ InternalErrorJSONResponse }
+
+func (response ResolveOperation500JSONResponse) VisitResolveOperationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ResolveOperation503JSONResponse struct{ UnavailableJSONResponse }
+
+func (response ResolveOperation503JSONResponse) VisitResolveOperationResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response); err != nil {
@@ -4743,6 +6807,12 @@ type StrictServerInterface interface {
 	// RevokeEnrollmentToken 撤销接入码
 	// (DELETE /enrollment-tokens/{id})
 	RevokeEnrollmentToken(ctx context.Context, request RevokeEnrollmentTokenRequestObject) (RevokeEnrollmentTokenResponseObject, error)
+	// GetFirewallPlan 读取不可变预览
+	// (GET /firewall/plans/{id})
+	GetFirewallPlan(ctx context.Context, request GetFirewallPlanRequestObject) (GetFirewallPlanResponseObject, error)
+	// ApplyFirewallPlan 受理预览并返回原操作
+	// (POST /firewall/plans/{id}/apply)
+	ApplyFirewallPlan(ctx context.Context, request ApplyFirewallPlanRequestObject) (ApplyFirewallPlanResponseObject, error)
 	// ListNodes 读取节点
 	// (GET /nodes)
 	ListNodes(ctx context.Context, request ListNodesRequestObject) (ListNodesResponseObject, error)
@@ -4752,9 +6822,36 @@ type StrictServerInterface interface {
 	// RenameNode 修改节点名称
 	// (PATCH /nodes/{id})
 	RenameNode(ctx context.Context, request RenameNodeRequestObject) (RenameNodeResponseObject, error)
+	// ReadFirewall 读取原生防火墙实际状态
+	// (GET /nodes/{id}/firewall)
+	ReadFirewall(ctx context.Context, request ReadFirewallRequestObject) (ReadFirewallResponseObject, error)
+	// InstallFirewall 安装但不启用防火墙组件
+	// (POST /nodes/{id}/firewall/install)
+	InstallFirewall(ctx context.Context, request InstallFirewallRequestObject) (InstallFirewallResponseObject, error)
+	// PreviewFirewallChange 预览单项变更
+	// (POST /nodes/{id}/firewall/plans)
+	PreviewFirewallChange(ctx context.Context, request PreviewFirewallChangeRequestObject) (PreviewFirewallChangeResponseObject, error)
 	// RevokeNode 撤销节点授权
 	// (POST /nodes/{id}/revoke)
 	RevokeNode(ctx context.Context, request RevokeNodeRequestObject) (RevokeNodeResponseObject, error)
+	// ListOperations 查询历史或定位原操作
+	// (GET /operations)
+	ListOperations(ctx context.Context, request ListOperationsRequestObject) (ListOperationsResponseObject, error)
+	// ListPendingOperations 独立读取全部未决操作
+	// (GET /operations/pending)
+	ListPendingOperations(ctx context.Context, request ListPendingOperationsRequestObject) (ListPendingOperationsResponseObject, error)
+	// GetOperation 查询原操作
+	// (GET /operations/{id})
+	GetOperation(ctx context.Context, request GetOperationRequestObject) (GetOperationResponseObject, error)
+	// ConfirmOperation 确认原操作
+	// (POST /operations/{id}/confirm)
+	ConfirmOperation(ctx context.Context, request ConfirmOperationRequestObject) (ConfirmOperationResponseObject, error)
+	// RecoverOperation 核对并继续原操作
+	// (POST /operations/{id}/recover)
+	RecoverOperation(ctx context.Context, request RecoverOperationRequestObject) (RecoverOperationResponseObject, error)
+	// ResolveOperation 接受现状并结束为人工处理
+	// (POST /operations/{id}/resolve)
+	ResolveOperation(ctx context.Context, request ResolveOperationRequestObject) (ResolveOperationResponseObject, error)
 	// GetAccount 读取管理员账号
 	// (GET /settings/account)
 	GetAccount(ctx context.Context, request GetAccountRequestObject) (GetAccountResponseObject, error)
@@ -5014,6 +7111,59 @@ func (sh *strictHandler) RevokeEnrollmentToken(w http.ResponseWriter, r *http.Re
 	}
 }
 
+// GetFirewallPlan operation middleware
+func (sh *strictHandler) GetFirewallPlan(w http.ResponseWriter, r *http.Request, id string) {
+	var request GetFirewallPlanRequestObject
+
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetFirewallPlan(ctx, request.(GetFirewallPlanRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetFirewallPlan")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetFirewallPlanResponseObject); ok {
+		if err := validResponse.VisitGetFirewallPlanResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ApplyFirewallPlan operation middleware
+func (sh *strictHandler) ApplyFirewallPlan(w http.ResponseWriter, r *http.Request, id string, params ApplyFirewallPlanParams) {
+	var request ApplyFirewallPlanRequestObject
+
+	request.Id = id
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ApplyFirewallPlan(ctx, request.(ApplyFirewallPlanRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ApplyFirewallPlan")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ApplyFirewallPlanResponseObject); ok {
+		if err := validResponse.VisitApplyFirewallPlanResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // ListNodes operation middleware
 func (sh *strictHandler) ListNodes(w http.ResponseWriter, r *http.Request) {
 	var request ListNodesRequestObject
@@ -5098,6 +7248,101 @@ func (sh *strictHandler) RenameNode(w http.ResponseWriter, r *http.Request, id s
 	}
 }
 
+// ReadFirewall operation middleware
+func (sh *strictHandler) ReadFirewall(w http.ResponseWriter, r *http.Request, id string, params ReadFirewallParams) {
+	var request ReadFirewallRequestObject
+
+	request.Id = id
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ReadFirewall(ctx, request.(ReadFirewallRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ReadFirewall")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ReadFirewallResponseObject); ok {
+		if err := validResponse.VisitReadFirewallResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// InstallFirewall operation middleware
+func (sh *strictHandler) InstallFirewall(w http.ResponseWriter, r *http.Request, id string, params InstallFirewallParams) {
+	var request InstallFirewallRequestObject
+
+	request.Id = id
+	request.Params = params
+
+	var body InstallFirewallJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.InstallFirewall(ctx, request.(InstallFirewallRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "InstallFirewall")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(InstallFirewallResponseObject); ok {
+		if err := validResponse.VisitInstallFirewallResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// PreviewFirewallChange operation middleware
+func (sh *strictHandler) PreviewFirewallChange(w http.ResponseWriter, r *http.Request, id string, params PreviewFirewallChangeParams) {
+	var request PreviewFirewallChangeRequestObject
+
+	request.Id = id
+	request.Params = params
+
+	var body PreviewFirewallChangeJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.PreviewFirewallChange(ctx, request.(PreviewFirewallChangeRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "PreviewFirewallChange")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(PreviewFirewallChangeResponseObject); ok {
+		if err := validResponse.VisitPreviewFirewallChangeResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // RevokeNode operation middleware
 func (sh *strictHandler) RevokeNode(w http.ResponseWriter, r *http.Request, id string, params RevokeNodeParams) {
 	var request RevokeNodeRequestObject
@@ -5118,6 +7363,186 @@ func (sh *strictHandler) RevokeNode(w http.ResponseWriter, r *http.Request, id s
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(RevokeNodeResponseObject); ok {
 		if err := validResponse.VisitRevokeNodeResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListOperations operation middleware
+func (sh *strictHandler) ListOperations(w http.ResponseWriter, r *http.Request, params ListOperationsParams) {
+	var request ListOperationsRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListOperations(ctx, request.(ListOperationsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListOperations")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListOperationsResponseObject); ok {
+		if err := validResponse.VisitListOperationsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListPendingOperations operation middleware
+func (sh *strictHandler) ListPendingOperations(w http.ResponseWriter, r *http.Request, params ListPendingOperationsParams) {
+	var request ListPendingOperationsRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListPendingOperations(ctx, request.(ListPendingOperationsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListPendingOperations")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListPendingOperationsResponseObject); ok {
+		if err := validResponse.VisitListPendingOperationsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetOperation operation middleware
+func (sh *strictHandler) GetOperation(w http.ResponseWriter, r *http.Request, id string) {
+	var request GetOperationRequestObject
+
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetOperation(ctx, request.(GetOperationRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetOperation")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetOperationResponseObject); ok {
+		if err := validResponse.VisitGetOperationResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ConfirmOperation operation middleware
+func (sh *strictHandler) ConfirmOperation(w http.ResponseWriter, r *http.Request, id string, params ConfirmOperationParams) {
+	var request ConfirmOperationRequestObject
+
+	request.Id = id
+	request.Params = params
+
+	var body ConfirmOperationJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ConfirmOperation(ctx, request.(ConfirmOperationRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ConfirmOperation")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ConfirmOperationResponseObject); ok {
+		if err := validResponse.VisitConfirmOperationResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// RecoverOperation operation middleware
+func (sh *strictHandler) RecoverOperation(w http.ResponseWriter, r *http.Request, id string, params RecoverOperationParams) {
+	var request RecoverOperationRequestObject
+
+	request.Id = id
+	request.Params = params
+
+	var body RecoverOperationJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.RecoverOperation(ctx, request.(RecoverOperationRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "RecoverOperation")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(RecoverOperationResponseObject); ok {
+		if err := validResponse.VisitRecoverOperationResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ResolveOperation operation middleware
+func (sh *strictHandler) ResolveOperation(w http.ResponseWriter, r *http.Request, id string, params ResolveOperationParams) {
+	var request ResolveOperationRequestObject
+
+	request.Id = id
+	request.Params = params
+
+	var body ResolveOperationJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ResolveOperation(ctx, request.(ResolveOperationRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ResolveOperation")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ResolveOperationResponseObject); ok {
+		if err := validResponse.VisitResolveOperationResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

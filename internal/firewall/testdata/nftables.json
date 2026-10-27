@@ -1,0 +1,13 @@
+{"nftables":[
+{"chain":{"family":"inet","table":"host","name":"input","type":"filter","hook":"input","policy":"drop","handle":1}},
+{"rule":{"family":"inet","table":"host","chain":"input","handle":2,"expr":[{"match":{"op":"==","left":{"meta":{"key":"nfproto"}},"right":"ipv4"}},{"match":{"op":"==","left":{"payload":{"protocol":"tcp","field":"dport"}},"right":22}},{"accept":null}]}},
+{"rule":{"family":"inet","table":"host","chain":"input","handle":3,"expr":[{"match":{"op":"==","left":{"meta":{"key":"nfproto"}},"right":"ipv4"}},{"match":{"op":"==","left":{"payload":{"protocol":"tcp","field":"dport"}},"right":443}},{"accept":null}]}},
+{"rule":{"family":"inet","table":"host","chain":"input","handle":4,"expr":[{"match":{"op":"==","left":{"meta":{"key":"nfproto"}},"right":"ipv4"}},{"match":{"op":"==","left":{"payload":{"protocol":"udp","field":"dport"}},"right":53}},{"drop":null}]}},
+{"rule":{"family":"inet","table":"host","chain":"input","handle":5,"expr":[{"jump":{"target":"external"}}]}},
+{"chain":{"family":"inet","table":"host","name":"external","handle":6}},
+{"rule":{"family":"inet","table":"host","chain":"external","handle":7,"expr":[{"counter":{}},{"drop":null}]}},
+{"chain":{"family":"ip","table":"docker","name":"forward","hook":"forward","policy":"accept","handle":8}},
+{"rule":{"family":"ip","table":"docker","chain":"forward","handle":9,"expr":[{"accept":null}]}},
+{"chain":{"family":"ip","table":"nat","name":"input","type":"nat","hook":"input","policy":"accept","handle":10}},
+{"rule":{"family":"ip","table":"nat","chain":"input","handle":11,"expr":[{"accept":null}]}}
+]}

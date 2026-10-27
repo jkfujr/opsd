@@ -22,12 +22,15 @@ export function SessionBoundary() {
     if (!id) return;
     const events = new EventSource('/api/v1/events', { withCredentials: true });
     const refreshNodes = () => { void queryClient.invalidateQueries({ queryKey: ['nodes'] }); void queryClient.invalidateQueries({ queryKey: ['tokens'] }); };
-    const refresh = () => { refreshNodes(); void queryClient.invalidateQueries({ queryKey: ['sessions'] }); };
+    const refreshOperations = () => { void queryClient.invalidateQueries({ queryKey: ['operations'] }); void queryClient.invalidateQueries({ queryKey: ['firewall'] }); };
+    const refresh = () => { refreshNodes(); refreshOperations(); void queryClient.invalidateQueries({ queryKey: ['sessions'] }); };
     events.onopen = refresh;
     events.addEventListener('invalidate', (event) => {
       try {
         const { resource } = JSON.parse((event as MessageEvent).data);
-        if (resource === 'nodes') refreshNodes();
+        if (resource === 'nodes') { refreshNodes(); refreshOperations(); }
+        if (resource === 'operations' || resource === 'firewall') { refreshNodes(); refreshOperations(); }
+        if (resource === 'all') refresh();
       } catch { refresh(); }
     });
     events.onerror = () => { if (queryClient.isMutating({ mutationKey: ['account-change'] }) === 0) void api.GET('/auth/session').catch(() => {}); };
@@ -36,7 +39,7 @@ export function SessionBoundary() {
   if (session.isPending) return <div className="p-8 text-foreground-muted">加载中…</div>;
   if (session.error) return <div className="m-auto max-w-md space-y-4 p-8"><Failure error={session.error} /><Button onClick={() => void session.refetch()}>重试</Button></div>;
   if (!session.data) {
-    if (location.pathname === '/' || location.pathname.startsWith('/settings')) return <p className="p-8">页面不存在</p>;
+    if (location.pathname === '/' || location.pathname === '/firewall' || location.pathname.startsWith('/settings')) return <p className="p-8">页面不存在</p>;
     return <Login entrance={location.pathname} />;
   }
   return <SessionContext value={session.data}><Outlet /></SessionContext>;
