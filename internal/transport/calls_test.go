@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"github.com/coder/websocket"
-	"github.com/opsd-labs/opsd/internal/identity"
-	"github.com/opsd-labs/opsd/internal/protocol"
+	"github.com/jkfujr/opsd/internal/identity"
+	"github.com/jkfujr/opsd/internal/protocol"
 )
 
 func TestCallsDispatchReversedRepliesAndHeartbeat(t *testing.T) {

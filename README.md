@@ -1,8 +1,8 @@
 # OPSD
 
-多节点防火墙与容器管理。当前已实现安装、账号、节点、首页、主机防火墙和全局操作抽屉，并完成本地验证及 C091 的首轮 UFW 实机验收。容器、Docker 端口、互信和部署迁移按后续批次实施。
+对等节点管理。每台机器安装同一个 `opsd`，提供成员通信、本机管理、监控和可选控制台；修改由目标节点持久受理并执行。普通节点只保存本机运行资料，附近的 CouchDB 保存共享数据和历史。
 
-2026-10-27，当前版本已在 C091（Debian 13、amd64）以原生 systemd 运行，页面与 Agent 共用 `65533`。登录入口与凭据单独交付；新增节点在“设置 → 接入码”生成安装命令。本次不重启整机或 Docker，不操作 WSL。
+当前为开发预发布的对等架构，不兼容旧 Hub／Agent 协议和数据库。
 
 ## 开发
 
@@ -16,64 +16,64 @@ npm run build
 npm test
 ```
 
-页面通过控制端的同源入口访问。`npm run dev` 只启动前端开发服务器，不转发后端请求；账号和节点验收使用 `opsd serve` 提供的入口。
+`api/openapi.json` 是 HTTP 类型来源，`npm run generate` 生成 Go 和 TypeScript 接口。前端资源嵌入程序，生产环境无需 Node.js。构建产物位于 `artifacts/`，包含 `install.sh` 与 `opsd-linux-amd64`、`opsd-linux-arm64`。
 
 ## 安装与运行
 
-在 Debian 或 Ubuntu 的 systemd 环境中使用同架构的两个已构建程序，保持 `opsd` 与 `opsd-agent` 位于同一目录：
+Debian／Ubuntu 的 systemd 主机使用 [Releases](https://github.com/jkfujr/opsd/releases) 中固定版本的 `install.sh`。以 root 下载脚本，完整下载后执行：
 
 ```bash
-sudo ./opsd install
+curl -fsSL https://github.com/jkfujr/opsd/releases/download/v$(node -p 'require("./package.json").version')/install.sh -o artifacts/install.sh
+sudo sh artifacts/install.sh
+sudo /opt/opsd/bin/opsd console --enabled=true
 ```
 
-向导支持安装目录、端口、安全入口、账号和隐藏密码输入。非交互安装使用 `--non-interactive`，其余参数为 `--install-dir`、`--port`、`--entrance`、`--username`、`--password`，对应 `OPSD_*` 环境变量；命令行优先。无终端时须显式启用非交互模式。
+控制台默认关闭；节点通信默认 TCP 8444，控制台默认 65533。安装输出独立管理员账号、随机密码及登录入口。可使用 `--username`、`--entrance`、`OPSD_PASSWORD` 设置初始账号；`--listen` 和 `--console-listen` 设置监听地址，`--install-dir` 设置程序目录，`--config` 设置实例配置路径。重复安装恢复服务，不覆盖已有身份或账号，不隐式升级。
 
-控制端安装后以专用普通用户运行，本机 Agent 以 root 运行。默认安装目录为 `/opt/opsd`，实例配置为 `/etc/opsd/instance.json`，Agent 数据为 `/var/lib/opsd-agent`。安装中断保留原意图及身份，重复安装不覆盖账号、密钥和数据，也不隐式升级。
+在节点页打开“添加节点”，可填写名称和地域，点击“生成安装命令”才创建接入码；接入码列表与撤销位于节点页“接入码”弹窗。安装命令支持 `--name` 和 `--region`，名称留空使用目标机器主机名，地域留空保持未设置。新成员主动连接签发节点取得目录；接入码 24 小时有效，成功加入即消费，之后不依赖签发节点在线。
 
-服务入口为 `opsd serve --instance <实例配置>` 和 `opsd-agent run --data-dir <Agent 数据目录>`。安装完成分别报告服务就绪和本机 Agent 接入，外部可访问性须另行验收。
+未指定 `--address` 时，安装器优先发现公网 IPv4，再尝试 IPv6；显式地址可使用现有组网网络。防火墙和云安全组需开放节点通信端口。节点详情可分别设置 IPv4／IPv6 的自动或手工公网 IP；自动模式每五分钟及网络变化后更新，冲突或失败保留旧值。
 
-远程节点使用“设置 → 接入码”生成的命令，以 root 运行同架构的 `opsd-agent`。接入码仅创建时展示，24 小时有效，登记成功即消费；撤销节点保留历史及本机数据。
+防火墙工具栏进入“设置”，可开启默认关闭的集群互信，为当前及后续加入成员维护主机入站来源放行。规则页的“互信规则”按当前目标节点展示其他成员、精确 IP、共享 IP 关联及实际状态；关闭后持续展示未撤除规则。互信来源可访问主机全部入站端口，共享公网 IP 的其他来源也在此范围。Docker 互信随后续容器功能接入。
 
-## 主机防火墙与操作恢复
+安装注册以下服务，均使用同一个程序：
 
-在“防火墙”选择节点与配置范围，单项编辑后预览、应用。运行规则修改及需要重载的操作，从首次原生写入前开始计时，须在 120 秒内从顶部操作抽屉确认保留；未确认时由节点独立撤销。永久配置修改不伪称已经运行生效。
+- `opsd.service`：普通用户运行节点、通信、采集和可选控制台。
+- `opsd-executor.service`：root 运行本机 Unix Socket 执行器，只接受有类型的操作。
+- `opsd-operation@.service`、`opsd-recover.service`：独立执行与恢复防火墙操作。
 
-UFW 支持可无损表达的入站规则、顺序及默认入站策略，分别读取 IPv4 的 `ufw-*` 和 IPv6 的 `ufw6-*` 原生链。复杂用户规则、自定义初始化脚本，或运行与永久用户配置不一致时保持只读。firewalld 支持运行／永久两侧、区域端口、简单 rich rule、原生优先级及无损条件下的区域目标重载。nftables 只修改来源明确、能唯一映射的入站基础链简单片段；变量、通配 include、共行混合语句等复杂来源保持只读。
-
-管理器全局启停目前保持只读，其影响超出本批入站恢复范围。Debian／Ubuntu 无管理器时可安装 UFW、firewalld 或 nftables；安装不自动启用或切换后端，只解除本次建立且归属明确的服务屏蔽。
-
-同一预览重复应用追踪原操作；每节点只允许一个未决写操作。受理前发现冲突保留页面草稿，提交结果不明时查询原操作，不自动重发。失联只显示“结果待同步”；第三值或定位歧义保持“需处理”及写入限制，人工接受现状不计为成功。
-
-Agent 安装会注册 `opsd-operation@.service` 和 `opsd-recover.service`。本机执行记录固定在 Agent 数据目录，操作服务独立于通信服务，使用 `Restart=on-failure` 和 `KillMode=control-group`。手工启动恢复使用：
+实例配置默认 `/etc/opsd/instance.json`，节点资料在 `/var/lib/opsd/node`，root 执行与恢复资料在 `/var/lib/opsd/executor`。控制台关闭不停止后台工作。本机账号修改与控制台开关通过本机 Socket 受理：
 
 ```bash
+sudo /opt/opsd/bin/opsd console --enabled=false
+sudo /opt/opsd/bin/opsd account --entrance /new-login-entry
+sudo env OPSD_PASSWORD='新密码' /opt/opsd/bin/opsd account
 sudo systemctl start opsd-recover.service
 ```
 
-`opsd-agent execute --operation-id <ID>` 和 `opsd-agent recover` 由对应 systemd 服务调用；直接绕过服务执行会被拒绝。恢复先停止旧操作服务并确认其受管命令已退出，再取得本机执行锁。
+## 地域存储
 
-本机账号恢复入口：
+普通节点不需要 Docker。仅在存储服务器准备 Docker，并在节点详情启用数据库，填写组网绑定 IP 和端口。程序部署 CouchDB 容器，数据保留在执行器目录下；数据库凭据与控制台密码独立。
 
-```bash
-sudo /opt/opsd/bin/opsd recovery show-entrance
-sudo /opt/opsd/bin/opsd recovery reset-password
-sudo /opt/opsd/bin/opsd recovery reset-entrance --entrance /new-login-entry
-```
+默认使用三个独立实例，各节点优先使用指定数据库、同地域数据库，再选择其他可用实例。CouchDB 持续复制任务在实例间异步复制；全部数据库不可达时，目标控制和本机恢复继续，集群历史明确显示不可用。地域断网不等待全局多数派。
 
-查看入口只读；修改命令在部署互斥下停服，以控制端数据所属用户事务更新凭据并撤销旧会话，然后启动服务。密码重置使用隐藏输入。
+配置、操作和账号密文由所属节点生成签名的不可变版本记录。批量上传逐项确认，切换旧副本不覆盖已知新版本。数据库内容不重放系统命令。私钥、浏览器会话和执行恢复资料只留本机。
 
-## 构建与契约
+监控默认每 5 分钟采集一次，保留 7 天；数据库按 UTC 日期分库，过期时先停止对应复制再删除。概览打开时每 3 秒直连获取读数，同一目标共享采集，实时读数不逐次写入数据库。
 
-`npm run build` 依次生成 Go／TypeScript 接口、检查并构建前端、嵌入界面资源，最后构建两个 Go 程序。产物位于 `dist/linux-amd64` 和 `dist/linux-arm64`；正式安装包在后续构建收口批次生成。
+## 操作与账号
 
-`api/openapi.json` 是唯一 HTTP 契约。单独更新生成文件使用 `npm run generate`，生成结果不手工修改；Go 服务仅挂载已实现接口。Agent 协议类型与编解码位于 `internal/protocol`，Noise 分片传输位于 `internal/transport`，控制端和 Agent 生命周期分别位于 `internal/control`、`internal/agent`。
+请求由目标节点本地落盘后编号，同一目标按受理顺序串行修改。重复操作 ID 或同一幂等键返回原记录；应答丢失时查询原操作。入口退出、数据库故障不取消目标已受理的操作。读取、取消、确认和恢复独立于后续修改。
 
-控制端与 Agent 的数据库迁移分别位于 `internal/storage/migrations/control` 和 `internal/storage/migrations/agent`。迁移使用事务提交版本，数据库采用 WAL、FULL 同步和连接级外键设置。账号、会话、接入码和身份已持久化；在线状态来自当前有效连接，不从历史记录推断。
+防火墙首次在后台导入当前用户入站规则及默认策略，之后由所属节点 SQLite 保存统一配置。页面直接读取保存的数据，按端口规则和 IP 规则分类；保存配置与操作同事务提交，返回待应用，后台立即执行并每 30 秒检查外部改动。运行规则变更保留读回、120 秒确认与定向撤销，停用时只维护持久配置；自动修复只使用已确认版本，失败版本保留修改并手动重试。无法表达的内容、系统基础规则和第三方独立链保留。独立操作服务不依赖控制台存活。
 
-生产环境由控制端提供嵌入的静态资源，无需 Node.js 服务。运行时模型请求为零。
+每个节点保留独立账号和会话。密码验证信息与可查看密文分开保存，密文使用 AES-GCM，解密密钥使用 age 多接收方封装。新成员获得授权封装，不复制其他节点私钥。撤销成员拒绝其新请求和后续密码授权，并移除数据库访问；离线成员恢复通信后才能得知撤销，已经获得的旧密码无法收回。
 
-第三批本地证据使用本地渠道。实际 HTTP／Noise／SQLite 覆盖持久受理、重复投递、应答丢失、封存与迟到投递、节点互斥、旧修订、确认与超时、主机启动标识变化及第三值冲突；原生格式夹具与受控执行替身覆盖三个后端、定向撤销和组件安装恢复。浏览器通过实际 HTTP／Noise 验证草稿、预览、操作抽屉、应答丢失、超时、离线和浅深主题窄屏交互。Go／TypeScript 生成、前端构建及 Linux amd64／arm64 两程序编译已通过。
+## 文档
 
-上述浏览器原生执行替身明确标为测试数据。C091 后续实机验收使用真实 UFW、systemd 和公网入口，覆盖安装权限、重复安装、本机入口恢复、带备注规则读写、排序、外部冲突、确认保留、操作进程强制结束后恢复、通信停止期间独立超时撤销及同操作重连同步；临时规则、监听和网络资源已清理。
-
-IPv4 流量通过公网新连接验证；IPv6 原生过滤通过临时网络命名空间客户端验证。当前开发机没有 IPv6 路由，公网 IPv6 访问仍未验收。整机重启恢复、firewalld／原生 nftables、Ubuntu 和 arm64 实机验收继续保留待完成。本次 UFW 修正仅重建并部署 amd64 Agent，控制端、前端和未变化范围的成功证据直接复用，没有运行云端 CI。
+- [开发](CONTRIBUTING.md)
+- [架构](docs/ARCHITECTURE.md)
+- [UI 规范](docs/UI.md)
+- [验收命令与最近结果](docs/VALIDATION.md)
+- [发布](docs/RELEASING.md)
+- [变更记录](CHANGELOG.md)

@@ -193,6 +193,9 @@ func validatePayload(payload Payload) error {
 
 func (action OperationAction) validate() error {
 	count := 0
+	if action.FirewallConfig != nil {
+		count++
+	}
 	if action.Firewall != nil {
 		count++
 	}
@@ -206,6 +209,11 @@ func (action OperationAction) validate() error {
 		return fmt.Errorf("操作必须包含且只包含一种业务载荷")
 	}
 	switch action.Kind {
+	case "firewall_config":
+		if action.FirewallConfig == nil || action.FirewallConfig.Revision == 0 {
+			return fmt.Errorf("防火墙配置缺少版本")
+		}
+		return nil
 	case "firewall":
 		if action.Firewall == nil {
 			return fmt.Errorf("防火墙操作缺少预览")

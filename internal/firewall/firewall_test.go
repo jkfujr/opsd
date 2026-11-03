@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/opsd-labs/opsd/internal/protocol"
+	"github.com/jkfujr/opsd/internal/protocol"
 )
 
 type nativeFixture struct {

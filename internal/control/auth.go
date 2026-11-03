@@ -1,16 +1,20 @@
 package control
 
 import (
+	"encoding/json"
+	"github.com/jkfujr/opsd/internal/cluster"
+	"github.com/jkfujr/opsd/internal/operations"
+	"github.com/jkfujr/opsd/internal/protocol"
 	"net/http"
 	"time"
 
-	"github.com/opsd-labs/opsd/internal/account"
-	"github.com/opsd-labs/opsd/internal/httpapi"
-	"github.com/opsd-labs/opsd/internal/identity"
+	"github.com/jkfujr/opsd/internal/account"
+	"github.com/jkfujr/opsd/internal/httpapi"
+	"github.com/jkfujr/opsd/internal/identity"
 )
 
-func clearCookie(w http.ResponseWriter) {
-	http.SetCookie(w, &http.Cookie{Name: cookieName, Path: "/", HttpOnly: true, SameSite: http.SameSiteLaxMode, MaxAge: -1})
+func (s *Server) clearCookie(w http.ResponseWriter) {
+	http.SetCookie(w, &http.Cookie{Name: s.cookieName(), Path: "/", HttpOnly: true, SameSite: http.SameSiteLaxMode, MaxAge: -1})
 }
 
 func (s *Server) Login(w http.ResponseWriter, r *http.Request) {
@@ -94,13 +98,13 @@ func (s *Server) Login(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, r, 409, "conflict", "凭据已变更，请重新登录")
 		return
 	}
-	http.SetCookie(w, &http.Cookie{Name: cookieName, Value: token, Path: "/", HttpOnly: true, SameSite: http.SameSiteLaxMode, MaxAge: 7 * 24 * 60 * 60, Expires: expires})
-	write(w, 200, httpapi.CurrentSession{CsrfToken: csrf, LoginAddress: entrance, Session: httpapi.Session{Id: id, Username: username, CreatedAt: now, ExpiresAt: expires, LastSeenAt: now, RemoteAddress: ip, Current: true}})
+	http.SetCookie(w, &http.Cookie{Name: s.cookieName(), Value: token, Path: "/", HttpOnly: true, SameSite: http.SameSiteLaxMode, MaxAge: 7 * 24 * 60 * 60, Expires: expires})
+	write(w, 200, httpapi.CurrentSession{LocalNodeId: s.node.ID, CsrfToken: csrf, LoginAddress: entrance, Session: httpapi.Session{Id: id, Username: username, CreatedAt: now, ExpiresAt: expires, LastSeenAt: now, RemoteAddress: ip, Current: true}})
 }
 
 func (s *Server) GetSession(w http.ResponseWriter, r *http.Request) {
 	value := current(r)
-	write(w, 200, httpapi.CurrentSession{CsrfToken: value.csrf, Session: value.session, LoginAddress: value.entrance})
+	write(w, 200, httpapi.CurrentSession{LocalNodeId: s.node.ID, CsrfToken: value.csrf, Session: value.session, LoginAddress: value.entrance})
 }
 
 func (s *Server) Logout(w http.ResponseWriter, r *http.Request, _ httpapi.LogoutParams) {
@@ -110,7 +114,7 @@ func (s *Server) Logout(w http.ResponseWriter, r *http.Request, _ httpapi.Logout
 		return
 	}
 	s.revokeStreams(id)
-	clearCookie(w)
+	s.clearCookie(w)
 	w.WriteHeader(204)
 }
 
@@ -157,7 +161,7 @@ func (s *Server) RevokeSession(w http.ResponseWriter, r *http.Request, id string
 	}
 	s.revokeStreams(id)
 	if current(r).session.Id == id {
-		clearCookie(w)
+		s.clearCookie(w)
 	}
 	w.WriteHeader(204)
 }
@@ -202,43 +206,42 @@ func (s *Server) ChangeAccount(w http.ResponseWriter, r *http.Request, _ httpapi
 		s.fail(w, r, 422, "invalid_request", err.Error())
 		return
 	}
+	change := cluster.AccountChange{Revision: revision, Username: username, Entrance: entrance}
 	if body.Password != nil {
-		var err error
-		hash, err = account.Hash(*body.Password)
+		change.Password = *body.Password
+	}
+	payload, _ := json.Marshal(change)
+	op, err := s.node.Submit(r.Context(), s.node.ID, cluster.Request{ID: cluster.NewOperationID(s.node.ID), Kind: "account", Payload: payload})
+	if err != nil {
+		s.operationError(w, r, err)
+		return
+	}
+	ticker := time.NewTicker(100 * time.Millisecond)
+	defer ticker.Stop()
+	for {
+		op, err = s.node.GetOperation(r.Context(), op.ID)
 		if err != nil {
-			s.fail(w, r, 422, "invalid_request", err.Error())
+			s.operationError(w, r, err)
 			return
 		}
-	}
-	tx, err := s.db.BeginTx(r.Context(), nil)
-	if err != nil {
-		s.fail(w, r, 500, "internal_error", "修改账号失败")
-		return
-	}
-	defer tx.Rollback()
-	result, err := tx.ExecContext(r.Context(), "UPDATE account SET username=?,password_hash=?,entrance=?,revision=revision+1 WHERE id=1 AND revision=?", username, hash, entrance, revision)
-	if err != nil {
-		s.fail(w, r, 500, "internal_error", "修改账号失败")
-		return
-	}
-	affected, err := result.RowsAffected()
-	if err != nil || affected != 1 {
-		s.fail(w, r, 409, "conflict", "账号已变更，请重新登录")
-		return
-	}
-	if _, err = tx.ExecContext(r.Context(), "UPDATE sessions SET revoked_at=? WHERE revoked_at IS NULL", s.now().Unix()); err != nil {
-		s.fail(w, r, 500, "internal_error", "撤销旧会话失败")
-		return
-	}
-	if err = tx.Commit(); err != nil {
-		s.fail(w, r, 500, "internal_error", "保存账号失败")
-		return
+		if operations.Terminal(op.State) {
+			if op.State != protocol.Succeeded {
+				s.fail(w, r, 409, "conflict", "账号修改未完成，请查看操作记录")
+				return
+			}
+			break
+		}
+		select {
+		case <-r.Context().Done():
+			return
+		case <-ticker.C:
+		}
 	}
 	s.revokeStreams("")
-	clearCookie(w)
+	s.clearCookie(w)
 	write(w, 200, httpapi.AccountChanged{LoginAddress: entrance})
 }
 
 func (s *Server) GetVersion(w http.ResponseWriter, r *http.Request) {
-	write(w, 200, httpapi.VersionInfo{ControlVersion: s.options.ControlVersion, FrontendVersion: s.options.FrontendVersion})
+	write(w, 200, httpapi.VersionInfo{NodeVersion: s.options.NodeVersion, FrontendVersion: s.options.FrontendVersion})
 }

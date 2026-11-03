@@ -5,11 +5,12 @@ import { ThemeProvider } from '@appica/ui-react/providers/theme-provider';
 import { App } from './App';
 import './styles.css';
 import { queryClient } from './state';
+import { themeOptions } from './theme';
 
 createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <QueryClientProvider client={queryClient}>
-      <ThemeProvider defaultTheme="system" storageKey="opsd.theme" disableTransitionOnChange>
+      <ThemeProvider {...themeOptions} disableTransitionOnChange>
         <App />
       </ThemeProvider>
     </QueryClientProvider>

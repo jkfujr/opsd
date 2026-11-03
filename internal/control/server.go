@@ -14,55 +14,36 @@ import (
 	"sync"
 	"time"
 
-	"github.com/opsd-labs/opsd/internal/httpapi"
-	"github.com/opsd-labs/opsd/internal/identity"
-	"github.com/opsd-labs/opsd/internal/transport"
+	"github.com/jkfujr/opsd/internal/cluster"
+	"github.com/jkfujr/opsd/internal/httpapi"
+	"github.com/jkfujr/opsd/internal/identity"
 )
 
-const cookieName = "opsd_session"
+func (s *Server) cookieName() string { return "opsd_session_" + s.node.ID }
 
 type Options struct {
 	Assets          fs.FS
-	ControlAddress  string
-	ControlVersion  string
+	Node            *cluster.Node
+	NodeVersion     string
 	FrontendVersion string
 	Now             func() time.Time
 }
-
-type connection struct {
-	channel  *transport.Channel
-	id       string
-	writable bool
-	ready    bool
-	blocked  string
-	calls    *transport.Calls
-}
-
 type subscriber struct {
 	session string
 	events  chan string
 	done    chan struct{}
 }
-
 type Server struct {
 	db            *sql.DB
-	key           identity.Key
+	node          *cluster.Node
 	options       Options
 	now           func() time.Time
 	mu            sync.Mutex
-	lifecycle     sync.Mutex
-	connections   map[string]*connection
 	subscribers   map[*subscriber]struct{}
 	failures      map[string][]time.Time
 	inFlight      map[string]int
 	passwordSlots chan struct{}
-	background    context.Context
-	stop          context.CancelFunc
-	workers       sync.WaitGroup
-	closed        bool
-	dispatching   map[string]bool
 }
-
 type sessionContext struct {
 	session  httpapi.Session
 	csrf     string
@@ -71,19 +52,13 @@ type sessionContext struct {
 type contextKey struct{}
 
 func New(ctx context.Context, db *sql.DB, options Options) (*Server, error) {
-	key, err := LoadKey(ctx, db)
-	if err != nil {
-		return nil, err
+	if options.Node == nil {
+		return nil, errors.New("缺少本机节点")
 	}
 	if options.Now == nil {
 		options.Now = time.Now
 	}
-	var entrance string
-	if err := db.QueryRowContext(ctx, "SELECT entrance FROM account WHERE id=1").Scan(&entrance); err != nil {
-		return nil, err
-	}
-	background, stop := context.WithCancel(context.Background())
-	return &Server{db: db, key: key, options: options, now: options.Now, connections: make(map[string]*connection), subscribers: make(map[*subscriber]struct{}), failures: make(map[string][]time.Time), inFlight: make(map[string]int), passwordSlots: make(chan struct{}, 2), background: background, stop: stop, dispatching: map[string]bool{}}, nil
+	return &Server{db: db, node: options.Node, options: options, now: options.Now, subscribers: map[*subscriber]struct{}{}, failures: map[string][]time.Time{}, inFlight: map[string]int{}, passwordSlots: make(chan struct{}, 1)}, nil
 }
 
 func (s *Server) Handler() http.Handler {
@@ -91,16 +66,11 @@ func (s *Server) Handler() http.Handler {
 	httpapi.HandlerWithOptions(s, httpapi.StdHTTPServerOptions{BaseURL: "/api/v1", BaseRouter: mux, ErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, err error) {
 		s.fail(w, r, 422, "invalid_request", "请求参数无效")
 	}})
-	mux.HandleFunc("GET /api/v1/agent/connect", s.connect)
 	mux.HandleFunc("GET /api/v1/events", s.events)
 	mux.HandleFunc("/", s.page)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Cache-Control", "no-store")
 		w.Header().Set("X-Content-Type-Options", "nosniff")
-		if r.URL.Path == "/api/v1/agent/connect" {
-			mux.ServeHTTP(w, r)
-			return
-		}
 		if strings.HasPrefix(r.URL.Path, "/api/") && r.URL.Path != "/api/v1/auth/login" {
 			session, err := s.authenticate(r)
 			if err != nil {
@@ -137,7 +107,7 @@ func remoteIP(r *http.Request) string {
 }
 
 func (s *Server) authenticate(r *http.Request) (sessionContext, error) {
-	cookie, err := r.Cookie(cookieName)
+	cookie, err := r.Cookie(s.cookieName())
 	if err != nil || len(cookie.Value) > 128 {
 		return sessionContext{}, sql.ErrNoRows
 	}
@@ -216,7 +186,7 @@ func (s *Server) page(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if path != entrance {
-		if path != "/" && path != "/firewall" && path != "/settings" && !strings.HasPrefix(path, "/settings/") {
+		if path != "/" && path != "/firewall" && path != "/firewall/settings" && path != "/nodes" && !strings.HasPrefix(path, "/nodes/") && path != "/settings" && !strings.HasPrefix(path, "/settings/") {
 			http.NotFound(w, r)
 			return
 		}
@@ -238,21 +208,7 @@ func (s *Server) page(w http.ResponseWriter, r *http.Request) {
 	w.Write(data)
 }
 
-func (s *Server) Close() {
-	s.stop()
-	s.mu.Lock()
-	s.closed = true
-	for _, conn := range s.connections {
-		conn.calls.Close()
-		conn.channel.Close()
-	}
-	for sub := range s.subscribers {
-		close(sub.done)
-		delete(s.subscribers, sub)
-	}
-	s.mu.Unlock()
-	s.workers.Wait()
-}
+func (s *Server) Close() { s.revokeStreams("") }
 
 func (s *Server) notify(event string) {
 	s.mu.Lock()

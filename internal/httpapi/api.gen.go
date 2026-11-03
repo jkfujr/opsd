@@ -19,6 +19,7 @@ import (
 
 // Defines values for APIErrorCode.
 const (
+	APIErrorCodeCancelled             APIErrorCode = "cancelled"
 	APIErrorCodeConflict              APIErrorCode = "conflict"
 	APIErrorCodeCsrfRejected          APIErrorCode = "csrf_rejected"
 	APIErrorCodeDependencyUnavailable APIErrorCode = "dependency_unavailable"
@@ -27,6 +28,7 @@ const (
 	APIErrorCodeInvalidRequest        APIErrorCode = "invalid_request"
 	APIErrorCodeNodeBusy              APIErrorCode = "node_busy"
 	APIErrorCodeNodeUnavailable       APIErrorCode = "node_unavailable"
+	APIErrorCodeNotAccepted           APIErrorCode = "not_accepted"
 	APIErrorCodeNotFound              APIErrorCode = "not_found"
 	APIErrorCodeRateLimited           APIErrorCode = "rate_limited"
 	APIErrorCodeUnauthenticated       APIErrorCode = "unauthenticated"
@@ -35,6 +37,8 @@ const (
 // Valid indicates whether the value is a known member of the APIErrorCode enum.
 func (e APIErrorCode) Valid() bool {
 	switch e {
+	case APIErrorCodeCancelled:
+		return true
 	case APIErrorCodeConflict:
 		return true
 	case APIErrorCodeCsrfRejected:
@@ -51,26 +55,13 @@ func (e APIErrorCode) Valid() bool {
 		return true
 	case APIErrorCodeNodeUnavailable:
 		return true
+	case APIErrorCodeNotAccepted:
+		return true
 	case APIErrorCodeNotFound:
 		return true
 	case APIErrorCodeRateLimited:
 		return true
 	case APIErrorCodeUnauthenticated:
-		return true
-	default:
-		return false
-	}
-}
-
-// Defines values for AddRuleKind.
-const (
-	AddRuleKindAddRule AddRuleKind = "add_rule"
-)
-
-// Valid indicates whether the value is a known member of the AddRuleKind enum.
-func (e AddRuleKind) Valid() bool {
-	switch e {
-	case AddRuleKindAddRule:
 		return true
 	default:
 		return false
@@ -120,6 +111,7 @@ const (
 	BackendNftables  Backend = "nftables"
 	BackendNone      Backend = "none"
 	BackendUfw       Backend = "ufw"
+	BackendUnknown   Backend = "unknown"
 )
 
 // Valid indicates whether the value is a known member of the Backend enum.
@@ -135,44 +127,7 @@ func (e Backend) Valid() bool {
 		return true
 	case BackendUfw:
 		return true
-	default:
-		return false
-	}
-}
-
-// Defines values for ChangePlanContractVersion.
-const (
-	N1 ChangePlanContractVersion = 1
-)
-
-// Valid indicates whether the value is a known member of the ChangePlanContractVersion enum.
-func (e ChangePlanContractVersion) Valid() bool {
-	switch e {
-	case N1:
-		return true
-	default:
-		return false
-	}
-}
-
-// Defines values for ComponentActionAction.
-const (
-	ComponentActionActionRemove  ComponentActionAction = "remove"
-	ComponentActionActionStart   ComponentActionAction = "start"
-	ComponentActionActionStop    ComponentActionAction = "stop"
-	ComponentActionActionUpgrade ComponentActionAction = "upgrade"
-)
-
-// Valid indicates whether the value is a known member of the ComponentActionAction enum.
-func (e ComponentActionAction) Valid() bool {
-	switch e {
-	case ComponentActionActionRemove:
-		return true
-	case ComponentActionActionStart:
-		return true
-	case ComponentActionActionStop:
-		return true
-	case ComponentActionActionUpgrade:
+	case BackendUnknown:
 		return true
 	default:
 		return false
@@ -181,274 +136,19 @@ func (e ComponentActionAction) Valid() bool {
 
 // Defines values for ConfigScope.
 const (
-	ConfigScopeBoth      ConfigScope = "both"
-	ConfigScopePermanent ConfigScope = "permanent"
-	ConfigScopeRuntime   ConfigScope = "runtime"
+	Both      ConfigScope = "both"
+	Permanent ConfigScope = "permanent"
+	Runtime   ConfigScope = "runtime"
 )
 
 // Valid indicates whether the value is a known member of the ConfigScope enum.
 func (e ConfigScope) Valid() bool {
 	switch e {
-	case ConfigScopeBoth:
+	case Both:
 		return true
-	case ConfigScopePermanent:
+	case Permanent:
 		return true
-	case ConfigScopeRuntime:
-		return true
-	default:
-		return false
-	}
-}
-
-// Defines values for ConnectPortainerKind.
-const (
-	Connect ConnectPortainerKind = "connect"
-)
-
-// Valid indicates whether the value is a known member of the ConnectPortainerKind enum.
-func (e ConnectPortainerKind) Valid() bool {
-	switch e {
-	case Connect:
-		return true
-	default:
-		return false
-	}
-}
-
-// Defines values for ContainerActionAction.
-const (
-	ContainerActionActionRestart ContainerActionAction = "restart"
-	ContainerActionActionStart   ContainerActionAction = "start"
-	ContainerActionActionStop    ContainerActionAction = "stop"
-)
-
-// Valid indicates whether the value is a known member of the ContainerActionAction enum.
-func (e ContainerActionAction) Valid() bool {
-	switch e {
-	case ContainerActionActionRestart:
-		return true
-	case ContainerActionActionStart:
-		return true
-	case ContainerActionActionStop:
-		return true
-	default:
-		return false
-	}
-}
-
-// Defines values for ContainerActionTargetAction.
-const (
-	ContainerActionTargetActionRestart ContainerActionTargetAction = "restart"
-	ContainerActionTargetActionStart   ContainerActionTargetAction = "start"
-	ContainerActionTargetActionStop    ContainerActionTargetAction = "stop"
-)
-
-// Valid indicates whether the value is a known member of the ContainerActionTargetAction enum.
-func (e ContainerActionTargetAction) Valid() bool {
-	switch e {
-	case ContainerActionTargetActionRestart:
-		return true
-	case ContainerActionTargetActionStart:
-		return true
-	case ContainerActionTargetActionStop:
-		return true
-	default:
-		return false
-	}
-}
-
-// Defines values for CreatePortainerKind.
-const (
-	Create CreatePortainerKind = "create"
-)
-
-// Valid indicates whether the value is a known member of the CreatePortainerKind enum.
-func (e CreatePortainerKind) Valid() bool {
-	switch e {
-	case Create:
-		return true
-	default:
-		return false
-	}
-}
-
-// Defines values for DataDirectoryChangeKind.
-const (
-	DataDirectoryChangeKindDataDirectoryChange DataDirectoryChangeKind = "data_directory_change"
-)
-
-// Valid indicates whether the value is a known member of the DataDirectoryChangeKind enum.
-func (e DataDirectoryChangeKind) Valid() bool {
-	switch e {
-	case DataDirectoryChangeKindDataDirectoryChange:
-		return true
-	default:
-		return false
-	}
-}
-
-// Defines values for DefaultPolicyAction.
-const (
-	DefaultPolicyActionAllow  DefaultPolicyAction = "allow"
-	DefaultPolicyActionDeny   DefaultPolicyAction = "deny"
-	DefaultPolicyActionReject DefaultPolicyAction = "reject"
-)
-
-// Valid indicates whether the value is a known member of the DefaultPolicyAction enum.
-func (e DefaultPolicyAction) Valid() bool {
-	switch e {
-	case DefaultPolicyActionAllow:
-		return true
-	case DefaultPolicyActionDeny:
-		return true
-	case DefaultPolicyActionReject:
-		return true
-	default:
-		return false
-	}
-}
-
-// Defines values for DeleteRuleKind.
-const (
-	DeleteRuleKindDeleteRule DeleteRuleKind = "delete_rule"
-)
-
-// Valid indicates whether the value is a known member of the DeleteRuleKind enum.
-func (e DeleteRuleKind) Valid() bool {
-	switch e {
-	case DeleteRuleKindDeleteRule:
-		return true
-	default:
-		return false
-	}
-}
-
-// Defines values for DeploymentProgressDecision.
-const (
-	DeploymentProgressDecisionCommit    DeploymentProgressDecision = "commit"
-	DeploymentProgressDecisionRevert    DeploymentProgressDecision = "revert"
-	DeploymentProgressDecisionUndecided DeploymentProgressDecision = "undecided"
-)
-
-// Valid indicates whether the value is a known member of the DeploymentProgressDecision enum.
-func (e DeploymentProgressDecision) Valid() bool {
-	switch e {
-	case DeploymentProgressDecisionCommit:
-		return true
-	case DeploymentProgressDecisionRevert:
-		return true
-	case DeploymentProgressDecisionUndecided:
-		return true
-	default:
-		return false
-	}
-}
-
-// Defines values for DeploymentProgressPhase.
-const (
-	DeploymentProgressPhaseAttentionRequired    DeploymentProgressPhase = "attention_required"
-	DeploymentProgressPhaseAwaitingConfirmation DeploymentProgressPhase = "awaiting_confirmation"
-	DeploymentProgressPhaseCleaning             DeploymentProgressPhase = "cleaning"
-	DeploymentProgressPhaseCommitted            DeploymentProgressPhase = "committed"
-	DeploymentProgressPhaseFinished             DeploymentProgressPhase = "finished"
-	DeploymentProgressPhasePreparing            DeploymentProgressPhase = "preparing"
-	DeploymentProgressPhaseReverting            DeploymentProgressPhase = "reverting"
-)
-
-// Valid indicates whether the value is a known member of the DeploymentProgressPhase enum.
-func (e DeploymentProgressPhase) Valid() bool {
-	switch e {
-	case DeploymentProgressPhaseAttentionRequired:
-		return true
-	case DeploymentProgressPhaseAwaitingConfirmation:
-		return true
-	case DeploymentProgressPhaseCleaning:
-		return true
-	case DeploymentProgressPhaseCommitted:
-		return true
-	case DeploymentProgressPhaseFinished:
-		return true
-	case DeploymentProgressPhasePreparing:
-		return true
-	case DeploymentProgressPhaseReverting:
-		return true
-	default:
-		return false
-	}
-}
-
-// Defines values for DockerPortPolicyMode.
-const (
-	AllowSources DockerPortPolicyMode = "allow_sources"
-	BlockAll     DockerPortPolicyMode = "block_all"
-	DenySources  DockerPortPolicyMode = "deny_sources"
-	Unrestricted DockerPortPolicyMode = "unrestricted"
-)
-
-// Valid indicates whether the value is a known member of the DockerPortPolicyMode enum.
-func (e DockerPortPolicyMode) Valid() bool {
-	switch e {
-	case AllowSources:
-		return true
-	case BlockAll:
-		return true
-	case DenySources:
-		return true
-	case Unrestricted:
-		return true
-	default:
-		return false
-	}
-}
-
-// Defines values for DockerPortStateState.
-const (
-	DockerPortStateStateApplied DockerPortStateState = "applied"
-	DockerPortStateStateChanged DockerPortStateState = "changed"
-	DockerPortStateStateMissing DockerPortStateState = "missing"
-	DockerPortStateStateUnknown DockerPortStateState = "unknown"
-)
-
-// Valid indicates whether the value is a known member of the DockerPortStateState enum.
-func (e DockerPortStateState) Valid() bool {
-	switch e {
-	case DockerPortStateStateApplied:
-		return true
-	case DockerPortStateStateChanged:
-		return true
-	case DockerPortStateStateMissing:
-		return true
-	case DockerPortStateStateUnknown:
-		return true
-	default:
-		return false
-	}
-}
-
-// Defines values for EditRuleKind.
-const (
-	EditRuleKindEditRule EditRuleKind = "edit_rule"
-)
-
-// Valid indicates whether the value is a known member of the EditRuleKind enum.
-func (e EditRuleKind) Valid() bool {
-	switch e {
-	case EditRuleKindEditRule:
-		return true
-	default:
-		return false
-	}
-}
-
-// Defines values for EntranceChangeKind.
-const (
-	EntranceChangeKindEntranceChange EntranceChangeKind = "entrance_change"
-)
-
-// Valid indicates whether the value is a known member of the EntranceChangeKind enum.
-func (e EntranceChangeKind) Valid() bool {
-	switch e {
-	case EntranceChangeKindEntranceChange:
+	case Runtime:
 		return true
 	default:
 		return false
@@ -476,33 +176,195 @@ func (e FirewallInstallRequestBackend) Valid() bool {
 	}
 }
 
-// Defines values for FirewallRuleOrigin.
+// Defines values for ManagedFirewallChangeAction.
 const (
-	Native        FirewallRuleOrigin = "native"
-	OpsdPeerTrust FirewallRuleOrigin = "opsd_peer_trust"
+	ManagedFirewallChangeActionAllow   ManagedFirewallChangeAction = "allow"
+	ManagedFirewallChangeActionDefault ManagedFirewallChangeAction = "default"
+	ManagedFirewallChangeActionDeny    ManagedFirewallChangeAction = "deny"
+	ManagedFirewallChangeActionReject  ManagedFirewallChangeAction = "reject"
 )
 
-// Valid indicates whether the value is a known member of the FirewallRuleOrigin enum.
-func (e FirewallRuleOrigin) Valid() bool {
+// Valid indicates whether the value is a known member of the ManagedFirewallChangeAction enum.
+func (e ManagedFirewallChangeAction) Valid() bool {
 	switch e {
-	case Native:
+	case ManagedFirewallChangeActionAllow:
 		return true
-	case OpsdPeerTrust:
+	case ManagedFirewallChangeActionDefault:
+		return true
+	case ManagedFirewallChangeActionDeny:
+		return true
+	case ManagedFirewallChangeActionReject:
 		return true
 	default:
 		return false
 	}
 }
 
-// Defines values for MoveRuleKind.
+// Defines values for ManagedFirewallChangeKind.
 const (
-	MoveRuleKindMoveRule MoveRuleKind = "move_rule"
+	AddRule          ManagedFirewallChangeKind = "add_rule"
+	DeleteRule       ManagedFirewallChangeKind = "delete_rule"
+	EditRule         ManagedFirewallChangeKind = "edit_rule"
+	MoveRule         ManagedFirewallChangeKind = "move_rule"
+	SetDefaultPolicy ManagedFirewallChangeKind = "set_default_policy"
 )
 
-// Valid indicates whether the value is a known member of the MoveRuleKind enum.
-func (e MoveRuleKind) Valid() bool {
+// Valid indicates whether the value is a known member of the ManagedFirewallChangeKind enum.
+func (e ManagedFirewallChangeKind) Valid() bool {
 	switch e {
-	case MoveRuleKindMoveRule:
+	case AddRule:
+		return true
+	case DeleteRule:
+		return true
+	case EditRule:
+		return true
+	case MoveRule:
+		return true
+	case SetDefaultPolicy:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ManagedFirewallStateState.
+const (
+	ManagedFirewallStateStateApplying             ManagedFirewallStateState = "applying"
+	ManagedFirewallStateStateAwaitingConfirmation ManagedFirewallStateState = "awaiting_confirmation"
+	ManagedFirewallStateStateFailed               ManagedFirewallStateState = "failed"
+	ManagedFirewallStateStateImporting            ManagedFirewallStateState = "importing"
+	ManagedFirewallStateStateInSync               ManagedFirewallStateState = "in_sync"
+	ManagedFirewallStateStatePending              ManagedFirewallStateState = "pending"
+	ManagedFirewallStateStateUnavailable          ManagedFirewallStateState = "unavailable"
+	ManagedFirewallStateStateUnknown              ManagedFirewallStateState = "unknown"
+)
+
+// Valid indicates whether the value is a known member of the ManagedFirewallStateState enum.
+func (e ManagedFirewallStateState) Valid() bool {
+	switch e {
+	case ManagedFirewallStateStateApplying:
+		return true
+	case ManagedFirewallStateStateAwaitingConfirmation:
+		return true
+	case ManagedFirewallStateStateFailed:
+		return true
+	case ManagedFirewallStateStateImporting:
+		return true
+	case ManagedFirewallStateStateInSync:
+		return true
+	case ManagedFirewallStateStatePending:
+		return true
+	case ManagedFirewallStateStateUnavailable:
+		return true
+	case ManagedFirewallStateStateUnknown:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ManagedPolicyAction.
+const (
+	ManagedPolicyActionAllow   ManagedPolicyAction = "allow"
+	ManagedPolicyActionDefault ManagedPolicyAction = "default"
+	ManagedPolicyActionDeny    ManagedPolicyAction = "deny"
+	ManagedPolicyActionReject  ManagedPolicyAction = "reject"
+)
+
+// Valid indicates whether the value is a known member of the ManagedPolicyAction enum.
+func (e ManagedPolicyAction) Valid() bool {
+	switch e {
+	case ManagedPolicyActionAllow:
+		return true
+	case ManagedPolicyActionDefault:
+		return true
+	case ManagedPolicyActionDeny:
+		return true
+	case ManagedPolicyActionReject:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for MonitoringReadingFirewall.
+const (
+	MonitoringReadingFirewallDisabled MonitoringReadingFirewall = "disabled"
+	MonitoringReadingFirewallEnabled  MonitoringReadingFirewall = "enabled"
+	MonitoringReadingFirewallNone     MonitoringReadingFirewall = "none"
+	MonitoringReadingFirewallUnknown  MonitoringReadingFirewall = "unknown"
+)
+
+// Valid indicates whether the value is a known member of the MonitoringReadingFirewall enum.
+func (e MonitoringReadingFirewall) Valid() bool {
+	switch e {
+	case MonitoringReadingFirewallDisabled:
+		return true
+	case MonitoringReadingFirewallEnabled:
+		return true
+	case MonitoringReadingFirewallNone:
+		return true
+	case MonitoringReadingFirewallUnknown:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for MonitoringReadingState.
+const (
+	MonitoringReadingStateError       MonitoringReadingState = "error"
+	MonitoringReadingStateOffline     MonitoringReadingState = "offline"
+	MonitoringReadingStatePartial     MonitoringReadingState = "partial"
+	MonitoringReadingStateReady       MonitoringReadingState = "ready"
+	MonitoringReadingStateUnsupported MonitoringReadingState = "unsupported"
+)
+
+// Valid indicates whether the value is a known member of the MonitoringReadingState enum.
+func (e MonitoringReadingState) Valid() bool {
+	switch e {
+	case MonitoringReadingStateError:
+		return true
+	case MonitoringReadingStateOffline:
+		return true
+	case MonitoringReadingStatePartial:
+		return true
+	case MonitoringReadingStateReady:
+		return true
+	case MonitoringReadingStateUnsupported:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for NodeConfigAddressMode.
+const (
+	NodeConfigAddressModeAuto   NodeConfigAddressMode = "auto"
+	NodeConfigAddressModeManual NodeConfigAddressMode = "manual"
+)
+
+// Valid indicates whether the value is a known member of the NodeConfigAddressMode enum.
+func (e NodeConfigAddressMode) Valid() bool {
+	switch e {
+	case NodeConfigAddressModeAuto:
+		return true
+	case NodeConfigAddressModeManual:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for NodeConfigRetentionDays.
+const (
+	N7 NodeConfigRetentionDays = 7
+)
+
+// Valid indicates whether the value is a known member of the NodeConfigRetentionDays enum.
+func (e NodeConfigRetentionDays) Valid() bool {
+	switch e {
+	case N7:
 		return true
 	default:
 		return false
@@ -511,22 +373,22 @@ func (e MoveRuleKind) Valid() bool {
 
 // Defines values for OperationDecision.
 const (
-	OperationDecisionCommit    OperationDecision = "commit"
-	OperationDecisionKeep      OperationDecision = "keep"
-	OperationDecisionRevert    OperationDecision = "revert"
-	OperationDecisionUndecided OperationDecision = "undecided"
+	Commit    OperationDecision = "commit"
+	Keep      OperationDecision = "keep"
+	Revert    OperationDecision = "revert"
+	Undecided OperationDecision = "undecided"
 )
 
 // Valid indicates whether the value is a known member of the OperationDecision enum.
 func (e OperationDecision) Valid() bool {
 	switch e {
-	case OperationDecisionCommit:
+	case Commit:
 		return true
-	case OperationDecisionKeep:
+	case Keep:
 		return true
-	case OperationDecisionRevert:
+	case Revert:
 		return true
-	case OperationDecisionUndecided:
+	case Undecided:
 		return true
 	default:
 		return false
@@ -535,16 +397,13 @@ func (e OperationDecision) Valid() bool {
 
 // Defines values for OperationExecutor.
 const (
-	Agent     OperationExecutor = "agent"
-	Portainer OperationExecutor = "portainer"
+	OperationExecutorNode OperationExecutor = "node"
 )
 
 // Valid indicates whether the value is a known member of the OperationExecutor enum.
 func (e OperationExecutor) Valid() bool {
 	switch e {
-	case Agent:
-		return true
-	case Portainer:
+	case OperationExecutorNode:
 		return true
 	default:
 		return false
@@ -553,22 +412,28 @@ func (e OperationExecutor) Valid() bool {
 
 // Defines values for OperationSubject.
 const (
-	OperationSubjectComponent  OperationSubject = "component"
-	OperationSubjectContainer  OperationSubject = "container"
-	OperationSubjectDeployment OperationSubject = "deployment"
-	OperationSubjectFirewall   OperationSubject = "firewall"
+	OperationSubjectAccount        OperationSubject = "account"
+	OperationSubjectComponent      OperationSubject = "component"
+	OperationSubjectConfig         OperationSubject = "config"
+	OperationSubjectFirewall       OperationSubject = "firewall"
+	OperationSubjectFirewallConfig OperationSubject = "firewall_config"
+	OperationSubjectName           OperationSubject = "name"
 )
 
 // Valid indicates whether the value is a known member of the OperationSubject enum.
 func (e OperationSubject) Valid() bool {
 	switch e {
+	case OperationSubjectAccount:
+		return true
 	case OperationSubjectComponent:
 		return true
-	case OperationSubjectContainer:
-		return true
-	case OperationSubjectDeployment:
+	case OperationSubjectConfig:
 		return true
 	case OperationSubjectFirewall:
+		return true
+	case OperationSubjectFirewallConfig:
+		return true
+	case OperationSubjectName:
 		return true
 	default:
 		return false
@@ -656,36 +521,63 @@ func (e OperationStepState) Valid() bool {
 	}
 }
 
-// Defines values for PeerTrustScopeResultComponent.
+// Defines values for PeerTrustNodeStatusState.
 const (
-	Docker PeerTrustScopeResultComponent = "docker"
-	Host   PeerTrustScopeResultComponent = "host"
+	PeerTrustNodeStatusStateDisabled PeerTrustNodeStatusState = "disabled"
+	PeerTrustNodeStatusStateFailed   PeerTrustNodeStatusState = "failed"
+	PeerTrustNodeStatusStateInSync   PeerTrustNodeStatusState = "in_sync"
+	PeerTrustNodeStatusStateOffline  PeerTrustNodeStatusState = "offline"
+	PeerTrustNodeStatusStatePending  PeerTrustNodeStatusState = "pending"
 )
 
-// Valid indicates whether the value is a known member of the PeerTrustScopeResultComponent enum.
-func (e PeerTrustScopeResultComponent) Valid() bool {
+// Valid indicates whether the value is a known member of the PeerTrustNodeStatusState enum.
+func (e PeerTrustNodeStatusState) Valid() bool {
 	switch e {
-	case Docker:
+	case PeerTrustNodeStatusStateDisabled:
 		return true
-	case Host:
+	case PeerTrustNodeStatusStateFailed:
+		return true
+	case PeerTrustNodeStatusStateInSync:
+		return true
+	case PeerTrustNodeStatusStateOffline:
+		return true
+	case PeerTrustNodeStatusStatePending:
 		return true
 	default:
 		return false
 	}
 }
 
-// Defines values for PeerTrustScopeResultScope.
+// Defines values for PeerTrustRuleState.
 const (
-	PeerTrustScopeResultScopePermanent PeerTrustScopeResultScope = "permanent"
-	PeerTrustScopeResultScopeRuntime   PeerTrustScopeResultScope = "runtime"
+	PeerTrustRuleStateConfirmed   PeerTrustRuleState = "confirmed"
+	PeerTrustRuleStateConflict    PeerTrustRuleState = "conflict"
+	PeerTrustRuleStateFailed      PeerTrustRuleState = "failed"
+	PeerTrustRuleStateInSync      PeerTrustRuleState = "in_sync"
+	PeerTrustRuleStatePending     PeerTrustRuleState = "pending"
+	PeerTrustRuleStateRemoving    PeerTrustRuleState = "removing"
+	PeerTrustRuleStateSaved       PeerTrustRuleState = "saved"
+	PeerTrustRuleStateUnsupported PeerTrustRuleState = "unsupported"
 )
 
-// Valid indicates whether the value is a known member of the PeerTrustScopeResultScope enum.
-func (e PeerTrustScopeResultScope) Valid() bool {
+// Valid indicates whether the value is a known member of the PeerTrustRuleState enum.
+func (e PeerTrustRuleState) Valid() bool {
 	switch e {
-	case PeerTrustScopeResultScopePermanent:
+	case PeerTrustRuleStateConfirmed:
 		return true
-	case PeerTrustScopeResultScopeRuntime:
+	case PeerTrustRuleStateConflict:
+		return true
+	case PeerTrustRuleStateFailed:
+		return true
+	case PeerTrustRuleStateInSync:
+		return true
+	case PeerTrustRuleStatePending:
+		return true
+	case PeerTrustRuleStateRemoving:
+		return true
+	case PeerTrustRuleStateSaved:
+		return true
+	case PeerTrustRuleStateUnsupported:
 		return true
 	default:
 		return false
@@ -694,24 +586,21 @@ func (e PeerTrustScopeResultScope) Valid() bool {
 
 // Defines values for PeerTrustScopeResultState.
 const (
-	PeerTrustScopeResultStateApplied           PeerTrustScopeResultState = "applied"
-	PeerTrustScopeResultStateAttentionRequired PeerTrustScopeResultState = "attention_required"
-	PeerTrustScopeResultStateFailed            PeerTrustScopeResultState = "failed"
-	PeerTrustScopeResultStateNotApplicable     PeerTrustScopeResultState = "not_applicable"
-	PeerTrustScopeResultStatePending           PeerTrustScopeResultState = "pending"
-	PeerTrustScopeResultStateUnsupported       PeerTrustScopeResultState = "unsupported"
+	PeerTrustScopeResultStateFailed      PeerTrustScopeResultState = "failed"
+	PeerTrustScopeResultStateInSync      PeerTrustScopeResultState = "in_sync"
+	PeerTrustScopeResultStateInactive    PeerTrustScopeResultState = "inactive"
+	PeerTrustScopeResultStatePending     PeerTrustScopeResultState = "pending"
+	PeerTrustScopeResultStateUnsupported PeerTrustScopeResultState = "unsupported"
 )
 
 // Valid indicates whether the value is a known member of the PeerTrustScopeResultState enum.
 func (e PeerTrustScopeResultState) Valid() bool {
 	switch e {
-	case PeerTrustScopeResultStateApplied:
-		return true
-	case PeerTrustScopeResultStateAttentionRequired:
-		return true
 	case PeerTrustScopeResultStateFailed:
 		return true
-	case PeerTrustScopeResultStateNotApplicable:
+	case PeerTrustScopeResultStateInSync:
+		return true
+	case PeerTrustScopeResultStateInactive:
 		return true
 	case PeerTrustScopeResultStatePending:
 		return true
@@ -722,37 +611,16 @@ func (e PeerTrustScopeResultState) Valid() bool {
 	}
 }
 
-// Defines values for PortTargetProtocol.
-const (
-	PortTargetProtocolTcp PortTargetProtocol = "tcp"
-	PortTargetProtocolUdp PortTargetProtocol = "udp"
-)
-
-// Valid indicates whether the value is a known member of the PortTargetProtocol enum.
-func (e PortTargetProtocol) Valid() bool {
-	switch e {
-	case PortTargetProtocolTcp:
-		return true
-	case PortTargetProtocolUdp:
-		return true
-	default:
-		return false
-	}
-}
-
 // Defines values for PublicAddressMode.
 const (
-	PublicAddressModeAuto     PublicAddressMode = "auto"
-	PublicAddressModeDisabled PublicAddressMode = "disabled"
-	PublicAddressModeManual   PublicAddressMode = "manual"
+	PublicAddressModeAuto   PublicAddressMode = "auto"
+	PublicAddressModeManual PublicAddressMode = "manual"
 )
 
 // Valid indicates whether the value is a known member of the PublicAddressMode enum.
 func (e PublicAddressMode) Valid() bool {
 	switch e {
 	case PublicAddressModeAuto:
-		return true
-	case PublicAddressModeDisabled:
 		return true
 	case PublicAddressModeManual:
 		return true
@@ -761,54 +629,42 @@ func (e PublicAddressMode) Valid() bool {
 	}
 }
 
-// Defines values for PublicAddressPatchMode.
+// Defines values for PublicAddressState.
 const (
-	PublicAddressPatchModeAuto     PublicAddressPatchMode = "auto"
-	PublicAddressPatchModeDisabled PublicAddressPatchMode = "disabled"
-	PublicAddressPatchModeManual   PublicAddressPatchMode = "manual"
+	PublicAddressStateConfirmed PublicAddressState = "confirmed"
+	PublicAddressStateConflict  PublicAddressState = "conflict"
+	PublicAddressStateFailed    PublicAddressState = "failed"
+	PublicAddressStatePending   PublicAddressState = "pending"
 )
 
-// Valid indicates whether the value is a known member of the PublicAddressPatchMode enum.
-func (e PublicAddressPatchMode) Valid() bool {
+// Valid indicates whether the value is a known member of the PublicAddressState enum.
+func (e PublicAddressState) Valid() bool {
 	switch e {
-	case PublicAddressPatchModeAuto:
+	case PublicAddressStateConfirmed:
 		return true
-	case PublicAddressPatchModeDisabled:
+	case PublicAddressStateConflict:
 		return true
-	case PublicAddressPatchModeManual:
+	case PublicAddressStateFailed:
+		return true
+	case PublicAddressStatePending:
 		return true
 	default:
 		return false
 	}
 }
 
-// Defines values for QueryInvalidationResource.
+// Defines values for PublicFamilyPatchMode.
 const (
-	QueryInvalidationResourceContainers      QueryInvalidationResource = "containers"
-	QueryInvalidationResourceFirewall        QueryInvalidationResource = "firewall"
-	QueryInvalidationResourceNodes           QueryInvalidationResource = "nodes"
-	QueryInvalidationResourceOperations      QueryInvalidationResource = "operations"
-	QueryInvalidationResourcePeerTrust       QueryInvalidationResource = "peer_trust"
-	QueryInvalidationResourcePublicAddresses QueryInvalidationResource = "public_addresses"
-	QueryInvalidationResourceSettings        QueryInvalidationResource = "settings"
+	PublicFamilyPatchModeAuto   PublicFamilyPatchMode = "auto"
+	PublicFamilyPatchModeManual PublicFamilyPatchMode = "manual"
 )
 
-// Valid indicates whether the value is a known member of the QueryInvalidationResource enum.
-func (e QueryInvalidationResource) Valid() bool {
+// Valid indicates whether the value is a known member of the PublicFamilyPatchMode enum.
+func (e PublicFamilyPatchMode) Valid() bool {
 	switch e {
-	case QueryInvalidationResourceContainers:
+	case PublicFamilyPatchModeAuto:
 		return true
-	case QueryInvalidationResourceFirewall:
-		return true
-	case QueryInvalidationResourceNodes:
-		return true
-	case QueryInvalidationResourceOperations:
-		return true
-	case QueryInvalidationResourcePeerTrust:
-		return true
-	case QueryInvalidationResourcePublicAddresses:
-		return true
-	case QueryInvalidationResourceSettings:
+	case PublicFamilyPatchModeManual:
 		return true
 	default:
 		return false
@@ -853,109 +709,64 @@ func (e RuleSpecAction) Valid() bool {
 
 // Defines values for RuleSpecProtocol.
 const (
-	RuleSpecProtocolAny    RuleSpecProtocol = "any"
-	RuleSpecProtocolIcmp   RuleSpecProtocol = "icmp"
-	RuleSpecProtocolIcmpv6 RuleSpecProtocol = "icmpv6"
-	RuleSpecProtocolTcp    RuleSpecProtocol = "tcp"
-	RuleSpecProtocolUdp    RuleSpecProtocol = "udp"
+	Any    RuleSpecProtocol = "any"
+	Icmp   RuleSpecProtocol = "icmp"
+	Icmpv6 RuleSpecProtocol = "icmpv6"
+	Tcp    RuleSpecProtocol = "tcp"
+	Udp    RuleSpecProtocol = "udp"
 )
 
 // Valid indicates whether the value is a known member of the RuleSpecProtocol enum.
 func (e RuleSpecProtocol) Valid() bool {
 	switch e {
-	case RuleSpecProtocolAny:
+	case Any:
 		return true
-	case RuleSpecProtocolIcmp:
+	case Icmp:
 		return true
-	case RuleSpecProtocolIcmpv6:
+	case Icmpv6:
 		return true
-	case RuleSpecProtocolTcp:
+	case Tcp:
 		return true
-	case RuleSpecProtocolUdp:
-		return true
-	default:
-		return false
-	}
-}
-
-// Defines values for SetDefaultPolicyAction.
-const (
-	SetDefaultPolicyActionAllow   SetDefaultPolicyAction = "allow"
-	SetDefaultPolicyActionDefault SetDefaultPolicyAction = "default"
-	SetDefaultPolicyActionDeny    SetDefaultPolicyAction = "deny"
-	SetDefaultPolicyActionReject  SetDefaultPolicyAction = "reject"
-)
-
-// Valid indicates whether the value is a known member of the SetDefaultPolicyAction enum.
-func (e SetDefaultPolicyAction) Valid() bool {
-	switch e {
-	case SetDefaultPolicyActionAllow:
-		return true
-	case SetDefaultPolicyActionDefault:
-		return true
-	case SetDefaultPolicyActionDeny:
-		return true
-	case SetDefaultPolicyActionReject:
+	case Udp:
 		return true
 	default:
 		return false
 	}
 }
 
-// Defines values for SetDefaultPolicyKind.
+// Defines values for StorageStatusState.
 const (
-	SetDefaultPolicyKindSetDefaultPolicy SetDefaultPolicyKind = "set_default_policy"
+	StorageStatusStatePending     StorageStatusState = "pending"
+	StorageStatusStateReady       StorageStatusState = "ready"
+	StorageStatusStateUnavailable StorageStatusState = "unavailable"
 )
 
-// Valid indicates whether the value is a known member of the SetDefaultPolicyKind enum.
-func (e SetDefaultPolicyKind) Valid() bool {
+// Valid indicates whether the value is a known member of the StorageStatusState enum.
+func (e StorageStatusState) Valid() bool {
 	switch e {
-	case SetDefaultPolicyKindSetDefaultPolicy:
+	case StorageStatusStatePending:
+		return true
+	case StorageStatusStateReady:
+		return true
+	case StorageStatusStateUnavailable:
 		return true
 	default:
 		return false
 	}
 }
 
-// Defines values for SetDockerPortPolicyKind.
+// Defines values for GetMonitoringHistoryParamsRange.
 const (
-	SetDockerPortPolicyKindSetDockerPortPolicy SetDockerPortPolicyKind = "set_docker_port_policy"
+	N24h GetMonitoringHistoryParamsRange = "24h"
+	N7d  GetMonitoringHistoryParamsRange = "7d"
 )
 
-// Valid indicates whether the value is a known member of the SetDockerPortPolicyKind enum.
-func (e SetDockerPortPolicyKind) Valid() bool {
+// Valid indicates whether the value is a known member of the GetMonitoringHistoryParamsRange enum.
+func (e GetMonitoringHistoryParamsRange) Valid() bool {
 	switch e {
-	case SetDockerPortPolicyKindSetDockerPortPolicy:
+	case N24h:
 		return true
-	default:
-		return false
-	}
-}
-
-// Defines values for SetFirewallEnabledKind.
-const (
-	SetEnabled SetFirewallEnabledKind = "set_enabled"
-)
-
-// Valid indicates whether the value is a known member of the SetFirewallEnabledKind enum.
-func (e SetFirewallEnabledKind) Valid() bool {
-	switch e {
-	case SetEnabled:
-		return true
-	default:
-		return false
-	}
-}
-
-// Defines values for UpgradeChangeKind.
-const (
-	UpgradeChangeKindUpgrade UpgradeChangeKind = "upgrade"
-)
-
-// Valid indicates whether the value is a known member of the UpgradeChangeKind enum.
-func (e UpgradeChangeKind) Valid() bool {
-	switch e {
-	case UpgradeChangeKindUpgrade:
+	case N7d:
 		return true
 	default:
 		return false
@@ -992,20 +803,6 @@ type AccountChange struct {
 type AccountChanged struct {
 	LoginAddress string `json:"login_address"`
 }
-
-// AddRule defines model for AddRule.
-type AddRule struct {
-	BeforeRuleId *string     `json:"before_rule_id,omitempty"`
-	Chain        *string     `json:"chain,omitempty"`
-	Kind         AddRuleKind `json:"kind"`
-	Priority     *int        `json:"priority,omitempty"`
-	Rule         RuleSpec    `json:"rule"`
-	Scope        ConfigScope `json:"scope"`
-	Zone         *string     `json:"zone,omitempty"`
-}
-
-// AddRuleKind defines model for AddRule.Kind.
-type AddRuleKind string
 
 // AddressFamily defines model for AddressFamily.
 type AddressFamily string
@@ -1045,198 +842,16 @@ type Capability struct {
 	Supported bool    `json:"supported"`
 }
 
-// ChangePlan defines model for ChangePlan.
-type ChangePlan struct {
-	AffectedScopes       []string                  `json:"affected_scopes"`
-	Backend              Backend                   `json:"backend"`
-	Baseline             PlanBaseline              `json:"baseline"`
-	Change               FirewallChange            `json:"change"`
-	ContractVersion      ChangePlanContractVersion `json:"contract_version"`
-	CreatedAt            time.Time                 `json:"created_at"`
-	Executable           bool                      `json:"executable"`
-	Id                   string                    `json:"id"`
-	NodeId               string                    `json:"node_id"`
-	OperationId          *string                   `json:"operation_id,omitempty"`
-	Reasons              []string                  `json:"reasons"`
-	RequiresConfirmation bool                      `json:"requires_confirmation"`
-}
-
-// ChangePlanContractVersion defines model for ChangePlan.ContractVersion.
-type ChangePlanContractVersion int
-
-// ComponentAction defines model for ComponentAction.
-type ComponentAction struct {
-	Action  ComponentActionAction `json:"action"`
-	Version *string               `json:"version,omitempty"`
-}
-
-// ComponentActionAction defines model for ComponentAction.Action.
-type ComponentActionAction string
-
 // ConfigScope defines model for ConfigScope.
 type ConfigScope string
-
-// ConnectPortainer defines model for ConnectPortainer.
-type ConnectPortainer struct {
-	Address  string               `json:"address"`
-	ApiToken *string              `json:"api_token,omitempty"`
-	Kind     ConnectPortainerKind `json:"kind"`
-}
-
-// ConnectPortainerKind defines model for ConnectPortainer.Kind.
-type ConnectPortainerKind string
-
-// Container defines model for Container.
-type Container struct {
-	Id     string       `json:"id"`
-	Image  string       `json:"image"`
-	Name   string       `json:"name"`
-	Ports  []PortTarget `json:"ports"`
-	State  string       `json:"state"`
-	Status string       `json:"status"`
-}
-
-// ContainerAction defines model for ContainerAction.
-type ContainerAction struct {
-	Action ContainerActionAction `json:"action"`
-}
-
-// ContainerActionAction defines model for ContainerAction.Action.
-type ContainerActionAction string
-
-// ContainerActionTarget defines model for ContainerActionTarget.
-type ContainerActionTarget struct {
-	Action      ContainerActionTargetAction `json:"action"`
-	ContainerId string                      `json:"container_id"`
-}
-
-// ContainerActionTargetAction defines model for ContainerActionTarget.Action.
-type ContainerActionTargetAction string
-
-// ContainerList defines model for ContainerList.
-type ContainerList struct {
-	CollectedAt time.Time   `json:"collected_at"`
-	Complete    bool        `json:"complete"`
-	Errors      []ReadError `json:"errors"`
-	Items       []Container `json:"items"`
-}
-
-// CreatePortainer defines model for CreatePortainer.
-type CreatePortainer struct {
-	Address       string              `json:"address"`
-	AdminPassword *string             `json:"admin_password,omitempty"`
-	AdminUsername *string             `json:"admin_username,omitempty"`
-	Kind          CreatePortainerKind `json:"kind"`
-	Version       string              `json:"version"`
-}
-
-// CreatePortainerKind defines model for CreatePortainer.Kind.
-type CreatePortainerKind string
 
 // CurrentSession defines model for CurrentSession.
 type CurrentSession struct {
 	CsrfToken    string  `json:"csrf_token"`
+	LocalNodeId  string  `json:"local_node_id"`
 	LoginAddress string  `json:"login_address"`
 	Session      Session `json:"session"`
 }
-
-// DataDirectoryChange defines model for DataDirectoryChange.
-type DataDirectoryChange struct {
-	DataDir string                  `json:"data_dir"`
-	Kind    DataDirectoryChangeKind `json:"kind"`
-}
-
-// DataDirectoryChangeKind defines model for DataDirectoryChange.Kind.
-type DataDirectoryChangeKind string
-
-// DefaultPolicy defines model for DefaultPolicy.
-type DefaultPolicy struct {
-	Action   DefaultPolicyAction `json:"action"`
-	Chain    *string             `json:"chain,omitempty"`
-	Editable bool                `json:"editable"`
-	Family   AddressFamily       `json:"family"`
-	Scope    ConfigScope         `json:"scope"`
-	Zone     *string             `json:"zone,omitempty"`
-}
-
-// DefaultPolicyAction defines model for DefaultPolicy.Action.
-type DefaultPolicyAction string
-
-// DeleteRule defines model for DeleteRule.
-type DeleteRule struct {
-	Chain  *string        `json:"chain,omitempty"`
-	Kind   DeleteRuleKind `json:"kind"`
-	RuleId string         `json:"rule_id"`
-	Scope  ConfigScope    `json:"scope"`
-	Zone   *string        `json:"zone,omitempty"`
-}
-
-// DeleteRuleKind defines model for DeleteRule.Kind.
-type DeleteRuleKind string
-
-// DeploymentChange defines model for DeploymentChange.
-type DeploymentChange struct {
-	union json.RawMessage
-}
-
-// DeploymentConfig defines model for DeploymentConfig.
-type DeploymentConfig struct {
-	DataDir       string `json:"data_dir"`
-	ListenAddress string `json:"listen_address"`
-	Port          int    `json:"port"`
-	PublicAddress string `json:"public_address"`
-}
-
-// DeploymentProgress defines model for DeploymentProgress.
-type DeploymentProgress struct {
-	ActiveConfig    *DeploymentConfig          `json:"active_config,omitempty"`
-	CandidateConfig *DeploymentConfig          `json:"candidate_config,omitempty"`
-	CleanupComplete bool                       `json:"cleanup_complete"`
-	Decision        DeploymentProgressDecision `json:"decision"`
-	Phase           DeploymentProgressPhase    `json:"phase"`
-}
-
-// DeploymentProgressDecision defines model for DeploymentProgress.Decision.
-type DeploymentProgressDecision string
-
-// DeploymentProgressPhase defines model for DeploymentProgress.Phase.
-type DeploymentProgressPhase string
-
-// DockerPortPolicy defines model for DockerPortPolicy.
-type DockerPortPolicy struct {
-	Mode    DockerPortPolicyMode `json:"mode"`
-	Sources []string             `json:"sources"`
-	Target  PortTarget           `json:"target"`
-}
-
-// DockerPortPolicyMode defines model for DockerPortPolicy.Mode.
-type DockerPortPolicyMode string
-
-// DockerPortState defines model for DockerPortState.
-type DockerPortState struct {
-	ContainerIds       []string               `json:"container_ids"`
-	Coverage           []PeerTrustScopeResult `json:"coverage"`
-	PeerTrustException bool                   `json:"peer_trust_exception"`
-	Policy             DockerPortPolicy       `json:"policy"`
-	State              DockerPortStateState   `json:"state"`
-}
-
-// DockerPortStateState defines model for DockerPortState.State.
-type DockerPortStateState string
-
-// EditRule defines model for EditRule.
-type EditRule struct {
-	Chain    *string      `json:"chain,omitempty"`
-	Kind     EditRuleKind `json:"kind"`
-	Priority *int         `json:"priority,omitempty"`
-	Rule     RuleSpec     `json:"rule"`
-	RuleId   string       `json:"rule_id"`
-	Scope    ConfigScope  `json:"scope"`
-	Zone     *string      `json:"zone,omitempty"`
-}
-
-// EditRuleKind defines model for EditRule.Kind.
-type EditRuleKind string
 
 // EnrollmentToken defines model for EnrollmentToken.
 type EnrollmentToken struct {
@@ -1249,10 +864,12 @@ type EnrollmentToken struct {
 
 // EnrollmentTokenCreated defines model for EnrollmentTokenCreated.
 type EnrollmentTokenCreated struct {
-	ControlAddress   string          `json:"control_address"`
-	ControlPublicKey string          `json:"control_public_key"`
-	Record           EnrollmentToken `json:"record"`
-	Token            string          `json:"token"`
+	InstallerUrl  string          `json:"installer_url"`
+	PeerAddress   string          `json:"peer_address"`
+	PeerPublicKey string          `json:"peer_public_key"`
+	Record        EnrollmentToken `json:"record"`
+	Token         string          `json:"token"`
+	Version       string          `json:"version"`
 }
 
 // EnrollmentTokenList defines model for EnrollmentTokenList.
@@ -1260,24 +877,16 @@ type EnrollmentTokenList struct {
 	Items []EnrollmentToken `json:"items"`
 }
 
-// EntranceChange defines model for EntranceChange.
-type EntranceChange struct {
-	Config DeploymentConfig   `json:"config"`
-	Kind   EntranceChangeKind `json:"kind"`
-}
-
-// EntranceChangeKind defines model for EntranceChange.Kind.
-type EntranceChangeKind string
-
 // FieldError defines model for FieldError.
 type FieldError struct {
 	Field   string `json:"field"`
 	Message string `json:"message"`
 }
 
-// FirewallChange defines model for FirewallChange.
-type FirewallChange struct {
-	union json.RawMessage
+// FirewallConfigPatch defines model for FirewallConfigPatch.
+type FirewallConfigPatch struct {
+	Change           ManagedFirewallChange `json:"change"`
+	ExpectedRevision int64                 `json:"expected_revision"`
 }
 
 // FirewallInstallRequest defines model for FirewallInstallRequest.
@@ -1288,40 +897,15 @@ type FirewallInstallRequest struct {
 // FirewallInstallRequestBackend defines model for FirewallInstallRequest.Backend.
 type FirewallInstallRequestBackend string
 
-// FirewallReadRequest defines model for FirewallReadRequest.
-type FirewallReadRequest struct {
-	Family *AddressFamily `json:"family,omitempty"`
-	Scope  *ConfigScope   `json:"scope,omitempty"`
+// FirewallSaved defines model for FirewallSaved.
+type FirewallSaved struct {
+	Configuration ManagedFirewallState `json:"configuration"`
+	OperationId   string               `json:"operation_id"`
 }
 
-// FirewallRule defines model for FirewallRule.
-type FirewallRule struct {
-	Editable bool           `json:"editable"`
-	Id       string         `json:"id"`
-	Native   NativePosition `json:"native"`
-
-	// NativeExpression 只供展示与基线比较，不作为命令执行
-	NativeExpression string             `json:"native_expression"`
-	Origin           FirewallRuleOrigin `json:"origin"`
-	ReadonlyReason   *string            `json:"readonly_reason,omitempty"`
-	Scope            ConfigScope        `json:"scope"`
-	Spec             *RuleSpec          `json:"spec,omitempty"`
-}
-
-// FirewallRuleOrigin defines model for FirewallRule.Origin.
-type FirewallRuleOrigin string
-
-// FirewallState defines model for FirewallState.
-type FirewallState struct {
-	Backend         Backend           `json:"backend"`
-	Capabilities    Capabilities      `json:"capabilities"`
-	CollectedAt     time.Time         `json:"collected_at"`
-	Complete        bool              `json:"complete"`
-	DefaultPolicies []DefaultPolicy   `json:"default_policies"`
-	DockerPorts     []DockerPortState `json:"docker_ports"`
-	Errors          []ReadError       `json:"errors"`
-	Rules           []FirewallRule    `json:"rules"`
-	ServiceActive   *bool             `json:"service_active,omitempty"`
+// FirewallSyncRequest defines model for FirewallSyncRequest.
+type FirewallSyncRequest struct {
+	ExpectedRevision int64 `json:"expected_revision"`
 }
 
 // LoginRequest defines model for LoginRequest.
@@ -1331,47 +915,200 @@ type LoginRequest struct {
 	Username string  `json:"username"`
 }
 
-// MoveRule defines model for MoveRule.
-type MoveRule struct {
-	BeforeRuleId *string      `json:"before_rule_id,omitempty"`
-	Chain        *string      `json:"chain,omitempty"`
-	Kind         MoveRuleKind `json:"kind"`
-	Priority     *int         `json:"priority,omitempty"`
-	RuleId       string       `json:"rule_id"`
-	Scope        ConfigScope  `json:"scope"`
-	Zone         *string      `json:"zone,omitempty"`
+// ManagedFirewallChange defines model for ManagedFirewallChange.
+type ManagedFirewallChange struct {
+	Action       *ManagedFirewallChangeAction `json:"action,omitempty"`
+	BeforeRuleId *string                      `json:"before_rule_id,omitempty"`
+	Chain        *string                      `json:"chain,omitempty"`
+	Kind         ManagedFirewallChangeKind    `json:"kind"`
+	Priority     *int                         `json:"priority,omitempty"`
+	Rule         *RuleSpec                    `json:"rule,omitempty"`
+	RuleId       *string                      `json:"rule_id,omitempty"`
+	Zone         *string                      `json:"zone,omitempty"`
 }
 
-// MoveRuleKind defines model for MoveRule.Kind.
-type MoveRuleKind string
+// ManagedFirewallChangeAction defines model for ManagedFirewallChange.Action.
+type ManagedFirewallChangeAction string
 
-// NativePosition defines model for NativePosition.
-type NativePosition struct {
-	Chain      *string `json:"chain,omitempty"`
-	Handle     *string `json:"handle,omitempty"`
-	Position   *int64  `json:"position,omitempty"`
-	Priority   *int64  `json:"priority,omitempty"`
-	SourceFile *string `json:"source_file,omitempty"`
-	Zone       *string `json:"zone,omitempty"`
+// ManagedFirewallChangeKind defines model for ManagedFirewallChange.Kind.
+type ManagedFirewallChangeKind string
+
+// ManagedFirewallError defines model for ManagedFirewallError.
+type ManagedFirewallError struct {
+	Code    string `json:"code"`
+	Message string `json:"message"`
+}
+
+// ManagedFirewallState defines model for ManagedFirewallState.
+type ManagedFirewallState struct {
+	Backend           Backend                   `json:"backend"`
+	Capabilities      Capabilities              `json:"capabilities"`
+	CheckedAt         *time.Time                `json:"checked_at,omitempty"`
+	ConfirmedRevision int64                     `json:"confirmed_revision"`
+	DefaultPolicies   []ManagedPolicy           `json:"default_policies"`
+	Error             *ManagedFirewallError     `json:"error,omitempty"`
+	OperationId       *string                   `json:"operation_id,omitempty"`
+	Revision          int64                     `json:"revision"`
+	Rules             []ManagedRule             `json:"rules"`
+	ServiceActive     *bool                     `json:"service_active,omitempty"`
+	State             ManagedFirewallStateState `json:"state"`
+}
+
+// ManagedFirewallStateState defines model for ManagedFirewallState.State.
+type ManagedFirewallStateState string
+
+// ManagedPolicy defines model for ManagedPolicy.
+type ManagedPolicy struct {
+	Action ManagedPolicyAction `json:"action"`
+	Chain  *string             `json:"chain,omitempty"`
+	Family AddressFamily       `json:"family"`
+	Zone   *string             `json:"zone,omitempty"`
+}
+
+// ManagedPolicyAction defines model for ManagedPolicy.Action.
+type ManagedPolicyAction string
+
+// ManagedRule defines model for ManagedRule.
+type ManagedRule struct {
+	Chain    *string  `json:"chain,omitempty"`
+	Id       string   `json:"id"`
+	Priority *int     `json:"priority,omitempty"`
+	Spec     RuleSpec `json:"spec"`
+	Zone     *string  `json:"zone,omitempty"`
+}
+
+// Metrics defines model for Metrics.
+type Metrics struct {
+	CollectedAt time.Time `json:"collected_at"`
+	CpuCores    int       `json:"cpu_cores"`
+	CpuUsage    *float64  `json:"cpu_usage,omitempty"`
+	DiskTotal   *float64  `json:"disk_total,omitempty"`
+	DiskUsed    *float64  `json:"disk_used,omitempty"`
+	Errors      []string  `json:"errors"`
+	MemoryTotal *float64  `json:"memory_total,omitempty"`
+	MemoryUsed  *float64  `json:"memory_used,omitempty"`
+	NetworkRx   *float64  `json:"network_rx,omitempty"`
+	NetworkTx   *float64  `json:"network_tx,omitempty"`
+}
+
+// MonitoringCoverage defines model for MonitoringCoverage.
+type MonitoringCoverage struct {
+	Cpu     int `json:"cpu"`
+	Disk    int `json:"disk"`
+	Memory  int `json:"memory"`
+	Network int `json:"network"`
+}
+
+// MonitoringHistory defines model for MonitoringHistory.
+type MonitoringHistory struct {
+	IntervalMinutes int               `json:"interval_minutes"`
+	Items           []MonitoringPoint `json:"items"`
+	Unavailable     *[]string         `json:"unavailable,omitempty"`
+}
+
+// MonitoringPoint defines model for MonitoringPoint.
+type MonitoringPoint struct {
+	CollectedAt time.Time         `json:"collected_at"`
+	Summary     MonitoringSummary `json:"summary"`
+}
+
+// MonitoringReading defines model for MonitoringReading.
+type MonitoringReading struct {
+	Error         *string                   `json:"error,omitempty"`
+	Firewall      MonitoringReadingFirewall `json:"firewall"`
+	FirewallError *string                   `json:"firewall_error,omitempty"`
+	Metrics       *Metrics                  `json:"metrics,omitempty"`
+	NodeId        string                    `json:"node_id"`
+	State         MonitoringReadingState    `json:"state"`
+}
+
+// MonitoringReadingFirewall defines model for MonitoringReading.Firewall.
+type MonitoringReadingFirewall string
+
+// MonitoringReadingState defines model for MonitoringReading.State.
+type MonitoringReadingState string
+
+// MonitoringSummary defines model for MonitoringSummary.
+type MonitoringSummary struct {
+	Metrics    Metrics            `json:"metrics"`
+	ValidNodes MonitoringCoverage `json:"valid_nodes"`
+}
+
+// NetworkError defines model for NetworkError.
+type NetworkError struct {
+	Code    string `json:"code"`
+	Message string `json:"message"`
 }
 
 // Node defines model for Node.
 type Node struct {
+	Address            *string       `json:"address,omitempty"`
 	Capabilities       *Capabilities `json:"capabilities,omitempty"`
 	Connected          bool          `json:"connected"`
+	ConsoleEnabled     *bool         `json:"console_enabled,omitempty"`
 	Id                 string        `json:"id"`
 	LastSeenAt         *time.Time    `json:"last_seen_at,omitempty"`
 	Local              bool          `json:"local"`
 	Name               string        `json:"name"`
 	PublicKey          string        `json:"public_key"`
+	Region             *string       `json:"region,omitempty"`
 	RevokedAt          *time.Time    `json:"revoked_at,omitempty"`
+	StorageAddress     *string       `json:"storage_address,omitempty"`
 	Writable           bool          `json:"writable"`
 	WriteBlockedReason *string       `json:"write_blocked_reason,omitempty"`
 }
 
+// NodeAccount defines model for NodeAccount.
+type NodeAccount struct {
+	Cached       *bool      `json:"cached,omitempty"`
+	Entrance     string     `json:"entrance"`
+	LastSyncedAt *time.Time `json:"last_synced_at,omitempty"`
+	Revision     int64      `json:"revision"`
+	Username     string     `json:"username"`
+}
+
+// NodeAccountChange defines model for NodeAccountChange.
+type NodeAccountChange struct {
+	Entrance *string `json:"entrance,omitempty"`
+	Password *string `json:"password,omitempty"`
+	Revision *int64  `json:"revision,omitempty"`
+	Username *string `json:"username,omitempty"`
+}
+
+// NodeConfig defines model for NodeConfig.
+type NodeConfig struct {
+	Address          string                  `json:"address"`
+	AddressMode      *NodeConfigAddressMode  `json:"address_mode,omitempty"`
+	Cached           *bool                   `json:"cached,omitempty"`
+	Console          bool                    `json:"console"`
+	ConsoleListen    string                  `json:"console_listen"`
+	IntervalMinutes  int                     `json:"interval_minutes"`
+	LastSyncedAt     *time.Time              `json:"last_synced_at,omitempty"`
+	Listen           string                  `json:"listen"`
+	Name             string                  `json:"name"`
+	PreferredStorage string                  `json:"preferred_storage"`
+	Region           string                  `json:"region"`
+	RetentionDays    NodeConfigRetentionDays `json:"retention_days"`
+	Revision         int64                   `json:"revision"`
+	Storage          StorageConfig           `json:"storage"`
+}
+
+// NodeConfigAddressMode defines model for NodeConfig.AddressMode.
+type NodeConfigAddressMode string
+
+// NodeConfigRetentionDays defines model for NodeConfig.RetentionDays.
+type NodeConfigRetentionDays int
+
 // NodeList defines model for NodeList.
 type NodeList struct {
 	Items []Node `json:"items"`
+}
+
+// NodePassword defines model for NodePassword.
+type NodePassword struct {
+	Entrance string `json:"entrance"`
+	Password string `json:"password"`
+	Username string `json:"username"`
 }
 
 // NodePatch defines model for NodePatch.
@@ -1381,24 +1118,25 @@ type NodePatch struct {
 
 // Operation defines model for Operation.
 type Operation struct {
-	ConfirmationDeadline         *time.Time             `json:"confirmation_deadline,omitempty"`
-	ConfirmationRemainingSeconds *int64                 `json:"confirmation_remaining_seconds,omitempty"`
-	ContainerAction              *ContainerActionTarget `json:"container_action,omitempty"`
-	CreatedAt                    time.Time              `json:"created_at"`
-	Decision                     OperationDecision      `json:"decision"`
-	Deployment                   *DeploymentProgress    `json:"deployment,omitempty"`
-	Error                        *APIError              `json:"error,omitempty"`
-	Executor                     OperationExecutor      `json:"executor"`
-	Id                           string                 `json:"id"`
-	LastObservedAt               *time.Time             `json:"last_observed_at,omitempty"`
-	NodeId                       string                 `json:"node_id"`
-	PlanId                       *string                `json:"plan_id,omitempty"`
-	ResultPendingSync            bool                   `json:"result_pending_sync"`
-	Revision                     int64                  `json:"revision"`
-	State                        OperationState         `json:"state"`
-	Steps                        []OperationStep        `json:"steps"`
-	Subject                      OperationSubject       `json:"subject"`
-	UpdatedAt                    time.Time              `json:"updated_at"`
+	Actor                        *string           `json:"actor,omitempty"`
+	ConfirmationDeadline         *time.Time        `json:"confirmation_deadline,omitempty"`
+	ConfirmationRemainingSeconds *int64            `json:"confirmation_remaining_seconds,omitempty"`
+	CreatedAt                    time.Time         `json:"created_at"`
+	Decision                     OperationDecision `json:"decision"`
+	Error                        *APIError         `json:"error,omitempty"`
+	Executor                     OperationExecutor `json:"executor"`
+	Id                           string            `json:"id"`
+	IdempotencyKey               *string           `json:"idempotency_key,omitempty"`
+	LastObservedAt               *time.Time        `json:"last_observed_at,omitempty"`
+	NodeId                       string            `json:"node_id"`
+	PlanId                       *string           `json:"plan_id,omitempty"`
+	QueueSequence                *int64            `json:"queue_sequence,omitempty"`
+	ResultPendingSync            bool              `json:"result_pending_sync"`
+	Revision                     int64             `json:"revision"`
+	State                        OperationState    `json:"state"`
+	Steps                        []OperationStep   `json:"steps"`
+	Subject                      OperationSubject  `json:"subject"`
+	UpdatedAt                    time.Time         `json:"updated_at"`
 }
 
 // OperationDecision defines model for Operation.Decision.
@@ -1412,8 +1150,9 @@ type OperationSubject string
 
 // OperationList defines model for OperationList.
 type OperationList struct {
-	Items      []Operation `json:"items"`
-	NextCursor *string     `json:"next_cursor,omitempty"`
+	Items       []Operation `json:"items"`
+	NextCursor  *string     `json:"next_cursor,omitempty"`
+	Unavailable *[]string   `json:"unavailable,omitempty"`
 }
 
 // OperationRevision defines model for OperationRevision.
@@ -1435,41 +1174,70 @@ type OperationStep struct {
 // OperationStepState defines model for OperationStep.State.
 type OperationStepState string
 
+// Overview defines model for Overview.
+type Overview struct {
+	Nodes             []OverviewNode    `json:"nodes"`
+	PendingOperations []Operation       `json:"pending_operations"`
+	Summary           MonitoringSummary `json:"summary"`
+	Unavailable       *[]string         `json:"unavailable,omitempty"`
+	UpdatedAt         time.Time         `json:"updated_at"`
+}
+
+// OverviewNode defines model for OverviewNode.
+type OverviewNode struct {
+	Node    Node              `json:"node"`
+	Reading MonitoringReading `json:"reading"`
+}
+
 // PeerTrustNodeStatus defines model for PeerTrustNodeStatus.
 type PeerTrustNodeStatus struct {
-	AppliedRevision  int64                  `json:"applied_revision"`
-	NodeId           string                 `json:"node_id"`
-	ReceivedRevision int64                  `json:"received_revision"`
-	Results          []PeerTrustScopeResult `json:"results"`
-	TargetRevision   int64                  `json:"target_revision"`
-	UpdatedAt        *time.Time             `json:"updated_at,omitempty"`
+	AppliedRevision int64                    `json:"applied_revision"`
+	CheckedAt       *time.Time               `json:"checked_at,omitempty"`
+	Enabled         bool                     `json:"enabled"`
+	NodeId          string                   `json:"node_id"`
+	PolicyVersion   PeerTrustVersion         `json:"policy_version"`
+	Results         []PeerTrustScopeResult   `json:"results"`
+	Rules           []PeerTrustRule          `json:"rules"`
+	State           PeerTrustNodeStatusState `json:"state"`
+	TargetRevision  int64                    `json:"target_revision"`
 }
+
+// PeerTrustNodeStatusState defines model for PeerTrustNodeStatus.State.
+type PeerTrustNodeStatusState string
 
 // PeerTrustPolicy defines model for PeerTrustPolicy.
 type PeerTrustPolicy struct {
-	Enabled  bool  `json:"enabled"`
-	Revision int64 `json:"revision"`
+	Enabled bool             `json:"enabled"`
+	Version PeerTrustVersion `json:"version"`
 }
 
 // PeerTrustPolicyPatch defines model for PeerTrustPolicyPatch.
 type PeerTrustPolicyPatch struct {
-	Enabled bool `json:"enabled"`
+	Enabled         bool             `json:"enabled"`
+	ExpectedVersion PeerTrustVersion `json:"expected_version"`
 }
+
+// PeerTrustRule defines model for PeerTrustRule.
+type PeerTrustRule struct {
+	Address *string            `json:"address,omitempty"`
+	Error   *string            `json:"error,omitempty"`
+	Family  AddressFamily      `json:"family"`
+	Members []TrustMember      `json:"members"`
+	State   PeerTrustRuleState `json:"state"`
+}
+
+// PeerTrustRuleState defines model for PeerTrustRule.State.
+type PeerTrustRuleState string
 
 // PeerTrustScopeResult defines model for PeerTrustScopeResult.
 type PeerTrustScopeResult struct {
-	Component PeerTrustScopeResultComponent `json:"component"`
-	Error     *string                       `json:"error,omitempty"`
-	Family    AddressFamily                 `json:"family"`
-	Scope     PeerTrustScopeResultScope     `json:"scope"`
-	State     PeerTrustScopeResultState     `json:"state"`
+	Addresses *[]string                 `json:"addresses,omitempty"`
+	Component string                    `json:"component"`
+	Error     *NetworkError             `json:"error,omitempty"`
+	Family    AddressFamily             `json:"family"`
+	Scope     ConfigScope               `json:"scope"`
+	State     PeerTrustScopeResultState `json:"state"`
 }
-
-// PeerTrustScopeResultComponent defines model for PeerTrustScopeResult.Component.
-type PeerTrustScopeResultComponent string
-
-// PeerTrustScopeResultScope defines model for PeerTrustScopeResult.Scope.
-type PeerTrustScopeResultScope string
 
 // PeerTrustScopeResultState defines model for PeerTrustScopeResult.State.
 type PeerTrustScopeResultState string
@@ -1480,12 +1248,10 @@ type PeerTrustStatus struct {
 	Policy PeerTrustPolicy       `json:"policy"`
 }
 
-// PeerTrustTarget defines model for PeerTrustTarget.
-type PeerTrustTarget struct {
-	Enabled  bool     `json:"enabled"`
-	Ipv4     []string `json:"ipv4"`
-	Ipv6     []string `json:"ipv6"`
-	Revision int64    `json:"revision"`
+// PeerTrustVersion defines model for PeerTrustVersion.
+type PeerTrustVersion struct {
+	Counter int64  `json:"counter"`
+	NodeId  string `json:"node_id"`
 }
 
 // PendingOperations defines model for PendingOperations.
@@ -1493,106 +1259,52 @@ type PendingOperations struct {
 	Items []Operation `json:"items"`
 }
 
-// PlanBaseline defines model for PlanBaseline.
-type PlanBaseline struct {
-	DefaultPolicies []DefaultPolicy   `json:"default_policies"`
-	DockerPorts     []DockerPortState `json:"docker_ports"`
-	Rules           []FirewallRule    `json:"rules"`
-	ServiceActive   *bool             `json:"service_active,omitempty"`
-}
-
-// PortTarget defines model for PortTarget.
-type PortTarget struct {
-	HostAddress string             `json:"host_address"`
-	Port        int                `json:"port"`
-	Protocol    PortTargetProtocol `json:"protocol"`
-}
-
-// PortTargetProtocol defines model for PortTarget.Protocol.
-type PortTargetProtocol string
-
-// PortainerBindRequest defines model for PortainerBindRequest.
-type PortainerBindRequest struct {
-	EnvironmentId int64 `json:"environment_id"`
-}
-
-// PortainerBinding defines model for PortainerBinding.
-type PortainerBinding struct {
-	EnvironmentId int64  `json:"environment_id"`
-	ManagedEdge   bool   `json:"managed_edge"`
-	NodeId        string `json:"node_id"`
-}
-
-// PortainerBindings defines model for PortainerBindings.
-type PortainerBindings struct {
-	Items []PortainerBinding `json:"items"`
-}
-
-// PortainerChange defines model for PortainerChange.
-type PortainerChange struct {
-	union json.RawMessage
-}
-
-// PortainerSettings defines model for PortainerSettings.
-type PortainerSettings struct {
-	Address    *string `json:"address,omitempty"`
-	Configured bool    `json:"configured"`
-	Connected  bool    `json:"connected"`
-	Error      *string `json:"error,omitempty"`
-	Managed    bool    `json:"managed"`
-	Version    *string `json:"version,omitempty"`
-}
-
 // PublicAddress defines model for PublicAddress.
 type PublicAddress struct {
-	Candidates  []AddressObservation `json:"candidates"`
-	Confirmed   *string              `json:"confirmed,omitempty"`
-	ConfirmedAt *time.Time           `json:"confirmed_at,omitempty"`
-	Conflict    bool                 `json:"conflict"`
-	Family      AddressFamily        `json:"family"`
-	LastError   *string              `json:"last_error,omitempty"`
-	Mode        PublicAddressMode    `json:"mode"`
+	Addresses    []string             `json:"addresses"`
+	Error        *string              `json:"error,omitempty"`
+	Mode         PublicAddressMode    `json:"mode"`
+	Observations []AddressObservation `json:"observations"`
+	State        PublicAddressState   `json:"state"`
+	UpdatedAt    *time.Time           `json:"updated_at,omitempty"`
 }
 
 // PublicAddressMode defines model for PublicAddress.Mode.
 type PublicAddressMode string
 
+// PublicAddressState defines model for PublicAddress.State.
+type PublicAddressState string
+
 // PublicAddressPatch defines model for PublicAddressPatch.
 type PublicAddressPatch struct {
-	Address *string                `json:"address,omitempty"`
-	Clear   *bool                  `json:"clear,omitempty"`
-	Family  AddressFamily          `json:"family"`
-	Mode    PublicAddressPatchMode `json:"mode"`
-}
-
-// PublicAddressPatchMode defines model for PublicAddressPatch.Mode.
-type PublicAddressPatchMode string
-
-// PublicAddressRefresh defines model for PublicAddressRefresh.
-type PublicAddressRefresh struct {
-	Families []AddressFamily `json:"families"`
+	ExpectedRevision int64              `json:"expected_revision"`
+	Ipv4             *PublicFamilyPatch `json:"ipv4,omitempty"`
+	Ipv6             *PublicFamilyPatch `json:"ipv6,omitempty"`
 }
 
 // PublicAddresses defines model for PublicAddresses.
 type PublicAddresses struct {
-	Ipv4 PublicAddress `json:"ipv4"`
-	Ipv6 PublicAddress `json:"ipv6"`
+	Cached   *bool         `json:"cached,omitempty"`
+	Ipv4     PublicAddress `json:"ipv4"`
+	Ipv6     PublicAddress `json:"ipv6"`
+	NodeId   string        `json:"node_id"`
+	Revision int64         `json:"revision"`
 }
 
-// QueryInvalidation defines model for QueryInvalidation.
-type QueryInvalidation struct {
-	NodeId   *string                   `json:"node_id,omitempty"`
-	Resource QueryInvalidationResource `json:"resource"`
+// PublicFamilyPatch defines model for PublicFamilyPatch.
+type PublicFamilyPatch struct {
+	Addresses []string              `json:"addresses"`
+	Mode      PublicFamilyPatchMode `json:"mode"`
 }
 
-// QueryInvalidationResource defines model for QueryInvalidation.Resource.
-type QueryInvalidationResource string
+// PublicFamilyPatchMode defines model for PublicFamilyPatch.Mode.
+type PublicFamilyPatchMode string
 
-// ReadError defines model for ReadError.
-type ReadError struct {
-	Code    string `json:"code"`
-	Message string `json:"message"`
-	Scope   string `json:"scope"`
+// ReplicationStatus defines model for ReplicationStatus.
+type ReplicationStatus struct {
+	ErrorCount int64  `json:"error_count"`
+	Id         string `json:"id"`
+	State      string `json:"state"`
 }
 
 // ResolveOperation defines model for ResolveOperation.
@@ -1637,54 +1349,35 @@ type SessionList struct {
 	Items []Session `json:"items"`
 }
 
-// SetDefaultPolicy defines model for SetDefaultPolicy.
-type SetDefaultPolicy struct {
-	Action SetDefaultPolicyAction `json:"action"`
-	Chain  *string                `json:"chain,omitempty"`
-	Family AddressFamily          `json:"family"`
-	Kind   SetDefaultPolicyKind   `json:"kind"`
-	Reload bool                   `json:"reload"`
-	Scope  ConfigScope            `json:"scope"`
-	Zone   *string                `json:"zone,omitempty"`
+// StorageConfig defines model for StorageConfig.
+type StorageConfig struct {
+	Address string `json:"address"`
+	Enabled bool   `json:"enabled"`
+	Port    int    `json:"port"`
 }
 
-// SetDefaultPolicyAction defines model for SetDefaultPolicy.Action.
-type SetDefaultPolicyAction string
-
-// SetDefaultPolicyKind defines model for SetDefaultPolicy.Kind.
-type SetDefaultPolicyKind string
-
-// SetDockerPortPolicy defines model for SetDockerPortPolicy.
-type SetDockerPortPolicy struct {
-	Kind   SetDockerPortPolicyKind `json:"kind"`
-	Policy DockerPortPolicy        `json:"policy"`
+// StorageStatus defines model for StorageStatus.
+type StorageStatus struct {
+	Enabled      bool                `json:"enabled"`
+	Pending      int64               `json:"pending"`
+	Replications []ReplicationStatus `json:"replications"`
+	Selected     string              `json:"selected"`
+	State        StorageStatusState  `json:"state"`
 }
 
-// SetDockerPortPolicyKind defines model for SetDockerPortPolicy.Kind.
-type SetDockerPortPolicyKind string
+// StorageStatusState defines model for StorageStatus.State.
+type StorageStatusState string
 
-// SetFirewallEnabled defines model for SetFirewallEnabled.
-type SetFirewallEnabled struct {
-	Enabled bool                   `json:"enabled"`
-	Kind    SetFirewallEnabledKind `json:"kind"`
+// TrustMember defines model for TrustMember.
+type TrustMember struct {
+	Id   string `json:"id"`
+	Name string `json:"name"`
 }
-
-// SetFirewallEnabledKind defines model for SetFirewallEnabled.Kind.
-type SetFirewallEnabledKind string
-
-// UpgradeChange defines model for UpgradeChange.
-type UpgradeChange struct {
-	Kind    UpgradeChangeKind `json:"kind"`
-	Version string            `json:"version"`
-}
-
-// UpgradeChangeKind defines model for UpgradeChange.Kind.
-type UpgradeChangeKind string
 
 // VersionInfo defines model for VersionInfo.
 type VersionInfo struct {
-	ControlVersion  string `json:"control_version"`
 	FrontendVersion string `json:"frontend_version"`
+	NodeVersion     string `json:"node_version"`
 }
 
 // Conflict defines model for Conflict.
@@ -1728,20 +1421,35 @@ type RevokeEnrollmentTokenParams struct {
 	XCSRFToken string `json:"X-CSRF-Token"`
 }
 
-// ApplyFirewallPlanParams defines parameters for ApplyFirewallPlan.
-type ApplyFirewallPlanParams struct {
-	XCSRFToken string `json:"X-CSRF-Token"`
+// GetMonitoringHistoryParams defines parameters for GetMonitoringHistory.
+type GetMonitoringHistoryParams struct {
+	Range  *GetMonitoringHistoryParamsRange `form:"range,omitempty" json:"range,omitempty"`
+	NodeId *string                          `form:"node_id,omitempty" json:"node_id,omitempty"`
 }
+
+// GetMonitoringHistoryParamsRange defines parameters for GetMonitoringHistory.
+type GetMonitoringHistoryParamsRange string
 
 // RenameNodeParams defines parameters for RenameNode.
 type RenameNodeParams struct {
 	XCSRFToken string `json:"X-CSRF-Token"`
 }
 
-// ReadFirewallParams defines parameters for ReadFirewall.
-type ReadFirewallParams struct {
-	Family *AddressFamily `form:"family,omitempty" json:"family,omitempty"`
-	Scope  *ConfigScope   `form:"scope,omitempty" json:"scope,omitempty"`
+// ChangeNodeAccountParams defines parameters for ChangeNodeAccount.
+type ChangeNodeAccountParams struct {
+	XCSRFToken     string `json:"X-CSRF-Token"`
+	IdempotencyKey string `json:"Idempotency-Key"`
+}
+
+// RevealNodePasswordParams defines parameters for RevealNodePassword.
+type RevealNodePasswordParams struct {
+	XCSRFToken string `json:"X-CSRF-Token"`
+}
+
+// ChangeFirewallConfigParams defines parameters for ChangeFirewallConfig.
+type ChangeFirewallConfigParams struct {
+	XCSRFToken     string `json:"X-CSRF-Token"`
+	IdempotencyKey string `json:"Idempotency-Key"`
 }
 
 // InstallFirewallParams defines parameters for InstallFirewall.
@@ -1750,14 +1458,31 @@ type InstallFirewallParams struct {
 	IdempotencyKey string `json:"Idempotency-Key"`
 }
 
-// PreviewFirewallChangeParams defines parameters for PreviewFirewallChange.
-type PreviewFirewallChangeParams struct {
+// SyncFirewallConfigParams defines parameters for SyncFirewallConfig.
+type SyncFirewallConfigParams struct {
+	XCSRFToken     string `json:"X-CSRF-Token"`
+	IdempotencyKey string `json:"Idempotency-Key"`
+}
+
+// ChangePublicAddressesParams defines parameters for ChangePublicAddresses.
+type ChangePublicAddressesParams struct {
+	XCSRFToken string `json:"X-CSRF-Token"`
+}
+
+// RefreshPublicAddressesParams defines parameters for RefreshPublicAddresses.
+type RefreshPublicAddressesParams struct {
 	XCSRFToken string `json:"X-CSRF-Token"`
 }
 
 // RevokeNodeParams defines parameters for RevokeNode.
 type RevokeNodeParams struct {
 	XCSRFToken string `json:"X-CSRF-Token"`
+}
+
+// ChangeNodeSettingsParams defines parameters for ChangeNodeSettings.
+type ChangeNodeSettingsParams struct {
+	XCSRFToken     string `json:"X-CSRF-Token"`
+	IdempotencyKey string `json:"Idempotency-Key"`
 }
 
 // ListOperationsParams defines parameters for ListOperations.
@@ -1773,6 +1498,12 @@ type ListOperationsParams struct {
 // ListPendingOperationsParams defines parameters for ListPendingOperations.
 type ListPendingOperationsParams struct {
 	NodeId *string `form:"node_id,omitempty" json:"node_id,omitempty"`
+	Cursor *string `form:"cursor,omitempty" json:"cursor,omitempty"`
+}
+
+// CancelOperationParams defines parameters for CancelOperation.
+type CancelOperationParams struct {
+	XCSRFToken string `json:"X-CSRF-Token"`
 }
 
 // ConfirmOperationParams defines parameters for ConfirmOperation.
@@ -1790,6 +1521,11 @@ type ResolveOperationParams struct {
 	XCSRFToken string `json:"X-CSRF-Token"`
 }
 
+// ChangePeerTrustParams defines parameters for ChangePeerTrust.
+type ChangePeerTrustParams struct {
+	XCSRFToken string `json:"X-CSRF-Token"`
+}
+
 // ChangeAccountParams defines parameters for ChangeAccount.
 type ChangeAccountParams struct {
 	XCSRFToken string `json:"X-CSRF-Token"`
@@ -1801,11 +1537,23 @@ type LoginJSONRequestBody = LoginRequest
 // RenameNodeJSONRequestBody defines body for RenameNode for application/json ContentType.
 type RenameNodeJSONRequestBody = NodePatch
 
+// ChangeNodeAccountJSONRequestBody defines body for ChangeNodeAccount for application/json ContentType.
+type ChangeNodeAccountJSONRequestBody = NodeAccountChange
+
+// ChangeFirewallConfigJSONRequestBody defines body for ChangeFirewallConfig for application/json ContentType.
+type ChangeFirewallConfigJSONRequestBody = FirewallConfigPatch
+
 // InstallFirewallJSONRequestBody defines body for InstallFirewall for application/json ContentType.
 type InstallFirewallJSONRequestBody = FirewallInstallRequest
 
-// PreviewFirewallChangeJSONRequestBody defines body for PreviewFirewallChange for application/json ContentType.
-type PreviewFirewallChangeJSONRequestBody = FirewallChange
+// SyncFirewallConfigJSONRequestBody defines body for SyncFirewallConfig for application/json ContentType.
+type SyncFirewallConfigJSONRequestBody = FirewallSyncRequest
+
+// ChangePublicAddressesJSONRequestBody defines body for ChangePublicAddresses for application/json ContentType.
+type ChangePublicAddressesJSONRequestBody = PublicAddressPatch
+
+// ChangeNodeSettingsJSONRequestBody defines body for ChangeNodeSettings for application/json ContentType.
+type ChangeNodeSettingsJSONRequestBody = NodeConfig
 
 // ConfirmOperationJSONRequestBody defines body for ConfirmOperation for application/json ContentType.
 type ConfirmOperationJSONRequestBody = OperationRevision
@@ -1816,527 +1564,11 @@ type RecoverOperationJSONRequestBody = OperationRevision
 // ResolveOperationJSONRequestBody defines body for ResolveOperation for application/json ContentType.
 type ResolveOperationJSONRequestBody = ResolveOperation
 
+// ChangePeerTrustJSONRequestBody defines body for ChangePeerTrust for application/json ContentType.
+type ChangePeerTrustJSONRequestBody = PeerTrustPolicyPatch
+
 // ChangeAccountJSONRequestBody defines body for ChangeAccount for application/json ContentType.
 type ChangeAccountJSONRequestBody = AccountChange
-
-// AsEntranceChange returns the union data inside the DeploymentChange as a EntranceChange
-func (t DeploymentChange) AsEntranceChange() (EntranceChange, error) {
-	var body EntranceChange
-	err := json.Unmarshal(t.union, &body)
-	return body, err
-}
-
-// FromEntranceChange overwrites any union data inside the DeploymentChange as the provided EntranceChange
-func (t *DeploymentChange) FromEntranceChange(v EntranceChange) error {
-	b, err := json.Marshal(v)
-	if err != nil {
-		return err
-	}
-	b, err = runtime.JSONMerge(b, []byte(`{"kind":"entrance_change"}`))
-	t.union = b
-	return err
-}
-
-// MergeEntranceChange performs a merge with any union data inside the DeploymentChange, using the provided EntranceChange
-func (t *DeploymentChange) MergeEntranceChange(v EntranceChange) error {
-	b, err := json.Marshal(v)
-	if err != nil {
-		return err
-	}
-	b, err = runtime.JSONMerge(b, []byte(`{"kind":"entrance_change"}`))
-	if err != nil {
-		return err
-	}
-
-	merged, err := runtime.JSONMerge(t.union, b)
-	t.union = merged
-	return err
-}
-
-// AsDataDirectoryChange returns the union data inside the DeploymentChange as a DataDirectoryChange
-func (t DeploymentChange) AsDataDirectoryChange() (DataDirectoryChange, error) {
-	var body DataDirectoryChange
-	err := json.Unmarshal(t.union, &body)
-	return body, err
-}
-
-// FromDataDirectoryChange overwrites any union data inside the DeploymentChange as the provided DataDirectoryChange
-func (t *DeploymentChange) FromDataDirectoryChange(v DataDirectoryChange) error {
-	b, err := json.Marshal(v)
-	if err != nil {
-		return err
-	}
-	b, err = runtime.JSONMerge(b, []byte(`{"kind":"data_directory_change"}`))
-	t.union = b
-	return err
-}
-
-// MergeDataDirectoryChange performs a merge with any union data inside the DeploymentChange, using the provided DataDirectoryChange
-func (t *DeploymentChange) MergeDataDirectoryChange(v DataDirectoryChange) error {
-	b, err := json.Marshal(v)
-	if err != nil {
-		return err
-	}
-	b, err = runtime.JSONMerge(b, []byte(`{"kind":"data_directory_change"}`))
-	if err != nil {
-		return err
-	}
-
-	merged, err := runtime.JSONMerge(t.union, b)
-	t.union = merged
-	return err
-}
-
-// AsUpgradeChange returns the union data inside the DeploymentChange as a UpgradeChange
-func (t DeploymentChange) AsUpgradeChange() (UpgradeChange, error) {
-	var body UpgradeChange
-	err := json.Unmarshal(t.union, &body)
-	return body, err
-}
-
-// FromUpgradeChange overwrites any union data inside the DeploymentChange as the provided UpgradeChange
-func (t *DeploymentChange) FromUpgradeChange(v UpgradeChange) error {
-	b, err := json.Marshal(v)
-	if err != nil {
-		return err
-	}
-	b, err = runtime.JSONMerge(b, []byte(`{"kind":"upgrade"}`))
-	t.union = b
-	return err
-}
-
-// MergeUpgradeChange performs a merge with any union data inside the DeploymentChange, using the provided UpgradeChange
-func (t *DeploymentChange) MergeUpgradeChange(v UpgradeChange) error {
-	b, err := json.Marshal(v)
-	if err != nil {
-		return err
-	}
-	b, err = runtime.JSONMerge(b, []byte(`{"kind":"upgrade"}`))
-	if err != nil {
-		return err
-	}
-
-	merged, err := runtime.JSONMerge(t.union, b)
-	t.union = merged
-	return err
-}
-
-func (t DeploymentChange) Discriminator() (string, error) {
-	var discriminator struct {
-		Discriminator string `json:"kind"`
-	}
-	err := json.Unmarshal(t.union, &discriminator)
-	return discriminator.Discriminator, err
-}
-
-func (t DeploymentChange) ValueByDiscriminator() (interface{}, error) {
-	discriminator, err := t.Discriminator()
-	if err != nil {
-		return nil, err
-	}
-	switch discriminator {
-	case "data_directory_change":
-		return t.AsDataDirectoryChange()
-	case "entrance_change":
-		return t.AsEntranceChange()
-	case "upgrade":
-		return t.AsUpgradeChange()
-	default:
-		return nil, errors.New("unknown discriminator value: " + discriminator)
-	}
-}
-
-func (t DeploymentChange) MarshalJSON() ([]byte, error) {
-	b, err := t.union.MarshalJSON()
-	return b, err
-}
-
-func (t *DeploymentChange) UnmarshalJSON(b []byte) error {
-	err := t.union.UnmarshalJSON(b)
-	return err
-}
-
-// AsAddRule returns the union data inside the FirewallChange as a AddRule
-func (t FirewallChange) AsAddRule() (AddRule, error) {
-	var body AddRule
-	err := json.Unmarshal(t.union, &body)
-	return body, err
-}
-
-// FromAddRule overwrites any union data inside the FirewallChange as the provided AddRule
-func (t *FirewallChange) FromAddRule(v AddRule) error {
-	b, err := json.Marshal(v)
-	if err != nil {
-		return err
-	}
-	b, err = runtime.JSONMerge(b, []byte(`{"kind":"add_rule"}`))
-	t.union = b
-	return err
-}
-
-// MergeAddRule performs a merge with any union data inside the FirewallChange, using the provided AddRule
-func (t *FirewallChange) MergeAddRule(v AddRule) error {
-	b, err := json.Marshal(v)
-	if err != nil {
-		return err
-	}
-	b, err = runtime.JSONMerge(b, []byte(`{"kind":"add_rule"}`))
-	if err != nil {
-		return err
-	}
-
-	merged, err := runtime.JSONMerge(t.union, b)
-	t.union = merged
-	return err
-}
-
-// AsEditRule returns the union data inside the FirewallChange as a EditRule
-func (t FirewallChange) AsEditRule() (EditRule, error) {
-	var body EditRule
-	err := json.Unmarshal(t.union, &body)
-	return body, err
-}
-
-// FromEditRule overwrites any union data inside the FirewallChange as the provided EditRule
-func (t *FirewallChange) FromEditRule(v EditRule) error {
-	b, err := json.Marshal(v)
-	if err != nil {
-		return err
-	}
-	b, err = runtime.JSONMerge(b, []byte(`{"kind":"edit_rule"}`))
-	t.union = b
-	return err
-}
-
-// MergeEditRule performs a merge with any union data inside the FirewallChange, using the provided EditRule
-func (t *FirewallChange) MergeEditRule(v EditRule) error {
-	b, err := json.Marshal(v)
-	if err != nil {
-		return err
-	}
-	b, err = runtime.JSONMerge(b, []byte(`{"kind":"edit_rule"}`))
-	if err != nil {
-		return err
-	}
-
-	merged, err := runtime.JSONMerge(t.union, b)
-	t.union = merged
-	return err
-}
-
-// AsDeleteRule returns the union data inside the FirewallChange as a DeleteRule
-func (t FirewallChange) AsDeleteRule() (DeleteRule, error) {
-	var body DeleteRule
-	err := json.Unmarshal(t.union, &body)
-	return body, err
-}
-
-// FromDeleteRule overwrites any union data inside the FirewallChange as the provided DeleteRule
-func (t *FirewallChange) FromDeleteRule(v DeleteRule) error {
-	b, err := json.Marshal(v)
-	if err != nil {
-		return err
-	}
-	b, err = runtime.JSONMerge(b, []byte(`{"kind":"delete_rule"}`))
-	t.union = b
-	return err
-}
-
-// MergeDeleteRule performs a merge with any union data inside the FirewallChange, using the provided DeleteRule
-func (t *FirewallChange) MergeDeleteRule(v DeleteRule) error {
-	b, err := json.Marshal(v)
-	if err != nil {
-		return err
-	}
-	b, err = runtime.JSONMerge(b, []byte(`{"kind":"delete_rule"}`))
-	if err != nil {
-		return err
-	}
-
-	merged, err := runtime.JSONMerge(t.union, b)
-	t.union = merged
-	return err
-}
-
-// AsMoveRule returns the union data inside the FirewallChange as a MoveRule
-func (t FirewallChange) AsMoveRule() (MoveRule, error) {
-	var body MoveRule
-	err := json.Unmarshal(t.union, &body)
-	return body, err
-}
-
-// FromMoveRule overwrites any union data inside the FirewallChange as the provided MoveRule
-func (t *FirewallChange) FromMoveRule(v MoveRule) error {
-	b, err := json.Marshal(v)
-	if err != nil {
-		return err
-	}
-	b, err = runtime.JSONMerge(b, []byte(`{"kind":"move_rule"}`))
-	t.union = b
-	return err
-}
-
-// MergeMoveRule performs a merge with any union data inside the FirewallChange, using the provided MoveRule
-func (t *FirewallChange) MergeMoveRule(v MoveRule) error {
-	b, err := json.Marshal(v)
-	if err != nil {
-		return err
-	}
-	b, err = runtime.JSONMerge(b, []byte(`{"kind":"move_rule"}`))
-	if err != nil {
-		return err
-	}
-
-	merged, err := runtime.JSONMerge(t.union, b)
-	t.union = merged
-	return err
-}
-
-// AsSetDefaultPolicy returns the union data inside the FirewallChange as a SetDefaultPolicy
-func (t FirewallChange) AsSetDefaultPolicy() (SetDefaultPolicy, error) {
-	var body SetDefaultPolicy
-	err := json.Unmarshal(t.union, &body)
-	return body, err
-}
-
-// FromSetDefaultPolicy overwrites any union data inside the FirewallChange as the provided SetDefaultPolicy
-func (t *FirewallChange) FromSetDefaultPolicy(v SetDefaultPolicy) error {
-	b, err := json.Marshal(v)
-	if err != nil {
-		return err
-	}
-	b, err = runtime.JSONMerge(b, []byte(`{"kind":"set_default_policy"}`))
-	t.union = b
-	return err
-}
-
-// MergeSetDefaultPolicy performs a merge with any union data inside the FirewallChange, using the provided SetDefaultPolicy
-func (t *FirewallChange) MergeSetDefaultPolicy(v SetDefaultPolicy) error {
-	b, err := json.Marshal(v)
-	if err != nil {
-		return err
-	}
-	b, err = runtime.JSONMerge(b, []byte(`{"kind":"set_default_policy"}`))
-	if err != nil {
-		return err
-	}
-
-	merged, err := runtime.JSONMerge(t.union, b)
-	t.union = merged
-	return err
-}
-
-// AsSetFirewallEnabled returns the union data inside the FirewallChange as a SetFirewallEnabled
-func (t FirewallChange) AsSetFirewallEnabled() (SetFirewallEnabled, error) {
-	var body SetFirewallEnabled
-	err := json.Unmarshal(t.union, &body)
-	return body, err
-}
-
-// FromSetFirewallEnabled overwrites any union data inside the FirewallChange as the provided SetFirewallEnabled
-func (t *FirewallChange) FromSetFirewallEnabled(v SetFirewallEnabled) error {
-	b, err := json.Marshal(v)
-	if err != nil {
-		return err
-	}
-	b, err = runtime.JSONMerge(b, []byte(`{"kind":"set_enabled"}`))
-	t.union = b
-	return err
-}
-
-// MergeSetFirewallEnabled performs a merge with any union data inside the FirewallChange, using the provided SetFirewallEnabled
-func (t *FirewallChange) MergeSetFirewallEnabled(v SetFirewallEnabled) error {
-	b, err := json.Marshal(v)
-	if err != nil {
-		return err
-	}
-	b, err = runtime.JSONMerge(b, []byte(`{"kind":"set_enabled"}`))
-	if err != nil {
-		return err
-	}
-
-	merged, err := runtime.JSONMerge(t.union, b)
-	t.union = merged
-	return err
-}
-
-// AsSetDockerPortPolicy returns the union data inside the FirewallChange as a SetDockerPortPolicy
-func (t FirewallChange) AsSetDockerPortPolicy() (SetDockerPortPolicy, error) {
-	var body SetDockerPortPolicy
-	err := json.Unmarshal(t.union, &body)
-	return body, err
-}
-
-// FromSetDockerPortPolicy overwrites any union data inside the FirewallChange as the provided SetDockerPortPolicy
-func (t *FirewallChange) FromSetDockerPortPolicy(v SetDockerPortPolicy) error {
-	b, err := json.Marshal(v)
-	if err != nil {
-		return err
-	}
-	b, err = runtime.JSONMerge(b, []byte(`{"kind":"set_docker_port_policy"}`))
-	t.union = b
-	return err
-}
-
-// MergeSetDockerPortPolicy performs a merge with any union data inside the FirewallChange, using the provided SetDockerPortPolicy
-func (t *FirewallChange) MergeSetDockerPortPolicy(v SetDockerPortPolicy) error {
-	b, err := json.Marshal(v)
-	if err != nil {
-		return err
-	}
-	b, err = runtime.JSONMerge(b, []byte(`{"kind":"set_docker_port_policy"}`))
-	if err != nil {
-		return err
-	}
-
-	merged, err := runtime.JSONMerge(t.union, b)
-	t.union = merged
-	return err
-}
-
-func (t FirewallChange) Discriminator() (string, error) {
-	var discriminator struct {
-		Discriminator string `json:"kind"`
-	}
-	err := json.Unmarshal(t.union, &discriminator)
-	return discriminator.Discriminator, err
-}
-
-func (t FirewallChange) ValueByDiscriminator() (interface{}, error) {
-	discriminator, err := t.Discriminator()
-	if err != nil {
-		return nil, err
-	}
-	switch discriminator {
-	case "add_rule":
-		return t.AsAddRule()
-	case "delete_rule":
-		return t.AsDeleteRule()
-	case "edit_rule":
-		return t.AsEditRule()
-	case "move_rule":
-		return t.AsMoveRule()
-	case "set_default_policy":
-		return t.AsSetDefaultPolicy()
-	case "set_docker_port_policy":
-		return t.AsSetDockerPortPolicy()
-	case "set_enabled":
-		return t.AsSetFirewallEnabled()
-	default:
-		return nil, errors.New("unknown discriminator value: " + discriminator)
-	}
-}
-
-func (t FirewallChange) MarshalJSON() ([]byte, error) {
-	b, err := t.union.MarshalJSON()
-	return b, err
-}
-
-func (t *FirewallChange) UnmarshalJSON(b []byte) error {
-	err := t.union.UnmarshalJSON(b)
-	return err
-}
-
-// AsConnectPortainer returns the union data inside the PortainerChange as a ConnectPortainer
-func (t PortainerChange) AsConnectPortainer() (ConnectPortainer, error) {
-	var body ConnectPortainer
-	err := json.Unmarshal(t.union, &body)
-	return body, err
-}
-
-// FromConnectPortainer overwrites any union data inside the PortainerChange as the provided ConnectPortainer
-func (t *PortainerChange) FromConnectPortainer(v ConnectPortainer) error {
-	b, err := json.Marshal(v)
-	if err != nil {
-		return err
-	}
-	b, err = runtime.JSONMerge(b, []byte(`{"kind":"connect"}`))
-	t.union = b
-	return err
-}
-
-// MergeConnectPortainer performs a merge with any union data inside the PortainerChange, using the provided ConnectPortainer
-func (t *PortainerChange) MergeConnectPortainer(v ConnectPortainer) error {
-	b, err := json.Marshal(v)
-	if err != nil {
-		return err
-	}
-	b, err = runtime.JSONMerge(b, []byte(`{"kind":"connect"}`))
-	if err != nil {
-		return err
-	}
-
-	merged, err := runtime.JSONMerge(t.union, b)
-	t.union = merged
-	return err
-}
-
-// AsCreatePortainer returns the union data inside the PortainerChange as a CreatePortainer
-func (t PortainerChange) AsCreatePortainer() (CreatePortainer, error) {
-	var body CreatePortainer
-	err := json.Unmarshal(t.union, &body)
-	return body, err
-}
-
-// FromCreatePortainer overwrites any union data inside the PortainerChange as the provided CreatePortainer
-func (t *PortainerChange) FromCreatePortainer(v CreatePortainer) error {
-	b, err := json.Marshal(v)
-	if err != nil {
-		return err
-	}
-	b, err = runtime.JSONMerge(b, []byte(`{"kind":"create"}`))
-	t.union = b
-	return err
-}
-
-// MergeCreatePortainer performs a merge with any union data inside the PortainerChange, using the provided CreatePortainer
-func (t *PortainerChange) MergeCreatePortainer(v CreatePortainer) error {
-	b, err := json.Marshal(v)
-	if err != nil {
-		return err
-	}
-	b, err = runtime.JSONMerge(b, []byte(`{"kind":"create"}`))
-	if err != nil {
-		return err
-	}
-
-	merged, err := runtime.JSONMerge(t.union, b)
-	t.union = merged
-	return err
-}
-
-func (t PortainerChange) Discriminator() (string, error) {
-	var discriminator struct {
-		Discriminator string `json:"kind"`
-	}
-	err := json.Unmarshal(t.union, &discriminator)
-	return discriminator.Discriminator, err
-}
-
-func (t PortainerChange) ValueByDiscriminator() (interface{}, error) {
-	discriminator, err := t.Discriminator()
-	if err != nil {
-		return nil, err
-	}
-	switch discriminator {
-	case "connect":
-		return t.AsConnectPortainer()
-	case "create":
-		return t.AsCreatePortainer()
-	default:
-		return nil, errors.New("unknown discriminator value: " + discriminator)
-	}
-}
-
-func (t PortainerChange) MarshalJSON() ([]byte, error) {
-	b, err := t.union.MarshalJSON()
-	return b, err
-}
-
-func (t *PortainerChange) UnmarshalJSON(b []byte) error {
-	err := t.union.UnmarshalJSON(b)
-	return err
-}
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
@@ -2364,12 +1596,9 @@ type ServerInterface interface {
 	// RevokeEnrollmentToken 撤销接入码
 	// (DELETE /enrollment-tokens/{id})
 	RevokeEnrollmentToken(w http.ResponseWriter, r *http.Request, id string, params RevokeEnrollmentTokenParams)
-	// GetFirewallPlan 读取不可变预览
-	// (GET /firewall/plans/{id})
-	GetFirewallPlan(w http.ResponseWriter, r *http.Request, id string)
-	// ApplyFirewallPlan 受理预览并返回原操作
-	// (POST /firewall/plans/{id}/apply)
-	ApplyFirewallPlan(w http.ResponseWriter, r *http.Request, id string, params ApplyFirewallPlanParams)
+	// GetMonitoringHistory 读取监控历史
+	// (GET /monitoring/history)
+	GetMonitoringHistory(w http.ResponseWriter, r *http.Request, params GetMonitoringHistoryParams)
 	// ListNodes 读取节点
 	// (GET /nodes)
 	ListNodes(w http.ResponseWriter, r *http.Request)
@@ -2379,18 +1608,51 @@ type ServerInterface interface {
 	// RenameNode 修改节点名称
 	// (PATCH /nodes/{id})
 	RenameNode(w http.ResponseWriter, r *http.Request, id string, params RenameNodeParams)
-	// ReadFirewall 读取原生防火墙实际状态
+
+	// (GET /nodes/{id}/account)
+	GetNodeAccount(w http.ResponseWriter, r *http.Request, id string)
+
+	// (PATCH /nodes/{id}/account)
+	ChangeNodeAccount(w http.ResponseWriter, r *http.Request, id string, params ChangeNodeAccountParams)
+
+	// (POST /nodes/{id}/account/password)
+	RevealNodePassword(w http.ResponseWriter, r *http.Request, id string, params RevealNodePasswordParams)
+	// ReadFirewall 读取 OPSD 防火墙配置及应用状态
 	// (GET /nodes/{id}/firewall)
-	ReadFirewall(w http.ResponseWriter, r *http.Request, id string, params ReadFirewallParams)
+	ReadFirewall(w http.ResponseWriter, r *http.Request, id string)
+
+	// (PATCH /nodes/{id}/firewall)
+	ChangeFirewallConfig(w http.ResponseWriter, r *http.Request, id string, params ChangeFirewallConfigParams)
 	// InstallFirewall 安装但不启用防火墙组件
 	// (POST /nodes/{id}/firewall/install)
 	InstallFirewall(w http.ResponseWriter, r *http.Request, id string, params InstallFirewallParams)
-	// PreviewFirewallChange 预览单项变更
-	// (POST /nodes/{id}/firewall/plans)
-	PreviewFirewallChange(w http.ResponseWriter, r *http.Request, id string, params PreviewFirewallChangeParams)
+	// GetNodePeerTrust 读取节点互信规则与应用状态
+	// (GET /nodes/{id}/firewall/peer-trust)
+	GetNodePeerTrust(w http.ResponseWriter, r *http.Request, id string)
+
+	// (POST /nodes/{id}/firewall/sync)
+	SyncFirewallConfig(w http.ResponseWriter, r *http.Request, id string, params SyncFirewallConfigParams)
+	// GetPublicAddresses 读取节点公网地址
+	// (GET /nodes/{id}/public-addresses)
+	GetPublicAddresses(w http.ResponseWriter, r *http.Request, id string)
+	// ChangePublicAddresses 保存节点公网地址
+	// (PATCH /nodes/{id}/public-addresses)
+	ChangePublicAddresses(w http.ResponseWriter, r *http.Request, id string, params ChangePublicAddressesParams)
+	// RefreshPublicAddresses 重新发现公网地址
+	// (POST /nodes/{id}/public-addresses/refresh)
+	RefreshPublicAddresses(w http.ResponseWriter, r *http.Request, id string, params RefreshPublicAddressesParams)
 	// RevokeNode 撤销节点授权
 	// (POST /nodes/{id}/revoke)
 	RevokeNode(w http.ResponseWriter, r *http.Request, id string, params RevokeNodeParams)
+
+	// (GET /nodes/{id}/settings)
+	GetNodeSettings(w http.ResponseWriter, r *http.Request, id string)
+
+	// (PATCH /nodes/{id}/settings)
+	ChangeNodeSettings(w http.ResponseWriter, r *http.Request, id string, params ChangeNodeSettingsParams)
+
+	// (GET /nodes/{id}/storage)
+	GetStorageStatus(w http.ResponseWriter, r *http.Request, id string)
 	// ListOperations 查询历史或定位原操作
 	// (GET /operations)
 	ListOperations(w http.ResponseWriter, r *http.Request, params ListOperationsParams)
@@ -2400,6 +1662,9 @@ type ServerInterface interface {
 	// GetOperation 查询原操作
 	// (GET /operations/{id})
 	GetOperation(w http.ResponseWriter, r *http.Request, id string)
+
+	// (POST /operations/{id}/cancel)
+	CancelOperation(w http.ResponseWriter, r *http.Request, id string, params CancelOperationParams)
 	// ConfirmOperation 确认原操作
 	// (POST /operations/{id}/confirm)
 	ConfirmOperation(w http.ResponseWriter, r *http.Request, id string, params ConfirmOperationParams)
@@ -2409,6 +1674,18 @@ type ServerInterface interface {
 	// ResolveOperation 接受现状并结束为人工处理
 	// (POST /operations/{id}/resolve)
 	ResolveOperation(w http.ResponseWriter, r *http.Request, id string, params ResolveOperationParams)
+	// GetOverview 读取集群概览
+	// (GET /overview)
+	GetOverview(w http.ResponseWriter, r *http.Request)
+	// GetPeerTrust 读取集群互信开关
+	// (GET /peer-trust)
+	GetPeerTrust(w http.ResponseWriter, r *http.Request)
+	// ChangePeerTrust 保存集群互信开关
+	// (PATCH /peer-trust)
+	ChangePeerTrust(w http.ResponseWriter, r *http.Request, params ChangePeerTrustParams)
+	// GetPeerTrustStatus 读取逐节点互信状态
+	// (GET /peer-trust/status)
+	GetPeerTrustStatus(w http.ResponseWriter, r *http.Request)
 	// GetAccount 读取管理员账号
 	// (GET /settings/account)
 	GetAccount(w http.ResponseWriter, r *http.Request)
@@ -2683,77 +1960,43 @@ func (siw *ServerInterfaceWrapper) RevokeEnrollmentToken(w http.ResponseWriter, 
 	handler.ServeHTTP(w, r)
 }
 
-// GetFirewallPlan operation middleware
-func (siw *ServerInterfaceWrapper) GetFirewallPlan(w http.ResponseWriter, r *http.Request) {
+// GetMonitoringHistory operation middleware
+func (siw *ServerInterfaceWrapper) GetMonitoringHistory(w http.ResponseWriter, r *http.Request) {
 
 	var err error
 	_ = err
-
-	// ------------- Path parameter "id" -------------
-	var id string
-
-	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
-		return
-	}
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.GetFirewallPlan(w, r, id)
-	}))
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		handler = middleware(handler)
-	}
-
-	handler.ServeHTTP(w, r)
-}
-
-// ApplyFirewallPlan operation middleware
-func (siw *ServerInterfaceWrapper) ApplyFirewallPlan(w http.ResponseWriter, r *http.Request) {
-
-	var err error
-	_ = err
-
-	// ------------- Path parameter "id" -------------
-	var id string
-
-	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
-		return
-	}
 
 	// Parameter object where we will unmarshal all parameters from the context
-	var params ApplyFirewallPlanParams
+	var params GetMonitoringHistoryParams
 
-	headers := r.Header
+	// ------------- Optional query parameter "range" -------------
 
-	// ------------- Required header parameter "X-CSRF-Token" -------------
-	if valueList, found := headers[http.CanonicalHeaderKey("X-CSRF-Token")]; found {
-		var XCSRFToken string
-		n := len(valueList)
-		if n != 1 {
-			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "X-CSRF-Token", Count: n})
-			return
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "range", r.URL.Query(), &params.Range, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "range"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "range", Err: err})
 		}
+		return
+	}
 
-		err = runtime.BindStyledParameterWithOptions("simple", "X-CSRF-Token", valueList[0], &XCSRFToken, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
-		if err != nil {
-			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-CSRF-Token", Err: err})
-			return
+	// ------------- Optional query parameter "node_id" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "node_id", r.URL.Query(), &params.NodeId, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "node_id"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "node_id", Err: err})
 		}
-
-		params.XCSRFToken = XCSRFToken
-
-	} else {
-		err := fmt.Errorf("Header parameter X-CSRF-Token is required, but not found")
-		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "X-CSRF-Token", Err: err})
 		return
 	}
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.ApplyFirewallPlan(w, r, id, params)
+		siw.Handler.GetMonitoringHistory(w, r, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -2857,6 +2100,163 @@ func (siw *ServerInterfaceWrapper) RenameNode(w http.ResponseWriter, r *http.Req
 	handler.ServeHTTP(w, r)
 }
 
+// GetNodeAccount operation middleware
+func (siw *ServerInterfaceWrapper) GetNodeAccount(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetNodeAccount(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ChangeNodeAccount operation middleware
+func (siw *ServerInterfaceWrapper) ChangeNodeAccount(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ChangeNodeAccountParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "X-CSRF-Token" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-CSRF-Token")]; found {
+		var XCSRFToken string
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "X-CSRF-Token", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "X-CSRF-Token", valueList[0], &XCSRFToken, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-CSRF-Token", Err: err})
+			return
+		}
+
+		params.XCSRFToken = XCSRFToken
+
+	} else {
+		err := fmt.Errorf("Header parameter X-CSRF-Token is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "X-CSRF-Token", Err: err})
+		return
+	}
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey string
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ChangeNodeAccount(w, r, id, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// RevealNodePassword operation middleware
+func (siw *ServerInterfaceWrapper) RevealNodePassword(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params RevealNodePasswordParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "X-CSRF-Token" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-CSRF-Token")]; found {
+		var XCSRFToken string
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "X-CSRF-Token", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "X-CSRF-Token", valueList[0], &XCSRFToken, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-CSRF-Token", Err: err})
+			return
+		}
+
+		params.XCSRFToken = XCSRFToken
+
+	} else {
+		err := fmt.Errorf("Header parameter X-CSRF-Token is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "X-CSRF-Token", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RevealNodePassword(w, r, id, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // ReadFirewall operation middleware
 func (siw *ServerInterfaceWrapper) ReadFirewall(w http.ResponseWriter, r *http.Request) {
 
@@ -2872,37 +2272,85 @@ func (siw *ServerInterfaceWrapper) ReadFirewall(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	// Parameter object where we will unmarshal all parameters from the context
-	var params ReadFirewallParams
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ReadFirewall(w, r, id)
+	}))
 
-	// ------------- Optional query parameter "family" -------------
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
 
-	err = runtime.BindQueryParameterWithOptions("form", true, false, "family", r.URL.Query(), &params.Family, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	handler.ServeHTTP(w, r)
+}
+
+// ChangeFirewallConfig operation middleware
+func (siw *ServerInterfaceWrapper) ChangeFirewallConfig(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
 	if err != nil {
-		var requiredError *runtime.RequiredParameterError
-		if errors.As(err, &requiredError) {
-			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "family"})
-		} else {
-			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "family", Err: err})
-		}
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
 		return
 	}
 
-	// ------------- Optional query parameter "scope" -------------
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ChangeFirewallConfigParams
 
-	err = runtime.BindQueryParameterWithOptions("form", true, false, "scope", r.URL.Query(), &params.Scope, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
-	if err != nil {
-		var requiredError *runtime.RequiredParameterError
-		if errors.As(err, &requiredError) {
-			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "scope"})
-		} else {
-			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "scope", Err: err})
+	headers := r.Header
+
+	// ------------- Required header parameter "X-CSRF-Token" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-CSRF-Token")]; found {
+		var XCSRFToken string
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "X-CSRF-Token", Count: n})
+			return
 		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "X-CSRF-Token", valueList[0], &XCSRFToken, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-CSRF-Token", Err: err})
+			return
+		}
+
+		params.XCSRFToken = XCSRFToken
+
+	} else {
+		err := fmt.Errorf("Header parameter X-CSRF-Token is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "X-CSRF-Token", Err: err})
+		return
+	}
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey string
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
 		return
 	}
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.ReadFirewall(w, r, id, params)
+		siw.Handler.ChangeFirewallConfig(w, r, id, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -2989,8 +2437,34 @@ func (siw *ServerInterfaceWrapper) InstallFirewall(w http.ResponseWriter, r *htt
 	handler.ServeHTTP(w, r)
 }
 
-// PreviewFirewallChange operation middleware
-func (siw *ServerInterfaceWrapper) PreviewFirewallChange(w http.ResponseWriter, r *http.Request) {
+// GetNodePeerTrust operation middleware
+func (siw *ServerInterfaceWrapper) GetNodePeerTrust(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetNodePeerTrust(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// SyncFirewallConfig operation middleware
+func (siw *ServerInterfaceWrapper) SyncFirewallConfig(w http.ResponseWriter, r *http.Request) {
 
 	var err error
 	_ = err
@@ -3005,7 +2479,110 @@ func (siw *ServerInterfaceWrapper) PreviewFirewallChange(w http.ResponseWriter, 
 	}
 
 	// Parameter object where we will unmarshal all parameters from the context
-	var params PreviewFirewallChangeParams
+	var params SyncFirewallConfigParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "X-CSRF-Token" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-CSRF-Token")]; found {
+		var XCSRFToken string
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "X-CSRF-Token", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "X-CSRF-Token", valueList[0], &XCSRFToken, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-CSRF-Token", Err: err})
+			return
+		}
+
+		params.XCSRFToken = XCSRFToken
+
+	} else {
+		err := fmt.Errorf("Header parameter X-CSRF-Token is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "X-CSRF-Token", Err: err})
+		return
+	}
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey string
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.SyncFirewallConfig(w, r, id, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetPublicAddresses operation middleware
+func (siw *ServerInterfaceWrapper) GetPublicAddresses(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetPublicAddresses(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ChangePublicAddresses operation middleware
+func (siw *ServerInterfaceWrapper) ChangePublicAddresses(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ChangePublicAddressesParams
 
 	headers := r.Header
 
@@ -3033,7 +2610,61 @@ func (siw *ServerInterfaceWrapper) PreviewFirewallChange(w http.ResponseWriter, 
 	}
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.PreviewFirewallChange(w, r, id, params)
+		siw.Handler.ChangePublicAddresses(w, r, id, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// RefreshPublicAddresses operation middleware
+func (siw *ServerInterfaceWrapper) RefreshPublicAddresses(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params RefreshPublicAddressesParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "X-CSRF-Token" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-CSRF-Token")]; found {
+		var XCSRFToken string
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "X-CSRF-Token", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "X-CSRF-Token", valueList[0], &XCSRFToken, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-CSRF-Token", Err: err})
+			return
+		}
+
+		params.XCSRFToken = XCSRFToken
+
+	} else {
+		err := fmt.Errorf("Header parameter X-CSRF-Token is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "X-CSRF-Token", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RefreshPublicAddresses(w, r, id, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -3088,6 +2719,135 @@ func (siw *ServerInterfaceWrapper) RevokeNode(w http.ResponseWriter, r *http.Req
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.RevokeNode(w, r, id, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetNodeSettings operation middleware
+func (siw *ServerInterfaceWrapper) GetNodeSettings(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetNodeSettings(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ChangeNodeSettings operation middleware
+func (siw *ServerInterfaceWrapper) ChangeNodeSettings(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ChangeNodeSettingsParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "X-CSRF-Token" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-CSRF-Token")]; found {
+		var XCSRFToken string
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "X-CSRF-Token", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "X-CSRF-Token", valueList[0], &XCSRFToken, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-CSRF-Token", Err: err})
+			return
+		}
+
+		params.XCSRFToken = XCSRFToken
+
+	} else {
+		err := fmt.Errorf("Header parameter X-CSRF-Token is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "X-CSRF-Token", Err: err})
+		return
+	}
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey string
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ChangeNodeSettings(w, r, id, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetStorageStatus operation middleware
+func (siw *ServerInterfaceWrapper) GetStorageStatus(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetStorageStatus(w, r, id)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -3217,6 +2977,19 @@ func (siw *ServerInterfaceWrapper) ListPendingOperations(w http.ResponseWriter, 
 		return
 	}
 
+	// ------------- Optional query parameter "cursor" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "cursor", r.URL.Query(), &params.Cursor, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "cursor"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "cursor", Err: err})
+		}
+		return
+	}
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.ListPendingOperations(w, r, params)
 	}))
@@ -3245,6 +3018,60 @@ func (siw *ServerInterfaceWrapper) GetOperation(w http.ResponseWriter, r *http.R
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetOperation(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CancelOperation operation middleware
+func (siw *ServerInterfaceWrapper) CancelOperation(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params CancelOperationParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "X-CSRF-Token" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-CSRF-Token")]; found {
+		var XCSRFToken string
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "X-CSRF-Token", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "X-CSRF-Token", valueList[0], &XCSRFToken, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-CSRF-Token", Err: err})
+			return
+		}
+
+		params.XCSRFToken = XCSRFToken
+
+	} else {
+		err := fmt.Errorf("Header parameter X-CSRF-Token is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "X-CSRF-Token", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CancelOperation(w, r, id, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -3407,6 +3234,93 @@ func (siw *ServerInterfaceWrapper) ResolveOperation(w http.ResponseWriter, r *ht
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.ResolveOperation(w, r, id, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetOverview operation middleware
+func (siw *ServerInterfaceWrapper) GetOverview(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetOverview(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetPeerTrust operation middleware
+func (siw *ServerInterfaceWrapper) GetPeerTrust(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetPeerTrust(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ChangePeerTrust operation middleware
+func (siw *ServerInterfaceWrapper) ChangePeerTrust(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ChangePeerTrustParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "X-CSRF-Token" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-CSRF-Token")]; found {
+		var XCSRFToken string
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "X-CSRF-Token", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "X-CSRF-Token", valueList[0], &XCSRFToken, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-CSRF-Token", Err: err})
+			return
+		}
+
+		params.XCSRFToken = XCSRFToken
+
+	} else {
+		err := fmt.Errorf("Header parameter X-CSRF-Token is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "X-CSRF-Token", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ChangePeerTrust(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetPeerTrustStatus operation middleware
+func (siw *ServerInterfaceWrapper) GetPeerTrustStatus(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetPeerTrustStatus(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -3617,21 +3531,36 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/enrollment-tokens", wrapper.ListEnrollmentTokens)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/enrollment-tokens", wrapper.CreateEnrollmentToken)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/enrollment-tokens/{id}", wrapper.RevokeEnrollmentToken)
-	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/firewall/plans/{id}", wrapper.GetFirewallPlan)
-	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/firewall/plans/{id}/apply", wrapper.ApplyFirewallPlan)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/monitoring/history", wrapper.GetMonitoringHistory)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/nodes", wrapper.ListNodes)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/nodes/{id}", wrapper.GetNode)
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/nodes/{id}", wrapper.RenameNode)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/nodes/{id}/account", wrapper.GetNodeAccount)
+	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/nodes/{id}/account", wrapper.ChangeNodeAccount)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/nodes/{id}/account/password", wrapper.RevealNodePassword)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/nodes/{id}/firewall", wrapper.ReadFirewall)
+	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/nodes/{id}/firewall", wrapper.ChangeFirewallConfig)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/nodes/{id}/firewall/install", wrapper.InstallFirewall)
-	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/nodes/{id}/firewall/plans", wrapper.PreviewFirewallChange)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/nodes/{id}/firewall/peer-trust", wrapper.GetNodePeerTrust)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/nodes/{id}/firewall/sync", wrapper.SyncFirewallConfig)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/nodes/{id}/public-addresses", wrapper.GetPublicAddresses)
+	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/nodes/{id}/public-addresses", wrapper.ChangePublicAddresses)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/nodes/{id}/public-addresses/refresh", wrapper.RefreshPublicAddresses)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/nodes/{id}/revoke", wrapper.RevokeNode)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/nodes/{id}/settings", wrapper.GetNodeSettings)
+	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/nodes/{id}/settings", wrapper.ChangeNodeSettings)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/nodes/{id}/storage", wrapper.GetStorageStatus)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/operations", wrapper.ListOperations)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/operations/pending", wrapper.ListPendingOperations)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/operations/{id}", wrapper.GetOperation)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/operations/{id}/cancel", wrapper.CancelOperation)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/operations/{id}/confirm", wrapper.ConfirmOperation)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/operations/{id}/recover", wrapper.RecoverOperation)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/operations/{id}/resolve", wrapper.ResolveOperation)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/overview", wrapper.GetOverview)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/peer-trust", wrapper.GetPeerTrust)
+	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/peer-trust", wrapper.ChangePeerTrust)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/peer-trust/status", wrapper.GetPeerTrustStatus)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/settings/account", wrapper.GetAccount)
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/settings/account", wrapper.ChangeAccount)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/settings/version", wrapper.GetVersion)
@@ -4608,17 +4537,17 @@ func (response RevokeEnrollmentToken503JSONResponse) VisitRevokeEnrollmentTokenR
 	return err
 }
 
-type GetFirewallPlanRequestObject struct {
-	Id string `json:"id"`
+type GetMonitoringHistoryRequestObject struct {
+	Params GetMonitoringHistoryParams
 }
 
-type GetFirewallPlanResponseObject interface {
-	VisitGetFirewallPlanResponse(w http.ResponseWriter) error
+type GetMonitoringHistoryResponseObject interface {
+	VisitGetMonitoringHistoryResponse(w http.ResponseWriter) error
 }
 
-type GetFirewallPlan200JSONResponse ChangePlan
+type GetMonitoringHistory200JSONResponse MonitoringHistory
 
-func (response GetFirewallPlan200JSONResponse) VisitGetFirewallPlanResponse(w http.ResponseWriter) error {
+func (response GetMonitoringHistory200JSONResponse) VisitGetMonitoringHistoryResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response); err != nil {
@@ -4630,130 +4559,9 @@ func (response GetFirewallPlan200JSONResponse) VisitGetFirewallPlanResponse(w ht
 	return err
 }
 
-type GetFirewallPlan401JSONResponse struct{ UnauthorizedJSONResponse }
+type GetMonitoringHistory401JSONResponse struct{ UnauthorizedJSONResponse }
 
-func (response GetFirewallPlan401JSONResponse) VisitGetFirewallPlanResponse(w http.ResponseWriter) error {
-
-	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(response); err != nil {
-		return err
-	}
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(401)
-	_, err := buf.WriteTo(w)
-	return err
-}
-
-type GetFirewallPlan403JSONResponse struct{ ForbiddenJSONResponse }
-
-func (response GetFirewallPlan403JSONResponse) VisitGetFirewallPlanResponse(w http.ResponseWriter) error {
-
-	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(response); err != nil {
-		return err
-	}
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(403)
-	_, err := buf.WriteTo(w)
-	return err
-}
-
-type GetFirewallPlan404JSONResponse struct{ NotFoundJSONResponse }
-
-func (response GetFirewallPlan404JSONResponse) VisitGetFirewallPlanResponse(w http.ResponseWriter) error {
-
-	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(response); err != nil {
-		return err
-	}
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(404)
-	_, err := buf.WriteTo(w)
-	return err
-}
-
-type GetFirewallPlan409JSONResponse struct{ ConflictJSONResponse }
-
-func (response GetFirewallPlan409JSONResponse) VisitGetFirewallPlanResponse(w http.ResponseWriter) error {
-
-	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(response); err != nil {
-		return err
-	}
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(409)
-	_, err := buf.WriteTo(w)
-	return err
-}
-
-type GetFirewallPlan422JSONResponse struct{ InvalidRequestJSONResponse }
-
-func (response GetFirewallPlan422JSONResponse) VisitGetFirewallPlanResponse(w http.ResponseWriter) error {
-
-	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(response); err != nil {
-		return err
-	}
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(422)
-	_, err := buf.WriteTo(w)
-	return err
-}
-
-type GetFirewallPlan500JSONResponse struct{ InternalErrorJSONResponse }
-
-func (response GetFirewallPlan500JSONResponse) VisitGetFirewallPlanResponse(w http.ResponseWriter) error {
-
-	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(response); err != nil {
-		return err
-	}
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(500)
-	_, err := buf.WriteTo(w)
-	return err
-}
-
-type GetFirewallPlan503JSONResponse struct{ UnavailableJSONResponse }
-
-func (response GetFirewallPlan503JSONResponse) VisitGetFirewallPlanResponse(w http.ResponseWriter) error {
-
-	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(response); err != nil {
-		return err
-	}
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(503)
-	_, err := buf.WriteTo(w)
-	return err
-}
-
-type ApplyFirewallPlanRequestObject struct {
-	Id     string `json:"id"`
-	Params ApplyFirewallPlanParams
-}
-
-type ApplyFirewallPlanResponseObject interface {
-	VisitApplyFirewallPlanResponse(w http.ResponseWriter) error
-}
-
-type ApplyFirewallPlan202JSONResponse Operation
-
-func (response ApplyFirewallPlan202JSONResponse) VisitApplyFirewallPlanResponse(w http.ResponseWriter) error {
-
-	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(response); err != nil {
-		return err
-	}
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(202)
-	_, err := buf.WriteTo(w)
-	return err
-}
-
-type ApplyFirewallPlan401JSONResponse struct{ UnauthorizedJSONResponse }
-
-func (response ApplyFirewallPlan401JSONResponse) VisitApplyFirewallPlanResponse(w http.ResponseWriter) error {
+func (response GetMonitoringHistory401JSONResponse) VisitGetMonitoringHistoryResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response); err != nil {
@@ -4765,9 +4573,9 @@ func (response ApplyFirewallPlan401JSONResponse) VisitApplyFirewallPlanResponse(
 	return err
 }
 
-type ApplyFirewallPlan403JSONResponse struct{ ForbiddenJSONResponse }
+type GetMonitoringHistory403JSONResponse struct{ ForbiddenJSONResponse }
 
-func (response ApplyFirewallPlan403JSONResponse) VisitApplyFirewallPlanResponse(w http.ResponseWriter) error {
+func (response GetMonitoringHistory403JSONResponse) VisitGetMonitoringHistoryResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response); err != nil {
@@ -4779,9 +4587,9 @@ func (response ApplyFirewallPlan403JSONResponse) VisitApplyFirewallPlanResponse(
 	return err
 }
 
-type ApplyFirewallPlan404JSONResponse struct{ NotFoundJSONResponse }
+type GetMonitoringHistory404JSONResponse struct{ NotFoundJSONResponse }
 
-func (response ApplyFirewallPlan404JSONResponse) VisitApplyFirewallPlanResponse(w http.ResponseWriter) error {
+func (response GetMonitoringHistory404JSONResponse) VisitGetMonitoringHistoryResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response); err != nil {
@@ -4793,9 +4601,9 @@ func (response ApplyFirewallPlan404JSONResponse) VisitApplyFirewallPlanResponse(
 	return err
 }
 
-type ApplyFirewallPlan409JSONResponse struct{ ConflictJSONResponse }
+type GetMonitoringHistory409JSONResponse struct{ ConflictJSONResponse }
 
-func (response ApplyFirewallPlan409JSONResponse) VisitApplyFirewallPlanResponse(w http.ResponseWriter) error {
+func (response GetMonitoringHistory409JSONResponse) VisitGetMonitoringHistoryResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response); err != nil {
@@ -4807,9 +4615,9 @@ func (response ApplyFirewallPlan409JSONResponse) VisitApplyFirewallPlanResponse(
 	return err
 }
 
-type ApplyFirewallPlan422JSONResponse struct{ InvalidRequestJSONResponse }
+type GetMonitoringHistory422JSONResponse struct{ InvalidRequestJSONResponse }
 
-func (response ApplyFirewallPlan422JSONResponse) VisitApplyFirewallPlanResponse(w http.ResponseWriter) error {
+func (response GetMonitoringHistory422JSONResponse) VisitGetMonitoringHistoryResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response); err != nil {
@@ -4821,9 +4629,9 @@ func (response ApplyFirewallPlan422JSONResponse) VisitApplyFirewallPlanResponse(
 	return err
 }
 
-type ApplyFirewallPlan500JSONResponse struct{ InternalErrorJSONResponse }
+type GetMonitoringHistory500JSONResponse struct{ InternalErrorJSONResponse }
 
-func (response ApplyFirewallPlan500JSONResponse) VisitApplyFirewallPlanResponse(w http.ResponseWriter) error {
+func (response GetMonitoringHistory500JSONResponse) VisitGetMonitoringHistoryResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response); err != nil {
@@ -4835,9 +4643,9 @@ func (response ApplyFirewallPlan500JSONResponse) VisitApplyFirewallPlanResponse(
 	return err
 }
 
-type ApplyFirewallPlan503JSONResponse struct{ UnavailableJSONResponse }
+type GetMonitoringHistory503JSONResponse struct{ UnavailableJSONResponse }
 
-func (response ApplyFirewallPlan503JSONResponse) VisitApplyFirewallPlanResponse(w http.ResponseWriter) error {
+func (response GetMonitoringHistory503JSONResponse) VisitGetMonitoringHistoryResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response); err != nil {
@@ -5098,16 +4906,16 @@ type RenameNodeResponseObject interface {
 	VisitRenameNodeResponse(w http.ResponseWriter) error
 }
 
-type RenameNode200JSONResponse Node
+type RenameNode202JSONResponse Operation
 
-func (response RenameNode200JSONResponse) VisitRenameNodeResponse(w http.ResponseWriter) error {
+func (response RenameNode202JSONResponse) VisitRenameNodeResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response); err != nil {
 		return err
 	}
 	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(200)
+	w.WriteHeader(202)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -5210,16 +5018,126 @@ func (response RenameNode503JSONResponse) VisitRenameNodeResponse(w http.Respons
 	return err
 }
 
-type ReadFirewallRequestObject struct {
+type GetNodeAccountRequestObject struct {
+	Id string `json:"id"`
+}
+
+type GetNodeAccountResponseObject interface {
+	VisitGetNodeAccountResponse(w http.ResponseWriter) error
+}
+
+type GetNodeAccount200JSONResponse NodeAccount
+
+func (response GetNodeAccount200JSONResponse) VisitGetNodeAccountResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetNodeAccount503JSONResponse APIError
+
+func (response GetNodeAccount503JSONResponse) VisitGetNodeAccountResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(503)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangeNodeAccountRequestObject struct {
 	Id     string `json:"id"`
-	Params ReadFirewallParams
+	Params ChangeNodeAccountParams
+	Body   *ChangeNodeAccountJSONRequestBody
+}
+
+type ChangeNodeAccountResponseObject interface {
+	VisitChangeNodeAccountResponse(w http.ResponseWriter) error
+}
+
+type ChangeNodeAccount202JSONResponse Operation
+
+func (response ChangeNodeAccount202JSONResponse) VisitChangeNodeAccountResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(202)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangeNodeAccount503JSONResponse APIError
+
+func (response ChangeNodeAccount503JSONResponse) VisitChangeNodeAccountResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(503)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RevealNodePasswordRequestObject struct {
+	Id     string `json:"id"`
+	Params RevealNodePasswordParams
+}
+
+type RevealNodePasswordResponseObject interface {
+	VisitRevealNodePasswordResponse(w http.ResponseWriter) error
+}
+
+type RevealNodePassword200JSONResponse NodePassword
+
+func (response RevealNodePassword200JSONResponse) VisitRevealNodePasswordResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RevealNodePassword503JSONResponse APIError
+
+func (response RevealNodePassword503JSONResponse) VisitRevealNodePasswordResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(503)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ReadFirewallRequestObject struct {
+	Id string `json:"id"`
 }
 
 type ReadFirewallResponseObject interface {
 	VisitReadFirewallResponse(w http.ResponseWriter) error
 }
 
-type ReadFirewall200JSONResponse FirewallState
+type ReadFirewall200JSONResponse ManagedFirewallState
 
 func (response ReadFirewall200JSONResponse) VisitReadFirewallResponse(w http.ResponseWriter) error {
 
@@ -5320,6 +5238,128 @@ func (response ReadFirewall500JSONResponse) VisitReadFirewallResponse(w http.Res
 type ReadFirewall503JSONResponse struct{ UnavailableJSONResponse }
 
 func (response ReadFirewall503JSONResponse) VisitReadFirewallResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(503)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangeFirewallConfigRequestObject struct {
+	Id     string `json:"id"`
+	Params ChangeFirewallConfigParams
+	Body   *ChangeFirewallConfigJSONRequestBody
+}
+
+type ChangeFirewallConfigResponseObject interface {
+	VisitChangeFirewallConfigResponse(w http.ResponseWriter) error
+}
+
+type ChangeFirewallConfig202JSONResponse FirewallSaved
+
+func (response ChangeFirewallConfig202JSONResponse) VisitChangeFirewallConfigResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(202)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangeFirewallConfig401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response ChangeFirewallConfig401JSONResponse) VisitChangeFirewallConfigResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangeFirewallConfig403JSONResponse struct{ ForbiddenJSONResponse }
+
+func (response ChangeFirewallConfig403JSONResponse) VisitChangeFirewallConfigResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangeFirewallConfig404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response ChangeFirewallConfig404JSONResponse) VisitChangeFirewallConfigResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangeFirewallConfig409JSONResponse struct{ ConflictJSONResponse }
+
+func (response ChangeFirewallConfig409JSONResponse) VisitChangeFirewallConfigResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangeFirewallConfig422JSONResponse struct{ InvalidRequestJSONResponse }
+
+func (response ChangeFirewallConfig422JSONResponse) VisitChangeFirewallConfigResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangeFirewallConfig500JSONResponse struct{ InternalErrorJSONResponse }
+
+func (response ChangeFirewallConfig500JSONResponse) VisitChangeFirewallConfigResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangeFirewallConfig503JSONResponse struct{ UnavailableJSONResponse }
+
+func (response ChangeFirewallConfig503JSONResponse) VisitChangeFirewallConfigResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response); err != nil {
@@ -5453,33 +5493,31 @@ func (response InstallFirewall503JSONResponse) VisitInstallFirewallResponse(w ht
 	return err
 }
 
-type PreviewFirewallChangeRequestObject struct {
-	Id     string `json:"id"`
-	Params PreviewFirewallChangeParams
-	Body   *PreviewFirewallChangeJSONRequestBody
+type GetNodePeerTrustRequestObject struct {
+	Id string `json:"id"`
 }
 
-type PreviewFirewallChangeResponseObject interface {
-	VisitPreviewFirewallChangeResponse(w http.ResponseWriter) error
+type GetNodePeerTrustResponseObject interface {
+	VisitGetNodePeerTrustResponse(w http.ResponseWriter) error
 }
 
-type PreviewFirewallChange201JSONResponse ChangePlan
+type GetNodePeerTrust200JSONResponse PeerTrustNodeStatus
 
-func (response PreviewFirewallChange201JSONResponse) VisitPreviewFirewallChangeResponse(w http.ResponseWriter) error {
+func (response GetNodePeerTrust200JSONResponse) VisitGetNodePeerTrustResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response); err != nil {
 		return err
 	}
 	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(201)
+	w.WriteHeader(200)
 	_, err := buf.WriteTo(w)
 	return err
 }
 
-type PreviewFirewallChange401JSONResponse struct{ UnauthorizedJSONResponse }
+type GetNodePeerTrust401JSONResponse struct{ UnauthorizedJSONResponse }
 
-func (response PreviewFirewallChange401JSONResponse) VisitPreviewFirewallChangeResponse(w http.ResponseWriter) error {
+func (response GetNodePeerTrust401JSONResponse) VisitGetNodePeerTrustResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response); err != nil {
@@ -5491,9 +5529,9 @@ func (response PreviewFirewallChange401JSONResponse) VisitPreviewFirewallChangeR
 	return err
 }
 
-type PreviewFirewallChange403JSONResponse struct{ ForbiddenJSONResponse }
+type GetNodePeerTrust403JSONResponse struct{ ForbiddenJSONResponse }
 
-func (response PreviewFirewallChange403JSONResponse) VisitPreviewFirewallChangeResponse(w http.ResponseWriter) error {
+func (response GetNodePeerTrust403JSONResponse) VisitGetNodePeerTrustResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response); err != nil {
@@ -5505,9 +5543,9 @@ func (response PreviewFirewallChange403JSONResponse) VisitPreviewFirewallChangeR
 	return err
 }
 
-type PreviewFirewallChange404JSONResponse struct{ NotFoundJSONResponse }
+type GetNodePeerTrust404JSONResponse struct{ NotFoundJSONResponse }
 
-func (response PreviewFirewallChange404JSONResponse) VisitPreviewFirewallChangeResponse(w http.ResponseWriter) error {
+func (response GetNodePeerTrust404JSONResponse) VisitGetNodePeerTrustResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response); err != nil {
@@ -5519,9 +5557,9 @@ func (response PreviewFirewallChange404JSONResponse) VisitPreviewFirewallChangeR
 	return err
 }
 
-type PreviewFirewallChange409JSONResponse struct{ ConflictJSONResponse }
+type GetNodePeerTrust409JSONResponse struct{ ConflictJSONResponse }
 
-func (response PreviewFirewallChange409JSONResponse) VisitPreviewFirewallChangeResponse(w http.ResponseWriter) error {
+func (response GetNodePeerTrust409JSONResponse) VisitGetNodePeerTrustResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response); err != nil {
@@ -5533,9 +5571,9 @@ func (response PreviewFirewallChange409JSONResponse) VisitPreviewFirewallChangeR
 	return err
 }
 
-type PreviewFirewallChange422JSONResponse struct{ InvalidRequestJSONResponse }
+type GetNodePeerTrust422JSONResponse struct{ InvalidRequestJSONResponse }
 
-func (response PreviewFirewallChange422JSONResponse) VisitPreviewFirewallChangeResponse(w http.ResponseWriter) error {
+func (response GetNodePeerTrust422JSONResponse) VisitGetNodePeerTrustResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response); err != nil {
@@ -5547,9 +5585,9 @@ func (response PreviewFirewallChange422JSONResponse) VisitPreviewFirewallChangeR
 	return err
 }
 
-type PreviewFirewallChange500JSONResponse struct{ InternalErrorJSONResponse }
+type GetNodePeerTrust500JSONResponse struct{ InternalErrorJSONResponse }
 
-func (response PreviewFirewallChange500JSONResponse) VisitPreviewFirewallChangeResponse(w http.ResponseWriter) error {
+func (response GetNodePeerTrust500JSONResponse) VisitGetNodePeerTrustResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response); err != nil {
@@ -5561,9 +5599,494 @@ func (response PreviewFirewallChange500JSONResponse) VisitPreviewFirewallChangeR
 	return err
 }
 
-type PreviewFirewallChange503JSONResponse struct{ UnavailableJSONResponse }
+type GetNodePeerTrust503JSONResponse struct{ UnavailableJSONResponse }
 
-func (response PreviewFirewallChange503JSONResponse) VisitPreviewFirewallChangeResponse(w http.ResponseWriter) error {
+func (response GetNodePeerTrust503JSONResponse) VisitGetNodePeerTrustResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(503)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SyncFirewallConfigRequestObject struct {
+	Id     string `json:"id"`
+	Params SyncFirewallConfigParams
+	Body   *SyncFirewallConfigJSONRequestBody
+}
+
+type SyncFirewallConfigResponseObject interface {
+	VisitSyncFirewallConfigResponse(w http.ResponseWriter) error
+}
+
+type SyncFirewallConfig202JSONResponse FirewallSaved
+
+func (response SyncFirewallConfig202JSONResponse) VisitSyncFirewallConfigResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(202)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SyncFirewallConfig401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response SyncFirewallConfig401JSONResponse) VisitSyncFirewallConfigResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SyncFirewallConfig403JSONResponse struct{ ForbiddenJSONResponse }
+
+func (response SyncFirewallConfig403JSONResponse) VisitSyncFirewallConfigResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SyncFirewallConfig404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response SyncFirewallConfig404JSONResponse) VisitSyncFirewallConfigResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SyncFirewallConfig409JSONResponse struct{ ConflictJSONResponse }
+
+func (response SyncFirewallConfig409JSONResponse) VisitSyncFirewallConfigResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SyncFirewallConfig422JSONResponse struct{ InvalidRequestJSONResponse }
+
+func (response SyncFirewallConfig422JSONResponse) VisitSyncFirewallConfigResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SyncFirewallConfig500JSONResponse struct{ InternalErrorJSONResponse }
+
+func (response SyncFirewallConfig500JSONResponse) VisitSyncFirewallConfigResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SyncFirewallConfig503JSONResponse struct{ UnavailableJSONResponse }
+
+func (response SyncFirewallConfig503JSONResponse) VisitSyncFirewallConfigResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(503)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetPublicAddressesRequestObject struct {
+	Id string `json:"id"`
+}
+
+type GetPublicAddressesResponseObject interface {
+	VisitGetPublicAddressesResponse(w http.ResponseWriter) error
+}
+
+type GetPublicAddresses200JSONResponse PublicAddresses
+
+func (response GetPublicAddresses200JSONResponse) VisitGetPublicAddressesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetPublicAddresses401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response GetPublicAddresses401JSONResponse) VisitGetPublicAddressesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetPublicAddresses403JSONResponse struct{ ForbiddenJSONResponse }
+
+func (response GetPublicAddresses403JSONResponse) VisitGetPublicAddressesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetPublicAddresses404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response GetPublicAddresses404JSONResponse) VisitGetPublicAddressesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetPublicAddresses409JSONResponse struct{ ConflictJSONResponse }
+
+func (response GetPublicAddresses409JSONResponse) VisitGetPublicAddressesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetPublicAddresses422JSONResponse struct{ InvalidRequestJSONResponse }
+
+func (response GetPublicAddresses422JSONResponse) VisitGetPublicAddressesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetPublicAddresses500JSONResponse struct{ InternalErrorJSONResponse }
+
+func (response GetPublicAddresses500JSONResponse) VisitGetPublicAddressesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetPublicAddresses503JSONResponse struct{ UnavailableJSONResponse }
+
+func (response GetPublicAddresses503JSONResponse) VisitGetPublicAddressesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(503)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangePublicAddressesRequestObject struct {
+	Id     string `json:"id"`
+	Params ChangePublicAddressesParams
+	Body   *ChangePublicAddressesJSONRequestBody
+}
+
+type ChangePublicAddressesResponseObject interface {
+	VisitChangePublicAddressesResponse(w http.ResponseWriter) error
+}
+
+type ChangePublicAddresses200JSONResponse PublicAddresses
+
+func (response ChangePublicAddresses200JSONResponse) VisitChangePublicAddressesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangePublicAddresses401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response ChangePublicAddresses401JSONResponse) VisitChangePublicAddressesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangePublicAddresses403JSONResponse struct{ ForbiddenJSONResponse }
+
+func (response ChangePublicAddresses403JSONResponse) VisitChangePublicAddressesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangePublicAddresses404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response ChangePublicAddresses404JSONResponse) VisitChangePublicAddressesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangePublicAddresses409JSONResponse struct{ ConflictJSONResponse }
+
+func (response ChangePublicAddresses409JSONResponse) VisitChangePublicAddressesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangePublicAddresses422JSONResponse struct{ InvalidRequestJSONResponse }
+
+func (response ChangePublicAddresses422JSONResponse) VisitChangePublicAddressesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangePublicAddresses500JSONResponse struct{ InternalErrorJSONResponse }
+
+func (response ChangePublicAddresses500JSONResponse) VisitChangePublicAddressesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangePublicAddresses503JSONResponse struct{ UnavailableJSONResponse }
+
+func (response ChangePublicAddresses503JSONResponse) VisitChangePublicAddressesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(503)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RefreshPublicAddressesRequestObject struct {
+	Id     string `json:"id"`
+	Params RefreshPublicAddressesParams
+}
+
+type RefreshPublicAddressesResponseObject interface {
+	VisitRefreshPublicAddressesResponse(w http.ResponseWriter) error
+}
+
+type RefreshPublicAddresses200JSONResponse PublicAddresses
+
+func (response RefreshPublicAddresses200JSONResponse) VisitRefreshPublicAddressesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RefreshPublicAddresses401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response RefreshPublicAddresses401JSONResponse) VisitRefreshPublicAddressesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RefreshPublicAddresses403JSONResponse struct{ ForbiddenJSONResponse }
+
+func (response RefreshPublicAddresses403JSONResponse) VisitRefreshPublicAddressesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RefreshPublicAddresses404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response RefreshPublicAddresses404JSONResponse) VisitRefreshPublicAddressesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RefreshPublicAddresses409JSONResponse struct{ ConflictJSONResponse }
+
+func (response RefreshPublicAddresses409JSONResponse) VisitRefreshPublicAddressesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RefreshPublicAddresses422JSONResponse struct{ InvalidRequestJSONResponse }
+
+func (response RefreshPublicAddresses422JSONResponse) VisitRefreshPublicAddressesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RefreshPublicAddresses500JSONResponse struct{ InternalErrorJSONResponse }
+
+func (response RefreshPublicAddresses500JSONResponse) VisitRefreshPublicAddressesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RefreshPublicAddresses503JSONResponse struct{ UnavailableJSONResponse }
+
+func (response RefreshPublicAddresses503JSONResponse) VisitRefreshPublicAddressesResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response); err != nil {
@@ -5685,6 +6208,116 @@ func (response RevokeNode500JSONResponse) VisitRevokeNodeResponse(w http.Respons
 type RevokeNode503JSONResponse struct{ UnavailableJSONResponse }
 
 func (response RevokeNode503JSONResponse) VisitRevokeNodeResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(503)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetNodeSettingsRequestObject struct {
+	Id string `json:"id"`
+}
+
+type GetNodeSettingsResponseObject interface {
+	VisitGetNodeSettingsResponse(w http.ResponseWriter) error
+}
+
+type GetNodeSettings200JSONResponse NodeConfig
+
+func (response GetNodeSettings200JSONResponse) VisitGetNodeSettingsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetNodeSettings503JSONResponse APIError
+
+func (response GetNodeSettings503JSONResponse) VisitGetNodeSettingsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(503)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangeNodeSettingsRequestObject struct {
+	Id     string `json:"id"`
+	Params ChangeNodeSettingsParams
+	Body   *ChangeNodeSettingsJSONRequestBody
+}
+
+type ChangeNodeSettingsResponseObject interface {
+	VisitChangeNodeSettingsResponse(w http.ResponseWriter) error
+}
+
+type ChangeNodeSettings202JSONResponse Operation
+
+func (response ChangeNodeSettings202JSONResponse) VisitChangeNodeSettingsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(202)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangeNodeSettings503JSONResponse APIError
+
+func (response ChangeNodeSettings503JSONResponse) VisitChangeNodeSettingsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(503)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetStorageStatusRequestObject struct {
+	Id string `json:"id"`
+}
+
+type GetStorageStatusResponseObject interface {
+	VisitGetStorageStatusResponse(w http.ResponseWriter) error
+}
+
+type GetStorageStatus200JSONResponse StorageStatus
+
+func (response GetStorageStatus200JSONResponse) VisitGetStorageStatusResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetStorageStatus503JSONResponse APIError
+
+func (response GetStorageStatus503JSONResponse) VisitGetStorageStatusResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response); err != nil {
@@ -6056,6 +6689,43 @@ func (response GetOperation503JSONResponse) VisitGetOperationResponse(w http.Res
 	return err
 }
 
+type CancelOperationRequestObject struct {
+	Id     string `json:"id"`
+	Params CancelOperationParams
+}
+
+type CancelOperationResponseObject interface {
+	VisitCancelOperationResponse(w http.ResponseWriter) error
+}
+
+type CancelOperation200JSONResponse Operation
+
+func (response CancelOperation200JSONResponse) VisitCancelOperationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CancelOperation503JSONResponse APIError
+
+func (response CancelOperation503JSONResponse) VisitCancelOperationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(503)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type ConfirmOperationRequestObject struct {
 	Id     string `json:"id"`
 	Params ConfirmOperationParams
@@ -6411,6 +7081,484 @@ func (response ResolveOperation500JSONResponse) VisitResolveOperationResponse(w 
 type ResolveOperation503JSONResponse struct{ UnavailableJSONResponse }
 
 func (response ResolveOperation503JSONResponse) VisitResolveOperationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(503)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetOverviewRequestObject struct {
+}
+
+type GetOverviewResponseObject interface {
+	VisitGetOverviewResponse(w http.ResponseWriter) error
+}
+
+type GetOverview200JSONResponse Overview
+
+func (response GetOverview200JSONResponse) VisitGetOverviewResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetOverview401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response GetOverview401JSONResponse) VisitGetOverviewResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetOverview403JSONResponse struct{ ForbiddenJSONResponse }
+
+func (response GetOverview403JSONResponse) VisitGetOverviewResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetOverview404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response GetOverview404JSONResponse) VisitGetOverviewResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetOverview409JSONResponse struct{ ConflictJSONResponse }
+
+func (response GetOverview409JSONResponse) VisitGetOverviewResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetOverview422JSONResponse struct{ InvalidRequestJSONResponse }
+
+func (response GetOverview422JSONResponse) VisitGetOverviewResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetOverview500JSONResponse struct{ InternalErrorJSONResponse }
+
+func (response GetOverview500JSONResponse) VisitGetOverviewResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetOverview503JSONResponse struct{ UnavailableJSONResponse }
+
+func (response GetOverview503JSONResponse) VisitGetOverviewResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(503)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetPeerTrustRequestObject struct {
+}
+
+type GetPeerTrustResponseObject interface {
+	VisitGetPeerTrustResponse(w http.ResponseWriter) error
+}
+
+type GetPeerTrust200JSONResponse PeerTrustPolicy
+
+func (response GetPeerTrust200JSONResponse) VisitGetPeerTrustResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetPeerTrust401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response GetPeerTrust401JSONResponse) VisitGetPeerTrustResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetPeerTrust403JSONResponse struct{ ForbiddenJSONResponse }
+
+func (response GetPeerTrust403JSONResponse) VisitGetPeerTrustResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetPeerTrust404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response GetPeerTrust404JSONResponse) VisitGetPeerTrustResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetPeerTrust409JSONResponse struct{ ConflictJSONResponse }
+
+func (response GetPeerTrust409JSONResponse) VisitGetPeerTrustResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetPeerTrust422JSONResponse struct{ InvalidRequestJSONResponse }
+
+func (response GetPeerTrust422JSONResponse) VisitGetPeerTrustResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetPeerTrust500JSONResponse struct{ InternalErrorJSONResponse }
+
+func (response GetPeerTrust500JSONResponse) VisitGetPeerTrustResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetPeerTrust503JSONResponse struct{ UnavailableJSONResponse }
+
+func (response GetPeerTrust503JSONResponse) VisitGetPeerTrustResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(503)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangePeerTrustRequestObject struct {
+	Params ChangePeerTrustParams
+	Body   *ChangePeerTrustJSONRequestBody
+}
+
+type ChangePeerTrustResponseObject interface {
+	VisitChangePeerTrustResponse(w http.ResponseWriter) error
+}
+
+type ChangePeerTrust200JSONResponse PeerTrustPolicy
+
+func (response ChangePeerTrust200JSONResponse) VisitChangePeerTrustResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangePeerTrust401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response ChangePeerTrust401JSONResponse) VisitChangePeerTrustResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangePeerTrust403JSONResponse struct{ ForbiddenJSONResponse }
+
+func (response ChangePeerTrust403JSONResponse) VisitChangePeerTrustResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangePeerTrust404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response ChangePeerTrust404JSONResponse) VisitChangePeerTrustResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangePeerTrust409JSONResponse struct{ ConflictJSONResponse }
+
+func (response ChangePeerTrust409JSONResponse) VisitChangePeerTrustResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangePeerTrust422JSONResponse struct{ InvalidRequestJSONResponse }
+
+func (response ChangePeerTrust422JSONResponse) VisitChangePeerTrustResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangePeerTrust500JSONResponse struct{ InternalErrorJSONResponse }
+
+func (response ChangePeerTrust500JSONResponse) VisitChangePeerTrustResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangePeerTrust503JSONResponse struct{ UnavailableJSONResponse }
+
+func (response ChangePeerTrust503JSONResponse) VisitChangePeerTrustResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(503)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetPeerTrustStatusRequestObject struct {
+}
+
+type GetPeerTrustStatusResponseObject interface {
+	VisitGetPeerTrustStatusResponse(w http.ResponseWriter) error
+}
+
+type GetPeerTrustStatus200JSONResponse PeerTrustStatus
+
+func (response GetPeerTrustStatus200JSONResponse) VisitGetPeerTrustStatusResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetPeerTrustStatus401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response GetPeerTrustStatus401JSONResponse) VisitGetPeerTrustStatusResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetPeerTrustStatus403JSONResponse struct{ ForbiddenJSONResponse }
+
+func (response GetPeerTrustStatus403JSONResponse) VisitGetPeerTrustStatusResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetPeerTrustStatus404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response GetPeerTrustStatus404JSONResponse) VisitGetPeerTrustStatusResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetPeerTrustStatus409JSONResponse struct{ ConflictJSONResponse }
+
+func (response GetPeerTrustStatus409JSONResponse) VisitGetPeerTrustStatusResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetPeerTrustStatus422JSONResponse struct{ InvalidRequestJSONResponse }
+
+func (response GetPeerTrustStatus422JSONResponse) VisitGetPeerTrustStatusResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetPeerTrustStatus500JSONResponse struct{ InternalErrorJSONResponse }
+
+func (response GetPeerTrustStatus500JSONResponse) VisitGetPeerTrustStatusResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetPeerTrustStatus503JSONResponse struct{ UnavailableJSONResponse }
+
+func (response GetPeerTrustStatus503JSONResponse) VisitGetPeerTrustStatusResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response); err != nil {
@@ -6807,12 +7955,9 @@ type StrictServerInterface interface {
 	// RevokeEnrollmentToken 撤销接入码
 	// (DELETE /enrollment-tokens/{id})
 	RevokeEnrollmentToken(ctx context.Context, request RevokeEnrollmentTokenRequestObject) (RevokeEnrollmentTokenResponseObject, error)
-	// GetFirewallPlan 读取不可变预览
-	// (GET /firewall/plans/{id})
-	GetFirewallPlan(ctx context.Context, request GetFirewallPlanRequestObject) (GetFirewallPlanResponseObject, error)
-	// ApplyFirewallPlan 受理预览并返回原操作
-	// (POST /firewall/plans/{id}/apply)
-	ApplyFirewallPlan(ctx context.Context, request ApplyFirewallPlanRequestObject) (ApplyFirewallPlanResponseObject, error)
+	// GetMonitoringHistory 读取监控历史
+	// (GET /monitoring/history)
+	GetMonitoringHistory(ctx context.Context, request GetMonitoringHistoryRequestObject) (GetMonitoringHistoryResponseObject, error)
 	// ListNodes 读取节点
 	// (GET /nodes)
 	ListNodes(ctx context.Context, request ListNodesRequestObject) (ListNodesResponseObject, error)
@@ -6822,18 +7967,51 @@ type StrictServerInterface interface {
 	// RenameNode 修改节点名称
 	// (PATCH /nodes/{id})
 	RenameNode(ctx context.Context, request RenameNodeRequestObject) (RenameNodeResponseObject, error)
-	// ReadFirewall 读取原生防火墙实际状态
+
+	// (GET /nodes/{id}/account)
+	GetNodeAccount(ctx context.Context, request GetNodeAccountRequestObject) (GetNodeAccountResponseObject, error)
+
+	// (PATCH /nodes/{id}/account)
+	ChangeNodeAccount(ctx context.Context, request ChangeNodeAccountRequestObject) (ChangeNodeAccountResponseObject, error)
+
+	// (POST /nodes/{id}/account/password)
+	RevealNodePassword(ctx context.Context, request RevealNodePasswordRequestObject) (RevealNodePasswordResponseObject, error)
+	// ReadFirewall 读取 OPSD 防火墙配置及应用状态
 	// (GET /nodes/{id}/firewall)
 	ReadFirewall(ctx context.Context, request ReadFirewallRequestObject) (ReadFirewallResponseObject, error)
+
+	// (PATCH /nodes/{id}/firewall)
+	ChangeFirewallConfig(ctx context.Context, request ChangeFirewallConfigRequestObject) (ChangeFirewallConfigResponseObject, error)
 	// InstallFirewall 安装但不启用防火墙组件
 	// (POST /nodes/{id}/firewall/install)
 	InstallFirewall(ctx context.Context, request InstallFirewallRequestObject) (InstallFirewallResponseObject, error)
-	// PreviewFirewallChange 预览单项变更
-	// (POST /nodes/{id}/firewall/plans)
-	PreviewFirewallChange(ctx context.Context, request PreviewFirewallChangeRequestObject) (PreviewFirewallChangeResponseObject, error)
+	// GetNodePeerTrust 读取节点互信规则与应用状态
+	// (GET /nodes/{id}/firewall/peer-trust)
+	GetNodePeerTrust(ctx context.Context, request GetNodePeerTrustRequestObject) (GetNodePeerTrustResponseObject, error)
+
+	// (POST /nodes/{id}/firewall/sync)
+	SyncFirewallConfig(ctx context.Context, request SyncFirewallConfigRequestObject) (SyncFirewallConfigResponseObject, error)
+	// GetPublicAddresses 读取节点公网地址
+	// (GET /nodes/{id}/public-addresses)
+	GetPublicAddresses(ctx context.Context, request GetPublicAddressesRequestObject) (GetPublicAddressesResponseObject, error)
+	// ChangePublicAddresses 保存节点公网地址
+	// (PATCH /nodes/{id}/public-addresses)
+	ChangePublicAddresses(ctx context.Context, request ChangePublicAddressesRequestObject) (ChangePublicAddressesResponseObject, error)
+	// RefreshPublicAddresses 重新发现公网地址
+	// (POST /nodes/{id}/public-addresses/refresh)
+	RefreshPublicAddresses(ctx context.Context, request RefreshPublicAddressesRequestObject) (RefreshPublicAddressesResponseObject, error)
 	// RevokeNode 撤销节点授权
 	// (POST /nodes/{id}/revoke)
 	RevokeNode(ctx context.Context, request RevokeNodeRequestObject) (RevokeNodeResponseObject, error)
+
+	// (GET /nodes/{id}/settings)
+	GetNodeSettings(ctx context.Context, request GetNodeSettingsRequestObject) (GetNodeSettingsResponseObject, error)
+
+	// (PATCH /nodes/{id}/settings)
+	ChangeNodeSettings(ctx context.Context, request ChangeNodeSettingsRequestObject) (ChangeNodeSettingsResponseObject, error)
+
+	// (GET /nodes/{id}/storage)
+	GetStorageStatus(ctx context.Context, request GetStorageStatusRequestObject) (GetStorageStatusResponseObject, error)
 	// ListOperations 查询历史或定位原操作
 	// (GET /operations)
 	ListOperations(ctx context.Context, request ListOperationsRequestObject) (ListOperationsResponseObject, error)
@@ -6843,6 +8021,9 @@ type StrictServerInterface interface {
 	// GetOperation 查询原操作
 	// (GET /operations/{id})
 	GetOperation(ctx context.Context, request GetOperationRequestObject) (GetOperationResponseObject, error)
+
+	// (POST /operations/{id}/cancel)
+	CancelOperation(ctx context.Context, request CancelOperationRequestObject) (CancelOperationResponseObject, error)
 	// ConfirmOperation 确认原操作
 	// (POST /operations/{id}/confirm)
 	ConfirmOperation(ctx context.Context, request ConfirmOperationRequestObject) (ConfirmOperationResponseObject, error)
@@ -6852,6 +8033,18 @@ type StrictServerInterface interface {
 	// ResolveOperation 接受现状并结束为人工处理
 	// (POST /operations/{id}/resolve)
 	ResolveOperation(ctx context.Context, request ResolveOperationRequestObject) (ResolveOperationResponseObject, error)
+	// GetOverview 读取集群概览
+	// (GET /overview)
+	GetOverview(ctx context.Context, request GetOverviewRequestObject) (GetOverviewResponseObject, error)
+	// GetPeerTrust 读取集群互信开关
+	// (GET /peer-trust)
+	GetPeerTrust(ctx context.Context, request GetPeerTrustRequestObject) (GetPeerTrustResponseObject, error)
+	// ChangePeerTrust 保存集群互信开关
+	// (PATCH /peer-trust)
+	ChangePeerTrust(ctx context.Context, request ChangePeerTrustRequestObject) (ChangePeerTrustResponseObject, error)
+	// GetPeerTrustStatus 读取逐节点互信状态
+	// (GET /peer-trust/status)
+	GetPeerTrustStatus(ctx context.Context, request GetPeerTrustStatusRequestObject) (GetPeerTrustStatusResponseObject, error)
 	// GetAccount 读取管理员账号
 	// (GET /settings/account)
 	GetAccount(ctx context.Context, request GetAccountRequestObject) (GetAccountResponseObject, error)
@@ -7111,52 +8304,25 @@ func (sh *strictHandler) RevokeEnrollmentToken(w http.ResponseWriter, r *http.Re
 	}
 }
 
-// GetFirewallPlan operation middleware
-func (sh *strictHandler) GetFirewallPlan(w http.ResponseWriter, r *http.Request, id string) {
-	var request GetFirewallPlanRequestObject
+// GetMonitoringHistory operation middleware
+func (sh *strictHandler) GetMonitoringHistory(w http.ResponseWriter, r *http.Request, params GetMonitoringHistoryParams) {
+	var request GetMonitoringHistoryRequestObject
 
-	request.Id = id
-
-	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
-		return sh.ssi.GetFirewallPlan(ctx, request.(GetFirewallPlanRequestObject))
-	}
-	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "GetFirewallPlan")
-	}
-
-	response, err := handler(r.Context(), w, r, request)
-
-	if err != nil {
-		sh.options.ResponseErrorHandlerFunc(w, r, err)
-	} else if validResponse, ok := response.(GetFirewallPlanResponseObject); ok {
-		if err := validResponse.VisitGetFirewallPlanResponse(w); err != nil {
-			sh.options.ResponseErrorHandlerFunc(w, r, err)
-		}
-	} else if response != nil {
-		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
-	}
-}
-
-// ApplyFirewallPlan operation middleware
-func (sh *strictHandler) ApplyFirewallPlan(w http.ResponseWriter, r *http.Request, id string, params ApplyFirewallPlanParams) {
-	var request ApplyFirewallPlanRequestObject
-
-	request.Id = id
 	request.Params = params
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
-		return sh.ssi.ApplyFirewallPlan(ctx, request.(ApplyFirewallPlanRequestObject))
+		return sh.ssi.GetMonitoringHistory(ctx, request.(GetMonitoringHistoryRequestObject))
 	}
 	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "ApplyFirewallPlan")
+		handler = middleware(handler, "GetMonitoringHistory")
 	}
 
 	response, err := handler(r.Context(), w, r, request)
 
 	if err != nil {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
-	} else if validResponse, ok := response.(ApplyFirewallPlanResponseObject); ok {
-		if err := validResponse.VisitApplyFirewallPlanResponse(w); err != nil {
+	} else if validResponse, ok := response.(GetMonitoringHistoryResponseObject); ok {
+		if err := validResponse.VisitGetMonitoringHistoryResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -7248,12 +8414,98 @@ func (sh *strictHandler) RenameNode(w http.ResponseWriter, r *http.Request, id s
 	}
 }
 
-// ReadFirewall operation middleware
-func (sh *strictHandler) ReadFirewall(w http.ResponseWriter, r *http.Request, id string, params ReadFirewallParams) {
-	var request ReadFirewallRequestObject
+// GetNodeAccount operation middleware
+func (sh *strictHandler) GetNodeAccount(w http.ResponseWriter, r *http.Request, id string) {
+	var request GetNodeAccountRequestObject
+
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetNodeAccount(ctx, request.(GetNodeAccountRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetNodeAccount")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetNodeAccountResponseObject); ok {
+		if err := validResponse.VisitGetNodeAccountResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ChangeNodeAccount operation middleware
+func (sh *strictHandler) ChangeNodeAccount(w http.ResponseWriter, r *http.Request, id string, params ChangeNodeAccountParams) {
+	var request ChangeNodeAccountRequestObject
 
 	request.Id = id
 	request.Params = params
+
+	var body ChangeNodeAccountJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ChangeNodeAccount(ctx, request.(ChangeNodeAccountRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ChangeNodeAccount")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ChangeNodeAccountResponseObject); ok {
+		if err := validResponse.VisitChangeNodeAccountResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// RevealNodePassword operation middleware
+func (sh *strictHandler) RevealNodePassword(w http.ResponseWriter, r *http.Request, id string, params RevealNodePasswordParams) {
+	var request RevealNodePasswordRequestObject
+
+	request.Id = id
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.RevealNodePassword(ctx, request.(RevealNodePasswordRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "RevealNodePassword")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(RevealNodePasswordResponseObject); ok {
+		if err := validResponse.VisitRevealNodePasswordResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ReadFirewall operation middleware
+func (sh *strictHandler) ReadFirewall(w http.ResponseWriter, r *http.Request, id string) {
+	var request ReadFirewallRequestObject
+
+	request.Id = id
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
 		return sh.ssi.ReadFirewall(ctx, request.(ReadFirewallRequestObject))
@@ -7268,6 +8520,40 @@ func (sh *strictHandler) ReadFirewall(w http.ResponseWriter, r *http.Request, id
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(ReadFirewallResponseObject); ok {
 		if err := validResponse.VisitReadFirewallResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ChangeFirewallConfig operation middleware
+func (sh *strictHandler) ChangeFirewallConfig(w http.ResponseWriter, r *http.Request, id string, params ChangeFirewallConfigParams) {
+	var request ChangeFirewallConfigRequestObject
+
+	request.Id = id
+	request.Params = params
+
+	var body ChangeFirewallConfigJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ChangeFirewallConfig(ctx, request.(ChangeFirewallConfigRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ChangeFirewallConfig")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ChangeFirewallConfigResponseObject); ok {
+		if err := validResponse.VisitChangeFirewallConfigResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -7309,14 +8595,40 @@ func (sh *strictHandler) InstallFirewall(w http.ResponseWriter, r *http.Request,
 	}
 }
 
-// PreviewFirewallChange operation middleware
-func (sh *strictHandler) PreviewFirewallChange(w http.ResponseWriter, r *http.Request, id string, params PreviewFirewallChangeParams) {
-	var request PreviewFirewallChangeRequestObject
+// GetNodePeerTrust operation middleware
+func (sh *strictHandler) GetNodePeerTrust(w http.ResponseWriter, r *http.Request, id string) {
+	var request GetNodePeerTrustRequestObject
+
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetNodePeerTrust(ctx, request.(GetNodePeerTrustRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetNodePeerTrust")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetNodePeerTrustResponseObject); ok {
+		if err := validResponse.VisitGetNodePeerTrustResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// SyncFirewallConfig operation middleware
+func (sh *strictHandler) SyncFirewallConfig(w http.ResponseWriter, r *http.Request, id string, params SyncFirewallConfigParams) {
+	var request SyncFirewallConfigRequestObject
 
 	request.Id = id
 	request.Params = params
 
-	var body PreviewFirewallChangeJSONRequestBody
+	var body SyncFirewallConfigJSONRequestBody
 	if err := runtime.BindJSONBody(r, &body); err != nil {
 		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
 		return
@@ -7324,18 +8636,105 @@ func (sh *strictHandler) PreviewFirewallChange(w http.ResponseWriter, r *http.Re
 	request.Body = &body
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
-		return sh.ssi.PreviewFirewallChange(ctx, request.(PreviewFirewallChangeRequestObject))
+		return sh.ssi.SyncFirewallConfig(ctx, request.(SyncFirewallConfigRequestObject))
 	}
 	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "PreviewFirewallChange")
+		handler = middleware(handler, "SyncFirewallConfig")
 	}
 
 	response, err := handler(r.Context(), w, r, request)
 
 	if err != nil {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
-	} else if validResponse, ok := response.(PreviewFirewallChangeResponseObject); ok {
-		if err := validResponse.VisitPreviewFirewallChangeResponse(w); err != nil {
+	} else if validResponse, ok := response.(SyncFirewallConfigResponseObject); ok {
+		if err := validResponse.VisitSyncFirewallConfigResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetPublicAddresses operation middleware
+func (sh *strictHandler) GetPublicAddresses(w http.ResponseWriter, r *http.Request, id string) {
+	var request GetPublicAddressesRequestObject
+
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetPublicAddresses(ctx, request.(GetPublicAddressesRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetPublicAddresses")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetPublicAddressesResponseObject); ok {
+		if err := validResponse.VisitGetPublicAddressesResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ChangePublicAddresses operation middleware
+func (sh *strictHandler) ChangePublicAddresses(w http.ResponseWriter, r *http.Request, id string, params ChangePublicAddressesParams) {
+	var request ChangePublicAddressesRequestObject
+
+	request.Id = id
+	request.Params = params
+
+	var body ChangePublicAddressesJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ChangePublicAddresses(ctx, request.(ChangePublicAddressesRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ChangePublicAddresses")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ChangePublicAddressesResponseObject); ok {
+		if err := validResponse.VisitChangePublicAddressesResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// RefreshPublicAddresses operation middleware
+func (sh *strictHandler) RefreshPublicAddresses(w http.ResponseWriter, r *http.Request, id string, params RefreshPublicAddressesParams) {
+	var request RefreshPublicAddressesRequestObject
+
+	request.Id = id
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.RefreshPublicAddresses(ctx, request.(RefreshPublicAddressesRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "RefreshPublicAddresses")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(RefreshPublicAddressesResponseObject); ok {
+		if err := validResponse.VisitRefreshPublicAddressesResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -7363,6 +8762,92 @@ func (sh *strictHandler) RevokeNode(w http.ResponseWriter, r *http.Request, id s
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(RevokeNodeResponseObject); ok {
 		if err := validResponse.VisitRevokeNodeResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetNodeSettings operation middleware
+func (sh *strictHandler) GetNodeSettings(w http.ResponseWriter, r *http.Request, id string) {
+	var request GetNodeSettingsRequestObject
+
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetNodeSettings(ctx, request.(GetNodeSettingsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetNodeSettings")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetNodeSettingsResponseObject); ok {
+		if err := validResponse.VisitGetNodeSettingsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ChangeNodeSettings operation middleware
+func (sh *strictHandler) ChangeNodeSettings(w http.ResponseWriter, r *http.Request, id string, params ChangeNodeSettingsParams) {
+	var request ChangeNodeSettingsRequestObject
+
+	request.Id = id
+	request.Params = params
+
+	var body ChangeNodeSettingsJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ChangeNodeSettings(ctx, request.(ChangeNodeSettingsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ChangeNodeSettings")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ChangeNodeSettingsResponseObject); ok {
+		if err := validResponse.VisitChangeNodeSettingsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetStorageStatus operation middleware
+func (sh *strictHandler) GetStorageStatus(w http.ResponseWriter, r *http.Request, id string) {
+	var request GetStorageStatusRequestObject
+
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetStorageStatus(ctx, request.(GetStorageStatusRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetStorageStatus")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetStorageStatusResponseObject); ok {
+		if err := validResponse.VisitGetStorageStatusResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -7441,6 +8926,33 @@ func (sh *strictHandler) GetOperation(w http.ResponseWriter, r *http.Request, id
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(GetOperationResponseObject); ok {
 		if err := validResponse.VisitGetOperationResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CancelOperation operation middleware
+func (sh *strictHandler) CancelOperation(w http.ResponseWriter, r *http.Request, id string, params CancelOperationParams) {
+	var request CancelOperationRequestObject
+
+	request.Id = id
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CancelOperation(ctx, request.(CancelOperationRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CancelOperation")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CancelOperationResponseObject); ok {
+		if err := validResponse.VisitCancelOperationResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -7543,6 +9055,111 @@ func (sh *strictHandler) ResolveOperation(w http.ResponseWriter, r *http.Request
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(ResolveOperationResponseObject); ok {
 		if err := validResponse.VisitResolveOperationResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetOverview operation middleware
+func (sh *strictHandler) GetOverview(w http.ResponseWriter, r *http.Request) {
+	var request GetOverviewRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetOverview(ctx, request.(GetOverviewRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetOverview")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetOverviewResponseObject); ok {
+		if err := validResponse.VisitGetOverviewResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetPeerTrust operation middleware
+func (sh *strictHandler) GetPeerTrust(w http.ResponseWriter, r *http.Request) {
+	var request GetPeerTrustRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetPeerTrust(ctx, request.(GetPeerTrustRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetPeerTrust")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetPeerTrustResponseObject); ok {
+		if err := validResponse.VisitGetPeerTrustResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ChangePeerTrust operation middleware
+func (sh *strictHandler) ChangePeerTrust(w http.ResponseWriter, r *http.Request, params ChangePeerTrustParams) {
+	var request ChangePeerTrustRequestObject
+
+	request.Params = params
+
+	var body ChangePeerTrustJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ChangePeerTrust(ctx, request.(ChangePeerTrustRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ChangePeerTrust")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ChangePeerTrustResponseObject); ok {
+		if err := validResponse.VisitChangePeerTrustResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetPeerTrustStatus operation middleware
+func (sh *strictHandler) GetPeerTrustStatus(w http.ResponseWriter, r *http.Request) {
+	var request GetPeerTrustStatusRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetPeerTrustStatus(ctx, request.(GetPeerTrustStatusRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetPeerTrustStatus")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetPeerTrustStatusResponseObject); ok {
+		if err := validResponse.VisitGetPeerTrustStatusResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

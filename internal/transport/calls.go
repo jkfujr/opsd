@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/opsd-labs/opsd/internal/identity"
-	"github.com/opsd-labs/opsd/internal/protocol"
+	"github.com/jkfujr/opsd/internal/identity"
+	"github.com/jkfujr/opsd/internal/protocol"
 )
 
 // Calls 由连接唯一的读取循环分发应答，调用者不能另行读取密码状态。

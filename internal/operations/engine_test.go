@@ -12,9 +12,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/opsd-labs/opsd/internal/firewall"
-	"github.com/opsd-labs/opsd/internal/protocol"
-	"github.com/opsd-labs/opsd/internal/storage"
+	"github.com/jkfujr/opsd/internal/firewall"
+	"github.com/jkfujr/opsd/internal/protocol"
+	"github.com/jkfujr/opsd/internal/storage"
 )
 
 type policyHost struct {
@@ -51,9 +51,9 @@ func (h *policyHost) Run(_ context.Context, name string, args ...string) ([]byte
 		h.mu.Unlock()
 		return v, nil
 	}
-	if name == "ufw" && len(args) == 4 && args[1] == "default" {
-		h.policy = map[string]string{"allow": "ACCEPT", "deny": "DROP", "reject": "REJECT"}[args[2]]
-		h.writes = append(h.writes, args[2])
+	if name == "ufw" && len(args) == 3 && args[0] == "default" {
+		h.policy = map[string]string{"allow": "ACCEPT", "deny": "DROP", "reject": "REJECT"}[args[1]]
+		h.writes = append(h.writes, args[1])
 		callback := h.afterWrite
 		h.mu.Unlock()
 		if callback != nil {
@@ -66,7 +66,7 @@ func (h *policyHost) Run(_ context.Context, name string, args ...string) ([]byte
 }
 func operationFixture(t *testing.T) (*Engine, *policyHost, *atomic.Int64) {
 	t.Helper()
-	db, e := storage.Open(t.Context(), filepath.Join(t.TempDir(), "agent.db"), storage.Agent)
+	db, e := storage.Open(t.Context(), filepath.Join(t.TempDir(), "agent.db"), storage.Executor)
 	if e != nil {
 		t.Fatal(e)
 	}

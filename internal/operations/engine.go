@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/opsd-labs/opsd/internal/firewall"
-	"github.com/opsd-labs/opsd/internal/protocol"
+	"github.com/jkfujr/opsd/internal/firewall"
+	"github.com/jkfujr/opsd/internal/protocol"
 )
 
 type Engine struct {
@@ -48,10 +48,16 @@ func (e *Engine) attention(ctx context.Context, l *Local, err error) error {
 	if l.Action != nil && l.Action.Firewall != nil && l.Action.Firewall.RequiresConfirmation {
 		l.Record.Decision = "revert"
 	}
+	if l.Action != nil && l.Action.FirewallConfig != nil && managedConfirmation(l.Action.FirewallConfig, l.Recipe) {
+		l.Record.Decision = "revert"
+	}
 	return e.Store.Save(ctx, l)
 }
 func (e *Engine) end(ctx context.Context, l *Local, state protocol.OperationState, err error) error {
 	l.Record.State = state
+	if state == protocol.Succeeded && l.Action != nil && l.Action.FirewallConfig != nil {
+		l.Record.Decision = "keep"
+	}
 	l.IntentStep = nil
 	if err != nil {
 		l.Record.Error = &protocol.Error{Code: firewall.Code(err), Message: err.Error()}
@@ -81,6 +87,9 @@ func (e *Engine) Run(ctx context.Context, id string) error {
 		return e.install(ctx, &l, boot)
 	}
 	p := l.Action.Firewall
+	if target := l.Action.FirewallConfig; target != nil {
+		p = &protocol.ChangePlan{Backend: target.Configuration.Backend, RequiresConfirmation: managedConfirmation(target, l.Recipe), Executable: true}
+	}
 	if p == nil {
 		return e.attention(ctx, &l, fmt.Errorf("操作动作无法解释"))
 	}
@@ -131,15 +140,30 @@ func (e *Engine) Run(ctx context.Context, id string) error {
 		if backend != p.Backend {
 			return e.end(ctx, &l, protocol.Rejected, firewall.Conflict("防火墙管理归属发生变化"))
 		}
-		l.Recipe, err = a.Prepare(ctx, *p)
+		if target := l.Action.FirewallConfig; target != nil {
+			var state protocol.FirewallState
+			state, err = e.Manager.Read(ctx)
+			if err == nil {
+				l.Recipe, err = e.Manager.PrepareConfiguration(ctx, state, target.Configuration)
+			}
+			p.RequiresConfirmation = managedConfirmation(target, l.Recipe)
+		} else {
+			l.Recipe, err = a.Prepare(ctx, *p)
+		}
 		if err != nil {
 			return e.end(ctx, &l, protocol.Rejected, err)
+		}
+		if l.Action.FirewallConfig != nil && len(l.Recipe) == 0 {
+			return e.end(ctx, &l, protocol.Succeeded, nil)
 		}
 		requires := false
 		for _, step := range l.Recipe {
 			if step.Selector.Scope == protocol.Runtime || step.Selector.Scope == protocol.Both || step.Forward.Kind == "set_enabled" {
 				requires = true
 			}
+		}
+		if l.Action.FirewallConfig != nil && l.Action.FirewallConfig.Automatic {
+			requires = false
 		}
 		if !p.Executable || requires != p.RequiresConfirmation {
 			return e.end(ctx, &l, protocol.Rejected, firewall.Conflict("预览的执行或确认条件不匹配，请重新生成预览"))

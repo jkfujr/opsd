@@ -5,7 +5,7 @@ generate:
   strict-server: true
 output: internal/httpapi/api.gen.go
 output-options:
-  skip-prune: true
+  skip-prune: false
   include-operation-ids:
     - login
     - logout
@@ -23,9 +23,6 @@ output-options:
     - changeAccount
     - getVersion
     - readFirewall
-    - previewFirewallChange
-    - getFirewallPlan
-    - applyFirewallPlan
     - listOperations
     - listPendingOperations
     - getOperation
@@ -33,3 +30,21 @@ output-options:
     - recoverOperation
     - resolveOperation
     - installFirewall
+    - getOverview
+    - getMonitoringHistory
+    - getNodeSettings
+    - changeNodeSettings
+    - getNodeAccount
+    - changeNodeAccount
+    - revealNodePassword
+    - getStorageStatus
+    - cancelOperation
+    - changeFirewallConfig
+    - syncFirewallConfig
+    - getPublicAddresses
+    - changePublicAddresses
+    - refreshPublicAddresses
+    - getPeerTrust
+    - changePeerTrust
+    - getPeerTrustStatus
+    - getNodePeerTrust

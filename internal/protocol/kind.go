@@ -4,6 +4,20 @@ import "fmt"
 
 func newPayload(kind Kind) (Payload, error) {
 	switch kind {
+	case "firewall.inspect":
+		return &FirewallInspect{}, nil
+	case "firewall.inspected":
+		return &FirewallInspected{}, nil
+	case "peer.hello":
+		return &PeerHello{}, nil
+	case "peer.call":
+		return &PeerCall{}, nil
+	case "peer.reply":
+		return &PeerReply{}, nil
+	case "monitoring.read":
+		return &MonitoringRead{}, nil
+	case "monitoring.result":
+		return &MonitoringResult{}, nil
 	case KindSessionOpen:
 		return &SessionOpen{}, nil
 	case KindSessionAccepted:

@@ -4,11 +4,11 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/opsd-labs/opsd/internal/cli"
+	"github.com/jkfujr/opsd/internal/cli"
 )
 
 func main() {
-	if err := cli.RunControl(os.Args[1:]); err != nil {
+	if err := cli.Run(os.Args[1:]); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(2)
 	}

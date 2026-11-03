@@ -9,8 +9,8 @@ import (
 	"fmt"
 	"regexp"
 
-	"github.com/opsd-labs/opsd/internal/firewall"
-	"github.com/opsd-labs/opsd/internal/protocol"
+	"github.com/jkfujr/opsd/internal/firewall"
+	"github.com/jkfujr/opsd/internal/protocol"
 )
 
 var ErrBusy = errors.New("节点存在未结束的写操作")
@@ -141,7 +141,7 @@ func (s Store) Receive(ctx context.Context, id string, version int, action proto
 	if _, e := protocol.Encode(protocol.Message{RequestID: "validation", Payload: &protocol.OperationSubmit{OperationID: id, ContractVersion: version, Action: action}}); e != nil {
 		return Local{}, false, e
 	}
-	if action.Kind != "firewall" && !(action.Kind == "component" && action.Component != nil && action.Component.Component == "firewall" && action.Component.Action == "install") {
+	if action.Kind != "firewall" && action.Kind != "firewall_config" && !(action.Kind == "component" && action.Component != nil && action.Component.Component == "firewall" && action.Component.Action == "install") {
 		return Local{}, false, firewall.Unsupported("当前版本不执行此类动作")
 	}
 	c, e := begin(ctx, s.DB)
@@ -169,6 +169,22 @@ func (s Store) Receive(ctx context.Context, id string, version int, action proto
 	}
 	if n != 0 {
 		return l, false, ErrBusy
+	}
+	if action.FirewallConfig != nil {
+		if e = firewall.ValidateConfiguration(action.FirewallConfig.Configuration); e != nil {
+			return l, false, e
+		}
+		confirmed, err := confirmedFrom(ctx, c)
+		if err != nil {
+			return l, false, err
+		}
+		if action.FirewallConfig.Automatic {
+			if !sameTarget(confirmed, *action.FirewallConfig) {
+				return l, false, firewall.Conflict("只能自动恢复已确认配置")
+			}
+		} else if action.FirewallConfig.Revision <= confirmed.Revision {
+			return l, false, firewall.Conflict("配置版本已经改变")
+		}
 	}
 	l = Local{Action: &action, BootID: bootID, Record: protocol.OperationRecord{ID: id, State: protocol.Prepared, Revision: 1, Decision: "undecided", Steps: []protocol.OperationStep{}}}
 	a, _ := json.Marshal(action)
@@ -221,7 +237,12 @@ func (s Store) Save(ctx context.Context, l *Local) error {
 	if e != nil {
 		return e
 	}
-	result, e := s.DB.ExecContext(ctx, "UPDATE operations SET record=?,recipe=?,component_state=?,terminal=?,boot_id=?,deadline_ns=?,next_step=?,intent_step=? WHERE id=? AND json_extract(record,'$.revision')=?", string(r), string(recipe), string(component), Terminal(l.Record.State), l.BootID, l.DeadlineNS, l.NextStep, l.IntentStep, l.Record.ID, previous)
+	tx, e := s.DB.BeginTx(ctx, nil)
+	if e != nil {
+		return e
+	}
+	defer tx.Rollback()
+	result, e := tx.ExecContext(ctx, "UPDATE operations SET record=?,recipe=?,component_state=?,terminal=?,boot_id=?,deadline_ns=?,next_step=?,intent_step=? WHERE id=? AND json_extract(record,'$.revision')=?", string(r), string(recipe), string(component), Terminal(l.Record.State), l.BootID, l.DeadlineNS, l.NextStep, l.IntentStep, l.Record.ID, previous)
 	if e != nil {
 		return e
 	}
@@ -232,7 +253,12 @@ func (s Store) Save(ctx context.Context, l *Local) error {
 	if n != 1 {
 		return firewall.Conflict("操作状态已改变")
 	}
-	return nil
+	if l.Record.State == protocol.Succeeded && l.Action != nil && l.Action.FirewallConfig != nil && !l.Action.FirewallConfig.Automatic {
+		if e = saveConfirmed(ctx, tx, *l.Action.FirewallConfig); e != nil {
+			return e
+		}
+	}
+	return tx.Commit()
 }
 func (s Store) Request(ctx context.Context, id, kind string, revision uint64) (Local, error) {
 	c, e := begin(ctx, s.DB)
@@ -304,6 +330,11 @@ func (s Store) Keep(ctx context.Context, id string, revision uint64, clock func(
 	}
 	if _, e = c.ExecContext(ctx, "UPDATE operations SET record=?,terminal=1 WHERE id=?", string(data), id); e != nil {
 		return l, e
+	}
+	if l.Action != nil && l.Action.FirewallConfig != nil && !l.Action.FirewallConfig.Automatic {
+		if e = saveConfirmed(ctx, c, *l.Action.FirewallConfig); e != nil {
+			return l, e
+		}
 	}
 	_, e = c.ExecContext(ctx, "COMMIT")
 	return l, e

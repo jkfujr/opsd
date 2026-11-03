@@ -1,0 +1,54 @@
+name: CI
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.14.1'
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            frontend/package-lock.json
+      - name: 安装依赖
+        run: |
+          npm ci
+          npm --prefix frontend ci
+      - name: 生成接口并构建双架构程序
+        run: |
+          npm run build
+          git diff --exit-code -- api/openapi.json internal/httpapi/api.gen.go frontend/src/api/schema.gen.ts
+          test "$(artifacts/opsd-linux-amd64 version --plain)" = "$(node -p 'require("./package.json").version')"
+          sh -n artifacts/install.sh
+      - name: 后端测试
+        run: npm test
+      - name: 原生互信规则与新连接
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq nftables iptables firewalld
+          go test -c -o artifacts/firewall-native.test ./internal/firewall
+          sudo env OPSD_NATIVE_TRUST=1 artifacts/firewall-native.test -test.run '^TestPeerTrustNativeNetwork$' -test.v
+      - uses: actions/upload-artifact@v4
+        with:
+          name: opsd-linux
+          path: |
+            artifacts/opsd-linux-amd64
+            artifacts/opsd-linux-arm64
+            artifacts/install.sh
+          retention-days: 14
+          if-no-files-found: error

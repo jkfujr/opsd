@@ -13,6 +13,7 @@ type Payload interface {
 const KindSessionOpen Kind = "session.open"
 
 type SessionOpen struct {
+	MonitoringVersion    int           `json:"monitoring_version,omitempty"`
 	Hostname             string        `json:"hostname"`
 	Purpose              string        `json:"purpose"`
 	EnrollmentToken      string        `json:"enrollment_token,omitempty"`
@@ -292,6 +293,7 @@ type PeerTrustUpdated struct {
 	ReceivedRevision uint64        `json:"received_revision"`
 	AppliedRevision  uint64        `json:"applied_revision"`
 	Results          []ScopeResult `json:"results"`
+	CheckedAt        *time.Time    `json:"checked_at,omitempty"`
 }
 
 func (*PeerTrustUpdated) Kind() Kind { return KindPeerTrustUpdated }

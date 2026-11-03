@@ -2,7 +2,7 @@ package firewall
 
 import (
 	"fmt"
-	"github.com/opsd-labs/opsd/internal/protocol"
+	"github.com/jkfujr/opsd/internal/protocol"
 	"slices"
 	"strings"
 )

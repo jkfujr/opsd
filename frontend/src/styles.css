@@ -13,14 +13,68 @@ body {
   margin: 0;
   background: var(--background);
   color: var(--foreground);
+  font-size: 0.875rem;
 }
 
 @layer components {
-  .nav-link {
-    @apply border-b-2 border-transparent py-2 text-sm text-foreground-muted hover:text-foreground-intense;
+  [data-slot='dialog-header'],
+  [data-slot='drawer-header'],
+  [data-slot='alert-dialog-header'] {
+    min-width: 0;
   }
-  .nav-link[aria-current='page'] {
-    @apply border-primary font-medium text-foreground-intense;
+  [data-slot='dialog-title'],
+  [data-slot='drawer-title'],
+  [data-slot='alert-dialog-title'],
+  [data-slot='alert-dialog-description'] {
+    overflow-wrap: anywhere;
+  }
+  [data-slot='dialog-title'],
+  [data-slot='drawer-title'] {
+    padding-inline-end: 2rem;
+  }
+  [data-slot='dialog-footer'],
+  [data-slot='drawer-footer'],
+  [data-slot='alert-dialog-footer'] {
+    flex-shrink: 0;
+    flex-wrap: wrap;
+  }
+  [data-slot='dialog-footer'] button,
+  [data-slot='drawer-footer'] button,
+  [data-slot='alert-dialog-footer'] button {
+    white-space: normal;
+    height: auto;
+    min-height: 2.5rem;
+    overflow-wrap: anywhere;
+  }
+  .surface, .panel {
+    @apply rounded-lg border border-border bg-background;
+  }
+  .panel {
+    @apply min-w-0 p-4 sm:p-5;
+  }
+  .page-toolbar {
+    @apply mb-4 flex min-w-0 flex-wrap items-end gap-3;
+  }
+  .toolbar-actions {
+    @apply ml-auto flex shrink-0 flex-wrap items-center gap-2;
+  }
+  .form-section {
+    @apply min-w-0 border-t border-border pt-4;
+  }
+  .section-title {
+    @apply mb-4 text-base font-semibold text-foreground-intense;
+  }
+  .form-grid {
+    @apply grid min-w-0 gap-4 sm:grid-cols-2;
+  }
+  .error-message {
+    @apply my-3 flex min-w-0 flex-wrap items-center gap-3;
+  }
+  .sidebar-link {
+    @apply flex items-center gap-3 rounded-md px-3 py-3 text-sm text-foreground-muted hover:bg-background-muted hover:text-foreground-intense;
+  }
+  .sidebar-link[aria-current='page'] {
+    @apply bg-background-muted font-semibold text-foreground-intense;
   }
   .settings-link {
     @apply rounded-md px-3 py-2 text-sm text-foreground-muted hover:bg-background-muted hover:text-foreground-intense;
@@ -29,3 +83,10 @@ body {
     @apply bg-background-muted font-medium text-foreground-intense;
   }
 }
+
+/* 统一表格密度，沿用组件库的表面、边框和交互样式。 */
+[data-slot='table-head'] { padding: 0.75rem; font-size: 0.75rem; font-weight: 500; }
+[data-slot='table-cell'] { padding: 0.75rem; vertical-align: middle; font-size: 0.875rem; }
+[data-slot='table-cell'] [data-slot='button'] { white-space: nowrap; }
+[data-slot='table-container'] { max-width: 100%; }
+:where(a, button):focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }

@@ -1,0 +1,67 @@
+name: Release
+on:
+  push:
+    tags: ['v*']
+permissions:
+  contents: read
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  release:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: write
+      actions: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      TAG: ${{ github.ref_name }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: 复用同提交已通过的 CI 工件
+        run: |
+          test "$TAG" = "v$(node -p 'require("./package.json").version')"
+          run_id=$(gh api "repos/$GH_REPO/actions/workflows/ci.yml/runs?head_sha=$GITHUB_SHA&status=success&per_page=1" --jq '.workflow_runs[0].id // empty')
+          test -n "$run_id" || { echo '该提交尚无成功的 CI 工件'; exit 1; }
+          gh run download "$run_id" --name opsd-linux --dir artifacts
+      - name: 发布固定版本
+        run: |
+          if ! gh release view "$TAG" >/dev/null 2>&1; then
+            gh release create "$TAG" --draft --verify-tag --title "$TAG" --generate-notes
+          fi
+          for file in artifacts/install.sh artifacts/opsd-linux-amd64 artifacts/opsd-linux-arm64; do
+            name=$(basename "$file")
+            size=$(stat -c%s "$file")
+            existing=$(gh release view "$TAG" --json assets --jq ".assets[] | select(.name == \"$name\") | .size")
+            if [ -n "$existing" ]; then
+              test "$existing" = "$size" || { echo "已有资产内容待核对：$name"; exit 1; }
+              mkdir -p artifacts/existing
+              gh release download "$TAG" --pattern "$name" --dir artifacts/existing --clobber
+              cmp "$file" "artifacts/existing/$name" || { echo "固定版本资产内容发生变化：$name"; exit 1; }
+            else
+              gh release upload "$TAG" "$file"
+            fi
+          done
+          if [[ "$TAG" == *-* ]]; then gh release edit "$TAG" --draft=false --prerelease; else gh release edit "$TAG" --draft=false --latest; fi
+      - name: 验证公开下载和实际安装
+        env:
+          GH_TOKEN: ''
+        run: |
+          mkdir -p /tmp/opsd-release-check
+          curl -fsSL "https://github.com/$GH_REPO/releases/download/$TAG/install.sh" -o /tmp/opsd-release-check/install.sh
+          sudo sh /tmp/opsd-release-check/install.sh --non-interactive --address http://127.0.0.1:8444 --name release-check > /tmp/opsd-release-check/install.log
+          sudo systemctl is-active opsd.service opsd-executor.service
+          test "$(/opt/opsd/bin/opsd version --plain)" = "${TAG#v}"
+          sudo sh /tmp/opsd-release-check/install.sh --non-interactive --address http://127.0.0.1:8444 --name preserve-existing > /tmp/opsd-release-check/repeat.log
+          sudo python3 - <<'PY'
+          import json, sqlite3
+          db = sqlite3.connect('file:/var/lib/opsd/node/node.db?mode=ro', uri=True)
+          config = json.loads(db.execute('select config from node_identity where id=1').fetchone()[0])
+          assert config['name'] == 'release-check'
+          assert not config['console']
+          PY
+      - name: 停止验收服务
+        if: always()
+        run: sudo systemctl stop opsd.service opsd-executor.service || true

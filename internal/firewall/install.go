@@ -3,7 +3,7 @@ package firewall
 import (
 	"context"
 	"fmt"
-	"github.com/opsd-labs/opsd/internal/protocol"
+	"github.com/jkfujr/opsd/internal/protocol"
 	"strings"
 )
 

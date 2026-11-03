@@ -26,6 +26,15 @@ type Host interface {
 type NativeHost struct{}
 
 func (NativeHost) Run(ctx context.Context, name string, args ...string) ([]byte, error) {
+	return runNative(ctx, nil, name, args...)
+}
+
+// RunInput 向原生命令传递规则事务，不经过 Shell 或临时脚本。
+func (NativeHost) RunInput(ctx context.Context, input []byte, name string, args ...string) ([]byte, error) {
+	return runNative(ctx, input, name, args...)
+}
+
+func runNative(ctx context.Context, input []byte, name string, args ...string) ([]byte, error) {
 	if runtime.GOOS != "linux" {
 		return nil, fmt.Errorf("原生防火墙仅支持 Linux")
 	}
@@ -36,6 +45,9 @@ func (NativeHost) Run(ctx context.Context, name string, args ...string) ([]byte,
 	ctx, cancel := context.WithTimeout(ctx, duration)
 	defer cancel()
 	cmd := exec.CommandContext(ctx, name, args...)
+	if input != nil {
+		cmd.Stdin = bytes.NewReader(input)
+	}
 	cmd.Env = append(os.Environ(), "LC_ALL=C", "LANG=C", "DEBIAN_FRONTEND=noninteractive")
 	configureCommand(cmd)
 	var output cappedBuffer

@@ -1,4 +1,4 @@
-module github.com/opsd-labs/opsd
+module github.com/jkfujr/opsd
 
 go 1.26.2
 
@@ -13,6 +13,7 @@ require (
 )
 
 require (
+	filippo.io/age v1.2.1 // indirect
 	github.com/apapsch/go-jsonmerge/v2 v2.0.0 // indirect
 	github.com/dprotaso/go-yit v0.0.0-20220510233725-9ba8df137936 // indirect
 	github.com/dustin/go-humanize v1.1.0 // indirect

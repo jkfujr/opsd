@@ -7,13 +7,6 @@ import (
 	"path/filepath"
 )
 
-type Instance struct {
-	InstallDir string `json:"install_dir"`
-	DataDir    string `json:"data_dir"`
-	AgentDir   string `json:"agent_dir"`
-	Listen     string `json:"listen"`
-}
-
 func Read(path string, value any) error {
 	data, err := os.ReadFile(path)
 	if err != nil {

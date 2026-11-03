@@ -1,3 +1,4 @@
 package buildinfo
 
-const Version = "0.1.0-dev"
+// Version 由构建入口从根 package.json 注入。
+var Version = "dev"

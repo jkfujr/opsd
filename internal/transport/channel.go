@@ -10,8 +10,8 @@ import (
 
 	"github.com/coder/websocket"
 	"github.com/flynn/noise"
-	"github.com/opsd-labs/opsd/internal/identity"
-	"github.com/opsd-labs/opsd/internal/protocol"
+	"github.com/jkfujr/opsd/internal/identity"
+	"github.com/jkfujr/opsd/internal/protocol"
 )
 
 const RecordBytes = 60 * 1024

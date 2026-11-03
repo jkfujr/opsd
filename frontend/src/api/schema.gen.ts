@@ -160,76 +160,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/nodes/{id}/public-addresses": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** 读取节点公网地址 */
-        get: operations["getPublicAddresses"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        /** 设置地址族模式或地址 */
-        patch: operations["setPublicAddress"];
-        trace?: never;
-    };
-    "/nodes/{id}/public-addresses/refresh": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** 刷新地址观测 */
-        post: operations["refreshPublicAddresses"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/peer-trust": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** 读取节点互信设置 */
-        get: operations["getPeerTrust"];
-        /** 设置节点互信 */
-        put: operations["setPeerTrust"];
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/peer-trust/status": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** 读取互信实际同步状态 */
-        get: operations["getPeerTrustStatus"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/nodes/{id}/firewall": {
         parameters: {
             query?: never;
@@ -237,116 +167,14 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** 读取原生防火墙实际状态 */
+        /** 读取 OPSD 防火墙配置及应用状态 */
         get: operations["readFirewall"];
         put?: never;
         post?: never;
         delete?: never;
         options?: never;
         head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/nodes/{id}/firewall/plans": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** 预览单项变更 */
-        post: operations["previewFirewallChange"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/firewall/plans/{id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** 读取不可变预览 */
-        get: operations["getFirewallPlan"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/firewall/plans/{id}/apply": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** 受理预览并返回原操作 */
-        post: operations["applyFirewallPlan"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/nodes/{id}/containers": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** 读取实时容器 */
-        get: operations["listContainers"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/nodes/{id}/containers/{container_id}/actions": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** 受理容器动作 */
-        post: operations["actOnContainer"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/nodes/{id}/containers/{container_id}/logs": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** 读取或跟随容器日志 */
-        get: operations["readContainerLogs"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
+        patch: operations["changeFirewallConfig"];
         trace?: never;
     };
     "/operations": {
@@ -469,111 +297,6 @@ export interface paths {
         patch: operations["changeAccount"];
         trace?: never;
     };
-    "/settings/deployment": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** 读取部署设置 */
-        get: operations["getDeployment"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/settings/deployment/changes": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** 受理部署变更 */
-        post: operations["changeDeployment"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/settings/portainer": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** 读取集成状态 */
-        get: operations["getPortainer"];
-        /** 接入或新建 Portainer */
-        put: operations["configurePortainer"];
-        post?: never;
-        /** 解除集成并保留组件数据 */
-        delete: operations["unbindPortainer"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/settings/portainer/bindings": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** 读取节点环境绑定 */
-        get: operations["listPortainerBindings"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/nodes/{id}/portainer-binding": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        /** 绑定节点环境 */
-        put: operations["bindPortainerEnvironment"];
-        post?: never;
-        /** 解除节点环境绑定 */
-        delete: operations["unbindPortainerEnvironment"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/settings/portainer/actions": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** 受理托管组件动作 */
-        post: operations["actOnPortainer"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/nodes/{id}/firewall/install": {
         parameters: {
             query?: never;
@@ -608,15 +331,15 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/events": {
+    "/overview": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** 接收查询失效通知 */
-        get: operations["watchEvents"];
+        /** 读取集群概览 */
+        get: operations["getOverview"];
         put?: never;
         post?: never;
         delete?: never;
@@ -625,18 +348,198 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/agent/connect": {
+    "/monitoring/history": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /**
-         * 建立 Noise 加密 WebSocket
-         * @description 协议版本 1；握手后才登记或恢复身份。业务、迁移试连、公网地址探测连接各有明确目的，消息类型由独立 Agent 协议包定义。
-         */
-        get: operations["connectAgent"];
+        /** 读取监控历史 */
+        get: operations["getMonitoringHistory"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/nodes/{id}/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getNodeSettings"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["changeNodeSettings"];
+        trace?: never;
+    };
+    "/nodes/{id}/account": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getNodeAccount"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["changeNodeAccount"];
+        trace?: never;
+    };
+    "/nodes/{id}/account/password": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["revealNodePassword"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/nodes/{id}/storage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getStorageStatus"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/operations/{id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["cancelOperation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/nodes/{id}/firewall/sync": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["syncFirewallConfig"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/nodes/{id}/public-addresses": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 读取节点公网地址 */
+        get: operations["getPublicAddresses"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** 保存节点公网地址 */
+        patch: operations["changePublicAddresses"];
+        trace?: never;
+    };
+    "/nodes/{id}/public-addresses/refresh": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 重新发现公网地址 */
+        post: operations["refreshPublicAddresses"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/peer-trust": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 读取集群互信开关 */
+        get: operations["getPeerTrust"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** 保存集群互信开关 */
+        patch: operations["changePeerTrust"];
+        trace?: never;
+    };
+    "/peer-trust/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 读取逐节点互信状态 */
+        get: operations["getPeerTrustStatus"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/nodes/{id}/firewall/peer-trust": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 读取节点互信规则与应用状态 */
+        get: operations["getNodePeerTrust"];
         put?: never;
         post?: never;
         delete?: never;
@@ -649,6 +552,74 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        Metrics: {
+            /** Format: date-time */
+            collected_at: string;
+            cpu_cores: number;
+            /** Format: double */
+            cpu_usage?: number;
+            /** Format: double */
+            memory_used?: number;
+            /** Format: double */
+            memory_total?: number;
+            /** Format: double */
+            disk_used?: number;
+            /** Format: double */
+            disk_total?: number;
+            /** Format: double */
+            network_rx?: number;
+            /** Format: double */
+            network_tx?: number;
+            errors: string[];
+        };
+        MonitoringCoverage: {
+            cpu: number;
+            memory: number;
+            disk: number;
+            network: number;
+        };
+        MonitoringSummary: {
+            metrics: components["schemas"]["Metrics"];
+            valid_nodes: components["schemas"]["MonitoringCoverage"];
+        };
+        MonitoringReading: {
+            node_id: string;
+            /** @enum {string} */
+            state: "ready" | "partial" | "error" | "offline" | "unsupported";
+            metrics?: components["schemas"]["Metrics"];
+            error?: string;
+            /** @enum {string} */
+            firewall: "enabled" | "disabled" | "none" | "unknown";
+            firewall_error?: string;
+        };
+        OverviewNode: {
+            node: components["schemas"]["Node"];
+            reading: components["schemas"]["MonitoringReading"];
+        };
+        Overview: {
+            /** Format: date-time */
+            updated_at: string;
+            summary: components["schemas"]["MonitoringSummary"];
+            nodes: components["schemas"]["OverviewNode"][];
+            pending_operations: components["schemas"]["Operation"][];
+            unavailable?: string[];
+        };
+        MonitoringPoint: {
+            /** Format: date-time */
+            collected_at: string;
+            summary: components["schemas"]["MonitoringSummary"];
+        };
+        MonitoringHistory: {
+            items: components["schemas"]["MonitoringPoint"][];
+            interval_minutes: number;
+            unavailable?: string[];
+        };
+        MonitoringSettings: {
+            /** @default 5 */
+            interval_minutes: number;
+            /** @default 7 */
+            retention_days: number;
+        };
         /** @enum {string} */
         AddressFamily: "ipv4" | "ipv6";
         /** @enum {string} */
@@ -656,14 +627,14 @@ export interface components {
         /** @enum {string} */
         OperationState: "accepted" | "prepared" | "applying" | "awaiting_confirmation" | "reverting" | "attention_required" | "succeeded" | "rejected" | "failed" | "reverted" | "resolved_manually";
         /** @enum {string} */
-        Backend: "ufw" | "firewalld" | "nftables" | "none" | "conflict";
+        Backend: "ufw" | "firewalld" | "nftables" | "none" | "conflict" | "unknown";
         FieldError: {
             field: string;
             message: string;
         };
         APIError: {
             /** @enum {string} */
-            code: "invalid_request" | "unauthenticated" | "forbidden" | "csrf_rejected" | "conflict" | "node_busy" | "node_unavailable" | "dependency_unavailable" | "not_found" | "rate_limited" | "internal_error";
+            code: "invalid_request" | "unauthenticated" | "forbidden" | "csrf_rejected" | "conflict" | "node_busy" | "node_unavailable" | "dependency_unavailable" | "not_found" | "rate_limited" | "internal_error" | "cancelled" | "not_accepted";
             /** @description 简短中文错误信息 */
             message: string;
             request_id: string;
@@ -702,6 +673,7 @@ export interface components {
             session: components["schemas"]["Session"];
             csrf_token: string;
             login_address: string;
+            local_node_id: string;
         };
         SessionList: {
             items: components["schemas"]["Session"][];
@@ -725,6 +697,10 @@ export interface components {
             capabilities?: components["schemas"]["Capabilities"];
             local: boolean;
             write_blocked_reason?: string;
+            region?: string;
+            address?: string;
+            console_enabled?: boolean;
+            storage_address?: string;
         };
         NodeList: {
             items: components["schemas"]["Node"][];
@@ -746,8 +722,10 @@ export interface components {
         EnrollmentTokenCreated: {
             token: string;
             record: components["schemas"]["EnrollmentToken"];
-            control_address: string;
-            control_public_key: string;
+            peer_address: string;
+            peer_public_key: string;
+            version: string;
+            installer_url: string;
         };
         EnrollmentTokenList: {
             items: components["schemas"]["EnrollmentToken"][];
@@ -761,36 +739,39 @@ export interface components {
             error?: string;
         };
         PublicAddress: {
-            family: components["schemas"]["AddressFamily"];
             /** @enum {string} */
-            mode: "auto" | "manual" | "disabled";
-            confirmed?: string;
+            mode: "auto" | "manual";
+            addresses: string[];
+            /** @enum {string} */
+            state: "pending" | "confirmed" | "failed" | "conflict";
+            observations: components["schemas"]["AddressObservation"][];
             /** Format: date-time */
-            confirmed_at?: string;
-            candidates: components["schemas"]["AddressObservation"][];
-            conflict: boolean;
-            last_error?: string;
+            updated_at?: string;
+            error?: string;
         };
         PublicAddresses: {
+            node_id: string;
+            /** Format: int64 */
+            revision: number;
             ipv4: components["schemas"]["PublicAddress"];
             ipv6: components["schemas"]["PublicAddress"];
+            cached?: boolean;
         };
         PublicAddressPatch: {
-            family: components["schemas"]["AddressFamily"];
-            /** @enum {string} */
-            mode: "auto" | "manual" | "disabled";
-            address?: string;
-            clear?: boolean;
+            /** Format: int64 */
+            expected_revision: number;
+            ipv4?: components["schemas"]["PublicFamilyPatch"];
+            ipv6?: components["schemas"]["PublicFamilyPatch"];
         };
         PublicAddressRefresh: {
             families: components["schemas"]["AddressFamily"][];
         };
         PeerTrustPolicy: {
+            version: components["schemas"]["PeerTrustVersion"];
             enabled: boolean;
-            /** Format: int64 */
-            revision: number;
         };
         PeerTrustPolicyPatch: {
+            expected_version: components["schemas"]["PeerTrustVersion"];
             enabled: boolean;
         };
         PeerTrustTarget: {
@@ -802,25 +783,27 @@ export interface components {
         };
         PeerTrustScopeResult: {
             family: components["schemas"]["AddressFamily"];
+            component: string;
+            scope: components["schemas"]["ConfigScope"];
             /** @enum {string} */
-            component: "host" | "docker";
-            /** @enum {string} */
-            scope: "runtime" | "permanent";
-            /** @enum {string} */
-            state: "pending" | "applied" | "failed" | "unsupported" | "not_applicable" | "attention_required";
-            error?: string;
+            state: "pending" | "in_sync" | "failed" | "inactive" | "unsupported";
+            addresses?: string[];
+            error?: components["schemas"]["NetworkError"];
         };
         PeerTrustNodeStatus: {
             node_id: string;
+            enabled: boolean;
+            policy_version: components["schemas"]["PeerTrustVersion"];
             /** Format: int64 */
             target_revision: number;
             /** Format: int64 */
-            received_revision: number;
-            /** Format: int64 */
             applied_revision: number;
+            /** @enum {string} */
+            state: "pending" | "in_sync" | "failed" | "disabled" | "offline";
+            rules: components["schemas"]["PeerTrustRule"][];
             results: components["schemas"]["PeerTrustScopeResult"][];
             /** Format: date-time */
-            updated_at?: string;
+            checked_at?: string;
         };
         PeerTrustStatus: {
             policy: components["schemas"]["PeerTrustPolicy"];
@@ -856,6 +839,11 @@ export interface components {
             native_expression: string;
             editable: boolean;
             readonly_reason?: string;
+            /**
+             * @description 适配器明确识别的系统默认规则；只影响展示
+             * @default false
+             */
+            system_default: boolean;
             /** @enum {string} */
             origin: "native" | "opsd_peer_trust";
         };
@@ -1088,9 +1076,9 @@ export interface components {
             id: string;
             node_id: string;
             /** @enum {string} */
-            executor: "agent" | "portainer";
+            executor: "node";
             /** @enum {string} */
-            subject: "firewall" | "container" | "deployment" | "component";
+            subject: "firewall" | "component" | "config" | "name" | "account" | "firewall_config";
             state: components["schemas"]["OperationState"];
             /** Format: int64 */
             revision: number;
@@ -1104,18 +1092,21 @@ export interface components {
             /** @enum {string} */
             decision: "undecided" | "keep" | "revert" | "commit";
             plan_id?: string;
-            container_action?: components["schemas"]["ContainerActionTarget"];
-            deployment?: components["schemas"]["DeploymentProgress"];
             steps: components["schemas"]["OperationStep"][];
             error?: components["schemas"]["APIError"];
             /** Format: date-time */
             last_observed_at?: string;
             /** Format: int64 */
             confirmation_remaining_seconds?: number;
+            /** Format: int64 */
+            queue_sequence?: number;
+            actor?: string;
+            idempotency_key?: string;
         };
         OperationList: {
             items: components["schemas"]["Operation"][];
             next_cursor?: string;
+            unavailable?: string[];
         };
         PendingOperations: {
             items: components["schemas"]["Operation"][];
@@ -1192,8 +1183,8 @@ export interface components {
             backend: "ufw" | "firewalld" | "nftables";
         };
         VersionInfo: {
-            control_version: string;
             frontend_version: string;
+            node_version: string;
         };
         QueryInvalidation: {
             /** @enum {string} */
@@ -1203,6 +1194,153 @@ export interface components {
         OperationRevision: {
             /** Format: int64 */
             expected_revision: number;
+        };
+        StorageConfig: {
+            enabled: boolean;
+            address: string;
+            port: number;
+        };
+        NodeConfig: {
+            /** Format: int64 */
+            revision: number;
+            name: string;
+            address: string;
+            region: string;
+            listen: string;
+            console: boolean;
+            console_listen: string;
+            preferred_storage: string;
+            interval_minutes: number;
+            /** @enum {integer} */
+            retention_days: 7;
+            storage: components["schemas"]["StorageConfig"];
+            cached?: boolean;
+            /** Format: date-time */
+            last_synced_at?: string;
+            /** @enum {string} */
+            address_mode?: "auto" | "manual";
+        };
+        NodeAccount: {
+            username: string;
+            entrance: string;
+            cached?: boolean;
+            /** Format: date-time */
+            last_synced_at?: string;
+            /** Format: int64 */
+            revision: number;
+        };
+        NodePassword: {
+            username: string;
+            entrance: string;
+            password: string;
+        };
+        NodeAccountChange: {
+            /** Format: int64 */
+            revision?: number;
+            username?: string;
+            entrance?: string;
+            password?: string;
+        };
+        ReplicationStatus: {
+            id: string;
+            state: string;
+            /** Format: int64 */
+            error_count: number;
+        };
+        StorageStatus: {
+            enabled: boolean;
+            selected: string;
+            /** Format: int64 */
+            pending: number;
+            /** @enum {string} */
+            state: "ready" | "pending" | "unavailable";
+            replications: components["schemas"]["ReplicationStatus"][];
+        };
+        ManagedRule: {
+            id: string;
+            spec: components["schemas"]["RuleSpec"];
+            chain?: string;
+            zone?: string;
+            priority?: number;
+        };
+        ManagedPolicy: {
+            family: components["schemas"]["AddressFamily"];
+            chain?: string;
+            zone?: string;
+            /** @enum {string} */
+            action: "allow" | "deny" | "reject" | "default";
+        };
+        ManagedFirewallError: {
+            code: string;
+            message: string;
+        };
+        ManagedFirewallState: {
+            backend: components["schemas"]["Backend"];
+            /** Format: int64 */
+            revision: number;
+            /** Format: int64 */
+            confirmed_revision: number;
+            /** @enum {string} */
+            state: "importing" | "unavailable" | "pending" | "applying" | "awaiting_confirmation" | "in_sync" | "failed" | "unknown";
+            rules: components["schemas"]["ManagedRule"][];
+            default_policies: components["schemas"]["ManagedPolicy"][];
+            service_active?: boolean;
+            /** Format: date-time */
+            checked_at?: string;
+            operation_id?: string;
+            error?: components["schemas"]["ManagedFirewallError"];
+            capabilities: components["schemas"]["Capabilities"];
+        };
+        ManagedFirewallChange: {
+            /** @enum {string} */
+            kind: "add_rule" | "edit_rule" | "delete_rule" | "move_rule" | "set_default_policy";
+            rule?: components["schemas"]["RuleSpec"];
+            rule_id?: string;
+            before_rule_id?: string;
+            chain?: string;
+            zone?: string;
+            priority?: number;
+            /** @enum {string} */
+            action?: "allow" | "deny" | "reject" | "default";
+        };
+        FirewallConfigPatch: {
+            /** Format: int64 */
+            expected_revision: number;
+            change: components["schemas"]["ManagedFirewallChange"];
+        };
+        FirewallSyncRequest: {
+            /** Format: int64 */
+            expected_revision: number;
+        };
+        FirewallSaved: {
+            configuration: components["schemas"]["ManagedFirewallState"];
+            operation_id: string;
+        };
+        PublicFamilyPatch: {
+            /** @enum {string} */
+            mode: "auto" | "manual";
+            addresses: string[];
+        };
+        PeerTrustVersion: {
+            /** Format: int64 */
+            counter: number;
+            node_id: string;
+        };
+        NetworkError: {
+            code: string;
+            message: string;
+        };
+        TrustMember: {
+            id: string;
+            name: string;
+        };
+        PeerTrustRule: {
+            address?: string;
+            family: components["schemas"]["AddressFamily"];
+            members: components["schemas"]["TrustMember"][];
+            /** @enum {string} */
+            state: "pending" | "in_sync" | "failed" | "unsupported" | "removing" | "saved" | "confirmed" | "conflict";
+            error?: string;
         };
     };
     responses: {
@@ -1314,6 +1452,7 @@ export interface operations {
                 };
             };
             500: components["responses"]["InternalError"];
+            /** @description 节点或数据库不可用 */
             503: components["responses"]["Unavailable"];
         };
     };
@@ -1341,6 +1480,7 @@ export interface operations {
             409: components["responses"]["Conflict"];
             422: components["responses"]["InvalidRequest"];
             500: components["responses"]["InternalError"];
+            /** @description 节点或数据库不可用 */
             503: components["responses"]["Unavailable"];
         };
     };
@@ -1368,6 +1508,7 @@ export interface operations {
             409: components["responses"]["Conflict"];
             422: components["responses"]["InvalidRequest"];
             500: components["responses"]["InternalError"];
+            /** @description 节点或数据库不可用 */
             503: components["responses"]["Unavailable"];
         };
     };
@@ -1395,6 +1536,7 @@ export interface operations {
             409: components["responses"]["Conflict"];
             422: components["responses"]["InvalidRequest"];
             500: components["responses"]["InternalError"];
+            /** @description 节点或数据库不可用 */
             503: components["responses"]["Unavailable"];
         };
     };
@@ -1424,6 +1566,7 @@ export interface operations {
             409: components["responses"]["Conflict"];
             422: components["responses"]["InvalidRequest"];
             500: components["responses"]["InternalError"];
+            /** @description 节点或数据库不可用 */
             503: components["responses"]["Unavailable"];
         };
     };
@@ -1451,6 +1594,7 @@ export interface operations {
             409: components["responses"]["Conflict"];
             422: components["responses"]["InvalidRequest"];
             500: components["responses"]["InternalError"];
+            /** @description 节点或数据库不可用 */
             503: components["responses"]["Unavailable"];
         };
     };
@@ -1480,6 +1624,7 @@ export interface operations {
             409: components["responses"]["Conflict"];
             422: components["responses"]["InvalidRequest"];
             500: components["responses"]["InternalError"];
+            /** @description 节点或数据库不可用 */
             503: components["responses"]["Unavailable"];
         };
     };
@@ -1500,13 +1645,13 @@ export interface operations {
             };
         };
         responses: {
-            /** @description 请求成功 */
-            200: {
+            /** @description 目标节点已受理 */
+            202: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Node"];
+                    "application/json": components["schemas"]["Operation"];
                 };
             };
             401: components["responses"]["Unauthorized"];
@@ -1515,6 +1660,7 @@ export interface operations {
             409: components["responses"]["Conflict"];
             422: components["responses"]["InvalidRequest"];
             500: components["responses"]["InternalError"];
+            /** @description 节点或数据库不可用 */
             503: components["responses"]["Unavailable"];
         };
     };
@@ -1546,6 +1692,7 @@ export interface operations {
             409: components["responses"]["Conflict"];
             422: components["responses"]["InvalidRequest"];
             500: components["responses"]["InternalError"];
+            /** @description 节点或数据库不可用 */
             503: components["responses"]["Unavailable"];
         };
     };
@@ -1573,6 +1720,7 @@ export interface operations {
             409: components["responses"]["Conflict"];
             422: components["responses"]["InvalidRequest"];
             500: components["responses"]["InternalError"];
+            /** @description 节点或数据库不可用 */
             503: components["responses"]["Unavailable"];
         };
     };
@@ -1602,6 +1750,7 @@ export interface operations {
             409: components["responses"]["Conflict"];
             422: components["responses"]["InvalidRequest"];
             500: components["responses"]["InternalError"];
+            /** @description 节点或数据库不可用 */
             503: components["responses"]["Unavailable"];
         };
     };
@@ -1631,264 +1780,12 @@ export interface operations {
             409: components["responses"]["Conflict"];
             422: components["responses"]["InvalidRequest"];
             500: components["responses"]["InternalError"];
-            503: components["responses"]["Unavailable"];
-        };
-    };
-    getPublicAddresses: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description 请求成功 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["PublicAddresses"];
-                };
-            };
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-            404: components["responses"]["NotFound"];
-            409: components["responses"]["Conflict"];
-            422: components["responses"]["InvalidRequest"];
-            500: components["responses"]["InternalError"];
-            503: components["responses"]["Unavailable"];
-        };
-    };
-    setPublicAddress: {
-        parameters: {
-            query?: never;
-            header: {
-                "X-CSRF-Token": string;
-            };
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["PublicAddressPatch"];
-            };
-        };
-        responses: {
-            /** @description 请求成功 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["PublicAddresses"];
-                };
-            };
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-            404: components["responses"]["NotFound"];
-            409: components["responses"]["Conflict"];
-            422: components["responses"]["InvalidRequest"];
-            500: components["responses"]["InternalError"];
-            503: components["responses"]["Unavailable"];
-        };
-    };
-    refreshPublicAddresses: {
-        parameters: {
-            query?: never;
-            header: {
-                "X-CSRF-Token": string;
-            };
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["PublicAddressRefresh"];
-            };
-        };
-        responses: {
-            /** @description 请求成功 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["PublicAddresses"];
-                };
-            };
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-            404: components["responses"]["NotFound"];
-            409: components["responses"]["Conflict"];
-            422: components["responses"]["InvalidRequest"];
-            500: components["responses"]["InternalError"];
-            503: components["responses"]["Unavailable"];
-        };
-    };
-    getPeerTrust: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description 请求成功 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["PeerTrustPolicy"];
-                };
-            };
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-            404: components["responses"]["NotFound"];
-            409: components["responses"]["Conflict"];
-            422: components["responses"]["InvalidRequest"];
-            500: components["responses"]["InternalError"];
-            503: components["responses"]["Unavailable"];
-        };
-    };
-    setPeerTrust: {
-        parameters: {
-            query?: never;
-            header: {
-                "X-CSRF-Token": string;
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["PeerTrustPolicyPatch"];
-            };
-        };
-        responses: {
-            /** @description 请求成功 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["PeerTrustPolicy"];
-                };
-            };
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-            404: components["responses"]["NotFound"];
-            409: components["responses"]["Conflict"];
-            422: components["responses"]["InvalidRequest"];
-            500: components["responses"]["InternalError"];
-            503: components["responses"]["Unavailable"];
-        };
-    };
-    getPeerTrustStatus: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description 请求成功 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["PeerTrustStatus"];
-                };
-            };
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-            404: components["responses"]["NotFound"];
-            409: components["responses"]["Conflict"];
-            422: components["responses"]["InvalidRequest"];
-            500: components["responses"]["InternalError"];
+            /** @description 节点或数据库不可用 */
             503: components["responses"]["Unavailable"];
         };
     };
     readFirewall: {
         parameters: {
-            query?: {
-                family?: components["schemas"]["AddressFamily"];
-                scope?: components["schemas"]["ConfigScope"];
-            };
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description 请求成功 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["FirewallState"];
-                };
-            };
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-            404: components["responses"]["NotFound"];
-            409: components["responses"]["Conflict"];
-            422: components["responses"]["InvalidRequest"];
-            500: components["responses"]["InternalError"];
-            503: components["responses"]["Unavailable"];
-        };
-    };
-    previewFirewallChange: {
-        parameters: {
-            query?: never;
-            header: {
-                "X-CSRF-Token": string;
-            };
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["FirewallChange"];
-            };
-        };
-        responses: {
-            /** @description 请求成功 */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ChangePlan"];
-                };
-            };
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-            404: components["responses"]["NotFound"];
-            409: components["responses"]["Conflict"];
-            422: components["responses"]["InvalidRequest"];
-            500: components["responses"]["InternalError"];
-            503: components["responses"]["Unavailable"];
-        };
-    };
-    getFirewallPlan: {
-        parameters: {
             query?: never;
             header?: never;
             path: {
@@ -1904,7 +1801,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ChangePlan"];
+                    "application/json": components["schemas"]["ManagedFirewallState"];
                 };
             };
             401: components["responses"]["Unauthorized"];
@@ -1913,70 +1810,11 @@ export interface operations {
             409: components["responses"]["Conflict"];
             422: components["responses"]["InvalidRequest"];
             500: components["responses"]["InternalError"];
+            /** @description 节点或数据库不可用 */
             503: components["responses"]["Unavailable"];
         };
     };
-    applyFirewallPlan: {
-        parameters: {
-            query?: never;
-            header: {
-                "X-CSRF-Token": string;
-            };
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description 已持久受理，须查询原操作取得实际结果 */
-            202: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Operation"];
-                };
-            };
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-            404: components["responses"]["NotFound"];
-            409: components["responses"]["Conflict"];
-            422: components["responses"]["InvalidRequest"];
-            500: components["responses"]["InternalError"];
-            503: components["responses"]["Unavailable"];
-        };
-    };
-    listContainers: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description 请求成功 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ContainerList"];
-                };
-            };
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-            404: components["responses"]["NotFound"];
-            409: components["responses"]["Conflict"];
-            422: components["responses"]["InvalidRequest"];
-            500: components["responses"]["InternalError"];
-            503: components["responses"]["Unavailable"];
-        };
-    };
-    actOnContainer: {
+    changeFirewallConfig: {
         parameters: {
             query?: never;
             header: {
@@ -1985,23 +1823,22 @@ export interface operations {
             };
             path: {
                 id: string;
-                container_id: string;
             };
             cookie?: never;
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["ContainerAction"];
+                "application/json": components["schemas"]["FirewallConfigPatch"];
             };
         };
         responses: {
-            /** @description 已持久受理，须查询原操作取得实际结果 */
+            /** @description 配置已保存，等待后台应用 */
             202: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Operation"];
+                    "application/json": components["schemas"]["FirewallSaved"];
                 };
             };
             401: components["responses"]["Unauthorized"];
@@ -2010,39 +1847,7 @@ export interface operations {
             409: components["responses"]["Conflict"];
             422: components["responses"]["InvalidRequest"];
             500: components["responses"]["InternalError"];
-            503: components["responses"]["Unavailable"];
-        };
-    };
-    readContainerLogs: {
-        parameters: {
-            query?: {
-                follow?: boolean;
-                tail?: number;
-            };
-            header?: never;
-            path: {
-                id: string;
-                container_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description 断开后不自动补齐；重新读取由用户发起 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "text/plain": string;
-                };
-            };
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-            404: components["responses"]["NotFound"];
-            409: components["responses"]["Conflict"];
-            422: components["responses"]["InvalidRequest"];
-            500: components["responses"]["InternalError"];
+            /** @description 节点或数据库不可用 */
             503: components["responses"]["Unavailable"];
         };
     };
@@ -2077,6 +1882,7 @@ export interface operations {
             409: components["responses"]["Conflict"];
             422: components["responses"]["InvalidRequest"];
             500: components["responses"]["InternalError"];
+            /** @description 节点或数据库不可用 */
             503: components["responses"]["Unavailable"];
         };
     };
@@ -2084,6 +1890,7 @@ export interface operations {
         parameters: {
             query?: {
                 node_id?: string;
+                cursor?: string;
             };
             header?: never;
             path?: never;
@@ -2106,6 +1913,7 @@ export interface operations {
             409: components["responses"]["Conflict"];
             422: components["responses"]["InvalidRequest"];
             500: components["responses"]["InternalError"];
+            /** @description 节点或数据库不可用 */
             503: components["responses"]["Unavailable"];
         };
     };
@@ -2135,6 +1943,7 @@ export interface operations {
             409: components["responses"]["Conflict"];
             422: components["responses"]["InvalidRequest"];
             500: components["responses"]["InternalError"];
+            /** @description 节点或数据库不可用 */
             503: components["responses"]["Unavailable"];
         };
     };
@@ -2170,6 +1979,7 @@ export interface operations {
             409: components["responses"]["Conflict"];
             422: components["responses"]["InvalidRequest"];
             500: components["responses"]["InternalError"];
+            /** @description 节点或数据库不可用 */
             503: components["responses"]["Unavailable"];
         };
     };
@@ -2205,6 +2015,7 @@ export interface operations {
             409: components["responses"]["Conflict"];
             422: components["responses"]["InvalidRequest"];
             500: components["responses"]["InternalError"];
+            /** @description 节点或数据库不可用 */
             503: components["responses"]["Unavailable"];
         };
     };
@@ -2240,6 +2051,7 @@ export interface operations {
             409: components["responses"]["Conflict"];
             422: components["responses"]["InvalidRequest"];
             500: components["responses"]["InternalError"];
+            /** @description 节点或数据库不可用 */
             503: components["responses"]["Unavailable"];
         };
     };
@@ -2267,6 +2079,7 @@ export interface operations {
             409: components["responses"]["Conflict"];
             422: components["responses"]["InvalidRequest"];
             500: components["responses"]["InternalError"];
+            /** @description 节点或数据库不可用 */
             503: components["responses"]["Unavailable"];
         };
     };
@@ -2300,280 +2113,7 @@ export interface operations {
             409: components["responses"]["Conflict"];
             422: components["responses"]["InvalidRequest"];
             500: components["responses"]["InternalError"];
-            503: components["responses"]["Unavailable"];
-        };
-    };
-    getDeployment: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description 请求成功 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["DeploymentConfig"];
-                };
-            };
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-            404: components["responses"]["NotFound"];
-            409: components["responses"]["Conflict"];
-            422: components["responses"]["InvalidRequest"];
-            500: components["responses"]["InternalError"];
-            503: components["responses"]["Unavailable"];
-        };
-    };
-    changeDeployment: {
-        parameters: {
-            query?: never;
-            header: {
-                "X-CSRF-Token": string;
-                "Idempotency-Key": string;
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["DeploymentChange"];
-            };
-        };
-        responses: {
-            /** @description 已持久受理，须查询原操作取得实际结果 */
-            202: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Operation"];
-                };
-            };
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-            404: components["responses"]["NotFound"];
-            409: components["responses"]["Conflict"];
-            422: components["responses"]["InvalidRequest"];
-            500: components["responses"]["InternalError"];
-            503: components["responses"]["Unavailable"];
-        };
-    };
-    getPortainer: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description 请求成功 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["PortainerSettings"];
-                };
-            };
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-            404: components["responses"]["NotFound"];
-            409: components["responses"]["Conflict"];
-            422: components["responses"]["InvalidRequest"];
-            500: components["responses"]["InternalError"];
-            503: components["responses"]["Unavailable"];
-        };
-    };
-    configurePortainer: {
-        parameters: {
-            query?: never;
-            header: {
-                "X-CSRF-Token": string;
-                "Idempotency-Key": string;
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["PortainerChange"];
-            };
-        };
-        responses: {
-            /** @description 已持久受理，须查询原操作取得实际结果 */
-            202: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Operation"];
-                };
-            };
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-            404: components["responses"]["NotFound"];
-            409: components["responses"]["Conflict"];
-            422: components["responses"]["InvalidRequest"];
-            500: components["responses"]["InternalError"];
-            503: components["responses"]["Unavailable"];
-        };
-    };
-    unbindPortainer: {
-        parameters: {
-            query?: never;
-            header: {
-                "X-CSRF-Token": string;
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description 请求成功 */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-            404: components["responses"]["NotFound"];
-            409: components["responses"]["Conflict"];
-            422: components["responses"]["InvalidRequest"];
-            500: components["responses"]["InternalError"];
-            503: components["responses"]["Unavailable"];
-        };
-    };
-    listPortainerBindings: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description 请求成功 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["PortainerBindings"];
-                };
-            };
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-            404: components["responses"]["NotFound"];
-            409: components["responses"]["Conflict"];
-            422: components["responses"]["InvalidRequest"];
-            500: components["responses"]["InternalError"];
-            503: components["responses"]["Unavailable"];
-        };
-    };
-    bindPortainerEnvironment: {
-        parameters: {
-            query?: never;
-            header: {
-                "X-CSRF-Token": string;
-            };
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["PortainerBindRequest"];
-            };
-        };
-        responses: {
-            /** @description 请求成功 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["PortainerBinding"];
-                };
-            };
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-            404: components["responses"]["NotFound"];
-            409: components["responses"]["Conflict"];
-            422: components["responses"]["InvalidRequest"];
-            500: components["responses"]["InternalError"];
-            503: components["responses"]["Unavailable"];
-        };
-    };
-    unbindPortainerEnvironment: {
-        parameters: {
-            query?: never;
-            header: {
-                "X-CSRF-Token": string;
-            };
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description 请求成功 */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-            404: components["responses"]["NotFound"];
-            409: components["responses"]["Conflict"];
-            422: components["responses"]["InvalidRequest"];
-            500: components["responses"]["InternalError"];
-            503: components["responses"]["Unavailable"];
-        };
-    };
-    actOnPortainer: {
-        parameters: {
-            query?: never;
-            header: {
-                "X-CSRF-Token": string;
-                "Idempotency-Key": string;
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["ComponentAction"];
-            };
-        };
-        responses: {
-            /** @description 已持久受理，须查询原操作取得实际结果 */
-            202: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Operation"];
-                };
-            };
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-            404: components["responses"]["NotFound"];
-            409: components["responses"]["Conflict"];
-            422: components["responses"]["InvalidRequest"];
-            500: components["responses"]["InternalError"];
+            /** @description 节点或数据库不可用 */
             503: components["responses"]["Unavailable"];
         };
     };
@@ -2610,6 +2150,7 @@ export interface operations {
             409: components["responses"]["Conflict"];
             422: components["responses"]["InvalidRequest"];
             500: components["responses"]["InternalError"];
+            /** @description 节点或数据库不可用 */
             503: components["responses"]["Unavailable"];
         };
     };
@@ -2637,37 +2178,11 @@ export interface operations {
             409: components["responses"]["Conflict"];
             422: components["responses"]["InvalidRequest"];
             500: components["responses"]["InternalError"];
+            /** @description 节点或数据库不可用 */
             503: components["responses"]["Unavailable"];
         };
     };
-    watchEvents: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description SSE 仅通知查询失效，载荷采用 QueryInvalidation，不提供历史重放 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "text/event-stream": string;
-                };
-            };
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-            404: components["responses"]["NotFound"];
-            409: components["responses"]["Conflict"];
-            422: components["responses"]["InvalidRequest"];
-            500: components["responses"]["InternalError"];
-            503: components["responses"]["Unavailable"];
-        };
-    };
-    connectAgent: {
+    getOverview: {
         parameters: {
             query?: never;
             header?: never;
@@ -2677,11 +2192,13 @@ export interface operations {
         requestBody?: never;
         responses: {
             /** @description 请求成功 */
-            101: {
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["Overview"];
+                };
             };
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
@@ -2689,6 +2206,528 @@ export interface operations {
             409: components["responses"]["Conflict"];
             422: components["responses"]["InvalidRequest"];
             500: components["responses"]["InternalError"];
+            /** @description 节点或数据库不可用 */
+            503: components["responses"]["Unavailable"];
+        };
+    };
+    getMonitoringHistory: {
+        parameters: {
+            query?: {
+                range?: "24h" | "7d";
+                node_id?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 请求成功 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MonitoringHistory"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["InvalidRequest"];
+            500: components["responses"]["InternalError"];
+            /** @description 节点或数据库不可用 */
+            503: components["responses"]["Unavailable"];
+        };
+    };
+    getNodeSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 成功 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NodeConfig"];
+                };
+            };
+            /** @description 节点或数据库不可用 */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["APIError"];
+                };
+            };
+        };
+    };
+    changeNodeSettings: {
+        parameters: {
+            query?: never;
+            header: {
+                "X-CSRF-Token": string;
+                "Idempotency-Key": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NodeConfig"];
+            };
+        };
+        responses: {
+            /** @description 成功 */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Operation"];
+                };
+            };
+            /** @description 节点或数据库不可用 */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["APIError"];
+                };
+            };
+        };
+    };
+    getNodeAccount: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 成功 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NodeAccount"];
+                };
+            };
+            /** @description 节点或数据库不可用 */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["APIError"];
+                };
+            };
+        };
+    };
+    changeNodeAccount: {
+        parameters: {
+            query?: never;
+            header: {
+                "X-CSRF-Token": string;
+                "Idempotency-Key": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NodeAccountChange"];
+            };
+        };
+        responses: {
+            /** @description 成功 */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Operation"];
+                };
+            };
+            /** @description 节点或数据库不可用 */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["APIError"];
+                };
+            };
+        };
+    };
+    revealNodePassword: {
+        parameters: {
+            query?: never;
+            header: {
+                "X-CSRF-Token": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 成功 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NodePassword"];
+                };
+            };
+            /** @description 节点或数据库不可用 */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["APIError"];
+                };
+            };
+        };
+    };
+    getStorageStatus: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 成功 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StorageStatus"];
+                };
+            };
+            /** @description 节点或数据库不可用 */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["APIError"];
+                };
+            };
+        };
+    };
+    cancelOperation: {
+        parameters: {
+            query?: never;
+            header: {
+                "X-CSRF-Token": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 成功 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Operation"];
+                };
+            };
+            /** @description 节点或数据库不可用 */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["APIError"];
+                };
+            };
+        };
+    };
+    syncFirewallConfig: {
+        parameters: {
+            query?: never;
+            header: {
+                "X-CSRF-Token": string;
+                "Idempotency-Key": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FirewallSyncRequest"];
+            };
+        };
+        responses: {
+            /** @description 配置已保存，等待后台应用 */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FirewallSaved"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["InvalidRequest"];
+            500: components["responses"]["InternalError"];
+            /** @description 节点或数据库不可用 */
+            503: components["responses"]["Unavailable"];
+        };
+    };
+    getPublicAddresses: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 请求成功 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicAddresses"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["InvalidRequest"];
+            500: components["responses"]["InternalError"];
+            /** @description 节点或数据库不可用 */
+            503: components["responses"]["Unavailable"];
+        };
+    };
+    changePublicAddresses: {
+        parameters: {
+            query?: never;
+            header: {
+                "X-CSRF-Token": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PublicAddressPatch"];
+            };
+        };
+        responses: {
+            /** @description 请求成功 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicAddresses"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["InvalidRequest"];
+            500: components["responses"]["InternalError"];
+            /** @description 节点或数据库不可用 */
+            503: components["responses"]["Unavailable"];
+        };
+    };
+    refreshPublicAddresses: {
+        parameters: {
+            query?: never;
+            header: {
+                "X-CSRF-Token": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 请求成功 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicAddresses"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["InvalidRequest"];
+            500: components["responses"]["InternalError"];
+            /** @description 节点或数据库不可用 */
+            503: components["responses"]["Unavailable"];
+        };
+    };
+    getPeerTrust: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 请求成功 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PeerTrustPolicy"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["InvalidRequest"];
+            500: components["responses"]["InternalError"];
+            /** @description 节点或数据库不可用 */
+            503: components["responses"]["Unavailable"];
+        };
+    };
+    changePeerTrust: {
+        parameters: {
+            query?: never;
+            header: {
+                "X-CSRF-Token": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PeerTrustPolicyPatch"];
+            };
+        };
+        responses: {
+            /** @description 请求成功 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PeerTrustPolicy"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["InvalidRequest"];
+            500: components["responses"]["InternalError"];
+            /** @description 节点或数据库不可用 */
+            503: components["responses"]["Unavailable"];
+        };
+    };
+    getPeerTrustStatus: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 请求成功 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PeerTrustStatus"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["InvalidRequest"];
+            500: components["responses"]["InternalError"];
+            /** @description 节点或数据库不可用 */
+            503: components["responses"]["Unavailable"];
+        };
+    };
+    getNodePeerTrust: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 请求成功 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PeerTrustNodeStatus"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["InvalidRequest"];
+            500: components["responses"]["InternalError"];
+            /** @description 节点或数据库不可用 */
             503: components["responses"]["Unavailable"];
         };
     };

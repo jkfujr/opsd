@@ -10,7 +10,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/opsd-labs/opsd/internal/protocol"
+	"github.com/jkfujr/opsd/internal/protocol"
 )
 
 type NFT struct{ Host Host }
@@ -701,6 +701,9 @@ func (n *NFT) Prepare(ctx context.Context, p protocol.ChangePlan) ([]Step, error
 }
 
 func (n *NFT) Write(ctx context.Context, step Step, reverse bool) error {
+	if step.Forward.Kind == "managed_chain" {
+		return n.writeManagedChain(ctx, step, reverse)
+	}
 	if step.Source != nil {
 		return n.writeSource(*step.Source, reverse)
 	}

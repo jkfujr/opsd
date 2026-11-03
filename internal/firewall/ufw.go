@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/opsd-labs/opsd/internal/protocol"
+	"github.com/jkfujr/opsd/internal/protocol"
 )
 
 type UFW struct{ Host Host }
@@ -260,7 +260,7 @@ func parseUFWRuntime(text string, family protocol.AddressFamily) ([]protocol.Fir
 			continue
 		}
 		chain := words[1]
-		if chain != prefix+"-user-input" && chain != prefix+"-before-input" && chain != prefix+"-after-input" && chain != "INPUT" {
+		if chain != prefix+"-user-input" && chain != prefix+"-before-input" && chain != prefix+"-after-input" && chain != prefix+"-reject-input" && chain != prefix+"-track-input" && chain != prefix+"-skip-to-policy-input" && chain != "INPUT" {
 			continue
 		}
 		if chain == prefix+"-user-input" && strings.TrimSpace(line) == "-A "+prefix+"-user-input -j RETURN" {
@@ -268,7 +268,7 @@ func parseUFWRuntime(text string, family protocol.AddressFamily) ([]protocol.Fir
 		}
 		position++
 		positions[chain]++
-		r := protocol.FirewallRule{ID: fmt.Sprintf("%s/runtime/%d", family, position), Scope: protocol.Runtime, Native: protocol.NativePosition{Chain: chain, Position: pointer(positions[chain])}, NativeExpression: line, Origin: "native", ReadonlyReason: "原生前置、后置或复杂规则只读"}
+		r := protocol.FirewallRule{ID: fmt.Sprintf("%s/runtime/%d", family, position), Scope: protocol.Runtime, Native: protocol.NativePosition{Chain: chain, Position: pointer(positions[chain])}, NativeExpression: line, Origin: "native", SystemDefault: ufwSystemDefault(line, prefix), ReadonlyReason: "原生前置、后置或复杂规则只读"}
 		if chain == prefix+"-user-input" {
 			if spec, ok := parseIPTablesRule(line, family); ok {
 				r.Spec = spec
@@ -451,6 +451,12 @@ func ufwSameConditions(a, b *protocol.RuleSpec) bool {
 }
 
 func (u *UFW) Write(ctx context.Context, step Step, reverse bool) error {
+	if step.Forward.Kind == "managed_rules" {
+		return u.writeManagedRules(ctx, step, reverse)
+	}
+	if step.Forward.Kind == "managed_policy" {
+		return u.writeManagedPolicy(ctx, step, reverse)
+	}
 	c, anchor := step.Forward, step.ForwardAnchor
 	if reverse {
 		c, anchor = step.Reverse, step.ReverseAnchor

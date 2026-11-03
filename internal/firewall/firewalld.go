@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/opsd-labs/opsd/internal/protocol"
+	"github.com/jkfujr/opsd/internal/protocol"
 )
 
 type Firewalld struct{ Host Host }
@@ -378,6 +378,9 @@ func (f *Firewalld) Prepare(ctx context.Context, p protocol.ChangePlan) ([]Step,
 }
 
 func (f *Firewalld) Write(ctx context.Context, step Step, reverse bool) error {
+	if step.Forward.Kind == "managed_reload" {
+		return f.writeManagedReload(ctx, step, reverse)
+	}
 	c := step.Forward
 	if reverse {
 		c = step.Reverse
@@ -450,6 +453,9 @@ func nativeTarget(action string) string {
 
 // reloadSafe 读取重载会替换的配置，不能用整体保存运行配置来掩盖差异。
 func (f *Firewalld) reloadSafe(ctx context.Context, ignoreTargetZone string, ignoreTarget bool) error {
+	return f.reloadSafeWithPolicy(ctx, ignoreTargetZone, ignoreTarget, false)
+}
+func (f *Firewalld) reloadSafeWithPolicy(ctx context.Context, ignoreTargetZone string, ignoreTarget bool, ignoreTrust bool) error {
 	for _, query := range []string{"--list-all-zones", "--list-all-policies"} {
 		a, e := f.Host.Run(ctx, "firewall-cmd", query)
 		if e != nil {
@@ -459,7 +465,12 @@ func (f *Firewalld) reloadSafe(ctx context.Context, ignoreTargetZone string, ign
 		if e != nil {
 			return Unsupported("不能完整读取永久配置：" + e.Error())
 		}
-		x, y := normalizeFirewalld(string(a), ignoreTargetZone, ignoreTarget), normalizeFirewalld(string(b), ignoreTargetZone, ignoreTarget)
+		ignore := ignoreTarget && query == "--list-all-zones"
+		if ignoreTrust && query == "--list-all-policies" {
+			a = []byte(stripTrustPolicy(string(a)))
+			b = []byte(stripTrustPolicy(string(b)))
+		}
+		x, y := normalizeFirewalld(string(a), ignoreTargetZone, ignore), normalizeFirewalld(string(b), ignoreTargetZone, ignore)
 		if x != y {
 			left, right := strings.Split(x, "\n"), strings.Split(y, "\n")
 			difference := query
@@ -536,7 +547,7 @@ func normalizeFirewalld(text, zone string, ignore bool) string {
 			current = strings.Fields(t)[0]
 			t = strings.SplitN(t, " (", 2)[0]
 		}
-		if ignore && current == zone && strings.HasPrefix(t, "target:") {
+		if ignore && (current == zone || zone == "*") && strings.HasPrefix(t, "target:") {
 			continue
 		}
 		lines = append(lines, current+"/"+t)

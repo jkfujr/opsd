@@ -11,8 +11,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/opsd-labs/opsd/internal/identity"
-	"github.com/opsd-labs/opsd/internal/protocol"
+	"github.com/jkfujr/opsd/internal/identity"
+	"github.com/jkfujr/opsd/internal/protocol"
 )
 
 type Adapter interface {
@@ -40,6 +40,7 @@ type SourceEdit struct {
 	Before     string `json:"before"`
 	After      string `json:"after"`
 	BeforeRule string `json:"before_rule,omitempty"`
+	WholeFile  bool   `json:"whole_file,omitempty"`
 }
 type Step struct {
 	Name          string                  `json:"name"`
@@ -184,10 +185,37 @@ func scopeContains(want, got protocol.ConfigScope) bool {
 func Capture(state protocol.FirewallState, selector Selector) View {
 	v := View{}
 	switch selector.Kind {
-	case "rules":
+	case "ufw_policy":
+		policySelector := selector
+		policySelector.Kind = "policy"
+		v.Policies = Capture(state, policySelector).Policies
+		prefix := ufwPrefix(selector.Family)
+		for _, r := range state.Rules {
+			if r.Scope == protocol.Runtime && (r.Native.Chain == prefix+"-reject-input" || r.Native.Chain == prefix+"-track-input" || r.Native.Chain == prefix+"-skip-to-policy-input") {
+				r.NativeExpression = strings.TrimSuffix(strings.TrimSuffix(strings.Join(strings.Fields(r.NativeExpression), " "), " --reject-with icmp-port-unreachable"), " --reject-with icmp6-port-unreachable")
+				v.Rules = append(v.Rules, r)
+			}
+		}
+		sort.SliceStable(v.Rules, func(i, j int) bool {
+			return v.Rules[i].Native.Chain+v.Rules[i].NativeExpression < v.Rules[j].Native.Chain+v.Rules[j].NativeExpression
+		})
+	case "managed_chain":
+		rules, policies := selector, selector
+		rules.Kind, policies.Kind = "rules", "policy"
+		v.Rules, v.Policies = Capture(state, rules).Rules, Capture(state, policies).Policies
+	case "rules", "managed_rules":
 		for _, r := range state.Rules {
 			if scopeContains(selector.Scope, r.Scope) && ruleFamilyMatches(r, selector.Family) && (selector.Chain == "" || r.Native.Chain == selector.Chain) && (selector.Zone == "" || r.Native.Zone == selector.Zone) {
 				v.Rules = append(v.Rules, r)
+			}
+		}
+		if selector.Kind == "managed_rules" && state.Backend == "ufw" && selector.Scope == protocol.Runtime {
+			for i := range v.Rules {
+				if v.Rules[i].Spec != nil {
+					spec := *v.Rules[i].Spec
+					spec.Comment = ""
+					v.Rules[i].Spec = &spec
+				}
 			}
 		}
 	case "policy":
@@ -274,6 +302,7 @@ func canonical(v View) View {
 		r.Editable = false
 		r.ReadonlyReason = ""
 		r.Origin = ""
+		r.SystemDefault = false
 		if r.Scope == protocol.Runtime && strings.Contains(r.Native.Chain, "/") {
 			r.Native.SourceFile = ""
 		}

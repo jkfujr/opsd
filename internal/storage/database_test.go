@@ -12,7 +12,7 @@ import (
 
 func TestOpenAndReopen(t *testing.T) {
 	ctx := context.Background()
-	for _, kind := range []Kind{Control, Agent} {
+	for _, kind := range []Kind{Executor} {
 		t.Run(string(kind), func(t *testing.T) {
 			path := filepath.Join(t.TempDir(), "含 空格.db")
 			for range 2 {
@@ -33,7 +33,8 @@ func TestOpenAndReopen(t *testing.T) {
 						t.Fatal(err)
 					}
 				}
-				if count != 3 || version != 3 || sync != 2 || foreign != 1 || mode != "wal" {
+				expectedVersion := 4
+				if count != expectedVersion || version != expectedVersion || sync != 2 || foreign != 1 || mode != "wal" {
 					t.Fatalf("数据库配置或迁移错误：记录=%d 版本=%d 同步=%d 外键=%d 日志=%s", count, version, sync, foreign, mode)
 				}
 				db.Close()
@@ -45,7 +46,7 @@ func TestOpenAndReopen(t *testing.T) {
 func TestFailedMigrationRollsBack(t *testing.T) {
 	ctx := context.Background()
 	path := filepath.Join(t.TempDir(), "failed.db")
-	source, _ := fs.Sub(migrations, "migrations/control")
+	source, _ := fs.Sub(migrations, "migrations/executor")
 	first, _ := fs.ReadFile(source, "001_schema.sql")
 	broken := fstest.MapFS{
 		"001_schema.sql": {Data: first},
@@ -70,7 +71,7 @@ func TestFailedMigrationRollsBack(t *testing.T) {
 	if version != 0 || tables != 0 {
 		t.Fatalf("迁移残留：版本=%d 表=%d", version, tables)
 	}
-	db, err = Open(ctx, path, Control)
+	db, err = Open(ctx, path, Executor)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -88,7 +89,7 @@ func TestNewerDatabaseIsNotChanged(t *testing.T) {
 		t.Fatal(err)
 	}
 	db.Close()
-	if opened, err := Open(ctx, path, Control); err == nil || !strings.Contains(err.Error(), "拒绝写入") {
+	if opened, err := Open(ctx, path, Executor); err == nil || !strings.Contains(err.Error(), "拒绝写入") {
 		if opened != nil {
 			opened.Close()
 		}

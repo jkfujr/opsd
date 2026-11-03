@@ -35,8 +35,9 @@ const (
 )
 
 type Error struct {
-	Code    string `json:"code"`
-	Message string `json:"message"`
+	Code      string `json:"code"`
+	Message   string `json:"message"`
+	RequestID string `json:"request_id,omitempty"`
 }
 
 type Capability struct {
@@ -78,6 +79,7 @@ type RuleSpec struct {
 }
 
 type FirewallRule struct {
+	SystemDefault    bool           `json:"system_default,omitempty"`
 	ID               string         `json:"id"`
 	Spec             *RuleSpec      `json:"spec,omitempty"`
 	Scope            ConfigScope    `json:"scope"`
@@ -115,6 +117,7 @@ type ScopeResult struct {
 	Scope     ConfigScope   `json:"scope"`
 	State     string        `json:"state"`
 	Error     *Error        `json:"error,omitempty"`
+	Addresses []string      `json:"addresses,omitempty"`
 }
 
 type DockerPortState struct {
@@ -216,10 +219,11 @@ type OperationRecord struct {
 
 // OperationAction 的三个载荷互斥，编解码层拒绝不匹配组合。
 type OperationAction struct {
-	Kind       string            `json:"kind"`
-	Firewall   *ChangePlan       `json:"firewall,omitempty"`
-	Deployment *DeploymentAction `json:"deployment,omitempty"`
-	Component  *ComponentAction  `json:"component,omitempty"`
+	Kind           string            `json:"kind"`
+	Firewall       *ChangePlan       `json:"firewall,omitempty"`
+	FirewallConfig *FirewallTarget   `json:"firewall_config,omitempty"`
+	Deployment     *DeploymentAction `json:"deployment,omitempty"`
+	Component      *ComponentAction  `json:"component,omitempty"`
 }
 
 type DeploymentAction struct {

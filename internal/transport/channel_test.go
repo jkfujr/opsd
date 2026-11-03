@@ -10,8 +10,8 @@ import (
 	"time"
 
 	"github.com/coder/websocket"
-	"github.com/opsd-labs/opsd/internal/identity"
-	"github.com/opsd-labs/opsd/internal/protocol"
+	"github.com/jkfujr/opsd/internal/identity"
+	"github.com/jkfujr/opsd/internal/protocol"
 )
 
 func pair(t *testing.T) (*Channel, <-chan error) {
