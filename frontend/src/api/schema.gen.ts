@@ -732,11 +732,11 @@ export interface components {
         };
         AddressObservation: {
             /** @enum {string} */
-            source: "control" | "public_https";
+            source: "peer" | "ipify";
             address?: string;
             /** Format: date-time */
             observed_at: string;
-            error?: string;
+            error?: components["schemas"]["NetworkError"];
         };
         PublicAddress: {
             /** @enum {string} */

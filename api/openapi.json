@@ -3028,8 +3028,8 @@
           "source": {
             "type": "string",
             "enum": [
-              "control",
-              "public_https"
+              "peer",
+              "ipify"
             ]
           },
           "address": {
@@ -3040,7 +3040,7 @@
             "format": "date-time"
           },
           "error": {
-            "type": "string"
+            "$ref": "#/components/schemas/NetworkError"
           }
         },
         "required": [

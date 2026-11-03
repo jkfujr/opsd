@@ -43,6 +43,26 @@ jobs:
           sudo apt-get install -y -qq nftables iptables firewalld
           go test -c -o artifacts/firewall-native.test ./internal/firewall
           sudo env OPSD_NATIVE_TRUST=1 artifacts/firewall-native.test -test.run '^TestPeerTrustNativeNetwork$' -test.v
+      - name: 安装生产程序并检查控制台
+        run: |
+          chmod +x artifacts/opsd-linux-amd64
+          password=$(openssl rand -hex 24)
+          echo "::add-mask::$password"
+          echo "OPSD_UI_PASSWORD=$password" >> "$GITHUB_ENV"
+          sudo env OPSD_PASSWORD="$password" artifacts/opsd-linux-amd64 install --non-interactive --address http://127.0.0.1:8444 --name ui-check --username ui-check --entrance /signin > artifacts/install-check.log
+          sudo /opt/opsd/bin/opsd console --enabled=true
+          npx playwright install --with-deps chromium
+      - name: 生产界面与交互
+        run: node scripts/check-ui.mjs
+      - name: 停止验收服务
+        if: always()
+        run: sudo systemctl stop opsd.service opsd-executor.service || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ui-check
+          path: artifacts/ui
+          if-no-files-found: ignore
       - uses: actions/upload-artifact@v4
         with:
           name: opsd-linux

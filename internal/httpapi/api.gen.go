@@ -88,16 +88,16 @@ func (e AddressFamily) Valid() bool {
 
 // Defines values for AddressObservationSource.
 const (
-	Control     AddressObservationSource = "control"
-	PublicHttps AddressObservationSource = "public_https"
+	Ipify AddressObservationSource = "ipify"
+	Peer  AddressObservationSource = "peer"
 )
 
 // Valid indicates whether the value is a known member of the AddressObservationSource enum.
 func (e AddressObservationSource) Valid() bool {
 	switch e {
-	case Control:
+	case Ipify:
 		return true
-	case PublicHttps:
+	case Peer:
 		return true
 	default:
 		return false
@@ -810,7 +810,7 @@ type AddressFamily string
 // AddressObservation defines model for AddressObservation.
 type AddressObservation struct {
 	Address    *string                  `json:"address,omitempty"`
-	Error      *string                  `json:"error,omitempty"`
+	Error      *NetworkError            `json:"error,omitempty"`
 	ObservedAt time.Time                `json:"observed_at"`
 	Source     AddressObservationSource `json:"source"`
 }

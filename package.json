@@ -3,7 +3,9 @@
   "private": true,
   "version": "0.1.0-dev",
   "type": "module",
-  "engines": { "node": ">=24.14.1" },
+  "engines": {
+    "node": ">=24.14.1"
+  },
   "scripts": {
     "generate": "node scripts/generate.mjs",
     "build": "node scripts/build.mjs",
@@ -12,6 +14,7 @@
   },
   "devDependencies": {
     "openapi-typescript": "7.13.0",
+    "playwright": "1.64.1",
     "typescript": "5.9.3"
   }
 }
