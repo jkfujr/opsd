@@ -54,7 +54,7 @@ func syncNFTTrust(ctx context.Context, h Host, target protocol.PeerTrustTarget) 
 	}
 	chains := []string{}
 	for chain, source := range sources.Chains {
-		if source.Policy != "" {
+		if source.Policy != "" && source.Input {
 			chains = append(chains, chain)
 		}
 	}

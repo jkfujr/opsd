@@ -95,7 +95,7 @@ func TestPeerTrustNativeNetwork(t *testing.T) {
 		t.Run(backend, func(t *testing.T) {
 			run("nft", "flush", "ruleset")
 			if backend == "nftables" {
-				config := "table inet filter {\n chain input {\n  type filter hook input priority 0; policy drop;\n  ct state established,related accept\n  tcp dport 22 accept comment \"existing\"\n }\n}\n"
+				config := "table inet filter {\n chain input {\n  type filter hook input priority 0; policy drop;\n  ct state established,related accept\n  tcp dport 22 accept comment \"existing\"\n }\n chain output {\n  type filter hook output priority 0;\n  policy accept;\n }\n}\n"
 				write("/etc/nftables.conf", config)
 				run("nft", "-f", h.path("/etc/nftables.conf"))
 			} else {

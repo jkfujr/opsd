@@ -18,6 +18,7 @@ type nftSource struct {
 	Path, Chain, Line string
 	Spec              *protocol.RuleSpec
 	Policy            string
+	Input             bool
 	Position          int
 }
 type nftSources struct {
@@ -48,6 +49,7 @@ var nftTableLine = regexp.MustCompile(`^table\s+(ip|ip6|inet)\s+([A-Za-z_][A-Za-
 var nftChainLine = regexp.MustCompile(`^chain\s+([A-Za-z_][A-Za-z0-9_-]*)\s*\{$`)
 var nftPolicyLine = regexp.MustCompile(`\bpolicy\s+(accept|drop)\s*;`)
 var nftPolicyMetadata = regexp.MustCompile(`^(?:type\s+filter\s+hook\s+input\s+priority\s+[A-Za-z0-9_+-]+;\s*)?policy\s+(accept|drop)\s*;$`)
+var nftInputMetadata = regexp.MustCompile(`^type\s+filter\s+hook\s+input\s+priority\s+[A-Za-z0-9_+-]+;`)
 var nftFileArg = regexp.MustCompile(`(?:^|\s)(?:-f|--file)\s+([^\s;\]}]+)`)
 
 func (n *NFT) sources(ctx context.Context) (nftSources, error) {
@@ -110,6 +112,11 @@ func (n *NFT) sources(ctx context.Context) (nftSources, error) {
 			}
 			if chain != "" && level == chainLevel {
 				ref := family + "/" + table + "/" + chain
+				if nftInputMetadata.MatchString(t) {
+					v := result.Chains[ref]
+					v.Input = true
+					result.Chains[ref] = v
+				}
 				if m := nftPolicyLine.FindStringSubmatch(t); len(m) == 2 {
 					if !nftPolicyMetadata.MatchString(t) {
 						return Unsupported("持久策略与其他语句共行，不能无损修改")

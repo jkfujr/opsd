@@ -23,6 +23,7 @@ npm test
 Debian／Ubuntu 的 systemd 主机使用 [Releases](https://github.com/jkfujr/opsd/releases) 中固定版本的 `install.sh`。以 root 下载脚本，完整下载后执行：
 
 ```bash
+mkdir -p artifacts
 curl -fsSL https://github.com/jkfujr/opsd/releases/download/v$(node -p 'require("./package.json").version')/install.sh -o artifacts/install.sh
 sudo sh artifacts/install.sh
 sudo /opt/opsd/bin/opsd console --enabled=true
