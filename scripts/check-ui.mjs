@@ -145,6 +145,8 @@ try {
     await page.route(`**/api/v1${trustPath}`, (route) => route.fulfill({ json: { ...trust, migration: { state, operation_id: migrated.migration.operation_id, ...(state === 'failed' ? { error: { code: 'conflict', message: '测试迁移失败' } } : {}) } } }));
     await page.reload();
     await page.getByText(state === 'failed' ? '迁移失败' : '迁移中', { exact: true }).waitFor();
+    assert.equal(await page.getByRole('button', { name: '查看操作', exact: true }).count(), 1);
+    if (state === 'failed') await page.getByRole('button', { name: '重试', exact: true }).waitFor();
     await capture(`trust-migration-${state}`);
     await page.unroute(`**/api/v1${trustPath}`);
   }
