@@ -2,7 +2,7 @@
 
 ## 准备与读取
 
-先确认用户已授权本次目标实例更新。`npm run build` 依次生成接口、构建前端、写入 `frontend/dist/version.txt`、将资源嵌入 Go，并产生 `dist/linux-amd64/opsd` 和 `dist/linux-arm64/opsd`；使用目标架构的完整工件，不修改二进制中的资源字符串。无需在服务器安装 Node.js 或编译。
+先确认用户已授权本次目标实例更新。`npm run build` 依次生成接口、构建前端、写入 `frontend/dist/version.txt`、将资源嵌入 Go，并产生 `artifacts/opsd-linux-amd64` 和 `artifacts/opsd-linux-arm64`；使用目标架构的完整工件，不修改二进制中的资源字符串。无需在服务器安装 Node.js 或编译。
 
 从实际实例配置读取 `binary`、`data_dir`、`executor_dir` 等路径，不把默认路径当成现场事实。检查节点队列和 root 操作中 `terminal=0` 的记录；有未结束操作时停止更新。普通用户与 root 服务使用同一程序，停止和恢复两者，不触碰 CouchDB 或其他服务。
 
@@ -19,7 +19,7 @@ py tools/skills/opsd-workflow/scripts/opsd_remote.py inspect --host root@服务�
 ## 续传与更新
 
 ```powershell
-py tools/skills/opsd-workflow/scripts/opsd_remote.py upload --host root@服务器 --identity F:/keys/服务器 --local-file dist/linux-amd64/opsd --remote-file /opt/opsd/bin/opsd.next
+py tools/skills/opsd-workflow/scripts/opsd_remote.py upload --host root@服务器 --identity F:/keys/服务器 --local-file artifacts/opsd-linux-amd64 --remote-file /opt/opsd/bin/opsd.next
 py tools/skills/opsd-workflow/scripts/opsd_remote.py update --host root@服务器 --identity F:/keys/服务器 --config /etc/opsd/instance.json --candidate /opt/opsd/bin/opsd.next
 ```
 

@@ -29,7 +29,7 @@ func TestUFWTrustRejectsForeignConditions(t *testing.T) {
 }
 
 func TestNFTTrustPreservedByOrdinaryConfiguration(t *testing.T) {
-	base := "table inet filter {\n chain input {\n  type filter hook input priority 0; policy drop;\n  tcp dport 22 accept\n }\n}\n"
+	base := "table inet filter {\n chain input {\n  type filter hook input priority 0; policy drop;\n  meta nfproto ipv4 tcp dport 22 accept\n }\n}\n"
 	target := protocol.PeerTrustTarget{Enabled: true, IPv4: []string{"8.8.8.8"}}
 	text, e := nftTrustFile(base, "inet/filter/input", target)
 	if e != nil {
