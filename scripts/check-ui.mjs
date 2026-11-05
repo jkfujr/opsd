@@ -47,13 +47,36 @@ try {
   await page.getByRole('button', { name: '添加节点', exact: true }).click();
   await page.getByRole('dialog').waitFor();
   await capture('add-node');
-  await page.keyboard.press('Escape');
+  await page.getByLabel('名称（可选）', { exact: true }).fill("界面验收'节点");
+  await page.getByRole('button', { name: '生成安装命令', exact: true }).click();
+  const command = page.getByLabel('一次性安装命令', { exact: true });
+  await command.waitFor();
+  const shell = await command.inputValue();
+  assert(shell.startsWith('sh -c '));
+  assert(shell.includes('https://github.com/jkfujr/opsd/releases/download/v'));
+  assert(shell.includes('/install.sh'));
+  await page.evaluate(() => Object.defineProperty(navigator, 'clipboard', { value: undefined, configurable: true }));
+  await page.getByRole('button', { name: '复制命令', exact: true }).click();
+  await page.getByRole('button', { name: '已复制', exact: true }).waitFor();
+  await page.getByRole('dialog').getByRole('button', { name: '关闭', exact: true }).last().click();
   await page.getByRole('dialog').waitFor({ state: 'hidden' });
   await page.goto(`${base}/firewall/settings`);
   await page.getByRole('switch', { name: '集群互信' }).click();
   await page.getByRole('alertdialog').waitFor();
   await capture('trust-confirm');
   await page.getByRole('button', { name: '取消', exact: true }).click();
+  assert.equal(await page.getByRole('switch', { name: '集群互信' }).isChecked(), false);
+  await page.getByRole('switch', { name: '集群互信' }).click();
+  await page.getByRole('button', { name: '开启互信', exact: true }).click();
+  await page.getByRole('alertdialog').waitFor({ state: 'hidden' });
+  assert.equal(await page.getByRole('switch', { name: '集群互信' }).isChecked(), true);
+  await page.goto(`${base}/firewall?node=${id}&type=trust`);
+  await page.getByRole('tab', { name: /^互信规则/ }).waitFor();
+  await capture('trust-rules');
+  await page.goto(`${base}/firewall/settings`);
+  await page.getByRole('switch', { name: '集群互信' }).click();
+  await page.getByRole('button', { name: '关闭互信', exact: true }).click();
+  await page.getByRole('alertdialog').waitFor({ state: 'hidden' });
   assert.equal(await page.getByRole('switch', { name: '集群互信' }).isChecked(), false);
   await page.goto(`${base}/settings/account`);
   await page.getByLabel('账号', { exact: true }).fill('changed');
@@ -78,7 +101,7 @@ try {
   writeFileSync(`${output}/result.json`, JSON.stringify({ pages: pages.length, themes: 2, widths: [320, 768, 1440], errors }, null, 2));
   console.log('界面验收通过：9 页面、深浅主题、3 种宽度、浮层与未提交修改。');
 } catch (error) {
-  await page.screenshot({ path: `${output}/failure.png`, fullPage: true }).catch(() => {});
+  await page.screenshot({ path: `${output}/failure.png`, fullPage: true, mask: [page.getByLabel('一次性安装命令', { exact: true })] }).catch(() => {});
   writeFileSync(`${output}/failure.txt`, `${page.url()}\n${error.stack}\n${errors.join('\n')}`);
   throw error;
 } finally { await browser.close(); }

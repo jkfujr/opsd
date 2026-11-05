@@ -46,6 +46,7 @@ jobs:
       - name: 安装生产程序并检查控制台
         run: |
           chmod +x artifacts/opsd-linux-amd64
+          sudo sh scripts/check-installer.sh
           password=$(openssl rand -hex 24)
           echo "::add-mask::$password"
           echo "OPSD_UI_PASSWORD=$password" >> "$GITHUB_ENV"

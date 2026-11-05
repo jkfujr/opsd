@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type RefObject } from 'react';
+import { useEffect, useId, useRef, useState, type RefObject } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogBody, DialogFooter } from '@appica/ui-react/dialog';
 import { Button } from '@appica/ui-react/button';
@@ -14,6 +14,7 @@ const shellQuote = (value: string) => `'${value.replaceAll("'", "'\\''")}'`;
 const bootstrap = `set -eu; [ "$(id -u)" -eq 0 ] || { printf '%s\\n' '请以 root 执行安装命令' >&2; exit 1; }; if { ! command -v curl >/dev/null 2>&1 && ! command -v wget >/dev/null 2>&1; } || [ ! -s /etc/ssl/certs/ca-certificates.crt ]; then . /etc/os-release; case "$ID" in debian|ubuntu) ;; *) exit 1 ;; esac; apt-get update -qq; DEBIAN_FRONTEND=noninteractive apt-get install -y -qq ca-certificates curl; fi; file=$(mktemp); trap 'rm -f "$file"' 0 1 2 15; url=$1; shift; if command -v curl >/dev/null 2>&1; then curl -fsSL --proto '=https' --proto-redir '=https' "$url" -o "$file"; else wget --https-only -q -O "$file" "$url"; fi; sh "$file" "$@"`;
 
 export function EnrollmentDialog({ mode, onClose, onManage, trigger }: { mode: 'add' | 'tokens'; onClose: () => void; onManage: () => void; trigger: RefObject<HTMLButtonElement | null> }) {
+  const commandID = useId();
   const [created, setCreated] = useState<{ result: components['schemas']['EnrollmentTokenCreated']; name: string; region: string } | null>(null);
   const [revoke, setRevoke] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
@@ -46,7 +47,7 @@ export function EnrollmentDialog({ mode, onClose, onManage, trigger }: { mode: '
       <DialogBody className="min-w-0 space-y-5 overflow-y-auto">
         {mode === 'add' ? created ? <>
           <dl className="flex flex-wrap gap-x-6 gap-y-2 text-sm">{created.name && <div><dt className="text-foreground-muted">名称</dt><dd className="break-all">{created.name}</dd></div>}{created.region && <div><dt className="text-foreground-muted">地域</dt><dd className="break-all">{created.region}</dd></div>}<div><dt className="text-foreground-muted">到期时间</dt><dd>{date(created.result.record.expires_at)}</dd></div></dl>
-          <Field className="space-y-2"><FieldLabel>一次性安装命令</FieldLabel><Textarea ref={textarea} value={command} readOnly rows={6} className="font-mono text-sm" /></Field><Failure error={copyError} />
+          <Field className="space-y-2"><FieldLabel htmlFor={commandID}>一次性安装命令</FieldLabel><Textarea id={commandID} ref={textarea} value={command} readOnly rows={6} className="font-mono text-sm" /></Field><Failure error={copyError} />
         </> : <form id="add-node" className="space-y-5" onSubmit={(event) => { event.preventDefault(); const form = new FormData(event.currentTarget); create.mutate({ name: String(form.get('name')).trim(), region: String(form.get('region')).trim() }); }}>
           <TextField label="名称（可选）" name="name" maxLength={255} placeholder="主机名" disabled={create.isPending || uncertain} />
           <TextField label="地域（可选）" name="region" disabled={create.isPending || uncertain} />
