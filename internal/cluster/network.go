@@ -583,6 +583,7 @@ func (n *Node) networkLoop() {
 	defer ticker.Stop()
 	var last time.Time
 	fingerprint := ""
+	addressMode := ""
 	for {
 		ctx, cancel := context.WithTimeout(n.ctx, 25*time.Second)
 		c, e := n.Config(ctx)
@@ -590,10 +591,11 @@ func (n *Node) networkLoop() {
 		network := publicaddress.Fingerprint()
 		addresses, _ := n.PublicAddresses(ctx, n.ID)
 		pending := addresses.Revision > 0 && (addresses.IPv4.Mode == "auto" && addresses.IPv4.State == "pending" || addresses.IPv6.Mode == "auto" && addresses.IPv6.State == "pending")
-		if e == nil && (c.AddressMode != "" || p.Enabled || pending) && (last.IsZero() || pending || n.Now().Sub(last) >= 5*time.Minute || network != fingerprint) {
+		if e == nil && (c.AddressMode != "" || p.Enabled || pending) && (last.IsZero() || pending || c.AddressMode != addressMode || n.Now().Sub(last) >= 5*time.Minute || network != fingerprint) {
 			_, _ = n.RefreshPublic(ctx)
 			last = n.Now()
 			fingerprint = network
+			addressMode = c.AddressMode
 		}
 		n.syncTrust(ctx)
 		cancel()
@@ -640,7 +642,7 @@ func equalTrustTarget(a, b protocol.PeerTrustTarget) bool {
 	return reflect.DeepEqual(a, b)
 }
 func (n *Node) syncTrust(ctx context.Context) {
-	if n.Executor == nil || n.Revoked(ctx, n.ID) {
+	if n.Executor == nil {
 		return
 	}
 	d, e := n.Directory(ctx)
@@ -648,7 +650,7 @@ func (n *Node) syncTrust(ctx context.Context) {
 		return
 	}
 	p, _ := n.TrustPolicy(ctx)
-	next := desiredTrust(d, n.ID, p.Enabled)
+	next := desiredTrust(d, n.ID, p.Enabled && !n.Revoked(ctx, n.ID))
 	tx, e := n.DB.BeginTx(ctx, nil)
 	if e != nil {
 		return

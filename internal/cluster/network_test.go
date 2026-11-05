@@ -3,10 +3,52 @@ package cluster
 import (
 	"context"
 	"crypto/ed25519"
-	"github.com/jkfujr/opsd/internal/protocol"
 	"testing"
 	"time"
+
+	"github.com/jkfujr/opsd/internal/protocol"
 )
+
+type trustExecutor struct {
+	lostExecutor
+	target protocol.PeerTrustTarget
+}
+
+func (x *trustExecutor) Call(_ context.Context, p protocol.Payload) (protocol.Payload, error) {
+	x.target = *p.(*protocol.PeerTrustTarget)
+	return &protocol.PeerTrustUpdated{TargetRevision: x.target.Revision}, nil
+}
+
+func TestRevokedNodeRemovesItsPersistedTrust(t *testing.T) {
+	a, _ := openTestNode(t)
+	b, _ := openTestNode(t)
+	joinTest(t, b, a)
+	manualAddress(t, a, "8.8.8.8")
+	if _, e := a.ChangeTrust(t.Context(), TrustPolicyPatch{Enabled: true}); e != nil {
+		t.Fatal(e)
+	}
+	d, _ := a.Directory(t.Context())
+	if e := b.merge(t.Context(), d, false); e != nil {
+		t.Fatal(e)
+	}
+	x := &trustExecutor{}
+	b.Executor = x
+	b.syncTrust(t.Context())
+	if !x.target.Enabled || len(x.target.IPv4) != 1 {
+		t.Fatal("互信目标未生成", x.target)
+	}
+	if e := a.Revoke(t.Context(), b.ID); e != nil {
+		t.Fatal(e)
+	}
+	d, _ = a.Directory(t.Context())
+	if e := b.merge(t.Context(), d, false); e != nil {
+		t.Fatal(e)
+	}
+	b.syncTrust(t.Context())
+	if x.target.Enabled || len(x.target.IPv4)+len(x.target.IPv6) != 0 || x.target.Revision != 2 {
+		t.Fatal("撤销后未移除互信", x.target)
+	}
+}
 
 func manualAddress(t *testing.T, n *Node, ip string) {
 	t.Helper()
@@ -102,6 +144,11 @@ func TestAddressConflictFailureAndManualOverride(t *testing.T) {
 	v, e = n.RefreshPublic(t.Context())
 	if e != nil || v.IPv4.State != "conflict" || v.IPv4.Addresses[0] != "8.8.8.8" {
 		t.Fatal(v, e)
+	}
+	n.ObservePublic = func(context.Context, protocol.AddressFamily) []protocol.AddressObservation { return nil }
+	v, e = n.RefreshPublic(t.Context())
+	if e != nil || v.IPv4.State != "failed" || v.IPv4.Addresses[0] != "8.8.8.8" {
+		t.Fatal("观测失败未保留已确认地址", v, e)
 	}
 	manualAddress(t, n, "9.9.9.9")
 	v, e = n.RefreshPublic(t.Context())

@@ -19,6 +19,7 @@ const capture = async (name) => {
 };
 try {
   await page.goto(`${base}/signin`);
+  await page.evaluate(() => document.fonts.ready);
   await page.getByRole('heading', { name: '登录', exact: true }).waitFor();
   await capture('login');
   await page.getByLabel('账号', { exact: true }).fill('ui-check');
@@ -30,7 +31,7 @@ try {
   const pages = [['overview', '/'], ['nodes', '/nodes'], ['detail', `/nodes/${id}`], ['firewall', `/firewall?node=${id}`], ['firewall-settings', '/firewall/settings'], ['account', '/settings/account'], ['sessions', '/settings/sessions'], ['appearance', '/settings/appearance'], ['version', '/settings/version']];
   for (const theme of ['light', 'dark']) {
     await page.goto(`${base}/settings/appearance`);
-    await page.getByLabel(theme === 'light' ? '浅色' : '深色', { exact: true }).click();
+    await page.getByRole('radio', { name: theme === 'light' ? '浅色' : '深色', exact: true }).click();
     for (const width of [320, 768, 1440]) {
       await page.setViewportSize({ width, height: 1000 });
       for (const [name, path] of pages) {
@@ -76,4 +77,8 @@ try {
   assert.deepEqual(errors, [], '浏览器运行错误');
   writeFileSync(`${output}/result.json`, JSON.stringify({ pages: pages.length, themes: 2, widths: [320, 768, 1440], errors }, null, 2));
   console.log('界面验收通过：9 页面、深浅主题、3 种宽度、浮层与未提交修改。');
+} catch (error) {
+  await page.screenshot({ path: `${output}/failure.png`, fullPage: true }).catch(() => {});
+  writeFileSync(`${output}/failure.txt`, `${page.url()}\n${error.stack}\n${errors.join('\n')}`);
+  throw error;
 } finally { await browser.close(); }

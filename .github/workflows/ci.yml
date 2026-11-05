@@ -40,7 +40,7 @@ jobs:
       - name: 原生互信规则与新连接
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y -qq nftables iptables firewalld
+          sudo apt-get install -y -qq nftables iptables firewalld fonts-noto-cjk
           go test -c -o artifacts/firewall-native.test ./internal/firewall
           sudo env OPSD_NATIVE_TRUST=1 artifacts/firewall-native.test -test.run '^TestPeerTrustNativeNetwork$' -test.v
       - name: 安装生产程序并检查控制台

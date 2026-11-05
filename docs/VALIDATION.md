@@ -11,7 +11,7 @@ npm run build
 npm test
 ```
 
-构建包含接口生成、前端类型检查与生产构建、Linux amd64／arm64 编译。CI 校对生成文件、版本和安装脚本语法，并在隔离网络空间执行原生互信规则的新连接验收。
+构建包含接口生成、前端类型检查与生产构建、Linux amd64／arm64 编译。CI 校对生成文件、版本和安装脚本语法，在隔离网络空间执行原生互信规则的新连接验收，再安装生产程序，通过 Chromium 检查页面与交互；截图输出为 `ui-check` 工件。
 
 ```bash
 go test -c -o artifacts/firewall-native.test ./internal/firewall
