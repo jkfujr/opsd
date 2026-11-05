@@ -19,6 +19,7 @@ type FirewallWrite struct {
 	ExpectedRevision uint64                   `json:"expected_revision"`
 	Change           *protocol.FirewallChange `json:"change,omitempty"`
 	Key              string                   `json:"key"`
+	migration        bool
 }
 
 type FirewallSaved struct {
@@ -105,6 +106,14 @@ func (n *Node) writeFirewall(ctx context.Context, origin string, request Firewal
 	target := protocol.FirewallTarget{Revision: state.Revision, Configuration: state.FirewallDefinition}
 	if maintenance {
 		target = protocol.FirewallTarget{Revision: state.ConfirmedRevision, Configuration: confirmed, Automatic: true}
+	} else if request.migration || request.Change == nil && state.Migration != nil && state.Migration.State == "failed" {
+		target, e = n.trustMigrationTarget(ctx, tx, state, confirmed)
+		if e != nil {
+			return out, e
+		}
+		if request.migration && request.Key != trustMigrationKey(target) {
+			return out, fault("conflict", "互信目标已经改变")
+		}
 	} else if request.Change != nil {
 		target.Configuration, e = firewall.ChangeConfiguration(state.FirewallDefinition, *request.Change)
 		if e != nil {
@@ -148,6 +157,10 @@ func (n *Node) writeFirewall(ctx context.Context, origin string, request Firewal
 	}
 	state.State = "pending"
 	state.OperationID = id
+	state.Error = nil
+	if target.PeerTrustMigration != nil {
+		state.Migration = &protocol.PeerTrustMigrationStatus{State: "pending", OperationID: id}
+	}
 	if e = n.persistFirewall(ctx, tx, state, confirmed); e != nil {
 		return out, e
 	}
@@ -204,6 +217,32 @@ func (n *Node) firewallOperation(ctx context.Context, tx *sql.Tx, op Operation) 
 	if op.LastObservedAt != nil {
 		state.CheckedAt = op.LastObservedAt
 	}
+	if target.PeerTrustMigration != nil {
+		state.Migration = &protocol.PeerTrustMigrationStatus{State: "pending", OperationID: op.ID, Error: op.Error}
+		switch {
+		case op.State == protocol.Succeeded:
+			state.FirewallDefinition = target.Configuration
+			state.Revision, state.ConfirmedRevision = target.Revision, target.Revision
+			confirmed = target.Configuration
+			state.State, state.Error = "in_sync", nil
+			state.Migration.State = "in_sync"
+		case operations.Terminal(op.State):
+			state.FirewallDefinition = confirmed
+			state.Revision = state.ConfirmedRevision
+			state.State, state.Error = "failed", op.Error
+			if state.Error == nil {
+				state.Error = &protocol.Error{Code: "conflict", Message: "互信迁移未完成，原 IP 规则保留"}
+			}
+			state.Migration.State, state.Migration.Error = "failed", state.Error
+		case op.State == protocol.AttentionRequired:
+			state.State, state.Error = "unknown", op.Error
+		case op.State == protocol.Prepared || op.State == protocol.Applying || op.State == protocol.Reverting:
+			state.State = "applying"
+		default:
+			state.State = "pending"
+		}
+		return n.persistFirewall(ctx, tx, state, confirmed)
+	}
 	switch op.State {
 	case protocol.Accepted:
 		state.State = "pending"
@@ -218,6 +257,7 @@ func (n *Node) firewallOperation(ctx context.Context, tx *sql.Tx, op Operation) 
 		if !target.Automatic {
 			state.ConfirmedRevision = target.Revision
 			confirmed = target.Configuration
+			state.Migration = nil
 		}
 		if state.Revision == state.ConfirmedRevision {
 			state.State = "in_sync"

@@ -6,6 +6,7 @@ import { Skeleton } from '@appica/ui-react/skeleton';
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerBody, DrawerFooter } from '@appica/ui-react/drawer';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@appica/ui-react/table';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@appica/ui-react/tabs';
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from '@appica/ui-react/dropdown-menu';
 import { api, RequestError, unwrap } from '../api/client';
 import type { components } from '../api/schema.gen';
 import { useSession } from '../auth';
@@ -14,6 +15,7 @@ import { queryClient } from '../state';
 import { BusyButton, ChoiceField, Confirm, date, Failure, LoadingRows, newRequestKey, PageTitle, PageToolbar, StatusLabel, TextField, useUnsavedChanges } from '../ui';
 import { nodesQuery } from './Nodes';
 import { TrustRulesTable, trustPolicyQuery, trustRulesQuery } from '../network';
+import { CopyAddress } from '../CopyAddress';
 
 type Rule = components['schemas']['ManagedRule'];
 type State = components['schemas']['ManagedFirewallState'];
@@ -45,7 +47,7 @@ function FirewallContent({ nodeID }: { nodeID: string }) {
   const category = search.get('type') === 'trust' ? 'trust' : search.get('type') === 'ip' ? 'ip' : 'port';
   const policy = useQuery(trustPolicyQuery);
   const trust = useQuery(trustRulesQuery(nodeID));
-  const showTrust = Boolean(policy.data?.enabled || trust.data?.enabled || trust.data?.rules.length || trust.data?.state === 'failed' || trust.data && trust.data.target_revision > trust.data.applied_revision);
+  const showTrust = Boolean(policy.data?.enabled || trust.data?.enabled || trust.data?.rules.length || trust.data?.state === 'failed' || trust.data?.migration?.state === 'failed' || trust.data?.migration?.state === 'pending' || trust.data && trust.data.target_revision > trust.data.applied_revision);
   useEffect(() => { if (category === 'trust' && policy.data && trust.data && !showTrust) setSearch((current) => { const next = new URLSearchParams(current); next.set('type', 'ip'); return next; }, { replace: true }); }, [category, showTrust, policy.data, trust.data, setSearch]);
   const nodes = useQuery(nodesQuery);
   const node = nodes.data?.items.find((n) => n.id === nodeID);
@@ -62,11 +64,12 @@ function FirewallContent({ nodeID }: { nodeID: string }) {
   const busy = Boolean(read && ['pending', 'applying', 'awaiting_confirmation', 'unknown'].includes(read.state));
   const disabled = state.isError || node?.connected === false || Boolean(node?.revoked_at) || busy;
   const rules = read?.rules.filter((r) => !family || r.spec.family === family) ?? [];
+  const showComments = (type: 'port' | 'ip') => rules.some((r) => Boolean(r.spec.port) === (type === 'port') && Boolean(r.spec.comment));
   const close = () => { setEditor(null); setDirty(false); setDiscard(false); };
   const retryKey = useRef('');
   const [retryUncertain, setRetryUncertain] = useState(false);
   const operations = useOperations();
-  const accepted = (result: components['schemas']['FirewallSaved']) => { queryClient.setQueryData(['firewall', nodeID], result.configuration); retryKey.current = ''; setRetryUncertain(false); invalidateOperations(); operations.show(result.operation_id); };
+  const accepted = (result: components['schemas']['FirewallSaved']) => { queryClient.setQueryData(['firewall', nodeID], result.configuration); void queryClient.invalidateQueries({ queryKey: ['peer-trust', nodeID] }); retryKey.current = ''; setRetryUncertain(false); invalidateOperations(); operations.show(result.operation_id); };
   const retry = useMutation({ mutationFn: async () => {
     if (!retryKey.current) retryKey.current = newRequestKey();
     return unwrap(await api.POST('/nodes/{id}/firewall/sync', { params: { path: { id: nodeID }, header: { 'X-CSRF-Token': '', 'Idempotency-Key': retryKey.current } }, body: { expected_revision: read!.revision } }));
@@ -74,30 +77,31 @@ function FirewallContent({ nodeID }: { nodeID: string }) {
   const locateRetry = useMutation({ mutationFn: () => findRequest(nodeID, retryKey.current), onSuccess: (op) => { if (op) operations.show(op.id); setRetryUncertain(false); retryKey.current = ''; void state.refetch(); } });
   return <section className="panel">
     <PageTitle>防火墙</PageTitle>
-    <PageToolbar>
-      <div className="min-w-48 flex-1"><ChoiceField label="节点" value={nodeID} options={nodes.data?.items.filter((n) => !n.revoked_at).map((n) => [n.id, n.name] as const) ?? [[nodeID, '本机']]} onChange={(value) => update('node', value)} /></div>
-      <div className="min-w-40 flex-1"><ChoiceField label="地址族" value={family} options={[[ '', 'IPv4 与 IPv6' ], ['ipv4', 'IPv4'], ['ipv6', 'IPv6']]} onChange={(value) => update('family', value)} /></div>
+    <PageToolbar className="firewall-filters">
+      <ChoiceField label="节点" value={nodeID} options={nodes.data?.items.filter((n) => !n.revoked_at).map((n) => [n.id, n.name] as const) ?? [[nodeID, '本机']]} onChange={(value) => update('node', value)} />
+      <ChoiceField label="地址族" value={family} options={[[ '', 'IPv4 与 IPv6' ], ['ipv4', 'IPv4'], ['ipv6', 'IPv6']]} onChange={(value) => update('family', value)} />
       <div className="toolbar-actions"><BusyButton variant="outline" busy={refreshing} disabled={state.isFetching || trust.isFetching} onClick={() => void refresh()}>刷新</BusyButton><Link to={`/firewall/settings?${search}`} className={buttonVariants({ variant: 'outline' })}>设置</Link></div>
     </PageToolbar>
     <Failure error={state.error} retry={() => void refresh()} busy={refreshing} /><Failure error={nodes.error} retry={() => void nodes.refetch()} busy={nodes.isFetching} />
     {node?.revoked_at && <p role="alert" className="mb-3"><StatusLabel state="offline">节点已撤销</StatusLabel></p>}
     {node?.connected === false && <p role="status" className="mb-3"><StatusLabel state="offline">节点离线</StatusLabel></p>}
-    <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border-y border-border py-3">
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">{!read ? state.isPending ? <Skeleton className="h-5 w-48" /> : '—' : <><span className="font-medium text-foreground-intense">{read.backend === 'none' ? '未安装防火墙' : read.backend === 'unknown' ? '防火墙' : read.backend}</span>{read.service_active !== undefined && <StatusLabel state={read.service_active ? 'online' : 'offline'}>{read.service_active ? '已启用' : '已停用'}</StatusLabel>}<StatusLabel state={read.state}>{read.state === 'in_sync' && read.service_active === false ? '已保存' : stateNames[read.state]}</StatusLabel>{read.checked_at && <span className="text-xs text-foreground-muted">{date(read.checked_at)}</span>}</>}</div>
-      <div className="flex flex-wrap gap-2">{category !== 'trust' && <><Button disabled={!read?.capabilities.edit_rules.supported || disabled || retryUncertain} onClick={() => { setEditor({ kind: 'add_rule' }); setDirty(false); }}>添加规则</Button><Button variant="outline" disabled={!read?.capabilities.default_policy.supported || disabled || retryUncertain} onClick={() => { setEditor({ kind: 'set_default_policy' }); setDirty(false); }}>默认入站策略</Button></>}{read?.operation_id && <Button variant="ghost" onClick={() => operations.show(read.operation_id!)}>查看操作</Button>}{retryUncertain ? <Button variant="outline" disabled={locateRetry.isPending} onClick={() => locateRetry.mutate()}>查询原操作</Button> : read?.state === 'failed' && read.revision > 0 && <BusyButton variant="outline" busy={retry.isPending} disabled={disabled} onClick={() => retry.mutate()}>重试</BusyButton>}</div>
+    <div className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-border pb-3">
+      {!read ? state.isPending ? <Skeleton className="h-5 w-48" /> : '—' : <><span className="font-medium text-foreground-intense">{read.backend === 'none' ? '未安装防火墙' : read.backend === 'unknown' ? '防火墙' : read.backend === 'ufw' ? 'UFW' : read.backend}</span>{read.service_active === false && <StatusLabel state="offline">已停用</StatusLabel>}<StatusLabel state={read.state}>{read.state === 'in_sync' && read.service_active === false ? '已保存' : stateNames[read.state]}</StatusLabel>{read.checked_at && <span className="text-xs tabular-nums text-foreground-muted">{date(read.checked_at)}</span>}</>}
     </div>
     {read?.error && <p role="alert" className="mb-3 text-sm text-error-intense">{read.error.message}</p>}
     <Failure error={retry.error ?? locateRetry.error} />
     {read && <InstallFirewall key={nodeID} nodeID={nodeID} available={read.backend === 'none' && read.capabilities.install.supported} disabled={node?.writable === false || state.isError} />}
-    {Boolean(read?.default_policies.length) && <div className="mb-4 flex flex-wrap gap-x-4 gap-y-2 text-xs text-foreground-muted"><span>默认入站</span>{read!.default_policies.filter((p) => !family || p.family === family).map((p, i) => <span key={i}>{p.zone || p.chain || ''} {p.family === 'ipv4' ? 'IPv4' : 'IPv6'}：{actionNames[p.action]}</span>)}</div>}
     <Tabs variant="line" value={category} onValueChange={(value) => update('type', String(value))}>
-      <TabsList aria-label="规则类别" className="mb-4 max-w-full overflow-x-auto"><TabsTrigger value="port">端口规则 {read && rules.filter((r) => r.spec.port).length}</TabsTrigger><TabsTrigger value="ip">IP 规则 {read && rules.filter((r) => !r.spec.port).length}</TabsTrigger>{showTrust && <TabsTrigger value="trust">互信规则 {trust.data?.rules.filter((r) => r.address && (!family || r.family === family)).length}</TabsTrigger>}</TabsList>
+      <div className="mb-4 flex min-w-0 flex-wrap items-center justify-between gap-x-4 gap-y-3">
+        <TabsList aria-label="规则类别" className="max-w-full overflow-x-auto"><TabsTrigger value="port">端口规则 {read && rules.filter((r) => r.spec.port).length}</TabsTrigger><TabsTrigger value="ip">IP 规则 {read && rules.filter((r) => !r.spec.port).length}</TabsTrigger>{showTrust && <TabsTrigger value="trust">互信规则 {trust.data?.rules.filter((r) => r.address && (!family || r.family === family)).length}</TabsTrigger>}</TabsList>
+        <div className="flex flex-wrap gap-2">{category !== 'trust' && <><Button disabled={!read?.capabilities.edit_rules.supported || disabled || retryUncertain} onClick={() => { setEditor({ kind: 'add_rule' }); setDirty(false); }}>添加规则</Button><Button variant="outline" disabled={!read?.capabilities.default_policy.supported || disabled || retryUncertain} onClick={() => { setEditor({ kind: 'set_default_policy' }); setDirty(false); }}>默认入站策略</Button></>}{read?.operation_id && !(category === 'trust' && read.migration && read.migration.state !== 'in_sync') && <Button variant="ghost" onClick={() => operations.show(read.operation_id!)}>查看操作</Button>}{retryUncertain ? <Button variant="outline" disabled={locateRetry.isPending} onClick={() => locateRetry.mutate()}>查询原操作</Button> : read && (read.state === 'failed' || read.migration?.state === 'failed') && read.revision > 0 && <BusyButton variant="outline" busy={retry.isPending} disabled={disabled} onClick={() => retry.mutate()}>重试</BusyButton>}</div>
+      </div>
       {(['port', 'ip'] as const).map((type) => <TabsContent key={type} value={type}>
-        <div className="max-w-full overflow-x-auto" aria-busy={state.isPending || read?.state === 'importing'}><Table hoverableRows className="min-w-220">
-          <TableHeader><TableRow>{type === 'port' && <TableHead>端口</TableHead>}<TableHead>来源</TableHead><TableHead>目标</TableHead><TableHead>协议</TableHead><TableHead>动作</TableHead><TableHead>备注</TableHead><TableHead className="text-right">操作</TableHead></TableRow></TableHeader>
-          <TableBody>{state.isPending || read?.state === 'importing' ? <LoadingRows columns={type === 'port' ? 7 : 6} /> : rules.filter((r) => type === 'port' ? Boolean(r.spec.port) : !r.spec.port).map((rule) => <TableRow key={rule.id}>
-            {type === 'port' && <TableCell className="whitespace-nowrap font-mono text-xs">{rule.spec.port}</TableCell>}<TableCell className="max-w-48 break-all"><span className="block font-mono text-xs">{address(rule.spec.source)}</span><span className="text-xs text-foreground-muted">{rule.spec.family === 'ipv4' ? 'IPv4' : 'IPv6'}</span></TableCell><TableCell className="max-w-48 break-all font-mono text-xs">{address(rule.spec.destination, '任意目标')}</TableCell><TableCell>{rule.spec.protocol === 'any' ? 'ANY' : rule.spec.protocol.toUpperCase()}</TableCell><TableCell>{actionNames[rule.spec.action]}</TableCell><TableCell className="max-w-48 break-words text-sm text-foreground-muted">{rule.spec.comment || '—'}</TableCell><TableCell><div className="flex justify-end gap-1"><Button variant="ghost" size="sm" onClick={() => setDetail(rule)}>查看</Button>{(['edit_rule', 'delete_rule', 'move_rule'] as const).map((kind) => <Button key={kind} variant="ghost" size="sm" disabled={disabled || retryUncertain || !read?.capabilities.edit_rules.supported} onClick={() => { setEditor({ kind, rule }); setDirty(false); }}>{kind === 'edit_rule' ? '编辑' : kind === 'delete_rule' ? '删除' : '排序'}</Button>)}</div></TableCell>
-          </TableRow>)}{!state.isPending && read?.state !== 'importing' && !state.isError && !rules.some((r) => type === 'port' ? Boolean(r.spec.port) : !r.spec.port) && <TableRow><TableCell colSpan={type === 'port' ? 7 : 6} className="py-8 text-center text-foreground-muted">暂无规则</TableCell></TableRow>}</TableBody>
+        <div className="max-w-full overflow-x-auto" aria-busy={state.isPending || read?.state === 'importing'}><Table hoverableRows className={type === 'port' ? 'min-w-180' : 'min-w-160'}>
+          <TableHeader><TableRow>{type === 'port' && <TableHead>端口</TableHead>}<TableHead>来源</TableHead><TableHead>目标</TableHead><TableHead>协议</TableHead><TableHead>动作</TableHead>{showComments(type) && <TableHead>备注</TableHead>}<TableHead className="text-right">操作</TableHead></TableRow></TableHeader>
+          <TableBody>{state.isPending || read?.state === 'importing' ? <LoadingRows columns={(type === 'port' ? 6 : 5) + Number(showComments(type))} /> : rules.filter((r) => type === 'port' ? Boolean(r.spec.port) : !r.spec.port).map((rule) => <TableRow key={rule.id}>
+            {type === 'port' && <TableCell className="whitespace-nowrap font-mono text-xs">{rule.spec.port}</TableCell>}<TableCell className="max-w-48 break-all">{address(rule.spec.source) === '任意来源' ? <span className="font-mono text-xs">任意来源</span> : <CopyAddress value={rule.spec.source} />}<span className="block text-xs text-foreground-muted">{rule.spec.family === 'ipv4' ? 'IPv4' : 'IPv6'}</span></TableCell><TableCell className="max-w-48 break-all font-mono text-xs">{address(rule.spec.destination, '任意目标') === '任意目标' ? '任意目标' : <CopyAddress value={rule.spec.destination!} />}</TableCell><TableCell>{rule.spec.protocol === 'any' ? 'ANY' : rule.spec.protocol.toUpperCase()}</TableCell><TableCell>{actionNames[rule.spec.action]}</TableCell>{showComments(type) && <TableCell className="max-w-48 break-words text-sm text-foreground-muted">{rule.spec.comment || '—'}</TableCell>}<TableCell><div className="flex justify-end gap-1"><Button variant="ghost" size="sm" onClick={() => setDetail(rule)}>查看</Button><DropdownMenu><DropdownMenuTrigger className={buttonVariants({ variant: 'ghost', size: 'sm' })} disabled={disabled || retryUncertain || !read?.capabilities.edit_rules.supported}>更多</DropdownMenuTrigger><DropdownMenuContent align="end">{(['edit_rule', 'move_rule', 'delete_rule'] as const).map((kind) => <DropdownMenuItem key={kind} className={kind === 'delete_rule' ? 'text-error-intense' : undefined} onClick={() => { setEditor({ kind, rule }); setDirty(false); }}>{kind === 'edit_rule' ? '编辑' : kind === 'delete_rule' ? '删除' : '排序'}</DropdownMenuItem>)}</DropdownMenuContent></DropdownMenu></div></TableCell>
+          </TableRow>)}{!state.isPending && read?.state !== 'importing' && !state.isError && !rules.some((r) => type === 'port' ? Boolean(r.spec.port) : !r.spec.port) && <TableRow><TableCell colSpan={(type === 'port' ? 6 : 5) + Number(showComments(type))} className="py-8 text-center text-foreground-muted">暂无规则</TableCell></TableRow>}</TableBody>
         </Table></div>
       </TabsContent>)}
       {showTrust && <TabsContent value="trust"><Failure error={trust.error} retry={() => void trust.refetch()} busy={trust.isFetching} /><TrustRulesTable data={trust.data} family={family} loading={trust.isPending} error={trust.error} /></TabsContent>}

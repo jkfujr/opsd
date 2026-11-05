@@ -58,6 +58,12 @@ body {
   .toolbar-actions {
     @apply ml-auto flex shrink-0 flex-wrap items-center gap-2;
   }
+  .firewall-filters {
+    @apply grid grid-cols-1 sm:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] xl:grid-cols-[minmax(0,24rem)_12rem_minmax(0,1fr)];
+  }
+  .firewall-filters .toolbar-actions {
+    @apply ml-0 justify-start sm:col-span-2 sm:justify-end xl:col-span-1;
+  }
   .form-section {
     @apply min-w-0 border-t border-border pt-4;
   }
@@ -83,6 +89,9 @@ body {
     @apply bg-background-muted font-medium text-foreground-intense;
   }
 }
+
+.firewall-filters [data-slot='field'] { display: grid; gap: 0.5rem; }
+.firewall-filters [data-slot='field'] > * { margin-block: 0; }
 
 /* 统一表格密度，沿用组件库的表面、边框和交互样式。 */
 [data-slot='table-head'] { padding: 0.75rem; font-size: 0.75rem; font-weight: 500; }

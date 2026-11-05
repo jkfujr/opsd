@@ -82,15 +82,16 @@ type TrustRule struct {
 	Error   string                 `json:"error,omitempty"`
 }
 type TrustRules struct {
-	NodeID          string                 `json:"node_id"`
-	Enabled         bool                   `json:"enabled"`
-	PolicyVersion   TrustVersion           `json:"policy_version"`
-	TargetRevision  uint64                 `json:"target_revision"`
-	AppliedRevision uint64                 `json:"applied_revision"`
-	State           string                 `json:"state"`
-	Rules           []TrustRule            `json:"rules"`
-	Results         []protocol.ScopeResult `json:"results"`
-	CheckedAt       *time.Time             `json:"checked_at,omitempty"`
+	NodeID          string                             `json:"node_id"`
+	Enabled         bool                               `json:"enabled"`
+	PolicyVersion   TrustVersion                       `json:"policy_version"`
+	TargetRevision  uint64                             `json:"target_revision"`
+	AppliedRevision uint64                             `json:"applied_revision"`
+	State           string                             `json:"state"`
+	Rules           []TrustRule                        `json:"rules"`
+	Results         []protocol.ScopeResult             `json:"results"`
+	CheckedAt       *time.Time                         `json:"checked_at,omitempty"`
+	Migration       *protocol.PeerTrustMigrationStatus `json:"migration,omitempty"`
 }
 type TrustStatus struct {
 	Policy TrustPolicyState `json:"policy"`
@@ -598,6 +599,7 @@ func (n *Node) networkLoop() {
 			addressMode = c.AddressMode
 		}
 		n.syncTrust(ctx)
+		n.migrateTrust(ctx)
 		cancel()
 		select {
 		case <-n.ctx.Done():
@@ -607,17 +609,28 @@ func (n *Node) networkLoop() {
 		}
 	}
 }
-func desiredTrust(d Directory, self string, enabled bool) protocol.PeerTrustTarget {
-	target := protocol.PeerTrustTarget{Enabled: enabled, IPv4: []string{}, IPv6: []string{}}
-	if !enabled {
-		return target
-	}
+func activeTrustMembers(d Directory) map[string]Member {
+	members := map[string]Member{}
 	revoked := map[string]bool{}
 	for _, r := range d.Revocations {
 		revoked[r.ID] = true
 	}
+	for _, m := range d.Members {
+		if !revoked[m.ID] {
+			members[m.ID] = m
+		}
+	}
+	return members
+}
+
+func desiredTrust(d Directory, enabled bool) protocol.PeerTrustTarget {
+	target := protocol.PeerTrustTarget{Enabled: enabled, IPv4: []string{}, IPv6: []string{}}
+	if !enabled {
+		return target
+	}
+	members := activeTrustMembers(d)
 	for _, r := range d.Addresses {
-		if r.NodeID == self || revoked[r.NodeID] {
+		if _, ok := members[r.NodeID]; !ok {
 			continue
 		}
 		for i, f := range []PublicFamily{r.IPv4, r.IPv6} {
@@ -650,7 +663,7 @@ func (n *Node) syncTrust(ctx context.Context) {
 		return
 	}
 	p, _ := n.TrustPolicy(ctx)
-	next := desiredTrust(d, n.ID, p.Enabled && !n.Revoked(ctx, n.ID))
+	next := desiredTrust(d, p.Enabled && !n.Revoked(ctx, n.ID))
 	tx, e := n.DB.BeginTx(ctx, nil)
 	if e != nil {
 		return
@@ -702,8 +715,13 @@ func (n *Node) LocalTrustRules(ctx context.Context) (TrustRules, error) {
 	if e != nil {
 		return TrustRules{}, e
 	}
-	desired := desiredTrust(d, n.ID, p.Enabled)
+	desired := desiredTrust(d, p.Enabled)
 	out := TrustRules{NodeID: n.ID, Enabled: p.Enabled, PolicyVersion: p.Version, State: "pending", Rules: []TrustRule{}, Results: []protocol.ScopeResult{}}
+	config, err := n.FirewallConfig(ctx)
+	if err != nil {
+		return out, err
+	}
+	out.Migration = config.Migration
 	var body string
 	var target protocol.PeerTrustTarget
 	var status protocol.PeerTrustUpdated
@@ -738,14 +756,7 @@ func (n *Node) LocalTrustRules(ctx context.Context) (TrustRules, error) {
 			out.State = "failed"
 		}
 	}
-	members := map[string]Member{}
-	revoked := map[string]bool{}
-	for _, m := range d.Members {
-		members[m.ID] = m
-	}
-	for _, r := range d.Revocations {
-		revoked[r.ID] = true
-	}
+	members := activeTrustMembers(d)
 	for i, family := range []protocol.AddressFamily{protocol.IPv4, protocol.IPv6} {
 		ips := desired.IPv4
 		if i == 1 {
@@ -802,17 +813,17 @@ func (n *Node) LocalTrustRules(ctx context.Context) (TrustRules, error) {
 				if i == 1 {
 					f = r.IPv6
 				}
-				if r.NodeID == n.ID || !slices.Contains(f.Addresses, ip) {
+				m, active := members[r.NodeID]
+				if !active || !slices.Contains(f.Addresses, ip) {
 					continue
 				}
-				m := members[r.NodeID]
 				row.Members = append(row.Members, TrustMember{ID: m.ID, Name: m.Name})
 			}
 			out.Rules = append(out.Rules, row)
 		}
 		if p.Enabled {
 			for _, m := range d.Members {
-				if m.ID == n.ID || revoked[m.ID] {
+				if _, active := members[m.ID]; !active {
 					continue
 				}
 				f := emptyPublic(m.ID).IPv4
@@ -825,7 +836,7 @@ func (n *Node) LocalTrustRules(ctx context.Context) (TrustRules, error) {
 						break
 					}
 				}
-				if len(f.Addresses) == 0 {
+				if len(f.Addresses) == 0 && f.Mode != "manual" {
 					out.Rules = append(out.Rules, TrustRule{Family: family, Members: []TrustMember{{ID: m.ID, Name: m.Name}}, State: f.State, Error: f.Error})
 				}
 			}

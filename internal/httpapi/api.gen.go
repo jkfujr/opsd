@@ -521,6 +521,27 @@ func (e OperationStepState) Valid() bool {
 	}
 }
 
+// Defines values for PeerTrustMigrationStatusState.
+const (
+	PeerTrustMigrationStatusStateFailed  PeerTrustMigrationStatusState = "failed"
+	PeerTrustMigrationStatusStateInSync  PeerTrustMigrationStatusState = "in_sync"
+	PeerTrustMigrationStatusStatePending PeerTrustMigrationStatusState = "pending"
+)
+
+// Valid indicates whether the value is a known member of the PeerTrustMigrationStatusState enum.
+func (e PeerTrustMigrationStatusState) Valid() bool {
+	switch e {
+	case PeerTrustMigrationStatusStateFailed:
+		return true
+	case PeerTrustMigrationStatusStateInSync:
+		return true
+	case PeerTrustMigrationStatusStatePending:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for PeerTrustNodeStatusState.
 const (
 	PeerTrustNodeStatusStateDisabled PeerTrustNodeStatusState = "disabled"
@@ -947,6 +968,7 @@ type ManagedFirewallState struct {
 	ConfirmedRevision int64                     `json:"confirmed_revision"`
 	DefaultPolicies   []ManagedPolicy           `json:"default_policies"`
 	Error             *ManagedFirewallError     `json:"error,omitempty"`
+	Migration         *PeerTrustMigrationStatus `json:"migration,omitempty"`
 	OperationId       *string                   `json:"operation_id,omitempty"`
 	Revision          int64                     `json:"revision"`
 	Rules             []ManagedRule             `json:"rules"`
@@ -1189,17 +1211,28 @@ type OverviewNode struct {
 	Reading MonitoringReading `json:"reading"`
 }
 
+// PeerTrustMigrationStatus defines model for PeerTrustMigrationStatus.
+type PeerTrustMigrationStatus struct {
+	Error       *ManagedFirewallError         `json:"error,omitempty"`
+	OperationId string                        `json:"operation_id"`
+	State       PeerTrustMigrationStatusState `json:"state"`
+}
+
+// PeerTrustMigrationStatusState defines model for PeerTrustMigrationStatus.State.
+type PeerTrustMigrationStatusState string
+
 // PeerTrustNodeStatus defines model for PeerTrustNodeStatus.
 type PeerTrustNodeStatus struct {
-	AppliedRevision int64                    `json:"applied_revision"`
-	CheckedAt       *time.Time               `json:"checked_at,omitempty"`
-	Enabled         bool                     `json:"enabled"`
-	NodeId          string                   `json:"node_id"`
-	PolicyVersion   PeerTrustVersion         `json:"policy_version"`
-	Results         []PeerTrustScopeResult   `json:"results"`
-	Rules           []PeerTrustRule          `json:"rules"`
-	State           PeerTrustNodeStatusState `json:"state"`
-	TargetRevision  int64                    `json:"target_revision"`
+	AppliedRevision int64                     `json:"applied_revision"`
+	CheckedAt       *time.Time                `json:"checked_at,omitempty"`
+	Enabled         bool                      `json:"enabled"`
+	Migration       *PeerTrustMigrationStatus `json:"migration,omitempty"`
+	NodeId          string                    `json:"node_id"`
+	PolicyVersion   PeerTrustVersion          `json:"policy_version"`
+	Results         []PeerTrustScopeResult    `json:"results"`
+	Rules           []PeerTrustRule           `json:"rules"`
+	State           PeerTrustNodeStatusState  `json:"state"`
+	TargetRevision  int64                     `json:"target_revision"`
 }
 
 // PeerTrustNodeStatusState defines model for PeerTrustNodeStatus.State.

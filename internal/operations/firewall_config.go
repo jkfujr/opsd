@@ -26,11 +26,13 @@ func confirmedFrom(ctx context.Context, q querier) (protocol.FirewallTarget, err
 
 func sameTarget(a, b protocol.FirewallTarget) bool {
 	a.Automatic, b.Automatic = false, false
+	a.PeerTrustMigration, b.PeerTrustMigration = nil, nil
 	return reflect.DeepEqual(a, b)
 }
 
 func saveConfirmed(ctx context.Context, q confirmedWriter, target protocol.FirewallTarget) error {
 	target.Automatic = false
+	target.PeerTrustMigration = nil
 	body, e := json.Marshal(target)
 	if e != nil {
 		return e
@@ -102,7 +104,7 @@ func (e *Engine) InspectFirewall(ctx context.Context, importCurrent bool) (*prot
 }
 
 func managedConfirmation(target *protocol.FirewallTarget, steps []firewall.Step) bool {
-	if target.Automatic {
+	if target.Automatic || target.PeerTrustMigration != nil {
 		return false
 	}
 	for _, step := range steps {
@@ -111,4 +113,51 @@ func managedConfirmation(target *protocol.FirewallTarget, steps []firewall.Step)
 		}
 	}
 	return false
+}
+
+func migrationTrust(ctx context.Context, q querier) (protocol.PeerTrustTarget, protocol.PeerTrustUpdated, error) {
+	var target protocol.PeerTrustTarget
+	var status protocol.PeerTrustUpdated
+	var a, b string
+	err := q.QueryRowContext(ctx, "SELECT target,status FROM peer_trust WHERE id=1").Scan(&a, &b)
+	if err == nil {
+		err = json.Unmarshal([]byte(a), &target)
+	}
+	if err == nil {
+		err = json.Unmarshal([]byte(b), &status)
+	}
+	return target, status, err
+}
+
+func validateMigration(ctx context.Context, q querier, before, after protocol.FirewallTarget) error {
+	target, status, err := migrationTrust(ctx, q)
+	if err != nil {
+		return firewall.Conflict("互信规则尚未完成实际读回")
+	}
+	return firewall.ValidatePeerTrustMigration(before, after, target, status)
+}
+
+// prepareMigration 在持有操作写锁时维护并读回互信，再准备普通规则移除。
+func (e *Engine) prepareMigration(ctx context.Context, after protocol.FirewallTarget) error {
+	before, err := e.Store.ConfirmedFirewall(ctx)
+	if err != nil {
+		return err
+	}
+	if err = validateMigration(ctx, e.Store.DB, before, after); err != nil {
+		return err
+	}
+	target, status, err := migrationTrust(ctx, e.Store.DB)
+	if err != nil {
+		return err
+	}
+	status.Results = e.Manager.SyncPeerTrust(ctx, target)
+	for _, result := range status.Results {
+		if result.State != "in_sync" && result.State != "inactive" {
+			return firewall.Conflict("互信规则实际检查失败，原 IP 规则保留")
+		}
+	}
+	if err = firewall.ValidatePeerTrustMigration(before, after, target, status); err != nil {
+		return err
+	}
+	return validateMigration(ctx, e.Store.DB, before, after)
 }

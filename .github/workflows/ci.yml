@@ -40,13 +40,17 @@ jobs:
       - name: 原生互信规则与新连接
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y -qq nftables iptables firewalld fonts-noto-cjk
+          sudo apt-get install -y -qq nftables iptables firewalld ufw fonts-noto-cjk
           go test -c -o artifacts/firewall-native.test ./internal/firewall
           sudo env OPSD_NATIVE_TRUST=1 artifacts/firewall-native.test -test.run '^TestPeerTrustNativeNetwork$' -test.v
       - name: 安装生产程序并检查控制台
         run: |
           chmod +x artifacts/opsd-linux-amd64
           sudo sh scripts/check-installer.sh
+          sudo systemctl stop firewalld.service nftables.service || true
+          sudo ufw --force reset > /dev/null
+          sudo ufw default allow incoming > /dev/null
+          sudo ufw --force enable > /dev/null
           password=$(openssl rand -hex 24)
           echo "::add-mask::$password"
           echo "OPSD_UI_PASSWORD=$password" >> "$GITHUB_ENV"

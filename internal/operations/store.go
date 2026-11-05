@@ -185,6 +185,11 @@ func (s Store) Receive(ctx context.Context, id string, version int, action proto
 		} else if action.FirewallConfig.Revision <= confirmed.Revision {
 			return l, false, firewall.Conflict("配置版本已经改变")
 		}
+		if action.FirewallConfig.PeerTrustMigration != nil {
+			if e = validateMigration(ctx, c, confirmed, *action.FirewallConfig); e != nil {
+				return l, false, e
+			}
+		}
 	}
 	l = Local{Action: &action, BootID: bootID, Record: protocol.OperationRecord{ID: id, State: protocol.Prepared, Revision: 1, Decision: "undecided", Steps: []protocol.OperationStep{}}}
 	a, _ := json.Marshal(action)

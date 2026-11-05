@@ -3,11 +3,76 @@ package cluster
 import (
 	"context"
 	"crypto/ed25519"
+	"slices"
 	"testing"
 	"time"
 
 	"github.com/jkfujr/opsd/internal/protocol"
 )
+
+func TestSingleNodeTrustIncludesItsAddressesAndPendingState(t *testing.T) {
+	n, _ := openTestNode(t)
+	if _, err := n.ChangeTrust(t.Context(), TrustPolicyPatch{Enabled: true}); err != nil {
+		t.Fatal(err)
+	}
+	v, err := n.LocalTrustRules(t.Context())
+	if err != nil || len(v.Rules) != 2 || v.Rules[0].Members[0].ID != n.ID || v.Rules[0].State != "pending" {
+		t.Fatal(v, err)
+	}
+	p, _ := n.PublicAddresses(t.Context(), n.ID)
+	_, err = n.PatchPublic(t.Context(), PublicAddressesPatch{ExpectedRevision: p.Revision, IPv4: &PublicFamilyPatch{Mode: "manual", Addresses: []string{"8.8.8.8"}}, IPv6: &PublicFamilyPatch{Mode: "manual", Addresses: []string{"2606:4700:4700::1111"}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	d, _ := n.Directory(t.Context())
+	target := desiredTrust(d, true)
+	if !slices.Equal(target.IPv4, []string{"8.8.8.8"}) || !slices.Equal(target.IPv6, []string{"2606:4700:4700::1111"}) {
+		t.Fatal(target)
+	}
+	v, err = n.LocalTrustRules(t.Context())
+	if err != nil || len(v.Rules) != 2 {
+		t.Fatal(v, err)
+	}
+	for _, r := range v.Rules {
+		if len(r.Members) != 1 || r.Members[0].ID != n.ID || r.Address == "" {
+			t.Fatal("本机规则关联缺失", r)
+		}
+	}
+}
+
+func TestSharedTrustAddressIncludesSelfAndOnlyActiveMembers(t *testing.T) {
+	a, _ := openTestNode(t)
+	b, _ := openTestNode(t)
+	joinTest(t, b, a)
+	manualAddress(t, a, "8.8.8.8")
+	manualAddress(t, b, "8.8.8.8")
+	d, _ := b.Directory(t.Context())
+	if err := a.merge(t.Context(), d, false); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := a.ChangeTrust(t.Context(), TrustPolicyPatch{Enabled: true}); err != nil {
+		t.Fatal(err)
+	}
+	read, err := a.LocalTrustRules(t.Context())
+	if err != nil || len(read.Rules) != 1 || len(read.Rules[0].Members) != 2 {
+		t.Fatal(read, err)
+	}
+	if err = a.Revoke(t.Context(), b.ID); err != nil {
+		t.Fatal(err)
+	}
+	read, err = a.LocalTrustRules(t.Context())
+	if err != nil || len(read.Rules) != 1 || len(read.Rules[0].Members) != 1 || read.Rules[0].Members[0].ID != a.ID {
+		t.Fatal("撤销改变了本机的共享来源", read, err)
+	}
+	manualAddress(t, a, "9.9.9.9")
+	d, _ = a.Directory(t.Context())
+	if got := desiredTrust(d, true); !slices.Equal(got.IPv4, []string{"9.9.9.9"}) {
+		t.Fatal("地址替换保留了旧来源", got)
+	}
+	if got := desiredTrust(d, false); len(got.IPv4)+len(got.IPv6) != 0 {
+		t.Fatal("关闭后保留了互信来源", got)
+	}
+}
 
 type trustExecutor struct {
 	lostExecutor
@@ -84,7 +149,7 @@ func TestTrustPolicyAndAddressesConvergeWithoutDatabase(t *testing.T) {
 		t.Fatal(e)
 	}
 	d, _ = a.Directory(t.Context())
-	target := desiredTrust(d, a.ID, true)
+	target := desiredTrust(d, true)
 	if len(target.IPv4) != 1 {
 		t.Fatal("共享 IP 未去重", target)
 	}
@@ -113,14 +178,14 @@ func TestTrustPolicyAndAddressesConvergeWithoutDatabase(t *testing.T) {
 		t.Fatal(e)
 	}
 	d, _ = a.Directory(t.Context())
-	if len(desiredTrust(d, a.ID, true).IPv4) != 1 {
+	if len(desiredTrust(d, true).IPv4) != 1 {
 		t.Fatal("撤销误删共享 IP")
 	}
 	if e = a.Revoke(t.Context(), c.ID); e != nil {
 		t.Fatal(e)
 	}
 	d, _ = a.Directory(t.Context())
-	if len(desiredTrust(d, a.ID, true).IPv4) != 0 {
+	if len(desiredTrust(d, true).IPv4) != 0 {
 		t.Fatal("撤销后仍信任旧 IP")
 	}
 }

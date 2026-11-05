@@ -3311,6 +3311,9 @@
           "checked_at": {
             "type": "string",
             "format": "date-time"
+          },
+          "migration": {
+            "$ref": "#/components/schemas/PeerTrustMigrationStatus"
           }
         },
         "required": [
@@ -5140,6 +5143,9 @@
           },
           "capabilities": {
             "$ref": "#/components/schemas/Capabilities"
+          },
+          "migration": {
+            "$ref": "#/components/schemas/PeerTrustMigrationStatus"
           }
         },
         "required": [
@@ -5360,6 +5366,30 @@
           "family",
           "members",
           "state"
+        ]
+      },
+      "PeerTrustMigrationStatus": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "state": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "in_sync",
+              "failed"
+            ]
+          },
+          "operation_id": {
+            "type": "string"
+          },
+          "error": {
+            "$ref": "#/components/schemas/ManagedFirewallError"
+          }
+        },
+        "required": [
+          "state",
+          "operation_id"
         ]
       }
     },

@@ -141,8 +141,24 @@ func (e *Engine) Run(ctx context.Context, id string) error {
 			return e.end(ctx, &l, protocol.Rejected, firewall.Conflict("防火墙管理归属发生变化"))
 		}
 		if target := l.Action.FirewallConfig; target != nil {
+			if target.PeerTrustMigration != nil {
+				if err = e.prepareMigration(ctx, *target); err != nil {
+					return e.end(ctx, &l, protocol.Rejected, err)
+				}
+			}
 			var state protocol.FirewallState
 			state, err = e.Manager.Read(ctx)
+			if err == nil && target.PeerTrustMigration != nil {
+				var confirmed protocol.FirewallTarget
+				confirmed, err = e.Store.ConfirmedFirewall(ctx)
+				if err == nil {
+					var changes []firewall.Step
+					changes, err = e.Manager.PrepareConfiguration(ctx, state, confirmed.Configuration)
+					if err == nil && len(changes) != 0 {
+						err = firewall.Conflict("普通规则存在外部修改，请先完成恢复")
+					}
+				}
+			}
 			if err == nil {
 				l.Recipe, err = e.Manager.PrepareConfiguration(ctx, state, target.Configuration)
 			}
@@ -162,7 +178,7 @@ func (e *Engine) Run(ctx context.Context, id string) error {
 				requires = true
 			}
 		}
-		if l.Action.FirewallConfig != nil && l.Action.FirewallConfig.Automatic {
+		if l.Action.FirewallConfig != nil && (l.Action.FirewallConfig.Automatic || l.Action.FirewallConfig.PeerTrustMigration != nil) {
 			requires = false
 		}
 		if !p.Executable || requires != p.RequiresConfirmation {

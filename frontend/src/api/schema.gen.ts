@@ -804,6 +804,7 @@ export interface components {
             results: components["schemas"]["PeerTrustScopeResult"][];
             /** Format: date-time */
             checked_at?: string;
+            migration?: components["schemas"]["PeerTrustMigrationStatus"];
         };
         PeerTrustStatus: {
             policy: components["schemas"]["PeerTrustPolicy"];
@@ -1290,6 +1291,7 @@ export interface components {
             operation_id?: string;
             error?: components["schemas"]["ManagedFirewallError"];
             capabilities: components["schemas"]["Capabilities"];
+            migration?: components["schemas"]["PeerTrustMigrationStatus"];
         };
         ManagedFirewallChange: {
             /** @enum {string} */
@@ -1341,6 +1343,12 @@ export interface components {
             /** @enum {string} */
             state: "pending" | "in_sync" | "failed" | "unsupported" | "removing" | "saved" | "confirmed" | "conflict";
             error?: string;
+        };
+        PeerTrustMigrationStatus: {
+            /** @enum {string} */
+            state: "pending" | "in_sync" | "failed";
+            operation_id: string;
+            error?: components["schemas"]["ManagedFirewallError"];
         };
     };
     responses: {

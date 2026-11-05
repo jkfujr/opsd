@@ -33,7 +33,7 @@ export function PageTitle({ children }: { children: ReactNode }) {
   return <h1 className="sr-only">{children}</h1>;
 }
 
-export function PageToolbar({ children }: { children: ReactNode }) { return <div className="page-toolbar">{children}</div>; }
+export function PageToolbar({ children, className = '' }: { children: ReactNode; className?: string }) { return <div className={`page-toolbar ${className}`}>{children}</div>; }
 
 export function FormSection({ title, children }: { title: string; children: ReactNode }) { return <fieldset className="form-section"><legend className="section-title">{title}</legend><div className="form-grid">{children}</div></fieldset>; }
 

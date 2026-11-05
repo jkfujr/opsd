@@ -27,21 +27,34 @@ type FirewallDefinition struct {
 }
 
 type FirewallTarget struct {
-	Revision      uint64             `json:"revision"`
-	Configuration FirewallDefinition `json:"configuration"`
-	Automatic     bool               `json:"automatic,omitempty"`
+	Revision           uint64              `json:"revision"`
+	Configuration      FirewallDefinition  `json:"configuration"`
+	Automatic          bool                `json:"automatic,omitempty"`
+	PeerTrustMigration *PeerTrustMigration `json:"peer_trust_migration,omitempty"`
+}
+
+type PeerTrustMigration struct {
+	RequiredRevision uint64   `json:"required_revision"`
+	RuleIDs          []string `json:"rule_ids"`
+}
+
+type PeerTrustMigrationStatus struct {
+	State       string `json:"state"`
+	OperationID string `json:"operation_id"`
+	Error       *Error `json:"error,omitempty"`
 }
 
 type ManagedFirewallState struct {
 	FirewallDefinition
-	Revision          uint64       `json:"revision"`
-	ConfirmedRevision uint64       `json:"confirmed_revision"`
-	State             string       `json:"state"`
-	ServiceActive     *bool        `json:"service_active,omitempty"`
-	CheckedAt         *time.Time   `json:"checked_at,omitempty"`
-	OperationID       string       `json:"operation_id,omitempty"`
-	Error             *Error       `json:"error,omitempty"`
-	Capabilities      Capabilities `json:"capabilities"`
+	Revision          uint64                    `json:"revision"`
+	ConfirmedRevision uint64                    `json:"confirmed_revision"`
+	State             string                    `json:"state"`
+	ServiceActive     *bool                     `json:"service_active,omitempty"`
+	CheckedAt         *time.Time                `json:"checked_at,omitempty"`
+	OperationID       string                    `json:"operation_id,omitempty"`
+	Error             *Error                    `json:"error,omitempty"`
+	Capabilities      Capabilities              `json:"capabilities"`
+	Migration         *PeerTrustMigrationStatus `json:"migration,omitempty"`
 }
 
 type FirewallConfigPatch struct {
