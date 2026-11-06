@@ -7,12 +7,14 @@ import (
 	"testing"
 	"time"
 
+	"github.com/jkfujr/opsd/internal/firewall"
 	"github.com/jkfujr/opsd/internal/protocol"
 )
 
 type configExecutor struct {
 	lostExecutor
 	inspection  protocol.FirewallInspected
+	inspectErr  error
 	inspections int
 	targets     []protocol.FirewallTarget
 	fail        bool
@@ -22,7 +24,7 @@ func (x *configExecutor) Call(ctx context.Context, p protocol.Payload) (protocol
 	switch p := p.(type) {
 	case *protocol.FirewallInspect:
 		x.inspections++
-		return &x.inspection, nil
+		return &x.inspection, x.inspectErr
 	case *protocol.OperationSubmit:
 		x.submits++
 		x.targets = append(x.targets, *p.Action.FirewallConfig)
@@ -34,6 +36,29 @@ func (x *configExecutor) Call(ctx context.Context, p protocol.Payload) (protocol
 		return nil, errors.New("应答丢失")
 	}
 	return x.lostExecutor.Call(ctx, p)
+}
+
+func TestManagedFirewallKeepsConfirmedStateDuringBusyInspection(t *testing.T) {
+	n, _ := openTestNode(t)
+	d := protocol.FirewallDefinition{Backend: "ufw", Rules: []protocol.ManagedRule{}, DefaultPolicies: []protocol.ManagedPolicy{{Family: protocol.IPv4, Action: "deny"}}}
+	x := &configExecutor{inspection: protocol.FirewallInspected{Target: &protocol.FirewallTarget{Revision: 1, Configuration: d}, Backend: "ufw", InSync: true, CheckedAt: time.Now().UTC()}}
+	n.Executor = x
+	n.checkFirewall(t.Context())
+	before, _ := n.FirewallConfig(t.Context())
+	x.inspectErr = &firewall.Fault{Code: "node_busy", Message: "本机操作执行中"}
+	n.checkFirewall(t.Context())
+	after, err := n.FirewallConfig(t.Context())
+	a, _ := json.Marshal(before)
+	b, _ := json.Marshal(after)
+	if err != nil || string(a) != string(b) || after.State != "in_sync" {
+		t.Fatal("锁繁忙改写了已确认配置状态", after, err)
+	}
+	x.inspectErr = errors.New("防火墙读取失败")
+	n.checkFirewall(t.Context())
+	after, err = n.FirewallConfig(t.Context())
+	if err != nil || after.State != "failed" || after.Error == nil || after.ConfirmedRevision != before.ConfirmedRevision {
+		t.Fatal("实际读取失败未保留错误及确认版本", after, err)
+	}
 }
 
 func TestManagedFirewallSavedReadsIdempotencyAndFailedRevision(t *testing.T) {

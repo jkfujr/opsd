@@ -303,7 +303,9 @@ func (n *Node) checkFirewall(ctx context.Context) {
 	}
 	reply, e := n.Executor.Call(ctx, &protocol.FirewallInspect{Import: state.Revision == 0})
 	if e != nil {
-		n.firewallCheckError(ctx, e)
+		if firewall.Code(e) != "node_busy" {
+			n.firewallCheckError(ctx, e)
+		}
 		return
 	}
 	inspection, ok := reply.(*protocol.FirewallInspected)

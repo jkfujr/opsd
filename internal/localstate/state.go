@@ -2,10 +2,13 @@ package localstate
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 )
+
+var ErrBusy = errors.New("已有安装、恢复或部署变更正在执行")
 
 func Read(path string, value any) error {
 	data, err := os.ReadFile(path)

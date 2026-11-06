@@ -1,14 +1,16 @@
 package localstate
 
 import (
-	"fmt"
 	"golang.org/x/sys/unix"
 	"os"
 )
 
 func lockFile(file *os.File) (func(), error) {
 	if err := unix.Flock(int(file.Fd()), unix.LOCK_EX|unix.LOCK_NB); err != nil {
-		return nil, fmt.Errorf("已有安装、恢复或部署变更正在执行")
+		if err == unix.EWOULDBLOCK || err == unix.EAGAIN {
+			return nil, ErrBusy
+		}
+		return nil, err
 	}
 	return func() { unix.Flock(int(file.Fd()), unix.LOCK_UN) }, nil
 }

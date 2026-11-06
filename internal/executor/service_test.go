@@ -2,14 +2,47 @@ package executor
 
 import (
 	"context"
+	"errors"
 	"path/filepath"
 	"testing"
 
 	"github.com/jkfujr/opsd/internal/firewall"
+	"github.com/jkfujr/opsd/internal/localstate"
 	"github.com/jkfujr/opsd/internal/operations"
 	"github.com/jkfujr/opsd/internal/protocol"
 	"github.com/jkfujr/opsd/internal/storage"
 )
+
+func TestFirewallInspectionWaitsForBusyLockAndKeepsOtherErrors(t *testing.T) {
+	attempts := 0
+	released := false
+	s := &Services{OperationLock: func() (func(), error) {
+		attempts++
+		if attempts < 3 {
+			return nil, localstate.ErrBusy
+		}
+		return func() { released = true }, nil
+	}}
+	unlock, err := s.inspectionLock(t.Context())
+	if err != nil || attempts != 3 || released {
+		t.Fatal("读取未等待本机写锁释放", attempts, err)
+	}
+	unlock()
+	if !released {
+		t.Fatal("读取锁未释放")
+	}
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+	s.OperationLock = func() (func(), error) { return nil, localstate.ErrBusy }
+	if _, err = s.inspectionLock(ctx); firewall.Code(err) != "node_busy" {
+		t.Fatal("等待结束未返回繁忙状态", err)
+	}
+	want := errors.New("锁文件读取失败")
+	s.OperationLock = func() (func(), error) { return nil, want }
+	if _, err = s.inspectionLock(t.Context()); !errors.Is(err, want) {
+		t.Fatal("实际锁错误被改成繁忙状态", err)
+	}
+}
 
 func TestManualRequestPersistsBeforeReplacingExitingWorker(t *testing.T) {
 	db, err := storage.Open(t.Context(), filepath.Join(t.TempDir(), "agent.db"), storage.Executor)

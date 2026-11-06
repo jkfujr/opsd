@@ -7,8 +7,10 @@ import (
 	"fmt"
 	"github.com/jkfujr/opsd/internal/dockerengine"
 	"sync"
+	"time"
 
 	"github.com/jkfujr/opsd/internal/firewall"
+	"github.com/jkfujr/opsd/internal/localstate"
 	"github.com/jkfujr/opsd/internal/monitoring"
 	"github.com/jkfujr/opsd/internal/operations"
 	"github.com/jkfujr/opsd/internal/protocol"
@@ -78,7 +80,7 @@ func (s *Services) Handle(ctx context.Context, payload protocol.Payload) (protoc
 		_, status, e := s.trustState(ctx)
 		return &status, e
 	case *protocol.FirewallInspect:
-		unlock, e := s.lock()
+		unlock, e := s.inspectionLock(ctx)
 		if e != nil {
 			return nil, e
 		}
@@ -165,6 +167,23 @@ func (s *Services) Handle(ctx context.Context, payload protocol.Payload) (protoc
 	}
 	return nil, firewall.Unsupported("当前版本不执行此消息")
 }
+
+func (s *Services) inspectionLock(ctx context.Context) (func(), error) {
+	ticker := time.NewTicker(100 * time.Millisecond)
+	defer ticker.Stop()
+	for {
+		unlock, err := s.lock()
+		if !errors.Is(err, localstate.ErrBusy) {
+			return unlock, err
+		}
+		select {
+		case <-ctx.Done():
+			return nil, &firewall.Fault{Code: "node_busy", Message: "本机操作执行中，请稍后读取"}
+		case <-ticker.C:
+		}
+	}
+}
+
 func (s *Services) clock() (string, int64, error) {
 	if s.Engine.Clock != nil {
 		return s.Engine.Clock()
