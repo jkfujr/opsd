@@ -117,7 +117,14 @@ func TestPeerTrustNativeNetwork(t *testing.T) {
 						prefix, restore, path = "ufw6", "ip6tables-restore", "/etc/ufw/before6.rules"
 					}
 					config := "*filter\n:INPUT DROP [0:0]\n:FORWARD ACCEPT [0:0]\n:OUTPUT ACCEPT [0:0]\n:OPSD_EXTERNAL - [0:0]\n:" + prefix + "-before-input - [0:0]\n-A INPUT -j OPSD_EXTERNAL\n-A INPUT -j " + prefix + "-before-input\n-A OPSD_EXTERNAL -m conntrack --ctstate ESTABLISHED,RELATED -j RETURN\n-A OPSD_EXTERNAL -p tcp --dport 22 -j RETURN\n-A OPSD_EXTERNAL -p tcp -j REJECT\n-A OPSD_EXTERNAL -j RETURN\n-A " + prefix + "-before-input -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT\n-A " + prefix + "-before-input -p tcp --dport 22 -j ACCEPT\nCOMMIT\n"
-					write(path, config)
+					persistent := []string{}
+					for _, line := range strings.Split(config, "\n") {
+						if strings.HasPrefix(line, ":INPUT ") || strings.HasPrefix(line, ":FORWARD ") || strings.HasPrefix(line, ":OUTPUT ") || strings.HasPrefix(line, ":OPSD_EXTERNAL ") || strings.HasPrefix(line, "-A INPUT ") || strings.HasPrefix(line, "-A OPSD_EXTERNAL ") {
+							continue
+						}
+						persistent = append(persistent, line)
+					}
+					write(path, strings.Join(persistent, "\n"))
 					if _, e := h.RunInput(t.Context(), []byte(config), restore); e != nil {
 						t.Fatal(e)
 					}
