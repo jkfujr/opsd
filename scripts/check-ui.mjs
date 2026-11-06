@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { mkdirSync, writeFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
 import { chromium } from 'playwright';
 
 // 对 CI 中实际安装的生产程序检查页面和交互，截图写入 artifacts。
@@ -26,7 +27,7 @@ const capture = async (name) => {
 const checkFirewallHeader = async () => {
   const width = page.viewportSize().width;
   const [node, family, filters, row, status, refresh, settings] = await Promise.all([
-    page.getByLabel('节点', { exact: true }), page.getByLabel('地址族', { exact: true }),
+    page.getByLabel('目标节点', { exact: true }), page.getByLabel('地址族', { exact: true }),
     page.locator('.firewall-filters'), page.locator('.firewall-status-row'), page.locator('.firewall-status'),
     page.getByRole('button', { name: '刷新', exact: true }), page.getByRole('link', { name: '设置', exact: true }).last(),
   ].map((locator) => locator.boundingBox()));
@@ -45,6 +46,27 @@ const checkFirewallHeader = async () => {
     assert(family.y >= node.y + node.height, `${width}px 筛选框未纵向排列`);
     near(refresh.x, status.x, '状态与操作未左对齐');
     near(refresh.y - status.y - status.height, 12, '状态与操作换行间距');
+  }
+};
+const checkContainerFilters = async () => {
+  const width = page.viewportSize().width;
+  const scale = await page.evaluate(() => Number.parseFloat(getComputedStyle(document.documentElement).zoom) || 1);
+  const [node, state, name, refresh] = await Promise.all([
+    page.getByLabel('节点', { exact: true }), page.getByLabel('容器状态', { exact: true }), page.getByLabel('名称', { exact: true }),
+    page.locator('.container-filters').getByRole('button', { name: '刷新', exact: true }),
+  ].map((locator) => locator.boundingBox()));
+  assert(node && state && name && refresh, `${width}px 容器筛选控件缺失`);
+  const near = (a, b, message) => assert(Math.abs(a - b) <= 1, `${width}px ${message}：${a} / ${b}`);
+  for (const box of [node, state, name, refresh]) near(box.height, 40 * scale, '容器控件高度');
+  if (width >= 1280) {
+    for (const box of [state, name, refresh]) near(box.y, node.y, '容器控件未同排');
+  } else if (width >= 640) {
+    near(state.y, node.y, '容器第一排未对齐');
+    near(refresh.y, name.y, '容器刷新未与名称对齐');
+    assert(name.y > node.y + node.height, '容器筛选未排为两列');
+  } else {
+    assert(state.y >= node.y + node.height && name.y >= state.y + state.height && refresh.y >= name.y + name.height, '窄屏容器筛选未纵向排列');
+    near(refresh.x, node.x, '窄屏刷新未左对齐');
   }
 };
 try {
@@ -119,7 +141,7 @@ try {
     await page.route('**/api/v1/nodes', (route) => route.fulfill({ json: { ...nodes, items: nodes.items.map((node) => node.id === id ? { ...node, name: longName } : node) } }));
     await page.setViewportSize({ width: 1000, height: 1000 });
     await page.reload();
-    await page.getByLabel('节点', { exact: true }).getByText(longName, { exact: true }).waitFor();
+    await page.getByLabel('目标节点', { exact: true }).getByText(longName, { exact: true }).waitFor();
     await checkFirewallHeader();
     await capture(`${theme}-1000-firewall-long-name`);
     await page.unroute('**/api/v1/nodes');
@@ -197,6 +219,7 @@ try {
   const containerList = await api('/containers');
   const nativeContainer = containerList.items.find((item) => item.name === 'opsd-ui-container');
   assert(nativeContainer, '实际 Docker 容器未显示');
+  assert.deepEqual(await page.getByRole('columnheader').allTextContents(), ['容器', '状态', '节点', '镜像', '端口', '操作']);
   const containerPath = `/nodes/${nativeContainer.node_id}/containers/${nativeContainer.container_id}`;
   const containerRow = page.getByRole('row').filter({ has: page.getByText('opsd-ui-container', { exact: true }) });
   await containerRow.getByRole('button', { name: '查看', exact: true }).click();
@@ -282,16 +305,35 @@ try {
         else if (scenario === 'partial') await page.getByText('节点离线', { exact: true }).waitFor();
         else if (scenario === 'long') await page.getByText('很长的容器名称'.repeat(12), { exact: true }).first().waitFor();
         else await page.getByRole('alert').filter({ hasText: '容器读取失败' }).waitFor();
+        await checkContainerFilters();
         await capture(`${theme}-${width}-containers-${scenario}`);
         if (scenario === 'loading') { releaseContainerLoad(); await page.locator('main [aria-busy="true"]').first().waitFor({ state: 'hidden' }); }
       }
     }
+    containerScenario = 'normal';
+    for (const width of firewallWidths) {
+      await page.setViewportSize({ width, height: 1000 });
+      await page.goto(`${base}/containers`);
+      await page.getByText('opsd-ui-container', { exact: true }).waitFor();
+      await checkContainerFilters();
+      await capture(`${theme}-${width}-containers-header`);
+    }
+    await page.goto(`${base}/containers?node=${id}`);
+    await page.getByText('opsd-ui-container', { exact: true }).waitFor();
+    assert.deepEqual(await page.getByRole('columnheader').allTextContents(), ['容器', '状态', '镜像', '端口', '操作']);
+    await capture(`${theme}-containers-single-node`);
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    await page.evaluate(() => { document.documentElement.style.zoom = '200%'; });
+    await checkContainerFilters();
+    await capture(`${theme}-containers-zoom-200`);
+    await page.evaluate(() => { document.documentElement.style.zoom = ''; });
   }
   await page.unroute(containerPattern);
   await page.setViewportSize({ width: 1440, height: 1000 });
   await page.goto(`${base}/firewall/settings`);
   await page.getByRole('switch', { name: '集群互信' }).click();
   await page.getByRole('alertdialog').waitFor();
+  await page.getByText(/优先放行.*所有主机入站端口.*数据库端口/).waitFor();
   await capture('trust-confirm');
   await page.getByRole('button', { name: '取消', exact: true }).click();
   assert.equal(await page.getByRole('switch', { name: '集群互信' }).isChecked(), false);
@@ -307,12 +349,76 @@ try {
   const trust = await api(trustPath);
   assert.equal(trust.rules.filter((rule) => rule.address).length, 2);
   assert(trust.rules.every((rule) => rule.members.some((member) => member.id === id)));
+  const nativeTrustReady = () => ['iptables-save', 'ip6tables-save'].every((save) => {
+    const raw = execFileSync('sudo', [save, '-t', 'filter'], { encoding: 'utf8' });
+    const inputs = raw.split('\n').filter((line) => line.startsWith('-A INPUT '));
+    const hook = '-A INPUT -m comment --comment opsd-peer-trust -j OPSD_PEERS';
+    return inputs[0] === hook && inputs.filter((line) => line === hook).length === 1;
+  });
+  await waitFor(async () => nativeTrustReady(), Boolean, '生产互信跳转未位于双栈 INPUT 首条');
+  execFileSync('sudo', ['ufw', 'reload']);
+  await waitFor(async () => nativeTrustReady(), Boolean, 'UFW 重载后互信顺序未恢复');
+  execFileSync('sudo', ['systemctl', 'stop', 'opsd.service']);
+  try {
+    for (const command of ['iptables', 'ip6tables']) execFileSync('sudo', [command, '-D', 'INPUT', '-m', 'comment', '--comment', 'opsd-peer-trust', '-j', 'OPSD_PEERS']);
+    execFileSync('sudo', ['systemctl', 'restart', 'opsd-executor.service']);
+    await waitFor(async () => nativeTrustReady(), Boolean, '节点停止时执行器未从持久目标恢复互信');
+  } finally { execFileSync('sudo', ['systemctl', 'start', 'opsd.service']); }
+  await waitFor(() => api(trustPath).catch(() => null), (value) => value?.state === 'in_sync', '节点恢复后互信状态未同步');
   await page.goto(`${base}/firewall?node=${id}&type=trust`);
   await page.getByRole('tab', { name: '互信规则 2', exact: true }).waitFor();
-  for (const width of [320, 768, 1440, 1920]) {
-    await page.setViewportSize({ width, height: 1000 });
-    await capture(`trust-rules-${width}`);
+  assert.deepEqual(await page.getByRole('columnheader').allTextContents(), ['来源节点', 'IPv4', 'IPv6', '操作']);
+  assert.equal(await page.locator('main tbody tr').count(), 1, '同一来源节点的双栈地址未合并');
+  for (const theme of ['light', 'dark']) {
+    await page.goto(`${base}/settings/appearance`);
+    await page.getByRole('radio', { name: theme === 'light' ? '浅色' : '深色', exact: true }).click();
+    for (const width of firewallWidths) {
+      await page.setViewportSize({ width, height: 1000 });
+      await page.goto(`${base}/firewall?node=${id}&type=trust`);
+      await page.getByRole('columnheader', { name: '来源节点', exact: true }).waitFor();
+      await page.locator('main tbody').getByRole('link', { name: 'ui-check', exact: true }).waitFor();
+      await capture(`${theme}-trust-rules-${width}`);
+    }
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    await page.evaluate(() => { document.documentElement.style.zoom = '200%'; });
+    await capture(`${theme}-trust-zoom-200`);
+    await page.evaluate(() => { document.documentElement.style.zoom = ''; });
   }
+  const trustError = { code: 'conflict', message: '测试互信运行规则读取失败' };
+  const partialTrust = { ...trust, state: 'failed', rules: trust.rules.map((rule) => rule.family === 'ipv4' ? { ...rule, state: 'failed', error: trustError.message } : rule), results: trust.results.map((result) => result.family === 'ipv4' && result.scope === 'runtime' ? { ...result, state: 'failed', error: trustError } : result) };
+  await page.route(`**/api/v1${trustPath}`, (route) => route.fulfill({ json: partialTrust }));
+  await page.reload();
+  await page.getByText('部分生效', { exact: true }).first().waitFor();
+  assert.equal(await page.getByText(trustError.message, { exact: true }).count(), 0, '互信列表重复展开了错误详情');
+  await page.getByRole('button', { name: '查看', exact: true }).click();
+  await page.getByRole('heading', { name: '互信详情', exact: true }).waitFor();
+  await page.getByText('永久配置', { exact: true }).first().waitFor();
+  await page.getByText('运行配置', { exact: true }).first().waitFor();
+  assert.equal(await page.getByText(trustError.message, { exact: true }).count(), 1);
+  await capture('trust-partial-detail');
+  await page.getByRole('button', { name: '关闭互信详情', exact: true }).click();
+  await page.getByLabel('地址族', { exact: true }).click();
+  await page.getByRole('option', { name: 'IPv4', exact: true }).click();
+  assert.deepEqual(await page.getByRole('columnheader').allTextContents(), ['来源节点', 'IPv4', '操作']);
+  await capture('trust-partial-ipv4');
+  await page.unroute(`**/api/v1${trustPath}`);
+  const activePolicy = await api('/peer-trust');
+  await page.route('**/api/v1/peer-trust/status', (route) => route.fulfill({ json: { policy: activePolicy, nodes: [partialTrust] } }));
+  await page.goto(`${base}/firewall/settings`);
+  await page.getByText('部分生效', { exact: true }).waitFor();
+  assert.deepEqual(await page.getByRole('columnheader').allTextContents(), ['目标节点', 'IPv4', 'IPv6', '互信状态', '检查时间', '操作']);
+  await capture('trust-partial-settings');
+  await page.unroute('**/api/v1/peer-trust/status');
+  const sharedTrust = { ...trust, rules: trust.rules.map((rule) => ({ ...rule, members: [...rule.members, { id: 'shared-node', name: '共享公网地址节点' }] })).concat([{ family: 'ipv4', members: [{ id: 'discovering-node', name: '待发现节点' }], state: 'pending' }, { family: 'ipv4', address: '9.9.9.9', members: [], state: 'removing' }]) };
+  await page.route(`**/api/v1${trustPath}`, (route) => route.fulfill({ json: sharedTrust }));
+  await page.goto(`${base}/firewall?node=${id}&type=trust`);
+  await page.getByRole('link', { name: '共享公网地址节点', exact: true }).waitFor();
+  assert.equal(await page.locator('main tbody tr').count(), 4, '共享地址、待发现与已移除节点的分组不符');
+  await page.getByText('待发现', { exact: true }).waitFor();
+  await page.getByText('已移除节点', { exact: true }).waitFor();
+  await capture('trust-shared-discovery-removal');
+  await page.unroute(`**/api/v1${trustPath}`);
+  await page.reload();
   await page.setViewportSize({ width: 1440, height: 1000 });
   for (const state of ['pending', 'failed']) {
     await page.route(`**/api/v1${trustPath}`, (route) => route.fulfill({ json: { ...trust, migration: { state, operation_id: migrated.migration.operation_id, ...(state === 'failed' ? { error: { code: 'conflict', message: '测试迁移失败' } } : {}) } } }));
@@ -350,7 +456,7 @@ try {
   await capture('mobile-menu');
   await page.keyboard.press('Escape');
   assert.deepEqual(errors, [], '浏览器运行错误');
-  writeFileSync(`${output}/result.json`, JSON.stringify({ pages: pages.length, themes: 2, widths: [320, 768, 1440], firewallWidths, firewallHeaderStates: ['normal', 'long_name', 'wrapped_status', 'loading', 'error'], containers: { native: true, restartRequests, logPolling: true, states: ['empty', 'partial', 'long', 'loading', 'error'] }, trustMigration: true, errors }, null, 2));
+  writeFileSync(`${output}/result.json`, JSON.stringify({ pages: pages.length, themes: 2, widths: [320, 768, 1440], firewallWidths, firewallHeaderStates: ['normal', 'long_name', 'wrapped_status', 'loading', 'error'], containers: { native: true, restartRequests, logPolling: true, headerWidths: firewallWidths, singleNodeColumns: true, states: ['empty', 'partial', 'long', 'loading', 'error'] }, trustMigration: true, trustPriority: { ufwReload: true, executorRestartWithoutNode: true }, trustLayout: { groupedSources: true, partialFamilies: true, widths: firewallWidths, cssZoom: 200 }, errors }, null, 2));
   console.log('界面验收通过：10 页面、深浅主题、容器真实操作与日志及 5 种页面状态、防火墙布局、互信迁移、浮层与未提交修改。');
 } catch (error) {
   try {

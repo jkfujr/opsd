@@ -22,8 +22,34 @@ type Policy = components['schemas']['PeerTrustPolicy'];
 
 export const networkStates: Record<string, string> = {
   pending: '待应用', in_sync: '已生效', disabled: '已关闭', offline: '离线', failed: '失败', inactive: '未启用', unsupported: '未支持',
-  removing: '待撤除', saved: '已保存', confirmed: '已确认', conflict: '地址冲突',
+  removing: '待撤除', saved: '已保存', confirmed: '已确认', conflict: '地址冲突', partial: '部分生效', empty: '未配置',
 };
+
+function combinedTrustState(states: string[], fallback: string) {
+  if (!states.length) return fallback;
+  if (states.includes('in_sync') && states.some((state) => state !== 'in_sync')) return 'partial';
+  return ['failed', 'unsupported', 'conflict', 'removing', 'pending', 'saved', 'inactive'].find((state) => states.includes(state)) ?? states[0];
+}
+
+function trustState(data: Trust, family?: 'ipv4' | 'ipv6') {
+  if (data.state === 'offline' || data.state === 'disabled') return data.state;
+  const rules = data.rules.filter((rule) => !family || rule.family === family);
+  const results = data.results.filter((result) => !family || result.family === family);
+  const fallback = results.find((result) => result.error)?.state ?? (data.enabled && !rules.length ? 'empty' : data.state);
+  return combinedTrustState(rules.map((rule) => rule.state), fallback);
+}
+
+function trustSources(rules: Trust['rules']) {
+  const sources = new Map<string, { id: string; name: string; rules: Trust['rules'] }>();
+  for (const rule of rules) {
+    for (const member of rule.members.length ? rule.members : [{ id: '', name: '已移除节点' }]) {
+      let source = sources.get(member.id);
+      if (!source) { source = { ...member, rules: [] }; sources.set(member.id, source); }
+      source.rules.push(rule);
+    }
+  }
+  return [...sources.values()];
+}
 export const trustPolicyQuery = { queryKey: ['peer-trust', 'policy'], queryFn: async ({ signal }: { signal: AbortSignal }) => unwrap(await api.GET('/peer-trust', { signal })) };
 export const trustRulesQuery = (id: string) => ({ queryKey: ['peer-trust', id], retry: false, queryFn: async ({ signal }: { signal: AbortSignal }) => unwrap(await api.GET('/nodes/{id}/firewall/peer-trust', { signal, params: { path: { id } } })), refetchInterval: 5000 });
 const uncertainWrite = (error: unknown) => !(error instanceof RequestError && [403, 404, 409, 422].includes(error.status));
@@ -48,11 +74,11 @@ export function FirewallSettings() {
     {uncertain && <div className="mt-4"><BusyButton variant="outline" busy={policy.isFetching} onClick={() => void verify()}>核对设置</BusyButton></div>}
     {change === null && <Failure error={save.error} />}
     <Failure error={status.error} retry={() => void status.refetch()} busy={status.isFetching} />
-    <div className="mt-6 overflow-x-auto" aria-busy={status.isPending}><Table className="min-w-128" hoverableRows><TableHeader><TableRow><TableHead>节点</TableHead><TableHead>互信状态</TableHead><TableHead>检查时间</TableHead><TableHead className="text-right">操作</TableHead></TableRow></TableHeader><TableBody>
-      {status.isPending ? <LoadingRows columns={4} /> : status.data?.nodes.map((n) => <TableRow key={n.node_id}><TableCell className="max-w-56 break-words">{names.get(n.node_id) ?? n.node_id}</TableCell><TableCell><StatusLabel state={n.state}>{networkStates[n.state] ?? n.state}</StatusLabel>{n.results.find((r) => r.error)?.error && <p className="mt-1 max-w-80 break-words text-xs text-error-intense">{n.results.find((r) => r.error)?.error?.message}</p>}</TableCell><TableCell className="whitespace-nowrap text-xs text-foreground-muted">{date(n.checked_at)}</TableCell><TableCell className="text-right"><Link to={`/firewall?node=${n.node_id}&type=trust`} className={buttonVariants({ variant: 'ghost', size: 'sm' })}>查看规则</Link></TableCell></TableRow>)}
-      {status.data?.nodes.length === 0 && !status.isError && <TableRow><TableCell colSpan={4} className="py-8 text-center text-foreground-muted">暂无节点</TableCell></TableRow>}
+    <div className="mt-6 overflow-x-auto" aria-busy={status.isPending}><Table className="min-w-160" hoverableRows><TableHeader><TableRow><TableHead>目标节点</TableHead><TableHead>IPv4</TableHead><TableHead>IPv6</TableHead><TableHead>互信状态</TableHead><TableHead>检查时间</TableHead><TableHead className="text-right">操作</TableHead></TableRow></TableHeader><TableBody>
+      {status.isPending ? <LoadingRows columns={6} /> : status.data?.nodes.map((n) => <TableRow key={n.node_id}><TableCell className="max-w-56 break-words">{names.get(n.node_id) ?? n.node_id}</TableCell>{(['ipv4', 'ipv6'] as const).map((family) => <TableCell key={family}><StatusLabel state={trustState(n, family)}>{networkStates[trustState(n, family)] ?? trustState(n, family)}</StatusLabel></TableCell>)}<TableCell><StatusLabel state={trustState(n)}>{networkStates[trustState(n)] ?? trustState(n)}</StatusLabel></TableCell><TableCell className="whitespace-nowrap text-xs text-foreground-muted">{date(n.checked_at)}</TableCell><TableCell className="text-right"><Link to={`/firewall?node=${n.node_id}&type=trust`} className={buttonVariants({ variant: 'ghost', size: 'sm' })}>查看规则</Link></TableCell></TableRow>)}
+      {status.data?.nodes.length === 0 && !status.isError && <TableRow><TableCell colSpan={6} className="py-8 text-center text-foreground-muted">暂无节点</TableCell></TableRow>}
     </TableBody></Table></div>
-    <Confirm open={change !== null} title={change?.enabled ? '开启集群互信？' : '关闭集群互信？'} description={change?.enabled ? `为 ${count} 个节点放行全部成员公网 IP 的主机入站流量，包含本机。已有相同的全协议 IP 放行规则将转交互信管理。共享公网 IP 的其他来源也在放行范围内。` : `撤除 ${count} 个节点的 OPSD 互信规则，包含已从普通 IP 规则转交的条目。离线节点恢复连接后继续撤除。`} confirmLabel={change?.enabled ? '开启互信' : '关闭互信'} dangerous={false} busy={save.isPending} error={save.error} onCancel={() => { if (!uncertain) setChange(null); }} onConfirm={() => { if (!uncertain) save.mutate(); }} />
+    <Confirm open={change !== null} title={change?.enabled ? '开启集群互信？' : '关闭集群互信？'} description={change?.enabled ? `为 ${count} 个节点优先放行全部成员公网 IP 的所有主机入站端口，包含本机和数据库端口。已有相同的全协议 IP 放行规则将转交互信管理。共享公网 IP 的其他来源也在放行范围内。` : `撤除 ${count} 个节点的 OPSD 互信规则，包含已从普通 IP 规则转交的条目。离线节点恢复连接后继续撤除。`} confirmLabel={change?.enabled ? '开启互信' : '关闭互信'} dangerous={false} busy={save.isPending} error={save.error} onCancel={() => { if (!uncertain) setChange(null); }} onConfirm={() => { if (!uncertain) save.mutate(); }} />
   </section>;
 }
 
@@ -60,11 +86,23 @@ export function TrustRulesTable({ data, family, loading, error }: { data?: Trust
   const [detail, setDetail] = useState<string | null>(null);
   const operations = useOperations();
   const rows = data?.rules.filter((r) => !family || r.family === family) ?? [];
-  const failures = data?.results.filter((r) => r.error && (!family || r.family === family)) ?? [];
-  return <>{data?.migration && data.migration.state !== 'in_sync' && <div className="mb-3 flex flex-wrap items-center gap-3"><StatusLabel state={data.migration.state}>{data.migration.state === 'failed' ? '迁移失败' : '迁移中'}</StatusLabel>{data.migration.error && <span role="alert" className="text-sm text-error-intense">{data.migration.error.message}</span>}<Button variant="ghost" size="sm" onClick={() => operations.show(data.migration!.operation_id)}>查看操作</Button></div>}{failures.map((r) => <p key={`${r.family}/${r.scope}`} role="alert" className="mb-3 text-sm text-error-intense">{r.family === 'ipv4' ? 'IPv4' : 'IPv6'} · {r.scope === 'permanent' ? '永久配置' : '运行配置'} · {r.error?.message}</p>)}<div className="max-w-full overflow-x-auto" aria-busy={loading}><Table className="min-w-200" hoverableRows><TableHeader><TableRow><TableHead>节点</TableHead><TableHead>来源 IP / CIDR</TableHead><TableHead>地址族</TableHead><TableHead>动作</TableHead><TableHead>状态</TableHead><TableHead>检查时间</TableHead><TableHead className="text-right">操作</TableHead></TableRow></TableHeader><TableBody>
-    {loading ? <LoadingRows columns={7} /> : rows.map((r, index) => <TableRow key={`${r.family}/${r.address ?? r.members[0]?.id}/${index}`}><TableCell className="max-w-56 break-words">{r.members.map((m) => <Link key={m.id} to={`/nodes/${m.id}`} className="block text-primary hover:underline">{m.name || m.id}</Link>)}{r.members.length === 0 && '已移除节点'}</TableCell><TableCell className="max-w-56 break-all font-mono text-xs">{r.address ? <CopyAddress value={`${r.address}/${r.family === 'ipv4' ? 32 : 128}`} /> : '—'}</TableCell><TableCell>{r.family === 'ipv4' ? 'IPv4' : 'IPv6'}</TableCell><TableCell>允许</TableCell><TableCell><StatusLabel state={r.state}>{r.address ? networkStates[r.state] ?? r.state : r.state === 'pending' ? '待发现' : networkStates[r.state] ?? r.state}</StatusLabel>{r.error && <p className="mt-1 max-w-64 break-words text-xs text-error-intense">{r.error}</p>}</TableCell><TableCell className="whitespace-nowrap text-xs text-foreground-muted">{date(data?.checked_at)}</TableCell><TableCell className="text-right"><Button variant="ghost" size="sm" onClick={() => setDetail(`${r.family}/${index}`)}>查看</Button></TableCell></TableRow>)}
-    {!loading && !error && !failures.length && rows.length === 0 && <TableRow><TableCell colSpan={7} className="py-8 text-center text-foreground-muted">暂无互信规则</TableCell></TableRow>}
-  </TableBody></Table></div><Drawer side="right" open={detail !== null} onOpenChange={(open) => { if (!open) setDetail(null); }}><DrawerContent frame={false} closeLabel="关闭应用状态" className="h-full w-full max-w-lg"><DrawerHeader><DrawerTitle>应用状态</DrawerTitle></DrawerHeader><DrawerBody className="space-y-4 overflow-y-auto">{data?.results.filter((r) => r.family === detail?.split('/')[0]).map((r) => <div key={`${r.family}/${r.scope}`} className="flex flex-wrap items-center gap-3 text-sm"><span>{r.scope === 'permanent' ? '永久配置' : '运行配置'}</span><StatusLabel state={r.state}>{networkStates[r.state] ?? r.state}</StatusLabel>{r.error && <span className="text-error-intense">{r.error.message}</span>}</div>)}</DrawerBody></DrawerContent></Drawer></>;
+  const sources = trustSources(rows);
+  const selected = sources.find((source) => source.id === detail);
+  const detailRules = selected?.rules ?? rows;
+  const families = (['ipv4', 'ipv6'] as const).filter((value) => !family || value === family);
+  const state = data ? trustState({ ...data, rules: rows, results: data.results.filter((result) => !family || result.family === family) }) : 'pending';
+  return <>
+    {data && <div className="mb-3 flex flex-wrap items-center gap-3 text-sm"><StatusLabel state={state}>{networkStates[state] ?? state}</StatusLabel><span className="tabular-nums text-xs text-foreground-muted">{date(data.checked_at)}</span><Button variant="ghost" size="sm" onClick={() => setDetail('*')}>查看详情</Button></div>}
+    {data?.migration && data.migration.state !== 'in_sync' && <div className="mb-3 flex flex-wrap items-center gap-3"><StatusLabel state={data.migration.state}>{data.migration.state === 'failed' ? '迁移失败' : '迁移中'}</StatusLabel>{data.migration.error && <span role="alert" className="text-sm text-error-intense">{data.migration.error.message}</span>}<Button variant="ghost" size="sm" onClick={() => operations.show(data.migration!.operation_id)}>查看操作</Button></div>}
+    <div className="max-w-full overflow-x-auto" aria-busy={loading}><Table className="min-w-160" hoverableRows><TableHeader><TableRow><TableHead>来源节点</TableHead>{families.map((value) => <TableHead key={value}>{value === 'ipv4' ? 'IPv4' : 'IPv6'}</TableHead>)}<TableHead className="text-right">操作</TableHead></TableRow></TableHeader><TableBody>
+      {loading ? <LoadingRows columns={families.length + 2} /> : sources.map((source) => <TableRow key={source.id || 'removed'}><TableCell className="max-w-56 break-words">{source.id ? <Link to={`/nodes/${source.id}`} className="font-medium text-primary hover:underline">{source.name || source.id}</Link> : source.name}{combinedTrustState(source.rules.map((rule) => rule.state), '') === 'partial' && <span className="mt-1 block"><StatusLabel state="partial">部分生效</StatusLabel></span>}</TableCell>{families.map((value) => <TableCell key={value}><div className="space-y-2">{source.rules.filter((rule) => rule.family === value).map((rule, index) => <div key={rule.address || index} className="flex flex-wrap items-center gap-2"><span className="max-w-64 break-all font-mono text-xs">{rule.address ? <CopyAddress value={`${rule.address}/${value === 'ipv4' ? 32 : 128}`} /> : '—'}</span><StatusLabel state={rule.state}>{!rule.address && rule.state === 'pending' ? '待发现' : networkStates[rule.state] ?? rule.state}</StatusLabel></div>)}{!source.rules.some((rule) => rule.family === value) && '—'}</div></TableCell>)}<TableCell className="text-right"><Button variant="ghost" size="sm" onClick={() => setDetail(source.id)}>查看</Button></TableCell></TableRow>)}
+      {!loading && !error && sources.length === 0 && <TableRow><TableCell colSpan={families.length + 2} className="py-8 text-center text-foreground-muted">暂无互信规则</TableCell></TableRow>}
+    </TableBody></Table></div>
+    <Drawer side="right" open={detail !== null} onOpenChange={(open) => { if (!open) setDetail(null); }}><DrawerContent frame={false} closeLabel="关闭互信详情" className="h-full w-full max-w-lg"><DrawerHeader><DrawerTitle>互信详情</DrawerTitle></DrawerHeader><DrawerBody className="space-y-5 overflow-y-auto">
+      {selected && <p className="break-words font-medium">{selected.name || selected.id}</p>}
+      {families.map((value) => <section key={value} className="space-y-3"><h3 className="font-medium">{value === 'ipv4' ? 'IPv4' : 'IPv6'}</h3>{detailRules.filter((rule) => rule.family === value).map((rule, index) => <div key={rule.address || index} className="space-y-1 text-sm">{rule.address && <CopyAddress value={`${rule.address}/${value === 'ipv4' ? 32 : 128}`} />}{rule.error && !data?.results.some((result) => result.family === value && result.error?.message === rule.error) && <p className="break-words text-error-intense">{rule.error}</p>}</div>)}{data?.results.filter((result) => result.family === value).map((result) => <div key={result.scope} className="space-y-1 text-sm"><div className="flex flex-wrap items-center gap-3"><span>{result.scope === 'permanent' ? '永久配置' : '运行配置'}</span><StatusLabel state={result.state}>{networkStates[result.state] ?? result.state}</StatusLabel></div>{result.error && <p className="break-words text-error-intense">{result.error.message}</p>}</div>)}</section>)}
+    </DrawerBody></DrawerContent></Drawer>
+  </>;
 }
 
 const publicQuery = (id: string) => ({ queryKey: ['public-addresses', id], retry: false, queryFn: async ({ signal }: { signal: AbortSignal }) => unwrap(await api.GET('/nodes/{id}/public-addresses', { signal, params: { path: { id } } })) });

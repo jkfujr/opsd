@@ -78,7 +78,7 @@ function FirewallContent({ nodeID }: { nodeID: string }) {
   return <section className="panel">
     <PageTitle>防火墙</PageTitle>
     <PageToolbar className="firewall-filters">
-      <ChoiceField label="节点" value={nodeID} options={nodes.data?.items.filter((n) => !n.revoked_at).map((n) => [n.id, n.name] as const) ?? [[nodeID, '本机']]} onChange={(value) => update('node', value)} />
+      <ChoiceField label="目标节点" value={nodeID} options={nodes.data?.items.filter((n) => !n.revoked_at).map((n) => [n.id, n.name] as const) ?? [[nodeID, '本机']]} onChange={(value) => update('node', value)} />
       <ChoiceField label="地址族" value={family} options={[[ '', 'IPv4 与 IPv6' ], ['ipv4', 'IPv4'], ['ipv6', 'IPv6']]} onChange={(value) => update('family', value)} />
     </PageToolbar>
     <div className="firewall-status-row">

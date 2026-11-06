@@ -28,6 +28,29 @@ func TestUFWTrustRejectsForeignConditions(t *testing.T) {
 	}
 }
 
+func TestUFWTrustRuntimeOwnershipAndPriority(t *testing.T) {
+	for _, family := range []protocol.AddressFamily{protocol.IPv4, protocol.IPv6} {
+		before := "-A " + ufwPrefix(family) + "-before-input -m comment --comment " + trustMarker + " -j " + trustChain
+		input := "-A INPUT -m comment --comment " + trustMarker + " -j " + trustChain
+		base := ":" + trustChain + " - [0:0]\n" + input + "\n-A INPUT -j EXTERNAL\n" + before
+		_, hooks, _, e := readUFWTrustRuntime(base, family)
+		if e != nil || !ufwTrustHooksCurrent(base, family, hooks) {
+			t.Fatalf("首条互信跳转未识别：%v", e)
+		}
+		for _, text := range []string{"-A INPUT -j EXTERNAL\n" + base, base + "\n" + input} {
+			_, hooks, _, e = readUFWTrustRuntime(text, family)
+			if e != nil || ufwTrustHooksCurrent(text, family, hooks) {
+				t.Fatal("顺序错误或重复的互信跳转被算作生效", e)
+			}
+		}
+		for _, text := range []string{base + "\n-A FORWARD -m comment --comment " + trustMarker + " -j " + trustChain, base + "\n-A " + trustChain + " -j DROP"} {
+			if _, _, _, e = readUFWTrustRuntime(text, family); Code(e) != "conflict" {
+				t.Fatal("专用链中的外部规则或引用未拒绝", e)
+			}
+		}
+	}
+}
+
 func TestNFTTrustPreservedByOrdinaryConfiguration(t *testing.T) {
 	base := "table inet filter {\n chain input {\n  type filter hook input priority 0; policy drop;\n  meta nfproto ipv4 tcp dport 22 accept\n }\n}\n"
 	target := protocol.PeerTrustTarget{Enabled: true, IPv4: []string{"8.8.8.8"}}

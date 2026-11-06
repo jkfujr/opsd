@@ -94,6 +94,16 @@ func TestPeerTrustNativeNetwork(t *testing.T) {
 	for _, backend := range []string{"ufw", "nftables"} {
 		t.Run(backend, func(t *testing.T) {
 			run("nft", "flush", "ruleset")
+			externalBefore := map[protocol.AddressFamily]string{}
+			externalRules := func(text string) string {
+				lines := []string{}
+				for _, line := range strings.Split(text, "\n") {
+					if strings.HasPrefix(line, "-A OPSD_EXTERNAL ") || strings.HasPrefix(line, "-A INPUT ") && !strings.Contains(line, trustMarker) {
+						lines = append(lines, line)
+					}
+				}
+				return strings.Join(lines, "\n")
+			}
 			if backend == "nftables" {
 				config := "table inet filter {\n chain input {\n  type filter hook input priority 0; policy drop;\n  ct state established,related accept\n  tcp dport 22 accept comment \"existing\"\n }\n chain output {\n  type filter hook output priority 0;\n  policy accept;\n }\n}\n"
 				write("/etc/nftables.conf", config)
@@ -106,11 +116,16 @@ func TestPeerTrustNativeNetwork(t *testing.T) {
 					if family == protocol.IPv6 {
 						prefix, restore, path = "ufw6", "ip6tables-restore", "/etc/ufw/before6.rules"
 					}
-					config := "*filter\n:INPUT DROP [0:0]\n:FORWARD ACCEPT [0:0]\n:OUTPUT ACCEPT [0:0]\n:" + prefix + "-before-input - [0:0]\n-A INPUT -j " + prefix + "-before-input\n-A " + prefix + "-before-input -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT\n-A " + prefix + "-before-input -p tcp --dport 22 -j ACCEPT\nCOMMIT\n"
+					config := "*filter\n:INPUT DROP [0:0]\n:FORWARD ACCEPT [0:0]\n:OUTPUT ACCEPT [0:0]\n:OPSD_EXTERNAL - [0:0]\n:" + prefix + "-before-input - [0:0]\n-A INPUT -j OPSD_EXTERNAL\n-A INPUT -j " + prefix + "-before-input\n-A OPSD_EXTERNAL -p tcp --dport 22 -j RETURN\n-A OPSD_EXTERNAL -p tcp -j REJECT\n-A OPSD_EXTERNAL -j RETURN\n-A " + prefix + "-before-input -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT\n-A " + prefix + "-before-input -p tcp --dport 22 -j ACCEPT\nCOMMIT\n"
 					write(path, config)
 					if _, e := h.RunInput(t.Context(), []byte(config), restore); e != nil {
 						t.Fatal(e)
 					}
+					raw, e := h.Run(t.Context(), strings.Replace(restore, "-restore", "-save", 1), "-t", "filter")
+					if e != nil {
+						t.Fatal(e)
+					}
+					externalBefore[family] = externalRules(string(raw))
 				}
 			}
 			sync := func(target protocol.PeerTrustTarget) {
@@ -162,8 +177,68 @@ func TestPeerTrustNativeNetwork(t *testing.T) {
 				run("nft", "flush", "ruleset")
 				run("nft", "-f", h.path("/etc/nftables.conf"))
 				probe(true)
+			} else {
+				checkHooks := func(enabled bool) {
+					t.Helper()
+					for _, family := range []protocol.AddressFamily{protocol.IPv4, protocol.IPv6} {
+						save := "iptables-save"
+						if family == protocol.IPv6 {
+							save = "ip6tables-save"
+						}
+						raw, e := h.Run(t.Context(), save, "-t", "filter")
+						if e != nil {
+							t.Fatal(e)
+						}
+						_, hooks, exists, e := readUFWTrustRuntime(string(raw), family)
+						if e != nil || enabled && !ufwTrustHooksCurrent(string(raw), family, hooks) || !enabled && (exists || len(hooks) > 0) {
+							t.Fatalf("互信跳转不符：%v\n%s", e, raw)
+						}
+						if externalRules(string(raw)) != externalBefore[family] {
+							t.Fatalf("外部规则被改变：\n%s", raw)
+						}
+					}
+				}
+				checkHooks(true)
+				for _, command := range []string{"iptables", "ip6tables"} {
+					run(command, "-D", "INPUT", "-j", "OPSD_EXTERNAL")
+					run(command, "-I", "INPUT", "1", "-j", "OPSD_EXTERNAL")
+					run(command, "-I", "INPUT", "1", "-m", "comment", "--comment", trustMarker, "-j", trustChain)
+				}
+				sync(target)
+				checkHooks(true)
+				probe(true)
+				for _, file := range []struct{ path, restore string }{{"/etc/ufw/before.rules", "iptables-restore"}, {"/etc/ufw/before6.rules", "ip6tables-restore"}} {
+					before, e := h.Read(file.path)
+					if e != nil {
+						t.Fatal(e)
+					}
+					if e = inputRules(h, t.Context(), string(before), file.restore, "--noflush"); e != nil {
+						t.Fatal(e)
+					}
+				}
+				sync(target)
+				checkHooks(true)
+				probe(true)
+				replacement := protocol.PeerTrustTarget{Enabled: true, Revision: 2, IPv4: []string{"9.9.9.9"}, IPv6: []string{"2606:4700::9999"}}
+				sync(replacement)
+				connection("8.8.8.8", "8.8.4.4", false)
+				connection("9.9.9.9", "8.8.4.4", true)
+				connection("2606:4700::1111", "2606:4700::1001", false)
+				connection("2606:4700::9999", "2606:4700::1001", true)
+				write("/etc/ufw/ufw.conf", "ENABLED=no\n")
+				sync(replacement)
+				checkHooks(false)
+				connection("9.9.9.9", "8.8.4.4", false)
+				before, e := h.Read("/etc/ufw/before.rules")
+				if e != nil || !strings.Contains(string(before), "-s 9.9.9.9 -j ACCEPT") {
+					t.Fatal("停用时未保留互信持久配置", e)
+				}
+				write("/etc/ufw/ufw.conf", "ENABLED=yes\n")
+				sync(target)
+				checkHooks(true)
+				probe(true)
 			}
-			sync(protocol.PeerTrustTarget{Revision: 2})
+			sync(protocol.PeerTrustTarget{Revision: 3})
 			probe(false)
 		})
 	}

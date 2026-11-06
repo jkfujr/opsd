@@ -79,7 +79,7 @@ func inputRules(h Host, ctx context.Context, input, name string, args ...string)
 	return e
 }
 
-// UFW 的互信规则在独立 before 链中，用户配置与自动修复不改写此链。
+// UFW 持久文件加载互信集合，执行器另将自有跳转维护在 INPUT 首条。
 func ufwTrustFile(text string, family protocol.AddressFamily, addresses []string) (string, error) {
 	begin, end := "# OPSD_PEER_TRUST_BEGIN", "# OPSD_PEER_TRUST_END"
 	lines := strings.Split(text, "\n")
@@ -187,7 +187,7 @@ func readUFWTrustRuntime(text string, family protocol.AddressFamily) ([]string, 
 			addresses = append(addresses, ip)
 			continue
 		}
-		if len(fields) == 8 && fields[0] == "-A" && fields[1] == ufwPrefix(family)+"-before-input" && strings.Join(fields[2:], " ") == "-m comment --comment "+trustMarker+" -j "+trustChain {
+		if len(fields) == 8 && fields[0] == "-A" && (fields[1] == "INPUT" || fields[1] == ufwPrefix(family)+"-before-input") && strings.Join(fields[2:], " ") == "-m comment --comment "+trustMarker+" -j "+trustChain {
 			hooks = append(hooks, line)
 			continue
 		}
@@ -199,19 +199,16 @@ func readUFWTrustRuntime(text string, family protocol.AddressFamily) ([]string, 
 	return addresses, hooks, chain, nil
 }
 
-func ufwTrustInputPath(text string, family protocol.AddressFamily) error {
+func ufwTrustHooksCurrent(text string, family protocol.AddressFamily, hooks []string) bool {
+	if len(hooks) != 2 || !slices.Contains(hooks, "-A "+ufwPrefix(family)+"-before-input -m comment --comment "+trustMarker+" -j "+trustChain) {
+		return false
+	}
 	for _, line := range strings.Split(text, "\n") {
-		if !strings.HasPrefix(line, "-A INPUT ") {
-			continue
-		}
-		if line == "-A INPUT -j "+ufwPrefix(family)+"-before-input" {
-			return nil
-		}
-		if line != "-A INPUT -j "+ufwPrefix(family)+"-before-logging-input" {
-			return Conflict("UFW 入站前置路径包含外部规则")
+		if strings.HasPrefix(line, "-A INPUT ") {
+			return line == "-A INPUT -m comment --comment "+trustMarker+" -j "+trustChain
 		}
 	}
-	return Conflict("UFW 入站调用路径缺失")
+	return false
 }
 func syncUFWTrust(ctx context.Context, h Host, target protocol.PeerTrustTarget) []protocol.ScopeResult {
 	out := []protocol.ScopeResult{}
@@ -232,7 +229,7 @@ func syncUFWTrust(ctx context.Context, h Host, target protocol.PeerTrustTarget) 
 			save = "ip6tables-save"
 			restore = "ip6tables-restore"
 		}
-		if family == protocol.IPv6 && configValue(string(defaults), "IPV6") != "yes" && len(wanted) > 0 {
+		if active && family == protocol.IPv6 && configValue(string(defaults), "IPV6") != "yes" && len(wanted) > 0 {
 			for _, scope := range []protocol.ConfigScope{protocol.Permanent, protocol.Runtime} {
 				r := trustResult(family, scope, nil, Unsupported("UFW 未启用 IPv6"))
 				r.State = "unsupported"
@@ -260,11 +257,9 @@ func syncUFWTrust(ctx context.Context, h Host, target protocol.PeerTrustTarget) 
 			}
 		}
 		out = append(out, trustResult(family, protocol.Permanent, permanent, e))
+		runtimeWanted := wanted
 		if !active {
-			r := trustResult(family, protocol.Runtime, nil, nil)
-			r.State = "inactive"
-			out = append(out, r)
-			continue
+			runtimeWanted = nil
 		}
 		raw, readErr := h.Run(ctx, save, "-t", "filter")
 		if readErr != nil {
@@ -272,20 +267,18 @@ func syncUFWTrust(ctx context.Context, h Host, target protocol.PeerTrustTarget) 
 			continue
 		}
 		actual, hooks, exists, readErr := readUFWTrustRuntime(string(raw), family)
-		if readErr == nil && len(wanted) > 0 {
-			readErr = ufwTrustInputPath(string(raw), family)
-		}
-		if readErr == nil && e != nil {
+		if readErr == nil && e != nil && active {
 			readErr = e
 		}
-		if readErr == nil && (!slices.Equal(actual, wanted) || len(hooks) != func() int {
-			if len(wanted) > 0 {
-				return 1
+		current := func() bool {
+			if len(runtimeWanted) == 0 {
+				return !exists && len(hooks) == 0
 			}
-			return 0
-		}()) {
+			return slices.Equal(actual, runtimeWanted) && ufwTrustHooksCurrent(string(raw), family, hooks)
+		}
+		if readErr == nil && !current() {
 			commands := []string{"*filter"}
-			if len(wanted) > 0 {
+			if len(runtimeWanted) > 0 && !exists {
 				commands = append(commands, ":"+trustChain+" - [0:0]")
 			}
 			if exists {
@@ -294,9 +287,10 @@ func syncUFWTrust(ctx context.Context, h Host, target protocol.PeerTrustTarget) 
 			for _, hook := range hooks {
 				commands = append(commands, strings.Replace(hook, "-A ", "-D ", 1))
 			}
-			if len(wanted) > 0 {
+			if len(runtimeWanted) > 0 {
 				commands = append(commands, "-I "+ufwPrefix(family)+"-before-input 1 -m comment --comment "+trustMarker+" -j "+trustChain)
-				for _, ip := range wanted {
+				commands = append(commands, "-I INPUT 1 -m comment --comment "+trustMarker+" -j "+trustChain)
+				for _, ip := range runtimeWanted {
 					commands = append(commands, "-A "+trustChain+" -s "+ip+" -j ACCEPT")
 				}
 			} else if exists {
@@ -307,14 +301,18 @@ func syncUFWTrust(ctx context.Context, h Host, target protocol.PeerTrustTarget) 
 			if readErr == nil {
 				raw, readErr = h.Run(ctx, save, "-t", "filter")
 				if readErr == nil {
-					actual, hooks, _, readErr = readUFWTrustRuntime(string(raw), family)
-					if readErr == nil && (!slices.Equal(actual, wanted) || len(wanted) > 0 && len(hooks) != 1) {
+					actual, hooks, exists, readErr = readUFWTrustRuntime(string(raw), family)
+					if readErr == nil && !current() {
 						readErr = Conflict("互信运行规则读回不一致")
 					}
 				}
 			}
 		}
-		out = append(out, trustResult(family, protocol.Runtime, actual, readErr))
+		r := trustResult(family, protocol.Runtime, actual, readErr)
+		if !active && readErr == nil {
+			r.State = "inactive"
+		}
+		out = append(out, r)
 	}
 	return out
 }
