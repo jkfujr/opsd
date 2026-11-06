@@ -12,6 +12,7 @@ const browser = await chromium.launch();
 const context = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
 const page = await context.newPage();
 const errors = [];
+const firewallWidths = [320, 639, 640, 768, 1000, 1440, 1920];
 page.on('pageerror', (error) => errors.push(error.message));
 const capture = async (name) => {
   await page.waitForFunction(() => !document.querySelector('[role="dialog"][data-starting-style], [role="alertdialog"][data-starting-style]'));
@@ -21,6 +22,30 @@ const capture = async (name) => {
   });
   await page.screenshot({ path: `${output}/${name}.png`, fullPage: true, animations: 'disabled' });
   assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), `${name} 页面横向溢出`);
+};
+const checkFirewallHeader = async () => {
+  const width = page.viewportSize().width;
+  const [node, family, filters, row, status, refresh, settings] = await Promise.all([
+    page.getByLabel('节点', { exact: true }), page.getByLabel('地址族', { exact: true }),
+    page.locator('.firewall-filters'), page.locator('.firewall-status-row'), page.locator('.firewall-status'),
+    page.getByRole('button', { name: '刷新', exact: true }), page.getByRole('link', { name: '设置', exact: true }).last(),
+  ].map((locator) => locator.boundingBox()));
+  assert(node && family && filters && row && status && refresh && settings, `${width}px 顶部控件缺失`);
+  const near = (actual, expected, message) => assert(Math.abs(actual - expected) <= 1, `${width}px ${message}：${actual} / ${expected}`);
+  for (const box of [node, family, refresh, settings]) near(box.height, 40, '控件高度');
+  assert(node.width <= 384 && family.width <= 192, `${width}px 筛选框过度拉伸`);
+  near(refresh.y, settings.y, '按钮未同排');
+  near(row.y - filters.y - filters.height, 16, '两层之间留白');
+  near(row.y + row.height - Math.max(status.y + status.height, refresh.y + refresh.height), 13, '分隔线前留白');
+  if (width >= 640) {
+    near(node.y, family.y, '筛选框未同排');
+    near(status.y + status.height / 2, refresh.y + refresh.height / 2, '状态与操作未垂直居中');
+    near(settings.x + settings.width, row.x + row.width, '操作未靠右');
+  } else {
+    assert(family.y >= node.y + node.height, `${width}px 筛选框未纵向排列`);
+    near(refresh.x, status.x, '状态与操作未左对齐');
+    near(refresh.y - status.y - status.height, 12, '状态与操作换行间距');
+  }
 };
 try {
   await page.goto(`${base}/signin`);
@@ -64,6 +89,7 @@ try {
   await addRule({ family: 'ipv4', source: '8.8.8.8/32', protocol: 'any', action: 'allow' });
   await addRule({ family: 'ipv4', source: '100.64.0.0/10', protocol: 'any', action: 'allow' });
   await addRule({ family: 'ipv4', source: '0.0.0.0/0', protocol: 'tcp', port: '22', action: 'allow' });
+  const firewall = await api(firewallPath);
   const pages = [['overview', '/'], ['nodes', '/nodes'], ['detail', `/nodes/${id}`], ['firewall', `/firewall?node=${id}`], ['firewall-settings', '/firewall/settings'], ['account', '/settings/account'], ['sessions', '/settings/sessions'], ['appearance', '/settings/appearance'], ['version', '/settings/version']];
   for (const theme of ['light', 'dark']) {
     await page.goto(`${base}/settings/appearance`);
@@ -77,16 +103,59 @@ try {
         await capture(`${theme}-${width}-${name}`);
       }
     }
-    await page.setViewportSize({ width: 1920, height: 1080 });
-    await page.goto(`${base}/firewall?node=${id}&type=ip`);
-    await page.getByRole('button', { name: '更多', exact: true }).first().waitFor();
-    const controls = await Promise.all([page.getByLabel('节点', { exact: true }), page.getByLabel('地址族', { exact: true }), page.getByRole('button', { name: '刷新', exact: true }), page.getByRole('link', { name: '设置', exact: true }).last()].map((locator) => locator.boundingBox()));
-    assert(controls.every((box) => box && Math.abs(box.y - controls[0].y) <= 1 && Math.abs(box.height - 40) <= 1), '筛选与操作控件未对齐');
-    assert(controls[0].width <= 384 && controls[1].width <= 192, '筛选框过度拉伸');
+    for (const width of firewallWidths) {
+      await page.setViewportSize({ width, height: 1000 });
+      await page.goto(`${base}/firewall?node=${id}&type=ip`);
+      await page.getByRole('button', { name: '更多', exact: true }).first().waitFor();
+      await checkFirewallHeader();
+      await capture(`${theme}-${width}-firewall-header`);
+    }
     assert.equal(await page.getByRole('columnheader', { name: '备注', exact: true }).count(), 0);
     assert.equal(await page.getByText('默认入站', { exact: true }).count(), 0);
     assert.equal(await page.getByText('已启用', { exact: true }).count(), 0);
-    await capture(`${theme}-1920-firewall`);
+
+    const longName = 'C091-GreenCloud-JP-TYO-长节点名称-'.repeat(3);
+    await page.route('**/api/v1/nodes', (route) => route.fulfill({ json: { ...nodes, items: nodes.items.map((node) => node.id === id ? { ...node, name: longName } : node) } }));
+    await page.setViewportSize({ width: 1000, height: 1000 });
+    await page.reload();
+    await page.getByLabel('节点', { exact: true }).getByText(longName, { exact: true }).waitFor();
+    await checkFirewallHeader();
+    await capture(`${theme}-1000-firewall-long-name`);
+    await page.unroute('**/api/v1/nodes');
+
+    await page.route(`**/api/v1${firewallPath}`, (route) => route.fulfill({ json: { ...firewall, service_active: false } }));
+    await page.setViewportSize({ width: 320, height: 1000 });
+    await page.reload();
+    await page.getByText('已保存', { exact: true }).waitFor();
+    const [backend, checked] = await Promise.all([page.locator('.firewall-status').getByText('UFW', { exact: true }), page.locator('.firewall-status .tabular-nums')].map((locator) => locator.boundingBox()));
+    assert(backend && checked && checked.y >= backend.y + backend.height, '窄屏长状态未换行');
+    await checkFirewallHeader();
+    await capture(`${theme}-320-firewall-status-wrap`);
+    await page.unroute(`**/api/v1${firewallPath}`);
+
+    let release;
+    const pending = new Promise((resolve) => { release = resolve; });
+    await page.route(`**/api/v1${firewallPath}`, async (route) => { await pending; await route.fulfill({ json: firewall }); });
+    await page.setViewportSize({ width: 1000, height: 1000 });
+    try {
+      await page.reload({ waitUntil: 'domcontentloaded' });
+      await page.locator('.firewall-status [data-slot="skeleton"]').waitFor();
+      await checkFirewallHeader();
+      await capture(`${theme}-1000-firewall-loading`);
+    } finally { release(); await page.unroute(`**/api/v1${firewallPath}`); }
+    await page.locator('.firewall-status').getByText('UFW', { exact: true }).waitFor();
+
+    await page.route(`**/api/v1${firewallPath}`, (route) => route.fulfill({ status: 503, json: { code: 'dependency_unavailable', message: '防火墙读取失败' } }));
+    await page.reload();
+    const alert = page.getByRole('alert').filter({ hasText: '防火墙读取失败' });
+    await alert.waitFor();
+    await checkFirewallHeader();
+    const [row, failure] = await Promise.all([page.locator('.firewall-status-row'), alert].map((locator) => locator.boundingBox()));
+    assert(row && failure && failure.y >= row.y + row.height, '错误提示未独立占行');
+    await capture(`${theme}-1000-firewall-error`);
+    await page.unroute(`**/api/v1${firewallPath}`);
+    await page.reload();
+    await page.getByRole('button', { name: '更多', exact: true }).first().waitFor();
   }
   await page.setViewportSize({ width: 1440, height: 1000 });
   await page.getByRole('button', { name: '更多', exact: true }).first().press('ArrowDown');
@@ -177,8 +246,8 @@ try {
   await capture('mobile-menu');
   await page.keyboard.press('Escape');
   assert.deepEqual(errors, [], '浏览器运行错误');
-  writeFileSync(`${output}/result.json`, JSON.stringify({ pages: pages.length, themes: 2, widths: [320, 768, 1440], firewallWidths: [320, 768, 1440, 1920], trustMigration: true, errors }, null, 2));
-  console.log('界面验收通过：9 页面、深浅主题、防火墙 4 种宽度、互信迁移、浮层与未提交修改。');
+  writeFileSync(`${output}/result.json`, JSON.stringify({ pages: pages.length, themes: 2, widths: [320, 768, 1440], firewallWidths, firewallHeaderStates: ['normal', 'long_name', 'wrapped_status', 'loading', 'error'], trustMigration: true, errors }, null, 2));
+  console.log('界面验收通过：9 页面、深浅主题、防火墙 7 种宽度及顶部 5 种状态、互信迁移、浮层与未提交修改。');
 } catch (error) {
   await page.screenshot({ path: `${output}/failure.png`, fullPage: true, mask: [page.getByLabel('一次性安装命令', { exact: true })] }).catch(() => {});
   writeFileSync(`${output}/failure.txt`, `${page.url()}\n${error.stack}\n${errors.join('\n')}`);

@@ -80,14 +80,16 @@ function FirewallContent({ nodeID }: { nodeID: string }) {
     <PageToolbar className="firewall-filters">
       <ChoiceField label="节点" value={nodeID} options={nodes.data?.items.filter((n) => !n.revoked_at).map((n) => [n.id, n.name] as const) ?? [[nodeID, '本机']]} onChange={(value) => update('node', value)} />
       <ChoiceField label="地址族" value={family} options={[[ '', 'IPv4 与 IPv6' ], ['ipv4', 'IPv4'], ['ipv6', 'IPv6']]} onChange={(value) => update('family', value)} />
-      <div className="toolbar-actions"><BusyButton variant="outline" busy={refreshing} disabled={state.isFetching || trust.isFetching} onClick={() => void refresh()}>刷新</BusyButton><Link to={`/firewall/settings?${search}`} className={buttonVariants({ variant: 'outline' })}>设置</Link></div>
     </PageToolbar>
+    <div className="firewall-status-row">
+      <div className="firewall-status min-w-0 flex flex-wrap items-center gap-x-3 gap-y-2">
+        {!read ? state.isPending ? <Skeleton className="h-5 w-48" /> : '—' : <><span className="font-medium text-foreground-intense">{read.backend === 'none' ? '未安装防火墙' : read.backend === 'unknown' ? '防火墙' : read.backend === 'ufw' ? 'UFW' : read.backend}</span>{read.service_active === false && <StatusLabel state="offline">已停用</StatusLabel>}<StatusLabel state={read.state}>{read.state === 'in_sync' && read.service_active === false ? '已保存' : stateNames[read.state]}</StatusLabel>{read.checked_at && <span className="text-xs tabular-nums text-foreground-muted">{date(read.checked_at)}</span>}</>}
+      </div>
+      <div className="toolbar-actions"><BusyButton variant="outline" busy={refreshing} disabled={state.isFetching || trust.isFetching} onClick={() => void refresh()}>刷新</BusyButton><Link to={`/firewall/settings?${search}`} className={buttonVariants({ variant: 'outline' })}>设置</Link></div>
+    </div>
     <Failure error={state.error} retry={() => void refresh()} busy={refreshing} /><Failure error={nodes.error} retry={() => void nodes.refetch()} busy={nodes.isFetching} />
     {node?.revoked_at && <p role="alert" className="mb-3"><StatusLabel state="offline">节点已撤销</StatusLabel></p>}
     {node?.connected === false && <p role="status" className="mb-3"><StatusLabel state="offline">节点离线</StatusLabel></p>}
-    <div className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-border pb-3">
-      {!read ? state.isPending ? <Skeleton className="h-5 w-48" /> : '—' : <><span className="font-medium text-foreground-intense">{read.backend === 'none' ? '未安装防火墙' : read.backend === 'unknown' ? '防火墙' : read.backend === 'ufw' ? 'UFW' : read.backend}</span>{read.service_active === false && <StatusLabel state="offline">已停用</StatusLabel>}<StatusLabel state={read.state}>{read.state === 'in_sync' && read.service_active === false ? '已保存' : stateNames[read.state]}</StatusLabel>{read.checked_at && <span className="text-xs tabular-nums text-foreground-muted">{date(read.checked_at)}</span>}</>}
-    </div>
     {read?.error && <p role="alert" className="mb-3 text-sm text-error-intense">{read.error.message}</p>}
     <Failure error={retry.error ?? locateRetry.error} />
     {read && <InstallFirewall key={nodeID} nodeID={nodeID} available={read.backend === 'none' && read.capabilities.install.supported} disabled={node?.writable === false || state.isError} />}
