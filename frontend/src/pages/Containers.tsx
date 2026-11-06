@@ -48,6 +48,8 @@ export function Containers() {
   const visible = useVisible();
   const nodes = useQuery(nodesQuery);
   const query = useQuery({ queryKey: ['containers', 'list', node, state, search], enabled: visible, queryFn: async ({ signal }) => unwrap(await api.GET('/containers', { signal, params: { query: { node_id: node || undefined, state: state || undefined, search: search || undefined } } })), refetchInterval: visible ? 5000 : false });
+  const [refreshing, setRefreshing] = useState(false);
+  const refresh = async () => { setRefreshing(true); try { await query.refetch(); } finally { setRefreshing(false); } };
   const [detail, setDetail] = useState<Container | null>(null);
   const [logs, setLogs] = useState<Container | null>(null);
   const [confirm, setConfirm] = useState<{ container: Container; action: Action } | null>(null);
@@ -77,9 +79,9 @@ export function Containers() {
       <ChoiceField label="节点" value={node} options={[[ '', '全部节点' ], ...(nodes.data?.items.filter((item) => !item.revoked_at).map((item) => [item.id, item.name] as const) ?? [])]} onChange={(value) => update('node', value)} />
       <ChoiceField label="容器状态" value={state} options={[[ '', '全部状态' ], ['running', '运行中'], ['stopped', '已停止'], ['paused', '已暂停'], ['restarting', '重启中'], ['dead', '异常']]} onChange={(value) => update('state', value)} />
       <TextField label="名称" value={search} onChange={(event) => update('search', event.target.value)} />
-      <div className="flex items-end"><BusyButton variant="outline" busy={query.isFetching} onClick={() => void query.refetch()}>刷新</BusyButton></div>
+      <div className="flex items-end"><BusyButton variant="outline" busy={refreshing} disabled={query.isFetching} onClick={() => void refresh()}>刷新</BusyButton></div>
     </div>
-    <Failure error={query.error ?? nodes.error} retry={() => { void query.refetch(); void nodes.refetch(); }} busy={query.isFetching} /><Failure error={change.error ?? locate.error} />
+    <Failure error={query.error ?? nodes.error} retry={() => { void refresh(); void nodes.refetch(); }} busy={refreshing} /><Failure error={change.error ?? locate.error} />
     {uncertain && <div className="mb-4 flex flex-wrap items-center gap-3"><span className="text-sm">{uncertain.container.node_name} · {actions[uncertain.action]} {uncertain.container.name} · 受理结果未知</span><BusyButton size="sm" variant="outline" busy={locate.isPending} onClick={() => locate.mutate()}>查询原操作</BusyButton></div>}
     {message && <p role="status" className="mb-3 text-sm">{message}</p>}
     {unavailable.length > 0 && <ul className="mb-4 space-y-2 text-sm">{unavailable.map((item) => <li key={item.node_id} className="flex flex-wrap items-center gap-x-3 gap-y-1"><Link to={`/nodes/${item.node_id}`} className="font-medium hover:underline">{item.node_name}</Link><StatusLabel state={item.state === 'offline' ? 'offline' : 'unknown'}>{runtimeStates[item.state]}</StatusLabel>{item.error && <span className="text-foreground-muted">{item.error.message}</span>}</li>)}</ul>}
@@ -118,9 +120,11 @@ function ContainerLogs({ container, onClose }: { container: Container; onClose: 
   const visible = useVisible();
   const automaticID = useId();
   const query = useQuery({ queryKey: ['containers', 'logs', container.node_id, container.engine_id, container.container_id, tail], enabled: visible, queryFn: async ({ signal }) => unwrap(await api.GET('/nodes/{id}/containers/{container_id}/logs', { signal, params: { path: { id: container.node_id, container_id: container.container_id }, query: { engine_id: container.engine_id, tail: Number(tail) } } })), refetchInterval: visible && automatic ? 2000 : false, refetchOnWindowFocus: automatic });
+  const [refreshing, setRefreshing] = useState(false);
+  const refresh = async () => { setRefreshing(true); try { await query.refetch(); } finally { setRefreshing(false); } };
   return <Dialog open onOpenChange={(open) => { if (!open) onClose(); }}><DialogContent className="w-full max-w-4xl" closeLabel="关闭容器日志"><DialogHeader><DialogTitle>容器日志</DialogTitle></DialogHeader><DialogBody className="min-w-0 space-y-4 overflow-y-auto">
-    <p className="break-all text-sm">{container.node_name} · {container.name}</p><div className="flex flex-wrap items-end gap-4"><div className="w-32"><ChoiceField label="行数" value={tail} options={['100', '200', '500', '1000'].map((value) => [value, value] as const)} onChange={setTail} /></div><div className="flex h-10 items-center gap-2"><label htmlFor={automaticID} className="text-sm">自动刷新</label><Switch id={automaticID} checked={automatic} onCheckedChange={setAutomatic} /></div><BusyButton variant="outline" busy={query.isFetching} onClick={() => void query.refetch()}>刷新</BusyButton></div>
-    <Failure error={query.error} retry={() => void query.refetch()} busy={query.isFetching} />{query.data?.truncated && <p role="status" className="text-sm text-foreground-muted">日志已截断</p>}
+    <p className="break-all text-sm">{container.node_name} · {container.name}</p><div className="flex flex-wrap items-end gap-4"><div className="w-32"><ChoiceField label="行数" value={tail} options={['100', '200', '500', '1000'].map((value) => [value, value] as const)} onChange={setTail} /></div><div className="flex h-10 items-center gap-2"><label htmlFor={automaticID} className="text-sm">自动刷新</label><Switch id={automaticID} checked={automatic} onCheckedChange={setAutomatic} /></div><BusyButton variant="outline" busy={refreshing} disabled={query.isFetching} onClick={() => void refresh()}>刷新</BusyButton></div>
+    <Failure error={query.error} retry={() => void refresh()} busy={refreshing} />{query.data?.truncated && <p role="status" className="text-sm text-foreground-muted">日志已截断</p>}
     {query.isPending ? <Skeleton className="h-64 w-full" /> : <pre aria-label="容器日志" className="max-h-128 min-h-48 overflow-auto whitespace-pre-wrap break-all rounded-md bg-background-muted p-4 font-mono text-xs">{query.data?.text || (query.isError ? '' : '暂无日志')}</pre>}
   </DialogBody></DialogContent></Dialog>;
 }

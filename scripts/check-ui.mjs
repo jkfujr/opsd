@@ -358,9 +358,9 @@ try {
     const nodes = await response.json();
     const id = nodes.items.find((node) => node.local)?.id;
     if (id) {
-      const paths = [`/nodes/${id}/firewall`, `/nodes/${id}/peer-trust`, '/operations/pending', `/operations?node_id=${id}&limit=20`];
+      const paths = [`/nodes/${id}/firewall`, `/nodes/${id}/firewall/peer-trust`, '/operations/pending', `/operations?node_id=${id}&limit=20`];
       const states = {};
-      for (const path of paths) { const result = await context.request.get(`${base}/api/v1${path}`); states[path] = { status: result.status(), body: await result.json() }; }
+      for (const path of paths) { const result = await context.request.get(`${base}/api/v1${path}`); const text = await result.text(); let body; try { body = JSON.parse(text); } catch { body = text; } states[path] = { status: result.status(), body }; }
       writeFileSync(`${output}/failure-state.json`, JSON.stringify(states, null, 2));
     }
   } catch { /* 保留原始失败及页面截图。 */ }
