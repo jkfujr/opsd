@@ -353,6 +353,17 @@ try {
   writeFileSync(`${output}/result.json`, JSON.stringify({ pages: pages.length, themes: 2, widths: [320, 768, 1440], firewallWidths, firewallHeaderStates: ['normal', 'long_name', 'wrapped_status', 'loading', 'error'], containers: { native: true, restartRequests, logPolling: true, states: ['empty', 'partial', 'long', 'loading', 'error'] }, trustMigration: true, errors }, null, 2));
   console.log('界面验收通过：10 页面、深浅主题、容器真实操作与日志及 5 种页面状态、防火墙布局、互信迁移、浮层与未提交修改。');
 } catch (error) {
+  try {
+    const response = await context.request.get(`${base}/api/v1/nodes`);
+    const nodes = await response.json();
+    const id = nodes.items.find((node) => node.local)?.id;
+    if (id) {
+      const paths = [`/nodes/${id}/firewall`, `/nodes/${id}/peer-trust`, '/operations/pending', `/operations?node_id=${id}&limit=20`];
+      const states = {};
+      for (const path of paths) { const result = await context.request.get(`${base}/api/v1${path}`); states[path] = { status: result.status(), body: await result.json() }; }
+      writeFileSync(`${output}/failure-state.json`, JSON.stringify(states, null, 2));
+    }
+  } catch { /* 保留原始失败及页面截图。 */ }
   await page.screenshot({ path: `${output}/failure.png`, fullPage: true, mask: [page.getByLabel('一次性安装命令', { exact: true })] }).catch(() => {});
   writeFileSync(`${output}/failure.txt`, `${page.url()}\n${error.stack}\n${errors.join('\n')}`);
   throw error;
