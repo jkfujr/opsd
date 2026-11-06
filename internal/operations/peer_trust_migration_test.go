@@ -16,6 +16,13 @@ type migrationPolicyHost struct {
 	afterUserWrite func()
 }
 
+func (h *migrationPolicyHost) Run(ctx context.Context, name string, args ...string) ([]byte, error) {
+	if name == "ip6tables-save" {
+		return []byte("*filter\n:INPUT ACCEPT [0:0]\nCOMMIT\n"), nil
+	}
+	return h.managedPolicyHost.Run(ctx, name, args...)
+}
+
 func (h *migrationPolicyHost) Replace(path string, before, after []byte) error {
 	err := h.managedPolicyHost.Replace(path, before, after)
 	if err == nil && path == "/etc/ufw/user.rules" && h.afterUserWrite != nil {
@@ -39,6 +46,11 @@ func TestPeerTrustMigrationChecksNativeCoverageAndPersistsConfirmedRemoval(t *te
 			}
 			target := protocol.PeerTrustTarget{Revision: 1, Enabled: true, IPv4: []string{"8.8.8.8"}, IPv6: []string{}}
 			status := protocol.PeerTrustUpdated{TargetRevision: 1, AppliedRevision: 1, Results: e.Manager.SyncPeerTrust(t.Context(), target)}
+			for _, result := range status.Results {
+				if result.State != "in_sync" && result.State != "inactive" {
+					t.Fatalf("初始互信未完成：%+v", result)
+				}
+			}
 			a, _ := json.Marshal(target)
 			b, _ := json.Marshal(status)
 			if _, err = e.Store.DB.Exec("INSERT INTO peer_trust(id,target,status) VALUES(1,?,?)", string(a), string(b)); err != nil {
