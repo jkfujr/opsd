@@ -142,7 +142,7 @@ try {
       await page.locator('.firewall-status [data-slot="skeleton"]').waitFor();
       await checkFirewallHeader();
       await capture(`${theme}-1000-firewall-loading`);
-    } finally { release(); await page.unroute(`**/api/v1${firewallPath}`); }
+    } finally { release(); await page.unrouteAll({ behavior: 'wait' }); }
     await page.locator('.firewall-status').getByText('UFW', { exact: true }).waitFor();
 
     await page.route(`**/api/v1${firewallPath}`, (route) => route.fulfill({ status: 503, json: { code: 'dependency_unavailable', message: '防火墙读取失败' } }));
