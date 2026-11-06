@@ -8,6 +8,8 @@
 
 `cluster` 负责节点协议和数据；`control` 负责会话、HTTP、SSE；`executor` 负责 root 服务；`operations` 负责独立执行与恢复；`firewall` 负责原生后端；`dockerengine` 负责本机 Docker；`monitoring` 负责采集。协议定义位于 `protocol`，HTTP 类型只从 `api/openapi.json` 生成。
 
+防火墙后台检查在请求期限内等待本机操作锁，锁繁忙时保留上次实际状态；实际读取失败单独记录错误。互信维护与容器操作共用该锁，检查完成后继续按确认配置和实际互信覆盖受理迁移。
+
 ## 容器
 
 容器读取经节点认证 RPC 和类型化执行器消息到达目标本机，官方 Docker Go SDK 依赖留在 `dockerengine`。显式使用本机 Unix Socket 和 API 协商，支持 Linux rootful Docker；控制台及普通用户节点保持现有权限。旧 Portainer 转发方案作为历史设计。
