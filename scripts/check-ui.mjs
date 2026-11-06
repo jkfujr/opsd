@@ -57,6 +57,7 @@ try {
   await page.getByRole('button', { name: '登录', exact: true }).click();
   await page.waitForURL(`${base}/`);
   const nodes = await (await context.request.get(`${base}/api/v1/nodes`)).json();
+  assert.equal(nodes.items[0].name, 'ui-check', '网络修改或重复安装改变了节点名称');
   const id = nodes.items[0].id;
   const session = await (await context.request.get(`${base}/api/v1/auth/session`)).json();
   const api = async (path, method = 'GET', data) => {
@@ -90,7 +91,7 @@ try {
   await addRule({ family: 'ipv4', source: '100.64.0.0/10', protocol: 'any', action: 'allow' });
   await addRule({ family: 'ipv4', source: '0.0.0.0/0', protocol: 'tcp', port: '22', action: 'allow' });
   const firewall = await api(firewallPath);
-  const pages = [['overview', '/'], ['nodes', '/nodes'], ['detail', `/nodes/${id}`], ['firewall', `/firewall?node=${id}`], ['firewall-settings', '/firewall/settings'], ['account', '/settings/account'], ['sessions', '/settings/sessions'], ['appearance', '/settings/appearance'], ['version', '/settings/version']];
+  const pages = [['overview', '/'], ['nodes', '/nodes'], ['detail', `/nodes/${id}`], ['containers', '/containers'], ['firewall', `/firewall?node=${id}`], ['firewall-settings', '/firewall/settings'], ['account', '/settings/account'], ['sessions', '/settings/sessions'], ['appearance', '/settings/appearance'], ['version', '/settings/version']];
   for (const theme of ['light', 'dark']) {
     await page.goto(`${base}/settings/appearance`);
     await page.getByRole('radio', { name: theme === 'light' ? '浅色' : '深色', exact: true }).click();
@@ -177,14 +178,117 @@ try {
   const command = page.getByLabel('一次性安装命令', { exact: true });
   await command.waitFor();
   const shell = await command.inputValue();
-  assert(shell.startsWith('sh -c '));
+  assert(shell.startsWith('curl -fsSL '));
+  assert(shell.includes('| sudo sh -s -- -e '));
+  assert(!shell.includes('--expected-version'));
+  assert(shell.includes("-n '界面验收'\\''节点'"));
   assert(shell.includes('https://github.com/jkfujr/opsd/releases/download/v'));
   assert(shell.includes('/install.sh'));
+  await page.getByLabel('下载工具', { exact: true }).click();
+  await page.getByRole('option', { name: 'wget', exact: true }).click();
+  assert((await command.inputValue()).startsWith('wget -qO- '));
   await page.evaluate(() => Object.defineProperty(navigator, 'clipboard', { value: undefined, configurable: true }));
   await page.getByRole('button', { name: '复制命令', exact: true }).click();
   await page.getByRole('button', { name: '已复制', exact: true }).waitFor();
   await page.getByRole('dialog').getByRole('button', { name: '关闭', exact: true }).last().click();
   await page.getByRole('dialog').waitFor({ state: 'hidden' });
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.goto(`${base}/containers`);
+  const containerList = await api('/containers');
+  const nativeContainer = containerList.items.find((item) => item.name === 'opsd-ui-container');
+  assert(nativeContainer, '实际 Docker 容器未显示');
+  const containerPath = `/nodes/${nativeContainer.node_id}/containers/${nativeContainer.container_id}`;
+  const containerRow = page.getByRole('row').filter({ has: page.getByText('opsd-ui-container', { exact: true }) });
+  await containerRow.getByRole('button', { name: '查看', exact: true }).click();
+  await page.getByRole('heading', { name: '容器详情', exact: true }).waitFor();
+  await page.getByText(nativeContainer.container_id, { exact: true }).waitFor();
+  await capture('container-detail');
+  await page.getByRole('button', { name: '关闭容器详情', exact: true }).click();
+  await containerRow.getByRole('button', { name: '更多', exact: true }).click();
+  await page.getByRole('menuitem', { name: '停止', exact: true }).click();
+  await page.getByRole('alertdialog').waitFor();
+  await capture('container-stop');
+  await page.getByRole('alertdialog').getByRole('button', { name: '停止', exact: true }).click();
+  await waitFor(() => api('/containers'), (value) => value.items.some((item) => item.container_id === nativeContainer.container_id && item.state === 'exited'), '容器停止未读回');
+  await page.getByRole('button', { name: '关闭操作', exact: true }).click();
+  await containerRow.getByRole('button', { name: '更多', exact: true }).click();
+  await page.getByRole('menuitem', { name: '启动', exact: true }).click();
+  await waitFor(() => api('/containers'), (value) => value.items.some((item) => item.container_id === nativeContainer.container_id && item.state === 'running'), '容器启动未读回');
+  await page.getByRole('button', { name: '关闭操作', exact: true }).click();
+  let restartRequests = 0;
+  const actionPattern = '**/api/v1/nodes/*/containers/*/actions';
+  await page.route(actionPattern, async (route) => { restartRequests++; const response = await route.fetch(); assert.equal(response.status(), 202); await route.abort('failed'); });
+  await containerRow.getByRole('button', { name: '更多', exact: true }).click();
+  await page.getByRole('menuitem', { name: '重启', exact: true }).click();
+  await page.getByRole('alertdialog').getByRole('button', { name: '重启', exact: true }).click();
+  await page.getByRole('button', { name: '查询原操作', exact: true }).waitFor();
+  await capture('container-unknown-response');
+  await page.getByRole('button', { name: '查询原操作', exact: true }).click();
+  await page.getByRole('button', { name: '关闭操作', exact: true }).waitFor();
+  assert.equal(restartRequests, 1, '应答丢失后重新发送了容器动作');
+  await page.unroute(actionPattern);
+  await page.getByRole('button', { name: '关闭操作', exact: true }).click();
+  const nativeDetail = await api(`${containerPath}?engine_id=${encodeURIComponent(nativeContainer.engine_id)}`);
+  assert.equal(nativeDetail.state, 'running');
+  let logRequests = 0;
+  const countLogs = (request) => { if (request.url().includes(`${containerPath}/logs`)) logRequests++; };
+  page.on('request', countLogs);
+  await containerRow.getByRole('button', { name: '日志', exact: true }).click();
+  await page.locator('pre[aria-label="容器日志"]').filter({ hasText: '界面验收容器输出' }).waitFor();
+  await capture('container-logs');
+  await page.getByRole('switch', { name: '自动刷新', exact: true }).click();
+  let previousLogRequests = logRequests;
+  await page.waitForTimeout(2300);
+  assert.equal(logRequests, previousLogRequests, '暂停日志后继续轮询');
+  await page.getByRole('switch', { name: '自动刷新', exact: true }).click();
+  await waitFor(async () => logRequests, (value) => value > previousLogRequests, '日志自动刷新未恢复');
+  await page.evaluate(() => { Object.defineProperty(document, 'visibilityState', { value: 'hidden', configurable: true }); document.dispatchEvent(new Event('visibilitychange')); });
+  previousLogRequests = logRequests;
+  await page.waitForTimeout(2300);
+  assert.equal(logRequests, previousLogRequests, '页面隐藏后继续读取日志');
+  await page.evaluate(() => { delete document.visibilityState; document.dispatchEvent(new Event('visibilitychange')); });
+  await page.getByRole('button', { name: '关闭容器日志', exact: true }).click();
+  await page.waitForTimeout(300);
+  previousLogRequests = logRequests;
+  await page.waitForTimeout(2300);
+  assert.equal(logRequests, previousLogRequests, '关闭日志后继续轮询');
+  page.off('request', countLogs);
+  let containerScenario = 'empty';
+  let releaseContainerLoad;
+  let containerLoadGate;
+  const containerPattern = '**/api/v1/containers*';
+  await page.route(containerPattern, async (route) => {
+    const scenario = containerScenario;
+    if (scenario === 'loading') await containerLoadGate;
+    if (scenario === 'error') { await route.fulfill({ status: 503, json: { code: 'dependency_unavailable', message: '容器读取失败，请重试' } }); return; }
+    const response = await route.fetch();
+    const value = await response.json();
+    if (scenario === 'empty') value.items = [];
+    if (scenario === 'partial') value.nodes.push({ node_id: 'offline-node', node_name: '远程节点', engine_id: '', version: '', state: 'offline', checked_at: new Date().toISOString(), error: { code: 'node_unavailable', message: '节点暂不可达' } });
+    if (scenario === 'long') for (const item of value.items) { item.name = '很长的容器名称'.repeat(12); item.node_name = '很长的节点名称'.repeat(10); item.image = 'registry.example.com/namespace/'.repeat(5) + 'image:latest'; item.health = 'unhealthy'; }
+    await route.fulfill({ response, json: value });
+  });
+  for (const theme of ['light', 'dark']) {
+    await page.goto(`${base}/settings/appearance`);
+    await page.getByRole('radio', { name: theme === 'light' ? '浅色' : '深色', exact: true }).click();
+    for (const width of [320, 768, 1440]) {
+      await page.setViewportSize({ width, height: 1000 });
+      for (const scenario of ['empty', 'partial', 'long', 'loading', 'error']) {
+        containerScenario = scenario;
+        if (scenario === 'loading') containerLoadGate = new Promise((resolve) => { releaseContainerLoad = resolve; });
+        await page.goto(`${base}/containers`);
+        if (scenario === 'loading') await page.locator('main [aria-busy="true"]').first().waitFor();
+        else if (scenario === 'empty') await page.getByText('暂无容器', { exact: true }).waitFor();
+        else if (scenario === 'partial') await page.getByText('节点离线', { exact: true }).waitFor();
+        else if (scenario === 'long') await page.getByText('很长的容器名称'.repeat(12), { exact: true }).first().waitFor();
+        else await page.getByRole('alert').filter({ hasText: '容器读取失败' }).waitFor();
+        await capture(`${theme}-${width}-containers-${scenario}`);
+        if (scenario === 'loading') { releaseContainerLoad(); await page.locator('main [aria-busy="true"]').first().waitFor({ state: 'hidden' }); }
+      }
+    }
+  }
+  await page.unroute(containerPattern);
+  await page.setViewportSize({ width: 1440, height: 1000 });
   await page.goto(`${base}/firewall/settings`);
   await page.getByRole('switch', { name: '集群互信' }).click();
   await page.getByRole('alertdialog').waitFor();
@@ -246,8 +350,8 @@ try {
   await capture('mobile-menu');
   await page.keyboard.press('Escape');
   assert.deepEqual(errors, [], '浏览器运行错误');
-  writeFileSync(`${output}/result.json`, JSON.stringify({ pages: pages.length, themes: 2, widths: [320, 768, 1440], firewallWidths, firewallHeaderStates: ['normal', 'long_name', 'wrapped_status', 'loading', 'error'], trustMigration: true, errors }, null, 2));
-  console.log('界面验收通过：9 页面、深浅主题、防火墙 7 种宽度及顶部 5 种状态、互信迁移、浮层与未提交修改。');
+  writeFileSync(`${output}/result.json`, JSON.stringify({ pages: pages.length, themes: 2, widths: [320, 768, 1440], firewallWidths, firewallHeaderStates: ['normal', 'long_name', 'wrapped_status', 'loading', 'error'], containers: { native: true, restartRequests, logPolling: true, states: ['empty', 'partial', 'long', 'loading', 'error'] }, trustMigration: true, errors }, null, 2));
+  console.log('界面验收通过：10 页面、深浅主题、容器真实操作与日志及 5 种页面状态、防火墙布局、互信迁移、浮层与未提交修改。');
 } catch (error) {
   await page.screenshot({ path: `${output}/failure.png`, fullPage: true, mask: [page.getByLabel('一次性安装命令', { exact: true })] }).catch(() => {});
   writeFileSync(`${output}/failure.txt`, `${page.url()}\n${error.stack}\n${errors.join('\n')}`);

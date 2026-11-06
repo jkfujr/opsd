@@ -36,7 +36,9 @@ jobs:
           test "$(artifacts/opsd-linux-amd64 version --plain)" = "$(node -p 'require("./package.json").version')"
           sh -n artifacts/install.sh
       - name: 后端测试
-        run: npm test
+        run: |
+          docker pull busybox:1.37.0
+          OPSD_DOCKER_TEST=1 npm test
       - name: 原生互信规则与新连接
         run: |
           sudo apt-get update -qq
@@ -54,14 +56,23 @@ jobs:
           password=$(openssl rand -hex 24)
           echo "::add-mask::$password"
           echo "OPSD_UI_PASSWORD=$password" >> "$GITHUB_ENV"
-          sudo env OPSD_PASSWORD="$password" artifacts/opsd-linux-amd64 install --non-interactive --address http://127.0.0.1:8444 --name ui-check --username ui-check --entrance /signin > artifacts/install-check.log
+          sudo env OPSD_PASSWORD="$password" artifacts/opsd-linux-amd64 install --non-interactive --address http://127.0.0.1:8444 -n ui-check --username ui-check --entrance /signin > artifacts/install-check.log
+          if sudo /opt/opsd/bin/opsd network --listen 127.0.0.1:8444 > artifacts/network-running.log 2>&1; then exit 1; fi
+          grep -q '请先停止 opsd.service' artifacts/network-running.log
+          sudo systemctl stop opsd.service opsd-executor.service
+          sudo /opt/opsd/bin/opsd network --listen 127.0.0.1:8444 --address-mode manual --address http://127.0.0.1:8444
+          sudo systemctl start opsd-executor.service opsd.service
+          sudo /opt/opsd/bin/opsd install -n '重复安装保留账号' --address http://127.0.0.1:1
           sudo /opt/opsd/bin/opsd console --enabled=true
+          docker run -d --name opsd-ui-container --label com.docker.compose.project=ui-demo --label com.docker.compose.service=web busybox:1.37.0 sh -c 'trap "exit 0" TERM INT; while :; do echo "界面验收容器输出"; echo "界面验收错误输出" >&2; sleep 1; done'
           npx playwright install --with-deps chromium
       - name: 生产界面与交互
         run: node scripts/check-ui.mjs
       - name: 停止验收服务
         if: always()
-        run: sudo systemctl stop opsd.service opsd-executor.service || true
+        run: |
+          sudo systemctl stop opsd.service opsd-executor.service || true
+          docker rm -f opsd-ui-container || true
       - uses: actions/upload-artifact@v4
         if: always()
         with:

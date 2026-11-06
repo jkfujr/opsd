@@ -1,5 +1,6 @@
 import { useEffect, useId, useRef, useState, type RefObject } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
+import { Link } from 'react-router';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogBody, DialogFooter } from '@appica/ui-react/dialog';
 import { Button } from '@appica/ui-react/button';
 import { Textarea } from '@appica/ui-react/textarea';
@@ -8,13 +9,17 @@ import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@
 import { api, RequestError, unwrap } from './api/client';
 import type { components } from './api/schema.gen';
 import { queryClient } from './state';
-import { BusyButton, Confirm, date, Failure, LoadingRows, TextField } from './ui';
+import { useSession } from './auth';
+import { BusyButton, ChoiceField, Confirm, date, Failure, LoadingRows, TextField } from './ui';
 
 const shellQuote = (value: string) => `'${value.replaceAll("'", "'\\''")}'`;
-const bootstrap = `set -eu; [ "$(id -u)" -eq 0 ] || { printf '%s\\n' '请以 root 执行安装命令' >&2; exit 1; }; if { ! command -v curl >/dev/null 2>&1 && ! command -v wget >/dev/null 2>&1; } || [ ! -s /etc/ssl/certs/ca-certificates.crt ]; then . /etc/os-release; case "$ID" in debian|ubuntu) ;; *) exit 1 ;; esac; apt-get update -qq; DEBIAN_FRONTEND=noninteractive apt-get install -y -qq ca-certificates curl; fi; file=$(mktemp); trap 'rm -f "$file"' 0 1 2 15; url=$1; shift; if command -v curl >/dev/null 2>&1; then curl -fsSL --proto '=https' --proto-redir '=https' "$url" -o "$file"; else wget --https-only -q -O "$file" "$url"; fi; sh "$file" "$@"`;
 
 export function EnrollmentDialog({ mode, onClose, onManage, trigger }: { mode: 'add' | 'tokens'; onClose: () => void; onManage: () => void; trigger: RefObject<HTMLButtonElement | null> }) {
   const commandID = useId();
+  const session = useSession();
+  const [downloader, setDownloader] = useState('curl');
+  const settings = `/nodes/${session.local_node_id}#node-settings`;
+  const config = useQuery({ queryKey: ['nodes', session.local_node_id, 'settings'], enabled: mode === 'add', queryFn: async ({ signal }) => unwrap(await api.GET('/nodes/{id}/settings', { signal, params: { path: { id: session.local_node_id } } })) });
   const [created, setCreated] = useState<{ result: components['schemas']['EnrollmentTokenCreated']; name: string; region: string } | null>(null);
   const [revoke, setRevoke] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
@@ -32,7 +37,7 @@ export function EnrollmentDialog({ mode, onClose, onManage, trigger }: { mode: '
   }, [mode, query.data, now]);
   const create = useMutation({ gcTime: 0, mutationFn: async (values: { name: string; region: string }) => ({ result: unwrap(await api.POST('/enrollment-tokens', { params: { header: { 'X-CSRF-Token': '' } } })), ...values }), onSuccess: (data) => { setCreated(data); void queryClient.invalidateQueries({ queryKey: ['tokens'] }); }, onError: (error) => setUncertain(!(error instanceof RequestError && [403, 409, 422].includes(error.status))) });
   const revoked = useMutation({ mutationFn: async () => unwrap(await api.DELETE('/enrollment-tokens/{id}', { params: { path: { id: revoke! }, header: { 'X-CSRF-Token': '' } } })), onSuccess: () => { setRevoke(null); void queryClient.invalidateQueries({ queryKey: ['tokens'] }); } });
-  const command = created ? `sh -c ${shellQuote(bootstrap)} sh ${shellQuote(created.result.installer_url)} --non-interactive --expected-version ${shellQuote(created.result.version)} --peer-address ${shellQuote(created.result.peer_address)} --peer-public-key ${shellQuote(created.result.peer_public_key)} --enrollment-token ${shellQuote(created.result.token)}${created.name ? ` --name ${shellQuote(created.name)}` : ''}${created.region ? ` --region ${shellQuote(created.region)}` : ''}` : '';
+  const command = created ? `${downloader === 'wget' ? 'wget -qO-' : 'curl -fsSL'} ${shellQuote(created.result.installer_url)} | sudo sh -s -- -e ${shellQuote(created.result.peer_address)} -k ${shellQuote(created.result.peer_public_key)} -t ${shellQuote(created.result.token)}${created.name ? ` -n ${shellQuote(created.name)}` : ''}${created.region ? ` -r ${shellQuote(created.region)}` : ''}` : '';
   const copy = async () => {
     setCopyError(null);
     try {
@@ -45,9 +50,11 @@ export function EnrollmentDialog({ mode, onClose, onManage, trigger }: { mode: '
     <DialogContent className={`w-full ${mode === 'tokens' ? 'max-w-3xl' : 'max-w-xl'}`} closeLabel="关闭" closeButton={!create.isPending && !revoked.isPending} finalFocus={trigger}>
       <DialogHeader><DialogTitle>{mode === 'add' ? '添加节点' : '接入码'}</DialogTitle></DialogHeader>
       <DialogBody className="min-w-0 space-y-5 overflow-y-auto">
+        {mode === 'add' && <div className="space-y-2"><dl className="text-sm"><dt className="text-foreground-muted">接入地址</dt><dd className="break-all">{created?.result.peer_address ?? config.data?.address ?? '—'}</dd></dl><Link to={settings} className="text-sm underline" onClick={onClose}>节点设置</Link><Failure error={config.error} /></div>}
         {mode === 'add' ? created ? <>
           <dl className="flex flex-wrap gap-x-6 gap-y-2 text-sm">{created.name && <div><dt className="text-foreground-muted">名称</dt><dd className="break-all">{created.name}</dd></div>}{created.region && <div><dt className="text-foreground-muted">地域</dt><dd className="break-all">{created.region}</dd></div>}<div><dt className="text-foreground-muted">到期时间</dt><dd>{date(created.result.record.expires_at)}</dd></div></dl>
-          <Field className="space-y-2"><FieldLabel htmlFor={commandID}>一次性安装命令</FieldLabel><Textarea id={commandID} ref={textarea} value={command} readOnly rows={6} className="font-mono text-sm" /></Field><Failure error={copyError} />
+          <ChoiceField label="下载工具" value={downloader} options={[[ 'curl', 'curl' ], [ 'wget', 'wget' ]]} onChange={(value) => { setDownloader(value); setCopied(false); }} />
+          <Field className="space-y-2"><FieldLabel htmlFor={commandID}>一次性安装命令</FieldLabel><Textarea id={commandID} ref={textarea} value={command} readOnly rows={4} className="font-mono text-sm" /></Field><Failure error={copyError} />
         </> : <form id="add-node" className="space-y-5" onSubmit={(event) => { event.preventDefault(); const form = new FormData(event.currentTarget); create.mutate({ name: String(form.get('name')).trim(), region: String(form.get('region')).trim() }); }}>
           <TextField label="名称（可选）" name="name" maxLength={255} placeholder="主机名" disabled={create.isPending || uncertain} />
           <TextField label="地域（可选）" name="region" disabled={create.isPending || uncertain} />

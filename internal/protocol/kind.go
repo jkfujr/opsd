@@ -4,6 +4,18 @@ import "fmt"
 
 func newPayload(kind Kind) (Payload, error) {
 	switch kind {
+	case "docker.read":
+		return &DockerRead{}, nil
+	case "docker.read.result":
+		return &DockerReadResult{}, nil
+	case "container.inspect":
+		return &ContainerInspect{}, nil
+	case "container.inspect.result":
+		return &ContainerInspectResult{}, nil
+	case "container.logs":
+		return &ContainerLogsRead{}, nil
+	case "container.logs.result":
+		return &ContainerLogsResult{}, nil
 	case "firewall.inspect":
 		return &FirewallInspect{}, nil
 	case "firewall.inspected":

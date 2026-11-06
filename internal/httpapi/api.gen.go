@@ -155,6 +155,54 @@ func (e ConfigScope) Valid() bool {
 	}
 }
 
+// Defines values for ContainerActionRequestAction.
+const (
+	Restart ContainerActionRequestAction = "restart"
+	Start   ContainerActionRequestAction = "start"
+	Stop    ContainerActionRequestAction = "stop"
+)
+
+// Valid indicates whether the value is a known member of the ContainerActionRequestAction enum.
+func (e ContainerActionRequestAction) Valid() bool {
+	switch e {
+	case Restart:
+		return true
+	case Start:
+		return true
+	case Stop:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for DockerNodeStateState.
+const (
+	DockerNodeStateStateNotInstalled DockerNodeStateState = "not_installed"
+	DockerNodeStateStateOffline      DockerNodeStateState = "offline"
+	DockerNodeStateStateReady        DockerNodeStateState = "ready"
+	DockerNodeStateStateUnavailable  DockerNodeStateState = "unavailable"
+	DockerNodeStateStateUnsupported  DockerNodeStateState = "unsupported"
+)
+
+// Valid indicates whether the value is a known member of the DockerNodeStateState enum.
+func (e DockerNodeStateState) Valid() bool {
+	switch e {
+	case DockerNodeStateStateNotInstalled:
+		return true
+	case DockerNodeStateStateOffline:
+		return true
+	case DockerNodeStateStateReady:
+		return true
+	case DockerNodeStateStateUnavailable:
+		return true
+	case DockerNodeStateStateUnsupported:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for FirewallInstallRequestBackend.
 const (
 	FirewallInstallRequestBackendFirewalld FirewallInstallRequestBackend = "firewalld"
@@ -415,6 +463,7 @@ const (
 	OperationSubjectAccount        OperationSubject = "account"
 	OperationSubjectComponent      OperationSubject = "component"
 	OperationSubjectConfig         OperationSubject = "config"
+	OperationSubjectContainer      OperationSubject = "container"
 	OperationSubjectFirewall       OperationSubject = "firewall"
 	OperationSubjectFirewallConfig OperationSubject = "firewall_config"
 	OperationSubjectName           OperationSubject = "name"
@@ -428,6 +477,8 @@ func (e OperationSubject) Valid() bool {
 	case OperationSubjectComponent:
 		return true
 	case OperationSubjectConfig:
+		return true
+	case OperationSubjectContainer:
 		return true
 	case OperationSubjectFirewall:
 		return true
@@ -866,6 +917,92 @@ type Capability struct {
 // ConfigScope defines model for ConfigScope.
 type ConfigScope string
 
+// ContainerActionRequest defines model for ContainerActionRequest.
+type ContainerActionRequest struct {
+	Action   ContainerActionRequestAction `json:"action"`
+	EngineId string                       `json:"engine_id"`
+}
+
+// ContainerActionRequestAction defines model for ContainerActionRequest.Action.
+type ContainerActionRequestAction string
+
+// ContainerDetail defines model for ContainerDetail.
+type ContainerDetail struct {
+	CheckedAt      time.Time          `json:"checked_at"`
+	ContainerId    string             `json:"container_id"`
+	CreatedAt      time.Time          `json:"created_at"`
+	EngineId       string             `json:"engine_id"`
+	FinishedAt     *time.Time         `json:"finished_at,omitempty"`
+	Health         string             `json:"health"`
+	Image          string             `json:"image"`
+	Mounts         []ContainerMount   `json:"mounts"`
+	Name           string             `json:"name"`
+	Networks       []ContainerNetwork `json:"networks"`
+	Ports          []ContainerPort    `json:"ports"`
+	Project        string             `json:"project"`
+	ReadOnlyReason *string            `json:"read_only_reason,omitempty"`
+	RestartCount   int                `json:"restart_count"`
+	RestartPolicy  string             `json:"restart_policy"`
+	Service        string             `json:"service"`
+	StartedAt      *time.Time         `json:"started_at,omitempty"`
+	State          string             `json:"state"`
+	Tty            bool               `json:"tty"`
+}
+
+// ContainerList defines model for ContainerList.
+type ContainerList struct {
+	Items []ContainerListItem `json:"items"`
+	Nodes []DockerNodeState   `json:"nodes"`
+}
+
+// ContainerListItem defines model for ContainerListItem.
+type ContainerListItem struct {
+	ContainerId    string          `json:"container_id"`
+	EngineId       string          `json:"engine_id"`
+	Health         string          `json:"health"`
+	Image          string          `json:"image"`
+	Name           string          `json:"name"`
+	NodeId         string          `json:"node_id"`
+	NodeName       string          `json:"node_name"`
+	Ports          []ContainerPort `json:"ports"`
+	Project        string          `json:"project"`
+	ReadOnlyReason *string         `json:"read_only_reason,omitempty"`
+	Service        string          `json:"service"`
+	State          string          `json:"state"`
+}
+
+// ContainerLogs defines model for ContainerLogs.
+type ContainerLogs struct {
+	CheckedAt   time.Time `json:"checked_at"`
+	ContainerId string    `json:"container_id"`
+	EngineId    string    `json:"engine_id"`
+	Text        string    `json:"text"`
+	Truncated   bool      `json:"truncated"`
+}
+
+// ContainerMount defines model for ContainerMount.
+type ContainerMount struct {
+	Destination string `json:"destination"`
+	ReadOnly    bool   `json:"read_only"`
+	Source      string `json:"source"`
+	Type        string `json:"type"`
+}
+
+// ContainerNetwork defines model for ContainerNetwork.
+type ContainerNetwork struct {
+	Ipv4 string `json:"ipv4"`
+	Ipv6 string `json:"ipv6"`
+	Name string `json:"name"`
+}
+
+// ContainerPort defines model for ContainerPort.
+type ContainerPort struct {
+	ContainerPort int    `json:"container_port"`
+	HostIp        string `json:"host_ip"`
+	HostPort      int    `json:"host_port"`
+	Protocol      string `json:"protocol"`
+}
+
 // CurrentSession defines model for CurrentSession.
 type CurrentSession struct {
 	CsrfToken    string  `json:"csrf_token"`
@@ -873,6 +1010,20 @@ type CurrentSession struct {
 	LoginAddress string  `json:"login_address"`
 	Session      Session `json:"session"`
 }
+
+// DockerNodeState defines model for DockerNodeState.
+type DockerNodeState struct {
+	CheckedAt time.Time            `json:"checked_at"`
+	EngineId  string               `json:"engine_id"`
+	Error     *NetworkError        `json:"error,omitempty"`
+	NodeId    string               `json:"node_id"`
+	NodeName  string               `json:"node_name"`
+	State     DockerNodeStateState `json:"state"`
+	Version   string               `json:"version"`
+}
+
+// DockerNodeStateState defines model for DockerNodeState.State.
+type DockerNodeStateState string
 
 // EnrollmentToken defines model for EnrollmentToken.
 type EnrollmentToken struct {
@@ -1444,6 +1595,13 @@ type RevokeSessionParams struct {
 	XCSRFToken string `json:"X-CSRF-Token"`
 }
 
+// ListContainersParams defines parameters for ListContainers.
+type ListContainersParams struct {
+	NodeId *string `form:"node_id,omitempty" json:"node_id,omitempty"`
+	State  *string `form:"state,omitempty" json:"state,omitempty"`
+	Search *string `form:"search,omitempty" json:"search,omitempty"`
+}
+
 // CreateEnrollmentTokenParams defines parameters for CreateEnrollmentToken.
 type CreateEnrollmentTokenParams struct {
 	XCSRFToken string `json:"X-CSRF-Token"`
@@ -1477,6 +1635,23 @@ type ChangeNodeAccountParams struct {
 // RevealNodePasswordParams defines parameters for RevealNodePassword.
 type RevealNodePasswordParams struct {
 	XCSRFToken string `json:"X-CSRF-Token"`
+}
+
+// GetContainerParams defines parameters for GetContainer.
+type GetContainerParams struct {
+	EngineId string `form:"engine_id" json:"engine_id"`
+}
+
+// ChangeContainerParams defines parameters for ChangeContainer.
+type ChangeContainerParams struct {
+	XCSRFToken     string `json:"X-CSRF-Token"`
+	IdempotencyKey string `json:"Idempotency-Key"`
+}
+
+// GetContainerLogsParams defines parameters for GetContainerLogs.
+type GetContainerLogsParams struct {
+	EngineId string `form:"engine_id" json:"engine_id"`
+	Tail     *int   `form:"tail,omitempty" json:"tail,omitempty"`
 }
 
 // ChangeFirewallConfigParams defines parameters for ChangeFirewallConfig.
@@ -1573,6 +1748,9 @@ type RenameNodeJSONRequestBody = NodePatch
 // ChangeNodeAccountJSONRequestBody defines body for ChangeNodeAccount for application/json ContentType.
 type ChangeNodeAccountJSONRequestBody = NodeAccountChange
 
+// ChangeContainerJSONRequestBody defines body for ChangeContainer for application/json ContentType.
+type ChangeContainerJSONRequestBody = ContainerActionRequest
+
 // ChangeFirewallConfigJSONRequestBody defines body for ChangeFirewallConfig for application/json ContentType.
 type ChangeFirewallConfigJSONRequestBody = FirewallConfigPatch
 
@@ -1620,6 +1798,9 @@ type ServerInterface interface {
 	// RevokeSession 撤销指定会话
 	// (DELETE /auth/sessions/{id})
 	RevokeSession(w http.ResponseWriter, r *http.Request, id string, params RevokeSessionParams)
+	// ListContainers 读取各节点容器和 Docker 状态
+	// (GET /containers)
+	ListContainers(w http.ResponseWriter, r *http.Request, params ListContainersParams)
 	// ListEnrollmentTokens 读取接入码状态
 	// (GET /enrollment-tokens)
 	ListEnrollmentTokens(w http.ResponseWriter, r *http.Request)
@@ -1650,6 +1831,15 @@ type ServerInterface interface {
 
 	// (POST /nodes/{id}/account/password)
 	RevealNodePassword(w http.ResponseWriter, r *http.Request, id string, params RevealNodePasswordParams)
+	// GetContainer 读取容器详情
+	// (GET /nodes/{id}/containers/{container_id})
+	GetContainer(w http.ResponseWriter, r *http.Request, id string, containerId string, params GetContainerParams)
+	// ChangeContainer 启动、停止或重启容器
+	// (POST /nodes/{id}/containers/{container_id}/actions)
+	ChangeContainer(w http.ResponseWriter, r *http.Request, id string, containerId string, params ChangeContainerParams)
+	// GetContainerLogs 读取最近容器日志
+	// (GET /nodes/{id}/containers/{container_id}/logs)
+	GetContainerLogs(w http.ResponseWriter, r *http.Request, id string, containerId string, params GetContainerLogsParams)
 	// ReadFirewall 读取 OPSD 防火墙配置及应用状态
 	// (GET /nodes/{id}/firewall)
 	ReadFirewall(w http.ResponseWriter, r *http.Request, id string)
@@ -1871,6 +2061,65 @@ func (siw *ServerInterfaceWrapper) RevokeSession(w http.ResponseWriter, r *http.
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.RevokeSession(w, r, id, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListContainers operation middleware
+func (siw *ServerInterfaceWrapper) ListContainers(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListContainersParams
+
+	// ------------- Optional query parameter "node_id" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "node_id", r.URL.Query(), &params.NodeId, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "node_id"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "node_id", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "state" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "state", r.URL.Query(), &params.State, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "state"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "state", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "search" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "search", r.URL.Query(), &params.Search, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "search"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "search", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListContainers(w, r, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -2281,6 +2530,207 @@ func (siw *ServerInterfaceWrapper) RevealNodePassword(w http.ResponseWriter, r *
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.RevealNodePassword(w, r, id, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetContainer operation middleware
+func (siw *ServerInterfaceWrapper) GetContainer(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "container_id" -------------
+	var containerId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "container_id", r.PathValue("container_id"), &containerId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "container_id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetContainerParams
+
+	// ------------- Required query parameter "engine_id" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, true, "engine_id", r.URL.Query(), &params.EngineId, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "engine_id"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "engine_id", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetContainer(w, r, id, containerId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ChangeContainer operation middleware
+func (siw *ServerInterfaceWrapper) ChangeContainer(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "container_id" -------------
+	var containerId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "container_id", r.PathValue("container_id"), &containerId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "container_id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ChangeContainerParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "X-CSRF-Token" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-CSRF-Token")]; found {
+		var XCSRFToken string
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "X-CSRF-Token", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "X-CSRF-Token", valueList[0], &XCSRFToken, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-CSRF-Token", Err: err})
+			return
+		}
+
+		params.XCSRFToken = XCSRFToken
+
+	} else {
+		err := fmt.Errorf("Header parameter X-CSRF-Token is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "X-CSRF-Token", Err: err})
+		return
+	}
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey string
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ChangeContainer(w, r, id, containerId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetContainerLogs operation middleware
+func (siw *ServerInterfaceWrapper) GetContainerLogs(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "container_id" -------------
+	var containerId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "container_id", r.PathValue("container_id"), &containerId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "container_id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetContainerLogsParams
+
+	// ------------- Required query parameter "engine_id" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, true, "engine_id", r.URL.Query(), &params.EngineId, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "engine_id"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "engine_id", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "tail" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "tail", r.URL.Query(), &params.Tail, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "tail"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "tail", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetContainerLogs(w, r, id, containerId, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -3561,6 +4011,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/auth/session", wrapper.GetSession)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/auth/sessions", wrapper.ListSessions)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/auth/sessions/{id}", wrapper.RevokeSession)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/containers", wrapper.ListContainers)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/enrollment-tokens", wrapper.ListEnrollmentTokens)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/enrollment-tokens", wrapper.CreateEnrollmentToken)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/enrollment-tokens/{id}", wrapper.RevokeEnrollmentToken)
@@ -3571,6 +4022,9 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/nodes/{id}/account", wrapper.GetNodeAccount)
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/nodes/{id}/account", wrapper.ChangeNodeAccount)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/nodes/{id}/account/password", wrapper.RevealNodePassword)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/nodes/{id}/containers/{container_id}", wrapper.GetContainer)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/nodes/{id}/containers/{container_id}/actions", wrapper.ChangeContainer)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/nodes/{id}/containers/{container_id}/logs", wrapper.GetContainerLogs)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/nodes/{id}/firewall", wrapper.ReadFirewall)
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/nodes/{id}/firewall", wrapper.ChangeFirewallConfig)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/nodes/{id}/firewall/install", wrapper.InstallFirewall)
@@ -4205,6 +4659,126 @@ func (response RevokeSession500JSONResponse) VisitRevokeSessionResponse(w http.R
 type RevokeSession503JSONResponse struct{ UnavailableJSONResponse }
 
 func (response RevokeSession503JSONResponse) VisitRevokeSessionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(503)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListContainersRequestObject struct {
+	Params ListContainersParams
+}
+
+type ListContainersResponseObject interface {
+	VisitListContainersResponse(w http.ResponseWriter) error
+}
+
+type ListContainers200JSONResponse ContainerList
+
+func (response ListContainers200JSONResponse) VisitListContainersResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListContainers401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response ListContainers401JSONResponse) VisitListContainersResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListContainers403JSONResponse struct{ ForbiddenJSONResponse }
+
+func (response ListContainers403JSONResponse) VisitListContainersResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListContainers404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response ListContainers404JSONResponse) VisitListContainersResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListContainers409JSONResponse struct{ ConflictJSONResponse }
+
+func (response ListContainers409JSONResponse) VisitListContainersResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListContainers422JSONResponse struct{ InvalidRequestJSONResponse }
+
+func (response ListContainers422JSONResponse) VisitListContainersResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListContainers500JSONResponse struct{ InternalErrorJSONResponse }
+
+func (response ListContainers500JSONResponse) VisitListContainersResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListContainers503JSONResponse struct{ UnavailableJSONResponse }
+
+func (response ListContainers503JSONResponse) VisitListContainersResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response); err != nil {
@@ -5151,6 +5725,373 @@ func (response RevealNodePassword200JSONResponse) VisitRevealNodePasswordRespons
 type RevealNodePassword503JSONResponse APIError
 
 func (response RevealNodePassword503JSONResponse) VisitRevealNodePasswordResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(503)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetContainerRequestObject struct {
+	Id          string `json:"id"`
+	ContainerId string `json:"container_id"`
+	Params      GetContainerParams
+}
+
+type GetContainerResponseObject interface {
+	VisitGetContainerResponse(w http.ResponseWriter) error
+}
+
+type GetContainer200JSONResponse ContainerDetail
+
+func (response GetContainer200JSONResponse) VisitGetContainerResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetContainer401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response GetContainer401JSONResponse) VisitGetContainerResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetContainer403JSONResponse struct{ ForbiddenJSONResponse }
+
+func (response GetContainer403JSONResponse) VisitGetContainerResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetContainer404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response GetContainer404JSONResponse) VisitGetContainerResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetContainer409JSONResponse struct{ ConflictJSONResponse }
+
+func (response GetContainer409JSONResponse) VisitGetContainerResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetContainer422JSONResponse struct{ InvalidRequestJSONResponse }
+
+func (response GetContainer422JSONResponse) VisitGetContainerResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetContainer500JSONResponse struct{ InternalErrorJSONResponse }
+
+func (response GetContainer500JSONResponse) VisitGetContainerResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetContainer503JSONResponse struct{ UnavailableJSONResponse }
+
+func (response GetContainer503JSONResponse) VisitGetContainerResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(503)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangeContainerRequestObject struct {
+	Id          string `json:"id"`
+	ContainerId string `json:"container_id"`
+	Params      ChangeContainerParams
+	Body        *ChangeContainerJSONRequestBody
+}
+
+type ChangeContainerResponseObject interface {
+	VisitChangeContainerResponse(w http.ResponseWriter) error
+}
+
+type ChangeContainer202JSONResponse Operation
+
+func (response ChangeContainer202JSONResponse) VisitChangeContainerResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(202)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangeContainer401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response ChangeContainer401JSONResponse) VisitChangeContainerResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangeContainer403JSONResponse struct{ ForbiddenJSONResponse }
+
+func (response ChangeContainer403JSONResponse) VisitChangeContainerResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangeContainer404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response ChangeContainer404JSONResponse) VisitChangeContainerResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangeContainer409JSONResponse struct{ ConflictJSONResponse }
+
+func (response ChangeContainer409JSONResponse) VisitChangeContainerResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangeContainer422JSONResponse struct{ InvalidRequestJSONResponse }
+
+func (response ChangeContainer422JSONResponse) VisitChangeContainerResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangeContainer500JSONResponse struct{ InternalErrorJSONResponse }
+
+func (response ChangeContainer500JSONResponse) VisitChangeContainerResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangeContainer503JSONResponse struct{ UnavailableJSONResponse }
+
+func (response ChangeContainer503JSONResponse) VisitChangeContainerResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(503)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetContainerLogsRequestObject struct {
+	Id          string `json:"id"`
+	ContainerId string `json:"container_id"`
+	Params      GetContainerLogsParams
+}
+
+type GetContainerLogsResponseObject interface {
+	VisitGetContainerLogsResponse(w http.ResponseWriter) error
+}
+
+type GetContainerLogs200JSONResponse ContainerLogs
+
+func (response GetContainerLogs200JSONResponse) VisitGetContainerLogsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetContainerLogs401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response GetContainerLogs401JSONResponse) VisitGetContainerLogsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetContainerLogs403JSONResponse struct{ ForbiddenJSONResponse }
+
+func (response GetContainerLogs403JSONResponse) VisitGetContainerLogsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetContainerLogs404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response GetContainerLogs404JSONResponse) VisitGetContainerLogsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetContainerLogs409JSONResponse struct{ ConflictJSONResponse }
+
+func (response GetContainerLogs409JSONResponse) VisitGetContainerLogsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetContainerLogs422JSONResponse struct{ InvalidRequestJSONResponse }
+
+func (response GetContainerLogs422JSONResponse) VisitGetContainerLogsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetContainerLogs500JSONResponse struct{ InternalErrorJSONResponse }
+
+func (response GetContainerLogs500JSONResponse) VisitGetContainerLogsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetContainerLogs503JSONResponse struct{ UnavailableJSONResponse }
+
+func (response GetContainerLogs503JSONResponse) VisitGetContainerLogsResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response); err != nil {
@@ -7979,6 +8920,9 @@ type StrictServerInterface interface {
 	// RevokeSession 撤销指定会话
 	// (DELETE /auth/sessions/{id})
 	RevokeSession(ctx context.Context, request RevokeSessionRequestObject) (RevokeSessionResponseObject, error)
+	// ListContainers 读取各节点容器和 Docker 状态
+	// (GET /containers)
+	ListContainers(ctx context.Context, request ListContainersRequestObject) (ListContainersResponseObject, error)
 	// ListEnrollmentTokens 读取接入码状态
 	// (GET /enrollment-tokens)
 	ListEnrollmentTokens(ctx context.Context, request ListEnrollmentTokensRequestObject) (ListEnrollmentTokensResponseObject, error)
@@ -8009,6 +8953,15 @@ type StrictServerInterface interface {
 
 	// (POST /nodes/{id}/account/password)
 	RevealNodePassword(ctx context.Context, request RevealNodePasswordRequestObject) (RevealNodePasswordResponseObject, error)
+	// GetContainer 读取容器详情
+	// (GET /nodes/{id}/containers/{container_id})
+	GetContainer(ctx context.Context, request GetContainerRequestObject) (GetContainerResponseObject, error)
+	// ChangeContainer 启动、停止或重启容器
+	// (POST /nodes/{id}/containers/{container_id}/actions)
+	ChangeContainer(ctx context.Context, request ChangeContainerRequestObject) (ChangeContainerResponseObject, error)
+	// GetContainerLogs 读取最近容器日志
+	// (GET /nodes/{id}/containers/{container_id}/logs)
+	GetContainerLogs(ctx context.Context, request GetContainerLogsRequestObject) (GetContainerLogsResponseObject, error)
 	// ReadFirewall 读取 OPSD 防火墙配置及应用状态
 	// (GET /nodes/{id}/firewall)
 	ReadFirewall(ctx context.Context, request ReadFirewallRequestObject) (ReadFirewallResponseObject, error)
@@ -8253,6 +9206,32 @@ func (sh *strictHandler) RevokeSession(w http.ResponseWriter, r *http.Request, i
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(RevokeSessionResponseObject); ok {
 		if err := validResponse.VisitRevokeSessionResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListContainers operation middleware
+func (sh *strictHandler) ListContainers(w http.ResponseWriter, r *http.Request, params ListContainersParams) {
+	var request ListContainersRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListContainers(ctx, request.(ListContainersRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListContainers")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListContainersResponseObject); ok {
+		if err := validResponse.VisitListContainersResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -8527,6 +9506,97 @@ func (sh *strictHandler) RevealNodePassword(w http.ResponseWriter, r *http.Reque
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(RevealNodePasswordResponseObject); ok {
 		if err := validResponse.VisitRevealNodePasswordResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetContainer operation middleware
+func (sh *strictHandler) GetContainer(w http.ResponseWriter, r *http.Request, id string, containerId string, params GetContainerParams) {
+	var request GetContainerRequestObject
+
+	request.Id = id
+	request.ContainerId = containerId
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetContainer(ctx, request.(GetContainerRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetContainer")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetContainerResponseObject); ok {
+		if err := validResponse.VisitGetContainerResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ChangeContainer operation middleware
+func (sh *strictHandler) ChangeContainer(w http.ResponseWriter, r *http.Request, id string, containerId string, params ChangeContainerParams) {
+	var request ChangeContainerRequestObject
+
+	request.Id = id
+	request.ContainerId = containerId
+	request.Params = params
+
+	var body ChangeContainerJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ChangeContainer(ctx, request.(ChangeContainerRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ChangeContainer")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ChangeContainerResponseObject); ok {
+		if err := validResponse.VisitChangeContainerResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetContainerLogs operation middleware
+func (sh *strictHandler) GetContainerLogs(w http.ResponseWriter, r *http.Request, id string, containerId string, params GetContainerLogsParams) {
+	var request GetContainerLogsRequestObject
+
+	request.Id = id
+	request.ContainerId = containerId
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetContainerLogs(ctx, request.(GetContainerLogsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetContainerLogs")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetContainerLogsResponseObject); ok {
+		if err := validResponse.VisitGetContainerLogsResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

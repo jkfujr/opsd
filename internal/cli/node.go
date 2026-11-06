@@ -35,7 +35,7 @@ import (
 
 func Run(args []string) error {
 	if len(args) == 0 {
-		return fmt.Errorf("用法：opsd version | install | node | console | account | executor | operation | recover")
+		return fmt.Errorf("用法：opsd version | install | node | network | console | account | executor | operation | recover")
 	}
 	switch args[0] {
 	case "version", "--version":
@@ -49,6 +49,8 @@ func Run(args []string) error {
 		return install(args[1:])
 	case "node":
 		return serveNode(args[1:])
+	case "network":
+		return network(args[1:])
 	case "executor":
 		return serveExecutor(args[1:])
 	case "operation":
@@ -309,6 +311,11 @@ func install(args []string) error {
 	seed := set.String("peer-address", "", "")
 	public := set.String("peer-public-key", "", "")
 	token := set.String("enrollment-token", os.Getenv("OPSD_ENROLLMENT_TOKEN"), "")
+	set.StringVar(seed, "e", "", "")
+	set.StringVar(public, "k", "", "")
+	set.StringVar(token, "t", *token, "")
+	set.StringVar(name, "n", "", "")
+	set.StringVar(region, "r", "", "")
 	_ = set.Bool("non-interactive", false, "")
 	if e := command.Parse(set, args); e != nil {
 		return e

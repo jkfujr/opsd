@@ -65,6 +65,8 @@ type Node struct {
 	addressMu     sync.Mutex
 	networkWake   chan struct{}
 	ObservePublic func(context.Context, protocol.AddressFamily) []protocol.AddressObservation
+	dockerMu      sync.Mutex
+	dockerReads   map[string]*containerRead
 }
 
 func Defaults(c Config) Config {

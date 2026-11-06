@@ -32,5 +32,8 @@ done
 grep -q '下载的程序版本不匹配' "$directory/wrong-version.log"
 if artifacts/opsd-linux-amd64 install --non-interactive --expected-version wrong-version --config "$directory/instance.json" > "$directory/version.log" 2>&1; then exit 1; fi
 grep -q '安装程序版本与接入命令不匹配' "$directory/version.log"
+
+if artifacts/opsd-linux-amd64 install --expected-version wrong-version -e 'http://127.0.0.1:8444' -k '节点公钥' -t '一次性接入码' -n "名称'含空格" -r '测试地域' > "$directory/short-options.log" 2>&1; then exit 1; fi
+grep -q '安装程序版本与接入命令不匹配' "$directory/short-options.log"
 test ! -e "$directory/instance.json"
-printf '%s\n' '安装失败路径通过：下载中断、程序版本错误、接入版本错误。'
+printf '%s\n' '安装失败路径通过：下载中断、程序版本错误、接入版本错误及全部短参数。'

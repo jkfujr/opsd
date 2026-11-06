@@ -23,6 +23,8 @@ func (n *Node) dispatch(ctx context.Context, origin, method string, body json.Ra
 		return nil, fault("forbidden", "节点未加入或已撤销")
 	}
 	switch method {
+	case "containers.read", "container.inspect", "container.logs":
+		return n.containerDispatch(ctx, method, body)
 	case "public_addresses.read":
 		return n.PublicAddresses(ctx, n.ID)
 	case "public_addresses.refresh":
@@ -168,6 +170,14 @@ func (n *Node) enqueue(ctx context.Context, origin string, r Request) (Operation
 		return Operation{}, fault("invalid_request", "请求标识或内容无效")
 	}
 	switch r.Kind {
+	case "container":
+		var action protocol.ContainerAction
+		if e := json.Unmarshal(r.Payload, &action); e != nil {
+			return Operation{}, e
+		}
+		if e := action.Validate(); e != nil {
+			return Operation{}, fault("invalid_request", e.Error())
+		}
 	case "firewall":
 		var p protocol.ChangePlan
 		if e := json.Unmarshal(r.Payload, &p); e != nil {
@@ -352,6 +362,9 @@ func (n *Node) saveOperation(ctx context.Context, op *Operation, phase string) e
 	}
 	if e = tx.Commit(); e == nil {
 		n.notifyChange(Change{Resource: "operations", NodeID: n.ID})
+		if op.Subject == "container" {
+			n.invalidateContainers()
+		}
 		if op.Subject == "firewall_config" {
 			n.notifyChange(Change{Resource: "firewall", NodeID: n.ID})
 		}
@@ -418,7 +431,7 @@ func (n *Node) advance() {
 		finish(protocol.Rejected, e)
 		return
 	}
-	if kind != "firewall" && kind != "component" && kind != "firewall_config" {
+	if kind != "firewall" && kind != "component" && kind != "firewall_config" && kind != "container" {
 		e = n.applyLocal(ctx, kind, plain, &op)
 		if e != nil {
 			finish(protocol.Rejected, e)
@@ -432,7 +445,10 @@ func (n *Node) advance() {
 	if claimed {
 		// 先记下发送意图。进程中断后只查询/封存同一 ID，不重新发送未知结果的动作。
 		action := protocol.OperationAction{Kind: kind}
-		if kind == "firewall_config" {
+		if kind == "container" {
+			action.Container = &protocol.ContainerAction{}
+			e = json.Unmarshal(plain, action.Container)
+		} else if kind == "firewall_config" {
 			action.FirewallConfig = &protocol.FirewallTarget{}
 			e = json.Unmarshal(plain, action.FirewallConfig)
 		} else if kind == "firewall" {
@@ -664,6 +680,9 @@ func (n *Node) decide(ctx context.Context, method string, d OperationDecision) (
 		p = &protocol.OperationConfirm{OperationID: d.ID, ExpectedRevision: d.ExpectedRevision - 1}
 	case "operation.recover":
 		p = &protocol.OperationRecover{OperationID: d.ID, ExpectedRevision: d.ExpectedRevision}
+		if op.Subject == "container" {
+			p = &protocol.OperationRecover{OperationID: d.ID, ExpectedRevision: d.ExpectedRevision - 1}
+		}
 	case "operation.resolve":
 		p = &protocol.OperationResolve{OperationID: d.ID, ExpectedRevision: d.ExpectedRevision - 1, AcceptCurrent: d.AcceptCurrent}
 	}

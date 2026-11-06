@@ -24,6 +24,7 @@ type Local struct {
 	Record          protocol.OperationRecord
 	Recipe          []firewall.Step
 	ComponentState  *firewall.InstallState
+	ContainerState  *containerState
 	BootID          string
 	DeadlineNS      int64
 	NextStep        int
@@ -46,10 +47,10 @@ func Terminal(state protocol.OperationState) bool {
 func (s Store) Get(ctx context.Context, id string) (Local, error) { return load(ctx, s.DB, id) }
 func load(ctx context.Context, q querier, id string) (Local, error) {
 	var l Local
-	var action, recipe, component sql.NullString
+	var action, recipe, component, container sql.NullString
 	var record string
 	var intent sql.NullInt64
-	err := q.QueryRowContext(ctx, "SELECT action,record,recipe,component_state,boot_id,deadline_ns,next_step,intent_step,request,request_revision FROM operations WHERE id=?", id).Scan(&action, &record, &recipe, &component, &l.BootID, &l.DeadlineNS, &l.NextStep, &intent, &l.Request, &l.RequestRevision)
+	err := q.QueryRowContext(ctx, "SELECT action,record,recipe,component_state,container_state,boot_id,deadline_ns,next_step,intent_step,request,request_revision FROM operations WHERE id=?", id).Scan(&action, &record, &recipe, &component, &container, &l.BootID, &l.DeadlineNS, &l.NextStep, &intent, &l.Request, &l.RequestRevision)
 	if err != nil {
 		return l, err
 	}
@@ -74,6 +75,11 @@ func load(ctx context.Context, q querier, id string) (Local, error) {
 	if intent.Valid {
 		v := int(intent.Int64)
 		l.IntentStep = &v
+	}
+	if container.Valid {
+		if err = json.Unmarshal([]byte(container.String), &l.ContainerState); err != nil {
+			return l, err
+		}
 	}
 	return l, nil
 }
@@ -141,7 +147,7 @@ func (s Store) Receive(ctx context.Context, id string, version int, action proto
 	if _, e := protocol.Encode(protocol.Message{RequestID: "validation", Payload: &protocol.OperationSubmit{OperationID: id, ContractVersion: version, Action: action}}); e != nil {
 		return Local{}, false, e
 	}
-	if action.Kind != "firewall" && action.Kind != "firewall_config" && !(action.Kind == "component" && action.Component != nil && action.Component.Component == "firewall" && action.Component.Action == "install") {
+	if action.Kind != "firewall" && action.Kind != "firewall_config" && action.Kind != "container" && !(action.Kind == "component" && action.Component != nil && action.Component.Component == "firewall" && action.Component.Action == "install") {
 		return Local{}, false, firewall.Unsupported("当前版本不执行此类动作")
 	}
 	c, e := begin(ctx, s.DB)
@@ -242,12 +248,16 @@ func (s Store) Save(ctx context.Context, l *Local) error {
 	if e != nil {
 		return e
 	}
+	container, e := json.Marshal(l.ContainerState)
+	if e != nil {
+		return e
+	}
 	tx, e := s.DB.BeginTx(ctx, nil)
 	if e != nil {
 		return e
 	}
 	defer tx.Rollback()
-	result, e := tx.ExecContext(ctx, "UPDATE operations SET record=?,recipe=?,component_state=?,terminal=?,boot_id=?,deadline_ns=?,next_step=?,intent_step=? WHERE id=? AND json_extract(record,'$.revision')=?", string(r), string(recipe), string(component), Terminal(l.Record.State), l.BootID, l.DeadlineNS, l.NextStep, l.IntentStep, l.Record.ID, previous)
+	result, e := tx.ExecContext(ctx, "UPDATE operations SET record=?,recipe=?,component_state=?,container_state=?,terminal=?,boot_id=?,deadline_ns=?,next_step=?,intent_step=? WHERE id=? AND json_extract(record,'$.revision')=?", string(r), string(recipe), string(component), string(container), Terminal(l.Record.State), l.BootID, l.DeadlineNS, l.NextStep, l.IntentStep, l.Record.ID, previous)
 	if e != nil {
 		return e
 	}

@@ -217,13 +217,14 @@ type OperationRecord struct {
 	ConfirmationRemainingSeconds *int64              `json:"confirmation_remaining_seconds,omitempty"`
 }
 
-// OperationAction 的三个载荷互斥，编解码层拒绝不匹配组合。
+// OperationAction 的业务载荷互斥，编解码层拒绝不匹配组合。
 type OperationAction struct {
 	Kind           string            `json:"kind"`
 	Firewall       *ChangePlan       `json:"firewall,omitempty"`
 	FirewallConfig *FirewallTarget   `json:"firewall_config,omitempty"`
 	Deployment     *DeploymentAction `json:"deployment,omitempty"`
 	Component      *ComponentAction  `json:"component,omitempty"`
+	Container      *ContainerAction  `json:"container,omitempty"`
 }
 
 type DeploymentAction struct {

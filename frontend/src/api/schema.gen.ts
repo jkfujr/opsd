@@ -548,6 +548,74 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/containers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 读取各节点容器和 Docker 状态 */
+        get: operations["listContainers"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/nodes/{id}/containers/{container_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 读取容器详情 */
+        get: operations["getContainer"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/nodes/{id}/containers/{container_id}/logs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 读取最近容器日志 */
+        get: operations["getContainerLogs"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/nodes/{id}/containers/{container_id}/actions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 启动、停止或重启容器 */
+        post: operations["changeContainer"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1010,11 +1078,8 @@ export interface components {
             ports: components["schemas"]["PortTarget"][];
         };
         ContainerList: {
-            /** Format: date-time */
-            collected_at: string;
-            complete: boolean;
-            items: components["schemas"]["Container"][];
-            errors: components["schemas"]["ReadError"][];
+            items: components["schemas"]["ContainerListItem"][];
+            nodes: components["schemas"]["DockerNodeState"][];
         };
         ContainerAction: {
             /** @enum {string} */
@@ -1079,7 +1144,7 @@ export interface components {
             /** @enum {string} */
             executor: "node";
             /** @enum {string} */
-            subject: "firewall" | "component" | "config" | "name" | "account" | "firewall_config";
+            subject: "firewall" | "component" | "config" | "name" | "account" | "firewall_config" | "container";
             state: components["schemas"]["OperationState"];
             /** Format: int64 */
             revision: number;
@@ -1349,6 +1414,98 @@ export interface components {
             state: "pending" | "in_sync" | "failed";
             operation_id: string;
             error?: components["schemas"]["ManagedFirewallError"];
+        };
+        ContainerPort: {
+            host_ip: string;
+            host_port: number;
+            container_port: number;
+            protocol: string;
+        };
+        ContainerSummary: {
+            engine_id: string;
+            container_id: string;
+            name: string;
+            image: string;
+            state: string;
+            health: string;
+            ports: components["schemas"]["ContainerPort"][];
+            project: string;
+            service: string;
+            read_only_reason?: string;
+        };
+        ContainerMount: {
+            type: string;
+            source: string;
+            destination: string;
+            read_only: boolean;
+        };
+        ContainerNetwork: {
+            name: string;
+            ipv4: string;
+            ipv6: string;
+        };
+        ContainerDetail: {
+            engine_id: string;
+            container_id: string;
+            name: string;
+            image: string;
+            state: string;
+            health: string;
+            ports: components["schemas"]["ContainerPort"][];
+            project: string;
+            service: string;
+            read_only_reason?: string;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            started_at?: string;
+            /** Format: date-time */
+            finished_at?: string;
+            restart_policy: string;
+            restart_count: number;
+            mounts: components["schemas"]["ContainerMount"][];
+            networks: components["schemas"]["ContainerNetwork"][];
+            tty: boolean;
+            /** Format: date-time */
+            checked_at: string;
+        };
+        ContainerListItem: {
+            engine_id: string;
+            container_id: string;
+            name: string;
+            image: string;
+            state: string;
+            health: string;
+            ports: components["schemas"]["ContainerPort"][];
+            project: string;
+            service: string;
+            read_only_reason?: string;
+            node_id: string;
+            node_name: string;
+        };
+        DockerNodeState: {
+            node_id: string;
+            node_name: string;
+            engine_id: string;
+            version: string;
+            /** @enum {string} */
+            state: "ready" | "not_installed" | "unavailable" | "unsupported" | "offline";
+            /** Format: date-time */
+            checked_at: string;
+            error?: components["schemas"]["NetworkError"];
+        };
+        ContainerActionRequest: {
+            engine_id: string;
+            /** @enum {string} */
+            action: "start" | "stop" | "restart";
+        };
+        ContainerLogs: {
+            engine_id: string;
+            container_id: string;
+            text: string;
+            truncated: boolean;
+            /** Format: date-time */
+            checked_at: string;
         };
     };
     responses: {
@@ -2727,6 +2884,143 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PeerTrustNodeStatus"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["InvalidRequest"];
+            500: components["responses"]["InternalError"];
+            /** @description 节点或数据库不可用 */
+            503: components["responses"]["Unavailable"];
+        };
+    };
+    listContainers: {
+        parameters: {
+            query?: {
+                node_id?: string;
+                state?: string;
+                search?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 请求成功 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContainerList"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["InvalidRequest"];
+            500: components["responses"]["InternalError"];
+            /** @description 节点或数据库不可用 */
+            503: components["responses"]["Unavailable"];
+        };
+    };
+    getContainer: {
+        parameters: {
+            query: {
+                engine_id: string;
+            };
+            header?: never;
+            path: {
+                id: string;
+                container_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 请求成功 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContainerDetail"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["InvalidRequest"];
+            500: components["responses"]["InternalError"];
+            /** @description 节点或数据库不可用 */
+            503: components["responses"]["Unavailable"];
+        };
+    };
+    getContainerLogs: {
+        parameters: {
+            query: {
+                engine_id: string;
+                tail?: number;
+            };
+            header?: never;
+            path: {
+                id: string;
+                container_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 请求成功 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContainerLogs"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["InvalidRequest"];
+            500: components["responses"]["InternalError"];
+            /** @description 节点或数据库不可用 */
+            503: components["responses"]["Unavailable"];
+        };
+    };
+    changeContainer: {
+        parameters: {
+            query?: never;
+            header: {
+                "X-CSRF-Token": string;
+                "Idempotency-Key": string;
+            };
+            path: {
+                id: string;
+                container_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ContainerActionRequest"];
+            };
+        };
+        responses: {
+            /** @description 操作已受理 */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Operation"];
                 };
             };
             401: components["responses"]["Unauthorized"];

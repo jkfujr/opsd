@@ -2309,6 +2309,323 @@
           }
         }
       }
+    },
+    "/containers": {
+      "get": {
+        "operationId": "listContainers",
+        "summary": "读取各节点容器和 Docker 状态",
+        "tags": [
+          "containers"
+        ],
+        "parameters": [
+          {
+            "name": "node_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "state",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "请求成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContainerList"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/InvalidRequest"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable",
+            "description": "节点或数据库不可用"
+          }
+        }
+      }
+    },
+    "/nodes/{id}/containers/{container_id}": {
+      "get": {
+        "operationId": "getContainer",
+        "summary": "读取容器详情",
+        "tags": [
+          "containers"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          {
+            "name": "container_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            }
+          },
+          {
+            "name": "engine_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "请求成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContainerDetail"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/InvalidRequest"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable",
+            "description": "节点或数据库不可用"
+          }
+        }
+      }
+    },
+    "/nodes/{id}/containers/{container_id}/logs": {
+      "get": {
+        "operationId": "getContainerLogs",
+        "summary": "读取最近容器日志",
+        "tags": [
+          "containers"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          {
+            "name": "container_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            }
+          },
+          {
+            "name": "engine_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256
+            }
+          },
+          {
+            "name": "tail",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1000,
+              "default": 200
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "请求成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContainerLogs"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/InvalidRequest"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable",
+            "description": "节点或数据库不可用"
+          }
+        }
+      }
+    },
+    "/nodes/{id}/containers/{container_id}/actions": {
+      "post": {
+        "operationId": "changeContainer",
+        "summary": "启动、停止或重启容器",
+        "tags": [
+          "containers"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          {
+            "name": "container_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ContainerActionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "操作已受理",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Operation"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/InvalidRequest"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable",
+            "description": "节点或数据库不可用"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -4090,31 +4407,22 @@
         "type": "object",
         "additionalProperties": false,
         "properties": {
-          "collected_at": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "complete": {
-            "type": "boolean"
-          },
           "items": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/Container"
+              "$ref": "#/components/schemas/ContainerListItem"
             }
           },
-          "errors": {
+          "nodes": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/ReadError"
+              "$ref": "#/components/schemas/DockerNodeState"
             }
           }
         },
         "required": [
-          "collected_at",
-          "complete",
           "items",
-          "errors"
+          "nodes"
         ]
       },
       "ContainerAction": {
@@ -4359,7 +4667,8 @@
               "config",
               "name",
               "account",
-              "firewall_config"
+              "firewall_config",
+              "container"
             ]
           },
           "state": {
@@ -5390,6 +5699,383 @@
         "required": [
           "state",
           "operation_id"
+        ]
+      },
+      "ContainerPort": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "host_ip": {
+            "type": "string"
+          },
+          "host_port": {
+            "type": "integer"
+          },
+          "container_port": {
+            "type": "integer"
+          },
+          "protocol": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "host_ip",
+          "host_port",
+          "container_port",
+          "protocol"
+        ]
+      },
+      "ContainerSummary": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "engine_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "container_id": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "name": {
+            "type": "string"
+          },
+          "image": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string"
+          },
+          "health": {
+            "type": "string"
+          },
+          "ports": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ContainerPort"
+            }
+          },
+          "project": {
+            "type": "string"
+          },
+          "service": {
+            "type": "string"
+          },
+          "read_only_reason": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "engine_id",
+          "container_id",
+          "name",
+          "image",
+          "state",
+          "health",
+          "ports",
+          "project",
+          "service"
+        ]
+      },
+      "ContainerMount": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "type": {
+            "type": "string"
+          },
+          "source": {
+            "type": "string"
+          },
+          "destination": {
+            "type": "string"
+          },
+          "read_only": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "type",
+          "source",
+          "destination",
+          "read_only"
+        ]
+      },
+      "ContainerNetwork": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "ipv4": {
+            "type": "string"
+          },
+          "ipv6": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "ipv4",
+          "ipv6"
+        ]
+      },
+      "ContainerDetail": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "engine_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "container_id": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "name": {
+            "type": "string"
+          },
+          "image": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string"
+          },
+          "health": {
+            "type": "string"
+          },
+          "ports": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ContainerPort"
+            }
+          },
+          "project": {
+            "type": "string"
+          },
+          "service": {
+            "type": "string"
+          },
+          "read_only_reason": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "started_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "finished_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "restart_policy": {
+            "type": "string"
+          },
+          "restart_count": {
+            "type": "integer"
+          },
+          "mounts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ContainerMount"
+            }
+          },
+          "networks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ContainerNetwork"
+            }
+          },
+          "tty": {
+            "type": "boolean"
+          },
+          "checked_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "engine_id",
+          "container_id",
+          "name",
+          "image",
+          "state",
+          "health",
+          "ports",
+          "project",
+          "service",
+          "created_at",
+          "restart_policy",
+          "restart_count",
+          "mounts",
+          "networks",
+          "tty",
+          "checked_at"
+        ]
+      },
+      "ContainerListItem": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "engine_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "container_id": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "name": {
+            "type": "string"
+          },
+          "image": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string"
+          },
+          "health": {
+            "type": "string"
+          },
+          "ports": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ContainerPort"
+            }
+          },
+          "project": {
+            "type": "string"
+          },
+          "service": {
+            "type": "string"
+          },
+          "read_only_reason": {
+            "type": "string"
+          },
+          "node_id": {
+            "type": "string"
+          },
+          "node_name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "engine_id",
+          "container_id",
+          "name",
+          "image",
+          "state",
+          "health",
+          "ports",
+          "project",
+          "service",
+          "node_id",
+          "node_name"
+        ]
+      },
+      "DockerNodeState": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "node_id": {
+            "type": "string"
+          },
+          "node_name": {
+            "type": "string"
+          },
+          "engine_id": {
+            "type": "string"
+          },
+          "version": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "ready",
+              "not_installed",
+              "unavailable",
+              "unsupported",
+              "offline"
+            ]
+          },
+          "checked_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "error": {
+            "$ref": "#/components/schemas/NetworkError"
+          }
+        },
+        "required": [
+          "node_id",
+          "node_name",
+          "engine_id",
+          "version",
+          "state",
+          "checked_at"
+        ]
+      },
+      "ContainerActionRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "engine_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "start",
+              "stop",
+              "restart"
+            ]
+          }
+        },
+        "required": [
+          "engine_id",
+          "action"
+        ]
+      },
+      "ContainerLogs": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "engine_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "container_id": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "text": {
+            "type": "string"
+          },
+          "truncated": {
+            "type": "boolean"
+          },
+          "checked_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "engine_id",
+          "container_id",
+          "text",
+          "truncated",
+          "checked_at"
         ]
       }
     },

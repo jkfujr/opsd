@@ -48,3 +48,7 @@ output-options:
     - changePeerTrust
     - getPeerTrustStatus
     - getNodePeerTrust
+    - listContainers
+    - getContainer
+    - changeContainer
+    - getContainerLogs

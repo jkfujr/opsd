@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -14,6 +15,7 @@ import (
 	"time"
 
 	"github.com/jkfujr/opsd/internal/cluster"
+	"github.com/jkfujr/opsd/internal/dockerengine"
 	"github.com/jkfujr/opsd/internal/firewall"
 	"github.com/jkfujr/opsd/internal/identity"
 	"github.com/jkfujr/opsd/internal/protocol"
@@ -90,7 +92,7 @@ func (c *Client) Storage(ctx context.Context, s cluster.StorageConfig) (cluster.
 }
 
 type Server struct {
-	prepare bool
+	prepare   bool
 	Services  *Services
 	Directory string
 	Host      firewall.Host
@@ -111,7 +113,12 @@ func (s *Server) Handler() http.Handler {
 		}
 		payload, e := s.Services.Handle(r.Context(), message.Payload)
 		if e != nil {
-			payload = &protocol.RequestFailed{Error: protocol.Error{Code: firewall.Code(e), Message: e.Error()}}
+			code := firewall.Code(e)
+			var docker *dockerengine.Fault
+			if errors.As(e, &docker) {
+				code = docker.Code
+			}
+			payload = &protocol.RequestFailed{Error: protocol.Error{Code: code, Message: e.Error()}}
 		}
 		out, e := protocol.Encode(protocol.Message{RequestID: identity.Random(), ReplyTo: message.RequestID, Payload: payload})
 		if e != nil {

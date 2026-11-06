@@ -12,6 +12,7 @@ import { Overview, NodeDetail } from './pages/Overview';
 import { Drawer, DrawerContent, DrawerHeader, DrawerBody, DrawerTitle } from '@appica/ui-react/drawer';
 import { Account, Appearance, Sessions, Version } from './pages/Settings';
 import { Firewall } from './pages/Firewall';
+import { Containers } from './pages/Containers';
 import { FirewallSettings } from './network';
 import { OperationsProvider, OperationsButton } from './operations';
 
@@ -22,12 +23,13 @@ function Layout() {
 }
 
 const settings = [['account', '账号'], ['sessions', '会话'], ['appearance', '外观'], ['version', '版本']];
-const navigation = [['/', '概览', 'overview'], ['/nodes', '节点', 'nodes'], ['/firewall', '防火墙', 'firewall'], ['/settings', '设置', 'settings']];
+const navigation = [['/', '概览', 'overview'], ['/nodes', '节点', 'nodes'], ['/firewall', '防火墙', 'firewall'], ['/containers', '容器', 'containers'], ['/settings', '设置', 'settings']];
 function NavIcon({ name }: { name: string }) {
   const paths: Record<string, React.ReactNode> = {
     overview: <><rect x="3" y="3" width="7" height="7" rx="1" /><rect x="14" y="3" width="7" height="7" rx="1" /><rect x="3" y="14" width="7" height="7" rx="1" /><rect x="14" y="14" width="7" height="7" rx="1" /></>,
     nodes: <><rect x="3" y="3" width="18" height="7" rx="2" /><rect x="3" y="14" width="18" height="7" rx="2" /><path d="M7 6.5h.01M7 17.5h.01M12 6.5h5M12 17.5h5" /></>,
     firewall: <><path d="M12 3 4 6v5c0 5 8 10 8 10s8-5 8-10V6z" /><path d="M9 12h6M12 9v6" /></>,
+    containers: <><path d="m12 3 9 5v8l-9 5-9-5V8zM3 8l9 5 9-5M12 13v8M7.5 5.5l9 5" /></>,
     settings: <><path d="M4 7h16M4 17h16" /><circle cx="9" cy="7" r="3" /><circle cx="15" cy="17" r="3" /></>,
   };
   return <svg aria-hidden="true" viewBox="0 0 24 24" className="size-4.5 shrink-0" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">{paths[name]}</svg>;
@@ -65,6 +67,7 @@ const router = createBrowserRouter([{ Component: SessionBoundary, children: [
     { path: 'nodes', Component: Nodes },
     { path: 'nodes/:id', Component: NodeDetail },
     { path: 'firewall', Component: Firewall },
+    { path: 'containers', Component: Containers },
     { path: 'firewall/settings', Component: FirewallSettings },
     { path: 'settings', Component: SettingsLayout, children: [
       { index: true, element: <Navigate to="account" replace /> },

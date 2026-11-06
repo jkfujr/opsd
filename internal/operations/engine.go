@@ -12,10 +12,11 @@ import (
 )
 
 type Engine struct {
-	Store   Store
-	Manager *firewall.Manager
-	Clock   func() (string, int64, error)
-	Install func(context.Context, *Local, func() error) error
+	Store      Store
+	Manager    *firewall.Manager
+	Clock      func() (string, int64, error)
+	Install    func(context.Context, *Local, func() error) error
+	Containers ContainerRuntime
 }
 
 func (e *Engine) clock() (string, int64, error) {
@@ -44,7 +45,7 @@ func (e *Engine) Record(ctx context.Context, id string) (protocol.OperationRecor
 }
 func (e *Engine) attention(ctx context.Context, l *Local, err error) error {
 	l.Record.State = protocol.AttentionRequired
-	l.Record.Error = &protocol.Error{Code: firewall.Code(err), Message: err.Error()}
+	l.Record.Error = &protocol.Error{Code: operationCode(err), Message: err.Error()}
 	if l.Action != nil && l.Action.Firewall != nil && l.Action.Firewall.RequiresConfirmation {
 		l.Record.Decision = "revert"
 	}
@@ -60,7 +61,7 @@ func (e *Engine) end(ctx context.Context, l *Local, state protocol.OperationStat
 	}
 	l.IntentStep = nil
 	if err != nil {
-		l.Record.Error = &protocol.Error{Code: firewall.Code(err), Message: err.Error()}
+		l.Record.Error = &protocol.Error{Code: operationCode(err), Message: err.Error()}
 	} else {
 		l.Record.Error = nil
 	}
@@ -85,6 +86,9 @@ func (e *Engine) Run(ctx context.Context, id string) error {
 	}
 	if l.Action.Kind == "component" {
 		return e.install(ctx, &l, boot)
+	}
+	if l.Action.Kind == "container" {
+		return e.container(ctx, &l, boot)
 	}
 	p := l.Action.Firewall
 	if target := l.Action.FirewallConfig; target != nil {

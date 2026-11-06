@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"github.com/jkfujr/opsd/internal/dockerengine"
 	"sync"
 
 	"github.com/jkfujr/opsd/internal/firewall"
@@ -16,6 +17,7 @@ import (
 type Services struct {
 	Metrics       monitoring.Collector
 	Engine        *operations.Engine
+	Docker        *dockerengine.Manager
 	Start         func(context.Context, string) error
 	Restart       func(context.Context, string) error
 	OperationLock func() (func(), error)
@@ -25,7 +27,8 @@ type Services struct {
 
 func NewServices(db *sql.DB) *Services {
 	m := firewall.New()
-	engine := &operations.Engine{Store: operations.Store{DB: db}, Manager: m}
+	docker := dockerengine.New()
+	engine := &operations.Engine{Store: operations.Store{DB: db}, Manager: m, Containers: docker}
 	engine.Install = func(ctx context.Context, l *operations.Local, persist func() error) error {
 		if l.ComponentState == nil {
 			l.ComponentState = &firewall.InstallState{Backend: l.Action.Component.Backend}
@@ -40,7 +43,7 @@ func NewServices(db *sql.DB) *Services {
 			return persist()
 		})
 	}
-	return &Services{Engine: engine, Start: func(ctx context.Context, id string) error {
+	return &Services{Engine: engine, Docker: docker, Start: func(ctx context.Context, id string) error {
 		_, e := m.Host.Run(ctx, "systemctl", "start", "--no-block", "opsd-operation@"+id+".service")
 		return e
 	}, Restart: func(ctx context.Context, id string) error {
@@ -50,6 +53,23 @@ func NewServices(db *sql.DB) *Services {
 }
 func (s *Services) Handle(ctx context.Context, payload protocol.Payload) (protocol.Payload, error) {
 	switch body := payload.(type) {
+	case *protocol.DockerRead:
+		if s.Docker == nil {
+			return nil, fmt.Errorf("Docker 读取入口不可用")
+		}
+		return &protocol.DockerReadResult{State: s.Docker.List(ctx)}, nil
+	case *protocol.ContainerInspect:
+		if s.Docker == nil {
+			return nil, fmt.Errorf("Docker 读取入口不可用")
+		}
+		result, err := s.Docker.Inspect(ctx, body.ContainerRef)
+		return &protocol.ContainerInspectResult{Container: result}, err
+	case *protocol.ContainerLogsRead:
+		if s.Docker == nil {
+			return nil, fmt.Errorf("Docker 读取入口不可用")
+		}
+		result, err := s.Docker.Logs(ctx, *body)
+		return &protocol.ContainerLogsResult{Logs: result}, err
 	case *protocol.PeerTrustTarget:
 		return s.receiveTrust(ctx, *body)
 	case *protocol.PeerTrustStatusQuery:

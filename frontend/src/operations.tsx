@@ -46,7 +46,7 @@ function OperationsDrawer({ open, onOpenChange, selected, onSelect }: { open: bo
   const detailSubject = detail.data?.subject;
   useEffect(() => {
     if (!detailNode || !detailID) return;
-    const key = detailSubject === 'firewall_config' || detailSubject === 'firewall' || detailSubject === 'component' ? ['firewall', detailNode] : ['nodes', detailNode, detailSubject === 'account' ? 'account' : 'settings'];
+    const key = detailSubject === 'container' ? ['containers'] : detailSubject === 'firewall_config' || detailSubject === 'firewall' || detailSubject === 'component' ? ['firewall', detailNode] : ['nodes', detailNode, detailSubject === 'account' ? 'account' : 'settings'];
     void queryClient.invalidateQueries({ queryKey: key });
   }, [detailID, detailRevision, detailNode, detailSubject]);
   const names = new Map(nodes.data?.items.map((n) => [n.id, n.name]) ?? []);
@@ -87,9 +87,9 @@ function OperationDetail({ operation: op }: { operation: Operation }) {
     <div className="flex flex-wrap gap-3">
       {op.state === 'accepted' && <BusyButton variant="outline" busy={mutation.isPending && mutation.variables === 'cancel'} disabled={mutation.isPending || op.result_pending_sync} onClick={() => mutation.mutate('cancel')}>取消排队</BusyButton>}
       {op.state === 'awaiting_confirmation' && <BusyButton busy={mutation.isPending && mutation.variables === 'confirm'} disabled={mutation.isPending || op.result_pending_sync || !left || left <= 0} onClick={() => mutation.mutate('confirm')}>确认保留</BusyButton>}
-      {['attention_required', 'prepared'].includes(op.state) && <BusyButton variant="outline" busy={mutation.isPending && mutation.variables === 'recover'} disabled={mutation.isPending || op.result_pending_sync} onClick={() => mutation.mutate('recover')}>重新处理</BusyButton>}
+      {['attention_required', 'prepared'].includes(op.state) && <BusyButton variant="outline" busy={mutation.isPending && mutation.variables === 'recover'} disabled={mutation.isPending || op.result_pending_sync} onClick={() => mutation.mutate('recover')}>{op.subject === 'container' ? '核对状态' : '重新处理'}</BusyButton>}
       {op.state === 'attention_required' && <Button variant="ghost" disabled={mutation.isPending || op.result_pending_sync} onClick={() => setResolve(true)}>接受现状</Button>}
     </div>
-    <Confirm open={resolve} title="接受当前规则并结束操作？" description="将记录为已人工处理，原操作不会计为成功。" busy={mutation.isPending} error={mutation.error} confirmLabel="接受现状" onCancel={() => setResolve(false)} onConfirm={() => mutation.mutate('resolve')} />
+    <Confirm open={resolve} title={op.subject === 'container' ? '接受当前容器状态并结束操作？' : '接受当前规则并结束操作？'} description="将记录为已人工处理。" busy={mutation.isPending} error={mutation.error} confirmLabel="接受现状" onCancel={() => setResolve(false)} onConfirm={() => mutation.mutate('resolve')} />
   </div>;
 }

@@ -91,6 +91,15 @@ func decodeJSON(data []byte, target any) error {
 func validatePayload(payload Payload) error {
 	var operationID string
 	switch body := payload.(type) {
+	case *ContainerInspect:
+		return body.ContainerRef.Validate()
+	case *ContainerLogsRead:
+		if err := body.ContainerRef.Validate(); err != nil {
+			return err
+		}
+		if body.Tail < 1 || body.Tail > 1000 {
+			return fmt.Errorf("日志行数须为 1 至 1000")
+		}
 	case *SessionOpen:
 		switch body.Purpose {
 		case "business":
@@ -205,10 +214,18 @@ func (action OperationAction) validate() error {
 	if action.Component != nil {
 		count++
 	}
+	if action.Container != nil {
+		count++
+	}
 	if count != 1 {
 		return fmt.Errorf("操作必须包含且只包含一种业务载荷")
 	}
 	switch action.Kind {
+	case "container":
+		if action.Container == nil {
+			return fmt.Errorf("容器操作缺少参数")
+		}
+		return action.Container.Validate()
 	case "firewall_config":
 		if action.FirewallConfig == nil || action.FirewallConfig.Revision == 0 {
 			return fmt.Errorf("防火墙配置缺少版本")

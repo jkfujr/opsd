@@ -28,4 +28,4 @@ trap 'rm -rf "$directory"' 0 1 2 15
 download "https://github.com/jkfujr/opsd/releases/download/v$version/opsd-linux-$arch" "$directory/opsd"
 chmod 700 "$directory/opsd"
 [ "$("$directory/opsd" version --plain)" = "$version" ] || fail '下载的程序版本不匹配'
-"$directory/opsd" install --expected-version "$version" "$@"
+"$directory/opsd" install --non-interactive --expected-version "$version" "$@"

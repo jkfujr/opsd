@@ -2,11 +2,12 @@
 
 ## 实际入口
 
-- `cmd/opsd/main.go` → `internal/cli/node.go`：install、node、console、account、executor、operation、recover。
+- `cmd/opsd/main.go` → `internal/cli/node.go`：install、node、network、console、account、executor、operation、recover。
 - `internal/installation/node.go`：安装记录和 systemd 服务；重复安装先读取已有实例，不重新生成身份或账号。`address.go` 在新安装写入前识别加入节点的地址。
 - `internal/cluster`：节点身份、成员目录、Noise 通信、持久队列、配置及账号、签名记录、CouchDB 上传和查询。`node.go` 定义本机配置和默认值，`firewall.go` 连接统一防火墙配置与队列。
 - `internal/control`：浏览器会话、HTTP、SSE；`internal/executor`：root Socket 和类型化服务；`internal/operations`：独立执行、读回、确认与恢复；`internal/firewall`：UFW、firewalld、nftables 适配。
 - `internal/monitoring` 与 `frontend/src/monitoring.tsx`：本机历史采集、当前读数与趋势。当前缺值显示“—”，不能拿历史补当前数据。
+- `internal/dockerengine`：显式本机 Socket、官方 SDK、容器身份核对和有界日志；容器执行意图保存在执行器 SQLite，恢复入口只核对原操作。列表与日志分别合并五秒及两秒内读取，操作更新后清除缓存。
 
 本机 SQLite 保存身份、配置、账号、队列及待上传记录。附近 CouchDB 保存共享数据和历史；其不可用不阻塞本机控制。普通节点不保存其他节点完整历史。
 
