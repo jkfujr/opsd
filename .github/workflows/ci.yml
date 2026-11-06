@@ -41,8 +41,8 @@ jobs:
           OPSD_DOCKER_TEST=1 npm test
       - name: 原生互信规则与新连接
         run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq nftables iptables firewalld ufw fonts-noto-cjk
+          sudo apt-get -o Acquire::Retries=1 -o Acquire::http::Timeout=20 -o Acquire::https::Timeout=20 update -q
+          sudo apt-get -o Acquire::Retries=1 -o Acquire::http::Timeout=20 -o Acquire::https::Timeout=20 install -y -q nftables iptables firewalld ufw fonts-noto-cjk
           go test -c -o artifacts/firewall-native.test ./internal/firewall
           sudo env OPSD_NATIVE_TRUST=1 artifacts/firewall-native.test -test.run '^TestPeerTrustNativeNetwork$' -test.v
       - name: 安装生产程序并检查控制台
