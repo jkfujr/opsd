@@ -399,6 +399,7 @@ try {
   await page.getByRole('button', { name: '关闭互信详情', exact: true }).click();
   await page.getByLabel('地址族', { exact: true }).click();
   await page.getByRole('option', { name: 'IPv4', exact: true }).click();
+  await page.getByRole('columnheader', { name: 'IPv6', exact: true }).waitFor({ state: 'hidden' });
   assert.deepEqual(await page.getByRole('columnheader').allTextContents(), ['来源节点', 'IPv4', '操作']);
   await capture('trust-partial-ipv4');
   await page.unroute(`**/api/v1${trustPath}`);
