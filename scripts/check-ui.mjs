@@ -97,6 +97,79 @@ try {
     }
     throw new Error(message);
   };
+  const navigationOrder = ['overview', 'nodes', 'containers', 'databases', 'storage', 'firewall', 'settings'];
+  const navigationLabels = ['概览', '节点', '容器', '数据库', '存储', '防火墙', '设置'];
+  const menuLabels = (target) => target.getByRole('navigation', { name: '主导航' }).locator('.sidebar-link').allTextContents().then((items) => items.map((item) => item.trim()));
+  const listLabels = (target) => target.getByRole('list', { name: '菜单顺序' }).locator('li > span').allTextContents();
+  assert.deepEqual((await api('/settings/navigation')).order, navigationOrder);
+  await waitFor(() => menuLabels(page), (items) => JSON.stringify(items) === JSON.stringify(navigationLabels), '默认菜单顺序错误');
+  await page.goto(`${base}/settings/appearance`);
+  await waitFor(() => page.getByRole('button', { name: '存储上移', exact: true }).isEnabled(), Boolean, '菜单偏好未读取');
+  const otherContext = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
+  try {
+    const otherPage = await otherContext.newPage();
+    otherPage.on('pageerror', (error) => errors.push(error.message));
+    await otherPage.goto(`${base}/signin`);
+    await otherPage.getByLabel('账号', { exact: true }).fill('ui-check');
+    await otherPage.getByLabel('密码', { exact: true }).fill(password);
+    const otherEvents = otherPage.waitForResponse((response) => response.url().endsWith('/api/v1/events'));
+    await otherPage.getByRole('button', { name: '登录', exact: true }).click();
+    await otherPage.waitForURL(`${base}/`);
+    await otherEvents;
+    const otherAppearanceEvents = otherPage.waitForResponse((response) => response.url().endsWith('/api/v1/events'));
+    await otherPage.goto(`${base}/settings/appearance`);
+    await otherAppearanceEvents;
+    await waitFor(() => otherPage.getByRole('button', { name: '存储上移', exact: true }).isEnabled(), Boolean, '另一会话未读取菜单偏好');
+    await page.getByRole('button', { name: '存储上移', exact: true }).click();
+    const customLabels = ['概览', '节点', '容器', '存储', '数据库', '防火墙', '设置'];
+    assert.deepEqual(await listLabels(page), customLabels);
+    assert.deepEqual(await menuLabels(page), navigationLabels);
+    await page.getByRole('button', { name: '保存', exact: true }).click();
+    await page.getByRole('status').filter({ hasText: '已保存' }).waitFor();
+    await waitFor(() => menuLabels(otherPage), (items) => JSON.stringify(items) === JSON.stringify(customLabels), '跨会话菜单未通过 SSE 更新');
+    const reloadedEvents = page.waitForResponse((response) => response.url().endsWith('/api/v1/events'));
+    await page.reload();
+    await reloadedEvents;
+    await waitFor(() => menuLabels(page), (items) => JSON.stringify(items) === JSON.stringify(customLabels), '刷新丢失菜单顺序');
+    await otherPage.getByRole('button', { name: '节点下移', exact: true }).click();
+    const dirtyLabels = ['概览', '容器', '节点', '存储', '数据库', '防火墙', '设置'];
+    const updated = otherPage.waitForResponse((response) => response.url().endsWith('/api/v1/settings/navigation') && response.request().method() === 'GET');
+    await page.getByRole('button', { name: '设置上移', exact: true }).click();
+    await page.getByRole('button', { name: '保存', exact: true }).click();
+    await updated;
+    await page.getByRole('status').filter({ hasText: '已保存' }).waitFor();
+    assert.deepEqual(await listLabels(otherPage), dirtyLabels, 'SSE 覆盖了未提交顺序');
+    const conflict = otherPage.waitForResponse((response) => response.url().endsWith('/api/v1/settings/navigation') && response.request().method() === 'PATCH');
+    await otherPage.getByRole('button', { name: '保存', exact: true }).click();
+    assert.equal((await conflict).status(), 409);
+    await otherPage.getByRole('button', { name: '重新读取', exact: true }).click();
+    assert.deepEqual(await listLabels(otherPage), dirtyLabels);
+    await waitFor(() => otherPage.getByRole('button', { name: '保存', exact: true }).isEnabled(), Boolean, '读取后未恢复保存');
+    await otherPage.getByRole('button', { name: '保存', exact: true }).click();
+    await otherPage.getByRole('status').filter({ hasText: '已保存' }).waitFor();
+    await waitFor(() => menuLabels(page), (items) => JSON.stringify(items) === JSON.stringify(dirtyLabels), '另一会话保存后菜单未更新');
+    await page.setViewportSize({ width: 320, height: 1000 });
+    await capture('navigation-order-320');
+    await page.getByRole('button', { name: '打开菜单', exact: true }).click();
+    await page.getByRole('dialog').waitFor();
+    assert.deepEqual(await menuLabels(page), dirtyLabels);
+    await capture('navigation-custom-mobile');
+    await page.keyboard.press('Escape');
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    await page.getByRole('button', { name: '恢复默认', exact: true }).click();
+    await page.getByRole('button', { name: '保存', exact: true }).click();
+    await page.getByRole('status').filter({ hasText: '已保存' }).waitFor();
+    await waitFor(() => menuLabels(otherPage), (items) => JSON.stringify(items) === JSON.stringify(navigationLabels), '恢复默认未同步');
+    assert.deepEqual((await api('/settings/navigation')).order, navigationOrder);
+    const otherSession = await (await otherContext.request.get(`${base}/api/v1/auth/session`)).json();
+    assert.equal((await otherContext.request.delete(`${base}/api/v1/auth/session`, { headers: { Origin: base, 'X-CSRF-Token': otherSession.csrf_token } })).status(), 204);
+    await otherPage.goto(`${base}/signin`);
+    await otherPage.getByLabel('账号', { exact: true }).fill('ui-check');
+    await otherPage.getByLabel('密码', { exact: true }).fill(password);
+    await otherPage.getByRole('button', { name: '登录', exact: true }).click();
+    await otherPage.waitForURL(`${base}/`);
+    await waitFor(() => menuLabels(otherPage), (items) => JSON.stringify(items) === JSON.stringify(navigationLabels), '重新登录丢失菜单偏好');
+  } finally { await otherContext.close(); }
   const firewallPath = `/nodes/${id}/firewall`;
   const addRule = async (rule) => {
     const current = await api(firewallPath);
@@ -127,7 +200,7 @@ try {
   await page.route('**/api/v1/databases/clusters', databaseListRoute);
   await page.route(`**/api/v1${databasePath}`, (route) => route.fulfill({ json: databaseValue }));
   await page.route(`**/api/v1${databasePath}/backups`, (route) => route.fulfill({ json: { items: [{ node_id: id, instance_id: 'galera', items: [{ name: 'daily', schedule: '*-*-* 03:00:00', state: 'failed', last_run: checked, last_success: checked, artifacts: ['/backup/daily/business.sql.zst'], error: '备份目录空间不足' }] }] } }));
-  const pages = [['overview', '/'], ['nodes', '/nodes'], ['detail', `/nodes/${id}`], ['containers', '/containers'], ['firewall', `/firewall?node=${id}`], ['firewall-settings', '/firewall/settings'], ['databases', '/databases'], ['database-detail', `/databases/${databaseID}`], ['api', '/settings/api'], ['account', '/settings/account'], ['sessions', '/settings/sessions'], ['appearance', '/settings/appearance'], ['version', '/settings/version']];
+  const pages = [['overview', '/'], ['nodes', '/nodes'], ['detail', `/nodes/${id}`], ['containers', '/containers'], ['firewall', `/firewall?node=${id}`], ['firewall-settings', '/firewall/settings'], ['databases', '/databases'], ['database-detail', `/databases/${databaseID}`], ['storage', '/storage'], ['api', '/settings/api'], ['account', '/settings/account'], ['sessions', '/settings/sessions'], ['appearance', '/settings/appearance'], ['version', '/settings/version']];
   for (const theme of ['light', 'dark']) {
     await page.goto(`${base}/settings/appearance`);
     await page.getByRole('radio', { name: theme === 'light' ? '浅色' : '深色', exact: true }).click();
@@ -576,7 +649,7 @@ try {
   await capture('mobile-menu');
   await page.keyboard.press('Escape');
   assert.deepEqual(errors, [], '浏览器运行错误');
-  writeFileSync(`${output}/result.json`, JSON.stringify({ pages: pages.length, themes: 2, widths: [320, 768, 1440], firewallWidths, firewallHeaderStates: ['normal', 'long_name', 'wrapped_status', 'loading', 'error'], api: { tokenCreatedInBrowser: true, authenticatedJSON: true, metrics: true, independentSwitches: true, releasedPort: true, revoked: true }, databases: { presentationData: 'injected', tabs: 6, operationRecovery: true, connectionForms: true }, containers: { native: true, restartRequests, logPolling: true, headerWidths: firewallWidths, singleNodeColumns: true, states: ['empty', 'partial', 'long', 'loading', 'error'] }, trustMigration: true, trustPriority: { ufwReload: true, executorRestartWithoutNode: true }, trustLayout: { groupedSources: true, partialFamilies: true, widths: firewallWidths, cssZoom: 200 }, errors }, null, 2));
+  writeFileSync(`${output}/result.json`, JSON.stringify({ pages: pages.length, navigation: { accountScope: true, crossSession: true, sse: true, unsavedPreserved: true, conflict: true, restored: true }, themes: 2, widths: [320, 768, 1440], firewallWidths, firewallHeaderStates: ['normal', 'long_name', 'wrapped_status', 'loading', 'error'], api: { tokenCreatedInBrowser: true, authenticatedJSON: true, metrics: true, independentSwitches: true, releasedPort: true, revoked: true }, databases: { presentationData: 'injected', tabs: 6, operationRecovery: true, connectionForms: true }, containers: { native: true, restartRequests, logPolling: true, headerWidths: firewallWidths, singleNodeColumns: true, states: ['empty', 'partial', 'long', 'loading', 'error'] }, trustMigration: true, trustPriority: { ufwReload: true, executorRestartWithoutNode: true }, trustLayout: { groupedSources: true, partialFamilies: true, widths: firewallWidths, cssZoom: 200 }, errors }, null, 2));
   console.log(`界面验收通过：${pages.length} 页面、深浅主题、API 令牌接入与独立启停、数据库页面与操作恢复、容器、防火墙及互信。`);
 } catch (error) {
   try {

@@ -68,3 +68,7 @@ Grafana 添加 Prometheus 数据源后，可查询 `opsd_node_up` 及其他 `ops
 数据库接口位于 `/databases/clusters`，变更使用 `POST /databases/clusters/{id}/changes`。库与账号在协调节点的合格成员执行一次，各代理分别保存步骤；部分完成后从原操作读取、重新处理或接受现状。代理存在其他待应用差异时保留现场并返回冲突。
 
 接口字段和响应以 [OpenAPI](../api/openapi.json) 为准。
+
+## 管理员菜单偏好
+
+`GET /settings/navigation` 返回当前节点管理员的 `order` 和 `revision`，`PATCH /settings/navigation` 保存完整顺序及读取时的版本。菜单 ID 为 `overview`、`nodes`、`containers`、`databases`、`storage`、`firewall`、`settings`，须全部提供且无重复；旧版本返回 409，重新读取后再保存。接口使用管理员会话，写入检查 CSRF，Bearer 令牌继续按管理接口拒绝。

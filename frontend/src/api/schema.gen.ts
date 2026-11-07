@@ -824,6 +824,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/settings/navigation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 读取菜单顺序 */
+        get: operations["getNavigation"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** 保存菜单顺序 */
+        patch: operations["updateNavigation"];
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -2001,6 +2019,13 @@ export interface components {
             items: components["schemas"]["DatabaseNodeBackups"][];
             /** Format: date-time */
             checked_at: string;
+        };
+        /** @enum {string} */
+        NavigationItem: "overview" | "nodes" | "containers" | "databases" | "storage" | "firewall" | "settings";
+        NavigationPreferences: {
+            order: components["schemas"]["NavigationItem"][];
+            /** Format: int64 */
+            revision: number;
         };
     };
     responses: {
@@ -3996,6 +4021,68 @@ export interface operations {
             };
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
+            503: components["responses"]["Unavailable"];
+        };
+    };
+    getNavigation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 请求成功 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NavigationPreferences"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["InvalidRequest"];
+            500: components["responses"]["InternalError"];
+            /** @description 节点或数据库不可用 */
+            503: components["responses"]["Unavailable"];
+        };
+    };
+    updateNavigation: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-CSRF-Token"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NavigationPreferences"];
+            };
+        };
+        responses: {
+            /** @description 请求成功 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NavigationPreferences"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["InvalidRequest"];
+            500: components["responses"]["InternalError"];
+            /** @description 节点或数据库不可用 */
             503: components["responses"]["Unavailable"];
         };
     };

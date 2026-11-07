@@ -22,6 +22,8 @@ output-options:
     - getAccount
     - changeAccount
     - getVersion
+    - getNavigation
+    - updateNavigation
     - readFirewall
     - listOperations
     - listPendingOperations

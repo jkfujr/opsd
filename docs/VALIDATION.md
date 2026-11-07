@@ -24,7 +24,7 @@ Release 复用同提交成功工件，通过公开地址下载，检查实际安
 
 ## 最近结果
 
-2026-11-07；提交：`f0cfc7d9d14dacb9fd1649911472239a61df0dd9`；环境：GitHub Ubuntu 24.04、Go 1.26.2、Node.js 24.14.1、Chromium、Docker、启用的 UFW；三个逻辑 OPSD 节点、三个 MariaDB Galera 成员和两个 ProxySQL 运行在同一 CI 主机，另运行真实 Prometheus 与 Grafana；覆盖项：构建、后端、原生互信、实际安装、API、数据库与页面交互。
+2026-11-07；提交：`f0cfc7d9d14dacb9fd1649911472239a61df0dd9`；环境：GitHub Ubuntu 24.04、Go 1.26.2、Node.js 24.14.1、Chromium、Docker、启用的 UFW，以及 C091 amd64 实例；三个逻辑 OPSD 节点、三个 MariaDB Galera 成员和两个 ProxySQL 运行在同一 CI 主机，另运行真实 Prometheus 与 Grafana；覆盖项：构建、后端、原生互信、实际安装、API、数据库、页面交互与 C091 原位更新。CI 结果复用此前同提交成功结果。
 
 已验证：OpenAPI 生成一致、前端类型与生产构建、Linux amd64／arm64 编译、程序版本及安装脚本语法、实际安装与重复安装保留配置。三节点令牌通用、节点及动态地域范围、权限编辑、停用、重新生成、撤销与所属节点失联；Bearer 优先于浏览器会话，模块权限与操作列表先过滤再分页；同一令牌跨入口重复提交返回原操作，参数变化冲突，已受理操作在令牌停用后继续。当前 JSON 与指标授权范围、采集合并、部分历史、按节点返回及七天边界通过。
 
@@ -34,11 +34,14 @@ Release 复用同提交成功工件，通过公开地址下载，检查实际安
 
 已验证：既有真实 Docker 启停、重启及日志，未知应答的重启请求数为 1；原生互信双栈新连接、UFW 重载、节点停止后的独立执行器恢复及迁移；防火墙七种宽度、五种状态、互信分组、共享地址和 200% CSS 缩放回归通过。已人工检查本轮宽屏成员表、中屏令牌表单、窄屏数据库账号与代理选择、操作恢复抽屉截图；窄屏代理名称保持完整，主机组单独排列。
 
-未验证：跨地域真实多主机、生产 MariaDB／ProxySQL 接入、arm64 实机、rootless Docker、整机重启及 firewalld 运行配置的新连接。本批未发布版本或更新 C091；备份页的既有计划及产物读取未在生产实例验收，Silo 页面与部署留待存储功能批次。
+已验证：C091 原位更新为 CI 42378352702 的同提交 amd64 工件，两个服务 active、NRestarts=0，未结束操作为 0；原管理员登录、节点身份、10 个既有容器的状态及启动时间保留。外部防火墙规则内容及相对顺序保留，双栈互信运行与永久配置均为 `in_sync`，所属 INPUT 跳转各一条且位于首条。线上 Chromium 完成数据库页面、本机 Galera 发现、创建限定本节点监控令牌、核验、当前 JSON 与 OpenMetrics 读取；未授权节点模块返回 403，删除令牌后核验返回 401。验收令牌已撤销，API 恢复原关闭状态，浏览器脚本错误为 0；已人工检查数据库发现与接入配置截图。
+
+未验证：跨地域真实多主机、生产 MariaDB／ProxySQL 集群登记及管理写入、arm64 实机、rootless Docker、整机重启及 firewalld 运行配置的新连接。C091 当前登记的数据库集群为 0；本批未发布版本，备份页的既有计划及产物读取未在生产实例验收，Silo 页面与部署留待存储功能批次。
 
 - [CI 42378352702](https://github.com/jkfujr/opsd/actions/runs/42378352702)
 - `ui-check` 工件下载到 `artifacts/ui-42378352702/`，`result.json` 记录 API、页面、容器和互信结果，PNG 保存实际截图。
 - `database-check` 工件下载到 `artifacts/database-42378352702/`，`database-result.json` 记录三个逻辑节点、三成员 Galera、两个 ProxySQL、幂等、部分恢复及看板结果。
 - `opsd-linux` 工件包含同提交 amd64／arm64 程序和固定版本安装脚本。
+- C091 部署结果保存在 `artifacts/deploy-42378352702/`：`browser-result.json` 为页面、数据库发现与令牌结果，`readback.json` 为服务、原有容器及防火墙读回，PNG 为线上截图。
 
 历史 CI 与 C091 部署结果见 [变更记录](../CHANGELOG.md)。

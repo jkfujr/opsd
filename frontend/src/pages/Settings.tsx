@@ -11,6 +11,7 @@ import { api, unwrap } from '../api/client';
 import type { components } from '../api/schema.gen';
 import { useSession } from '../auth';
 import { queryClient } from '../state';
+import { defaultNavigationOrder, navigation, useNavigation } from '../navigation';
 import { BusyButton, date, Failure, LoadingRows, PageTitle, TextField, useUnsavedChanges } from '../ui';
 
 export function Account() {
@@ -50,7 +51,43 @@ export function Appearance() {
     <RadioGroup aria-label="主题" value={mounted ? theme : 'system'} onValueChange={(value) => setTheme(String(value))} orientation="horizontal" className="flex flex-wrap gap-x-10 gap-y-6">
       {[['light', '浅色'], ['dark', '深色'], ['system', '跟随系统']].map(([value, label]) => <label key={value} className="flex min-h-11 cursor-pointer items-center gap-3"><Radio value={value} /><span>{label}</span></label>)}
     </RadioGroup>
-  </Fieldset></>;
+  </Fieldset><NavigationSettings /></>;
+}
+
+function NavigationSettings() {
+  const nodeID = useSession().local_node_id;
+  const query = useNavigation();
+  const [draft, setDraft] = useState<components['schemas']['NavigationPreferences'] | null>(null);
+  const [needsRead, setNeedsRead] = useState(false);
+  useUnsavedChanges(draft !== null);
+  const value = draft ?? query.data;
+  const save = useMutation({ mutationFn: async (input: components['schemas']['NavigationPreferences']) => unwrap(await api.PATCH('/settings/navigation', { body: input })), onSuccess: (data) => {
+    queryClient.setQueryData(['navigation', nodeID], data);
+    setDraft(null);
+    setNeedsRead(false);
+  }, onError: () => setNeedsRead(true) });
+  const change = (order: components['schemas']['NavigationItem'][]) => { setDraft({ ...value!, order }); save.reset(); };
+  const move = (index: number, step: number) => {
+    const order = [...value!.order];
+    [order[index], order[index + step]] = [order[index + step], order[index]];
+    change(order);
+  };
+  const read = async () => {
+    const result = await query.refetch();
+    if (!result.data || result.isError) return;
+    setDraft((current) => current && (current.order.every((id, index) => id === result.data!.order[index]) ? null : { ...current, revision: result.data!.revision }));
+    setNeedsRead(false);
+    save.reset();
+  };
+  return <Fieldset className="mt-8 border-t border-border pt-4"><FieldsetLegend className="section-title">菜单顺序</FieldsetLegend>
+    <Failure error={query.error} retry={() => void query.refetch()} busy={query.isFetching} />
+    <ol aria-label="菜单顺序" aria-busy={query.isPending} className="max-w-lg divide-y divide-border">{(value?.order ?? defaultNavigationOrder).map((id, index) => {
+      const label = navigation.find((item) => item.id === id)!.label;
+      return <li key={id} className="flex min-h-14 items-center justify-between gap-3 py-2"><span>{label}</span><div className="flex gap-2"><Button size="sm" variant="outline" aria-label={`${label}上移`} disabled={!value || save.isPending || index === 0} onClick={() => move(index, -1)}>上移</Button><Button size="sm" variant="outline" aria-label={`${label}下移`} disabled={!value || save.isPending || index === defaultNavigationOrder.length - 1} onClick={() => move(index, 1)}>下移</Button></div></li>;
+    })}</ol>
+    <Failure error={save.error} />
+    <div className="mt-4 flex flex-wrap items-center gap-3"><Button variant="outline" disabled={!value || save.isPending} onClick={() => change([...defaultNavigationOrder])}>恢复默认</Button><BusyButton busy={save.isPending} disabled={!draft || needsRead || query.isError} onClick={() => save.mutate(draft!)}>保存</BusyButton>{needsRead && <BusyButton variant="outline" busy={query.isFetching} onClick={() => void read()}>重新读取</BusyButton>}{save.isSuccess && !draft && <span role="status" className="text-sm text-foreground-muted">已保存</span>}</div>
+  </Fieldset>;
 }
 
 export function Version() {

@@ -21,6 +21,8 @@
 
 主题配置集中在 `frontend/src/theme.ts`。Vite 使用 `getThemeScript()` 将同步脚本插入 HTML 头部，React `ThemeProvider` 使用同一配置；纯客户端首次主题由 HTML 脚本应用。主题修改使用生产构建验收首次打开、刷新和系统偏好，开发环境 StrictMode 会重复执行 Effect。
 
+导航定义与共享查询位于 `frontend/src/navigation.ts`。账号菜单顺序经 `/settings/navigation` 保存到所属节点的 `account_navigation` 表，SSE 的 `navigation` 事件只刷新对应节点查询；编辑器保留未提交版本。账号偏好独立于凭据版本与其他节点账号，修改密码时保留偏好。“存储”的当前入口只展示未接入状态，Silo 功能按后续批次建设。
+
 - `DialogContent` 的直接子项使用 Header、Body、Footer；长内容在 Body 滚动。表单放 Body，Footer 的提交按钮用 `form` 关联。
 - 抽屉同样使用 Header、Body、Footer；用框架焦点管理及中文关闭标签。确认框复用 `ui.tsx` 的 `Confirm`。
 - `BusyButton` 在提交或手动刷新时转圈，保留动作名称。后台轮询保留旧内容，不反复转圈。

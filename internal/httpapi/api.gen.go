@@ -593,6 +593,39 @@ func (e MonitoringReadingState) Valid() bool {
 	}
 }
 
+// Defines values for NavigationItem.
+const (
+	NavigationItemContainers NavigationItem = "containers"
+	NavigationItemDatabases  NavigationItem = "databases"
+	NavigationItemFirewall   NavigationItem = "firewall"
+	NavigationItemNodes      NavigationItem = "nodes"
+	NavigationItemOverview   NavigationItem = "overview"
+	NavigationItemSettings   NavigationItem = "settings"
+	NavigationItemStorage    NavigationItem = "storage"
+)
+
+// Valid indicates whether the value is a known member of the NavigationItem enum.
+func (e NavigationItem) Valid() bool {
+	switch e {
+	case NavigationItemContainers:
+		return true
+	case NavigationItemDatabases:
+		return true
+	case NavigationItemFirewall:
+		return true
+	case NavigationItemNodes:
+		return true
+	case NavigationItemOverview:
+		return true
+	case NavigationItemSettings:
+		return true
+	case NavigationItemStorage:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for NodeConfigAddressMode.
 const (
 	NodeConfigAddressModeAuto   NodeConfigAddressMode = "auto"
@@ -1736,6 +1769,15 @@ type MonitoringSummary struct {
 	ValidNodes MonitoringCoverage `json:"valid_nodes"`
 }
 
+// NavigationItem defines model for NavigationItem.
+type NavigationItem string
+
+// NavigationPreferences defines model for NavigationPreferences.
+type NavigationPreferences struct {
+	Order    []NavigationItem `json:"order"`
+	Revision int64            `json:"revision"`
+}
+
 // NetworkError defines model for NetworkError.
 type NetworkError struct {
 	Code    string `json:"code"`
@@ -2315,6 +2357,11 @@ type ChangeAccountParams struct {
 	XCSRFToken *string `json:"X-CSRF-Token,omitempty"`
 }
 
+// UpdateNavigationParams defines parameters for UpdateNavigation.
+type UpdateNavigationParams struct {
+	XCSRFToken *string `json:"X-CSRF-Token,omitempty"`
+}
+
 // CreateAPITokenJSONRequestBody defines body for CreateAPIToken for application/json ContentType.
 type CreateAPITokenJSONRequestBody = APITokenInput
 
@@ -2377,6 +2424,9 @@ type ChangePeerTrustJSONRequestBody = PeerTrustPolicyPatch
 
 // ChangeAccountJSONRequestBody defines body for ChangeAccount for application/json ContentType.
 type ChangeAccountJSONRequestBody = AccountChange
+
+// UpdateNavigationJSONRequestBody defines body for UpdateNavigation for application/json ContentType.
+type UpdateNavigationJSONRequestBody = NavigationPreferences
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
@@ -2557,6 +2607,12 @@ type ServerInterface interface {
 	// ChangeAccount 修改账号凭据或安全入口
 	// (PATCH /settings/account)
 	ChangeAccount(w http.ResponseWriter, r *http.Request, params ChangeAccountParams)
+	// GetNavigation 读取菜单顺序
+	// (GET /settings/navigation)
+	GetNavigation(w http.ResponseWriter, r *http.Request)
+	// UpdateNavigation 保存菜单顺序
+	// (PATCH /settings/navigation)
+	UpdateNavigation(w http.ResponseWriter, r *http.Request, params UpdateNavigationParams)
 	// GetVersion 读取版本
 	// (GET /settings/version)
 	GetVersion(w http.ResponseWriter, r *http.Request)
@@ -4955,6 +5011,61 @@ func (siw *ServerInterfaceWrapper) ChangeAccount(w http.ResponseWriter, r *http.
 	handler.ServeHTTP(w, r)
 }
 
+// GetNavigation operation middleware
+func (siw *ServerInterfaceWrapper) GetNavigation(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetNavigation(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdateNavigation operation middleware
+func (siw *ServerInterfaceWrapper) UpdateNavigation(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params UpdateNavigationParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "X-CSRF-Token" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-CSRF-Token")]; found {
+		var XCSRFToken string
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "X-CSRF-Token", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "X-CSRF-Token", valueList[0], &XCSRFToken, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-CSRF-Token", Err: err})
+			return
+		}
+
+		params.XCSRFToken = &XCSRFToken
+
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateNavigation(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // GetVersion operation middleware
 func (siw *ServerInterfaceWrapper) GetVersion(w http.ResponseWriter, r *http.Request) {
 
@@ -5148,6 +5259,8 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/peer-trust/status", wrapper.GetPeerTrustStatus)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/settings/account", wrapper.GetAccount)
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/settings/account", wrapper.ChangeAccount)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/settings/navigation", wrapper.GetNavigation)
+	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/settings/navigation", wrapper.UpdateNavigation)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/settings/version", wrapper.GetVersion)
 
 	return m
@@ -11377,6 +11490,246 @@ func (response ChangeAccount503JSONResponse) VisitChangeAccountResponse(w http.R
 	return err
 }
 
+type GetNavigationRequestObject struct {
+}
+
+type GetNavigationResponseObject interface {
+	VisitGetNavigationResponse(w http.ResponseWriter) error
+}
+
+type GetNavigation200JSONResponse NavigationPreferences
+
+func (response GetNavigation200JSONResponse) VisitGetNavigationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetNavigation401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response GetNavigation401JSONResponse) VisitGetNavigationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetNavigation403JSONResponse struct{ ForbiddenJSONResponse }
+
+func (response GetNavigation403JSONResponse) VisitGetNavigationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetNavigation404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response GetNavigation404JSONResponse) VisitGetNavigationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetNavigation409JSONResponse struct{ ConflictJSONResponse }
+
+func (response GetNavigation409JSONResponse) VisitGetNavigationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetNavigation422JSONResponse struct{ InvalidRequestJSONResponse }
+
+func (response GetNavigation422JSONResponse) VisitGetNavigationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetNavigation500JSONResponse struct{ InternalErrorJSONResponse }
+
+func (response GetNavigation500JSONResponse) VisitGetNavigationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetNavigation503JSONResponse struct{ UnavailableJSONResponse }
+
+func (response GetNavigation503JSONResponse) VisitGetNavigationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(503)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateNavigationRequestObject struct {
+	Params UpdateNavigationParams
+	Body   *UpdateNavigationJSONRequestBody
+}
+
+type UpdateNavigationResponseObject interface {
+	VisitUpdateNavigationResponse(w http.ResponseWriter) error
+}
+
+type UpdateNavigation200JSONResponse NavigationPreferences
+
+func (response UpdateNavigation200JSONResponse) VisitUpdateNavigationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateNavigation401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response UpdateNavigation401JSONResponse) VisitUpdateNavigationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateNavigation403JSONResponse struct{ ForbiddenJSONResponse }
+
+func (response UpdateNavigation403JSONResponse) VisitUpdateNavigationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateNavigation404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response UpdateNavigation404JSONResponse) VisitUpdateNavigationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateNavigation409JSONResponse struct{ ConflictJSONResponse }
+
+func (response UpdateNavigation409JSONResponse) VisitUpdateNavigationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateNavigation422JSONResponse struct{ InvalidRequestJSONResponse }
+
+func (response UpdateNavigation422JSONResponse) VisitUpdateNavigationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateNavigation500JSONResponse struct{ InternalErrorJSONResponse }
+
+func (response UpdateNavigation500JSONResponse) VisitUpdateNavigationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateNavigation503JSONResponse struct{ UnavailableJSONResponse }
+
+func (response UpdateNavigation503JSONResponse) VisitUpdateNavigationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(503)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type GetVersionRequestObject struct {
 }
 
@@ -11675,6 +12028,12 @@ type StrictServerInterface interface {
 	// ChangeAccount 修改账号凭据或安全入口
 	// (PATCH /settings/account)
 	ChangeAccount(ctx context.Context, request ChangeAccountRequestObject) (ChangeAccountResponseObject, error)
+	// GetNavigation 读取菜单顺序
+	// (GET /settings/navigation)
+	GetNavigation(ctx context.Context, request GetNavigationRequestObject) (GetNavigationResponseObject, error)
+	// UpdateNavigation 保存菜单顺序
+	// (PATCH /settings/navigation)
+	UpdateNavigation(ctx context.Context, request UpdateNavigationRequestObject) (UpdateNavigationResponseObject, error)
 	// GetVersion 读取版本
 	// (GET /settings/version)
 	GetVersion(ctx context.Context, request GetVersionRequestObject) (GetVersionResponseObject, error)
@@ -13396,6 +13755,63 @@ func (sh *strictHandler) ChangeAccount(w http.ResponseWriter, r *http.Request, p
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(ChangeAccountResponseObject); ok {
 		if err := validResponse.VisitChangeAccountResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetNavigation operation middleware
+func (sh *strictHandler) GetNavigation(w http.ResponseWriter, r *http.Request) {
+	var request GetNavigationRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetNavigation(ctx, request.(GetNavigationRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetNavigation")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetNavigationResponseObject); ok {
+		if err := validResponse.VisitGetNavigationResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// UpdateNavigation operation middleware
+func (sh *strictHandler) UpdateNavigation(w http.ResponseWriter, r *http.Request, params UpdateNavigationParams) {
+	var request UpdateNavigationRequestObject
+
+	request.Params = params
+
+	var body UpdateNavigationJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.UpdateNavigation(ctx, request.(UpdateNavigationRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "UpdateNavigation")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(UpdateNavigationResponseObject); ok {
+		if err := validResponse.VisitUpdateNavigationResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

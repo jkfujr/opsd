@@ -6,6 +6,8 @@
 
 所属节点 SQLite 保存身份、配置、账号、成员目录、队列与待上传记录。地域 CouchDB 保存签名共享记录和历史，数据库内容用于查询与复制。目标操作在本机持久受理后串行执行；控制台、入口或共享数据库停止时，本机操作与恢复继续。
 
+菜单顺序绑定所属节点的管理员账号，保存在独立的 `account_navigation` 表，版本与账号凭据分开。修改通过本机事务保存并向当前控制台会话发送 SSE，账号改名、改密及重启后保留；其他节点的管理员独立保存各自顺序。
+
 `cluster` 负责节点协议和数据；`control` 负责会话、HTTP、SSE；`apiauth` 负责令牌摘要、生命周期与权限；`executor` 负责 root 服务；`operations` 负责独立执行与恢复；`firewall` 负责原生后端；`dockerengine` 负责本机 Docker；`databaseengine` 负责本机 MariaDB／ProxySQL；`monitoring` 负责采集。协议定义位于 `protocol`，HTTP 类型只从 `api/openapi.json` 生成。
 
 防火墙后台检查在请求期限内等待本机操作锁，锁繁忙时保留上次实际状态；实际读取失败单独记录错误。互信维护与容器操作共用该锁，检查完成后继续按确认配置和实际互信覆盖受理迁移。

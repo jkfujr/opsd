@@ -3539,6 +3539,110 @@
           }
         }
       }
+    },
+    "/settings/navigation": {
+      "get": {
+        "operationId": "getNavigation",
+        "summary": "读取菜单顺序",
+        "tags": [
+          "settings"
+        ],
+        "responses": {
+          "200": {
+            "description": "请求成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NavigationPreferences"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/InvalidRequest"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable",
+            "description": "节点或数据库不可用"
+          }
+        }
+      },
+      "patch": {
+        "operationId": "updateNavigation",
+        "summary": "保存菜单顺序",
+        "tags": [
+          "settings"
+        ],
+        "responses": {
+          "200": {
+            "description": "请求成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NavigationPreferences"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/InvalidRequest"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable",
+            "description": "节点或数据库不可用"
+          }
+        },
+        "parameters": [
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NavigationPreferences"
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -8117,6 +8221,42 @@
         "required": [
           "items",
           "checked_at"
+        ]
+      },
+      "NavigationItem": {
+        "type": "string",
+        "enum": [
+          "overview",
+          "nodes",
+          "containers",
+          "databases",
+          "storage",
+          "firewall",
+          "settings"
+        ]
+      },
+      "NavigationPreferences": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "order": {
+            "type": "array",
+            "minItems": 7,
+            "maxItems": 7,
+            "uniqueItems": true,
+            "items": {
+              "$ref": "#/components/schemas/NavigationItem"
+            }
+          },
+          "revision": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "order",
+          "revision"
         ]
       }
     },

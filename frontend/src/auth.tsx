@@ -40,6 +40,7 @@ export function SessionBoundary() {
           if (resource === 'firewall') void queryClient.invalidateQueries({ queryKey: node_id ? ['firewall', node_id] : ['firewall'] });
           if (resource === 'containers') void queryClient.invalidateQueries({ queryKey: ['containers'] });
           if (resource === 'databases') void queryClient.invalidateQueries({ queryKey: ['databases'] });
+          if (resource === 'navigation') void queryClient.invalidateQueries({ queryKey: ['navigation', node_id] });
           if (resource === 'settings' || resource === 'account') void queryClient.invalidateQueries({ queryKey: ['nodes', node_id, resource] });
           if (resource === 'settings') void queryClient.invalidateQueries({ queryKey: ['nodes', node_id, 'storage'] });
           if (['tokens', 'sessions', 'monitoring'].includes(resource)) void queryClient.invalidateQueries({ queryKey: [resource] });
@@ -55,7 +56,7 @@ export function SessionBoundary() {
   if (session.isPending) return <div className="grid min-h-screen place-items-center"><Spinner aria-label="正在检查会话" /></div>;
   if (session.error) return <div className="m-auto max-w-md space-y-4 p-8"><Failure error={session.error} /><Button onClick={() => void session.refetch()}>重试</Button></div>;
   if (!session.data) {
-    if (location.pathname === '/' || location.pathname.startsWith('/firewall') || location.pathname.startsWith('/nodes') || location.pathname.startsWith('/settings')) return <p className="p-8">页面不存在</p>;
+    if (location.pathname === '/' || location.pathname.startsWith('/firewall') || location.pathname.startsWith('/nodes') || location.pathname.startsWith('/settings') || location.pathname.startsWith('/storage')) return <p className="p-8">页面不存在</p>;
     return <Login entrance={location.pathname} />;
   }
   return <SessionContext value={session.data}><Outlet /></SessionContext>;
