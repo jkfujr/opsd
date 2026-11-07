@@ -13,7 +13,6 @@ import (
 	"github.com/jkfujr/opsd/internal/cluster"
 	"github.com/jkfujr/opsd/internal/httpapi"
 	"github.com/jkfujr/opsd/internal/monitoring"
-	"github.com/jkfujr/opsd/internal/protocol"
 )
 
 func convertHTTP[T any](v any) T {
