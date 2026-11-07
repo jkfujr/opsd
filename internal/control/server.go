@@ -227,7 +227,7 @@ func (s *Server) page(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if path != entrance {
-		if path != "/" && path != "/containers" && path != "/databases" && !strings.HasPrefix(path, "/databases/") && path != "/firewall" && path != "/firewall/settings" && path != "/nodes" && !strings.HasPrefix(path, "/nodes/") && path != "/settings" && !strings.HasPrefix(path, "/settings/") {
+		if path != "/" && path != "/containers" && path != "/databases" && !strings.HasPrefix(path, "/databases/") && path != "/storage" && path != "/firewall" && path != "/firewall/settings" && path != "/nodes" && !strings.HasPrefix(path, "/nodes/") && path != "/settings" && !strings.HasPrefix(path, "/settings/") {
 			http.NotFound(w, r)
 			return
 		}
