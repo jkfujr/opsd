@@ -16,6 +16,11 @@ const page = await context.newPage();
 const errors = [];
 const firewallWidths = [320, 639, 640, 768, 1000, 1440, 1920];
 page.on('pageerror', (error) => errors.push(error.message));
+const submitLogin = async (target) => {
+  await Promise.all([target.waitForEvent('domcontentloaded'), target.getByRole('button', { name: '登录', exact: true }).click()]);
+  await target.waitForURL(`${base}/`);
+  await target.locator('main h1').waitFor({ state: 'attached' });
+};
 const capture = async (name) => {
   await page.waitForFunction(() => !document.querySelector('[role="dialog"][data-starting-style], [role="alertdialog"][data-starting-style]'));
   await page.evaluate(async () => {
@@ -77,8 +82,7 @@ try {
   await capture('login');
   await page.getByLabel('账号', { exact: true }).fill('ui-check');
   await page.getByLabel('密码', { exact: true }).fill(password);
-  await page.getByRole('button', { name: '登录', exact: true }).click();
-  await page.waitForURL(`${base}/`);
+  await submitLogin(page);
   const nodes = await (await context.request.get(`${base}/api/v1/nodes`)).json();
   assert.equal(nodes.items[0].name, 'ui-check', '网络修改或重复安装改变了节点名称');
   const id = nodes.items[0].id;
@@ -113,8 +117,7 @@ try {
     await otherPage.getByLabel('账号', { exact: true }).fill('ui-check');
     await otherPage.getByLabel('密码', { exact: true }).fill(password);
     const otherEvents = otherPage.waitForResponse((response) => response.url().endsWith('/api/v1/events'));
-    await otherPage.getByRole('button', { name: '登录', exact: true }).click();
-    await otherPage.waitForURL(`${base}/`);
+    await submitLogin(otherPage);
     await otherEvents;
     const otherAppearanceEvents = otherPage.waitForResponse((response) => response.url().endsWith('/api/v1/events'));
     await otherPage.goto(`${base}/settings/appearance`);
@@ -165,8 +168,7 @@ try {
     await otherPage.waitForURL(`${base}/signin`);
     await otherPage.getByLabel('账号', { exact: true }).fill('ui-check');
     await otherPage.getByLabel('密码', { exact: true }).fill(password);
-    await otherPage.getByRole('button', { name: '登录', exact: true }).click();
-    await otherPage.waitForURL(`${base}/`);
+    await submitLogin(otherPage);
     await waitFor(() => menuLabels(otherPage), (items) => JSON.stringify(items) === JSON.stringify(navigationLabels), '重新登录丢失菜单偏好');
   } finally { await otherContext.close(); }
   const firewallPath = `/nodes/${id}/firewall`;
