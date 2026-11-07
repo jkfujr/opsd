@@ -30,9 +30,7 @@ import (
 	"github.com/jkfujr/opsd/internal/cluster"
 	"github.com/jkfujr/opsd/internal/databaseengine"
 	"github.com/jkfujr/opsd/internal/executor"
-	"github.com/jkfujr/opsd/internal/httpapi"
 	"github.com/jkfujr/opsd/internal/identity"
-	"github.com/jkfujr/opsd/internal/operations"
 	"github.com/jkfujr/opsd/internal/protocol"
 	"github.com/jkfujr/opsd/internal/storage"
 )

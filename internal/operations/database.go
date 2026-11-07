@@ -79,7 +79,8 @@ func (e *Engine) database(ctx context.Context, l *Local) error {
 			if ctx.Err() != nil {
 				return ctx.Err()
 			}
-			observed, readErr := e.Databases.Observe(ctx, a, stage)
+			var readErr error
+			observed, readErr = e.Databases.Observe(ctx, a, stage)
 			if readErr != nil {
 				return e.attention(ctx, l, readErr)
 			}

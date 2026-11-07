@@ -10,6 +10,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"slices"
 	"sort"
 	"strconv"
@@ -288,6 +289,29 @@ func proxyLayers(ctx context.Context, s *session) ([][]map[string]string, error)
 	}
 	return out, nil
 }
+
+// 运行表按前后端分别保存启用用户；配置中的同一行可同时承担两种角色。
+func proxyRuntimeFingerprint(users []map[string]string) string {
+	projected := []map[string]string{}
+	for _, user := range users {
+		if user["active"] != "1" {
+			continue
+		}
+		for _, role := range []string{"backend", "frontend"} {
+			if user[role] == "1" {
+				row := maps.Clone(user)
+				row["backend"], row["frontend"] = "0", "0"
+				row[role] = "1"
+				projected = append(projected, row)
+			}
+		}
+	}
+	sort.Slice(projected, func(i, j int) bool {
+		a, b := projected[i], projected[j]
+		return a["username"]+"/"+a["backend"]+a["frontend"] < b["username"]+"/"+b["backend"]+b["frontend"]
+	})
+	return fingerprint(projected)
+}
 func readProxy(ctx context.Context, s *session, c protocol.DatabaseConnection, out protocol.DatabaseState) (protocol.DatabaseState, error) {
 	v, e := rows(ctx, s, "SELECT @@version AS version")
 	if e != nil {
@@ -300,7 +324,7 @@ func readProxy(ctx context.Context, s *session, c protocol.DatabaseConnection, o
 	if e != nil {
 		return out, e
 	}
-	out.PendingChanges = fingerprint(layers[0]) != fingerprint(layers[1]) || fingerprint(layers[0]) != fingerprint(layers[2])
+	out.PendingChanges = proxyRuntimeFingerprint(layers[0]) != proxyRuntimeFingerprint(layers[1]) || fingerprint(layers[0]) != fingerprint(layers[2])
 	for _, u := range layers[0] {
 		state := "in_sync"
 		if out.PendingChanges {
@@ -372,7 +396,7 @@ func (Manager) Prepare(ctx context.Context, a protocol.DatabaseAction) ([]string
 		if e != nil {
 			return nil, e
 		}
-		if fingerprint(layers[0]) != fingerprint(layers[1]) || fingerprint(layers[0]) != fingerprint(layers[2]) {
+		if proxyRuntimeFingerprint(layers[0]) != proxyRuntimeFingerprint(layers[1]) || fingerprint(layers[0]) != fingerprint(layers[2]) {
 			return nil, fmt.Errorf("ProxySQL 存在其他待应用的账号配置")
 		}
 		return []string{"memory", "runtime", "disk"}, nil
@@ -435,7 +459,7 @@ func (Manager) Observe(ctx context.Context, a protocol.DatabaseAction, step stri
 		out.Source = fingerprint(layers[0])
 		out.Fingerprint = fingerprint(layers)
 		if step == "runtime" {
-			out.Satisfied = fingerprint(layers[0]) == fingerprint(layers[1])
+			out.Satisfied = proxyRuntimeFingerprint(layers[0]) == proxyRuntimeFingerprint(layers[1])
 			return out, nil
 		}
 		if step == "disk" {
