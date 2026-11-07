@@ -24,7 +24,7 @@ func TestNavigationPersistsAcrossAccountChangeAndReopen(t *testing.T) {
 	if e != nil || saved.Revision != 1 {
 		t.Fatal("保存菜单顺序失败", saved, e)
 	}
-	op, e := n.Submit(t.Context(), n.ID, Request{Kind: "account", Payload: payload(AccountChange{Username: "changed", Password: "changed-password", Entrance: "/other-signin"})})
+	op, e := n.Submit(t.Context(), n.ID, Request{ID: NewOperationID(n.ID), Kind: "account", Payload: payload(AccountChange{Username: "changed", Password: "changed-password", Entrance: "/other-signin"})})
 	if e != nil {
 		t.Fatal(e)
 	}
