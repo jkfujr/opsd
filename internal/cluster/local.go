@@ -25,7 +25,7 @@ func (n *Node) LocalHandler() http.Handler {
 			http.Error(w, "请求无效", 422)
 			return
 		}
-		if request.Kind == "console" {
+		if request.Kind == "console" || request.Kind == "api" {
 			var value struct {
 				Enabled bool `json:"enabled"`
 			}
@@ -38,7 +38,11 @@ func (n *Node) LocalHandler() http.Handler {
 				http.Error(w, "配置不可用", 503)
 				return
 			}
-			c.Console = value.Enabled
+			if request.Kind == "console" {
+				c.Console = value.Enabled
+			} else {
+				c.API = value.Enabled
+			}
 			request.Kind = "config"
 			request.Payload, _ = json.Marshal(c)
 		} else if request.Kind != "account" {

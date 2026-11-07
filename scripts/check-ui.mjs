@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
+import { createServer } from 'node:net';
 import { chromium } from 'playwright';
 
 // 对 CI 中实际安装的生产程序检查页面和交互，截图写入 artifacts。
@@ -21,7 +22,7 @@ const capture = async (name) => {
     await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
     await Promise.all(document.getAnimations().filter((a) => a.effect?.getComputedTiming().iterations !== Infinity).map((a) => a.finished.catch(() => {})));
   });
-  await page.screenshot({ path: `${output}/${name}.png`, fullPage: true, animations: 'disabled' });
+  await page.screenshot({ path: `${output}/${name}.png`, fullPage: true, animations: 'disabled', mask: [page.getByLabel('令牌（仅显示一次）', { exact: true }), page.getByLabel('验证命令', { exact: true }), page.getByLabel('Prometheus 配置', { exact: true })] });
   assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), `${name} 页面横向溢出`);
 };
 const checkFirewallHeader = async () => {
@@ -113,7 +114,20 @@ try {
   await addRule({ family: 'ipv4', source: '100.64.0.0/10', protocol: 'any', action: 'allow' });
   await addRule({ family: 'ipv4', source: '0.0.0.0/0', protocol: 'tcp', port: '22', action: 'allow' });
   const firewall = await api(firewallPath);
-  const pages = [['overview', '/'], ['nodes', '/nodes'], ['detail', `/nodes/${id}`], ['containers', '/containers'], ['firewall', `/firewall?node=${id}`], ['firewall-settings', '/firewall/settings'], ['account', '/settings/account'], ['sessions', '/settings/sessions'], ['appearance', '/settings/appearance'], ['version', '/settings/version']];
+  // 数据库执行使用后端真实集群验收；页面在同一生产程序中注入各状态数据。
+  const databaseID = 'ui-galera';
+  const checked = new Date().toISOString();
+  const member = { node_id: id, instance_id: 'galera', name: 'MariaDB', address: '127.0.0.1:3306' };
+  const proxy = { node_id: id, instance_id: 'proxy', name: 'ProxySQL', address: '127.0.0.1:6032' };
+  const databaseState = { state: 'ready', version: '11.8.9-MariaDB', cluster_id: 'ui-cluster', cluster_name: '业务集群', configured_members: 'gcomm://10.0.0.1,10.0.0.2', actual_members: '10.0.0.1:3306,10.0.0.2:3306', member_address: '10.0.0.1:3306', cluster_size: 2, primary: true, ready: true, synced: true, read_only: false, connections: 12, receive_queue: 0, send_queue: 0, flow_control: 0.01, checked_at: checked, databases: [{ name: 'mysql', charset: 'utf8mb4', collation: 'utf8mb4_general_ci', bytes: 4096, protected: true }, { name: 'business', charset: 'utf8mb4', collation: 'utf8mb4_unicode_ci', bytes: 1048576, protected: false }], users: [{ name: 'root', host: 'localhost', protected: true, grants: [] }, { name: 'business', host: '%', protected: false, grants: [{ database: 'business', privileges: ['SELECT', 'INSERT'] }] }], servers: [], pools: [], proxy_users: [], pending_changes: false };
+  const definition = { id: databaseID, name: '业务 Galera', coordinator: id, cluster_id: 'ui-cluster', revision: 1, members: [member], proxies: [proxy], workbench_url: 'https://example.com/sql' };
+  const databaseValue = { cluster: definition, checked_at: checked, members: [{ ...member, status: databaseState }], proxies: [{ ...proxy, status: { ...databaseState, version: '3.0.3', servers: [{ hostgroup: 10, host: '10.0.0.1', port: 3306, state: 'ONLINE' }], pools: [{ hostgroup: 10, host: '10.0.0.1', port: 3306, used: 3, free: 7, errors: 0 }], proxy_users: [{ name: 'business', active: true, hostgroup: 10, state: 'in_sync', protected: false }] } }] };
+  const databasePath = `/databases/clusters/${databaseID}`;
+  const databaseListRoute = (route) => route.request().method() === 'GET' ? route.fulfill({ json: { items: [databaseValue] } }) : route.continue();
+  await page.route('**/api/v1/databases/clusters', databaseListRoute);
+  await page.route(`**/api/v1${databasePath}`, (route) => route.fulfill({ json: databaseValue }));
+  await page.route(`**/api/v1${databasePath}/backups`, (route) => route.fulfill({ json: { items: [{ node_id: id, instance_id: 'galera', items: [{ name: 'daily', schedule: '*-*-* 03:00:00', state: 'failed', last_run: checked, last_success: checked, artifacts: ['/backup/daily/business.sql.zst'], error: '备份目录空间不足' }] }] } }));
+  const pages = [['overview', '/'], ['nodes', '/nodes'], ['detail', `/nodes/${id}`], ['containers', '/containers'], ['firewall', `/firewall?node=${id}`], ['firewall-settings', '/firewall/settings'], ['databases', '/databases'], ['database-detail', `/databases/${databaseID}`], ['api', '/settings/api'], ['account', '/settings/account'], ['sessions', '/settings/sessions'], ['appearance', '/settings/appearance'], ['version', '/settings/version']];
   for (const theme of ['light', 'dark']) {
     await page.goto(`${base}/settings/appearance`);
     await page.getByRole('radio', { name: theme === 'light' ? '浅色' : '深色', exact: true }).click();
@@ -437,6 +451,104 @@ try {
   assert.equal(await page.getByRole('switch', { name: '集群互信' }).isChecked(), false);
   await waitFor(() => api(trustPath), (value) => value.state === 'disabled' && value.rules.length === 0, '关闭后互信规则未撤除');
   assert(!(await api(firewallPath)).rules.some((rule) => rule.spec.source === '8.8.8.8/32'));
+  for (const theme of ['light', 'dark']) {
+    await page.goto(`${base}/settings/appearance`);
+    await page.getByRole('radio', { name: theme === 'light' ? '浅色' : '深色', exact: true }).click();
+    for (const width of [320, 768, 1440]) {
+      await page.setViewportSize({ width, height: 1000 });
+      await page.goto(`${base}/settings/api`);
+      await page.getByRole('button', { name: '创建令牌', exact: true }).click();
+      const form = page.getByRole('dialog');
+      await form.getByLabel('监控范围', { exact: true }).click();
+      await page.getByRole('option', { name: '指定节点', exact: true }).click();
+      await form.getByRole('checkbox', { name: 'ui-check', exact: true }).check();
+      await capture(`${theme}-${width}-api-token-form`);
+      await page.getByRole('button', { name: '关闭令牌表单', exact: true }).click();
+      await page.goto(`${base}/databases/${databaseID}`);
+      for (const tab of ['概览', '成员', '库', '账号', '代理', '备份']) {
+        await page.getByRole('tab', { name: tab, exact: true }).click();
+        if (tab === '备份') await page.getByText('备份目录空间不足', { exact: true }).waitFor();
+        await capture(`${theme}-${width}-database-${tab}`);
+      }
+      await page.getByRole('tab', { name: '库', exact: true }).click();
+      await page.getByRole('button', { name: '创建库', exact: true }).click();
+      await page.getByLabel('库名', { exact: true }).fill('ui_business');
+      await capture(`${theme}-${width}-database-create`);
+      await page.getByRole('button', { name: '关闭数据库操作', exact: true }).click();
+      await page.getByRole('tab', { name: '账号', exact: true }).click();
+      await page.getByRole('button', { name: '创建账号', exact: true }).click();
+      await page.getByRole('checkbox', { name: 'ProxySQL', exact: true }).check();
+      await page.getByLabel('主机组', { exact: true }).fill('10');
+      await capture(`${theme}-${width}-database-account`);
+      await page.getByRole('button', { name: '关闭数据库操作', exact: true }).click();
+      await page.getByRole('button', { name: '编辑集群', exact: true }).click();
+      await capture(`${theme}-${width}-database-setup`);
+      await page.getByRole('button', { name: '关闭数据库集群表单', exact: true }).click();
+    }
+  }
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.goto(`${base}/settings/api`);
+  await page.getByRole('button', { name: '创建令牌', exact: true }).click();
+  await page.getByRole('dialog').getByLabel('名称', { exact: true }).fill('实际看板接入');
+  await page.getByRole('button', { name: '生成令牌', exact: true }).click();
+  const tokenValue = await page.getByLabel('令牌（仅显示一次）', { exact: true }).inputValue();
+  const authorization = { Authorization: `Bearer ${tokenValue}` };
+  const verify = await context.request.get(`${base}/api/v1/api-tokens/verify`, { headers: authorization });
+  assert.equal(verify.status(), 200);
+  const createdToken = await verify.json();
+  const current = await context.request.get(`${base}/api/v1/monitoring/current`, { headers: authorization });
+  assert.equal(current.status(), 200);
+  assert.equal((await current.json()).items[0].node_id, id);
+  const metrics = await context.request.get(`${base}/metrics`, { headers: authorization });
+  assert.equal(metrics.status(), 200);
+  assert.match(await metrics.text(), /opsd_node_up\{/);
+  assert.match(await page.getByLabel('验证命令', { exact: true }).inputValue(), /api-tokens\/verify/);
+  assert.match(await page.getByLabel('Prometheus 配置', { exact: true }).inputValue(), /scrape_interval: 15s/);
+  await capture('api-connection-result');
+  await page.getByRole('button', { name: '完成', exact: true }).click();
+
+  let databaseOperation = { ...(await api('/operations?limit=1')).items[0], id: 'ui-database-operation', node_id: id, subject: 'database', resource_id: databaseID, state: 'attention_required', revision: 1, result_pending_sync: false, error: { code: 'dependency_unavailable', message: 'ProxySQL 目标暂不可达' }, steps: [{ name: 'Galera：创建业务库', state: 'completed' }, { name: 'ProxySQL：同步账号', state: 'unknown' }] };
+  await page.route(`**/api/v1${databasePath}/changes`, (route) => route.fulfill({ status: 202, json: databaseOperation }));
+  await page.route('**/api/v1/operations/ui-database-operation', (route) => route.fulfill({ json: databaseOperation }));
+  await page.route('**/api/v1/operations/ui-database-operation/recover', (route) => { databaseOperation = { ...databaseOperation, revision: 2, state: 'succeeded', error: undefined, steps: databaseOperation.steps.map((step) => ({ ...step, state: 'completed' })) }; return route.fulfill({ json: databaseOperation }); });
+  await page.goto(`${base}/databases/${databaseID}`);
+  await page.getByRole('tab', { name: '库', exact: true }).click();
+  await page.getByRole('button', { name: '创建库', exact: true }).click();
+  await page.getByLabel('库名', { exact: true }).fill('ui_business');
+  await page.getByRole('dialog').getByRole('button', { name: '创建库', exact: true }).click();
+  await page.getByText('ProxySQL 目标暂不可达', { exact: true }).waitFor();
+  await capture('database-operation-partial');
+  await page.getByRole('button', { name: '重新处理', exact: true }).click();
+  await page.getByRole('button', { name: '重新处理', exact: true }).waitFor({ state: 'hidden' });
+  await capture('database-operation-recovered');
+  await page.getByRole('button', { name: '关闭操作', exact: true }).click();
+  await page.unroute(`**/api/v1${databasePath}/changes`);
+  await page.unroute('**/api/v1/operations/ui-database-operation');
+  await page.unroute('**/api/v1/operations/ui-database-operation/recover');
+  await page.route(`**/api/v1${databasePath}`, (route) => route.fulfill({ status: 503, json: { code: 'dependency_unavailable', message: '数据库协调节点暂不可达' } }));
+  await page.reload();
+  await page.getByRole('alert').filter({ hasText: '数据库协调节点暂不可达' }).waitFor();
+  await capture('database-read-error');
+  await page.unroute(`**/api/v1${databasePath}`);
+  await page.unroute('**/api/v1/databases/clusters');
+  await page.unroute(`**/api/v1${databasePath}/backups`);
+
+  const cli = (kind, enabled) => execFileSync('sudo', ['/opt/opsd/bin/opsd', kind, `--enabled=${enabled}`]);
+  try {
+    cli('console', false);
+    await waitFor(() => context.request.get(`${base}/signin`), (r) => r.status() === 404, '控制台未关闭');
+    assert.equal((await context.request.get(`${base}/api/v1/api-tokens/verify`, { headers: authorization })).status(), 200);
+    cli('console', true);
+    cli('api', false);
+    await waitFor(() => context.request.get(`${base}/api/v1/api-tokens/verify`, { headers: authorization }), (r) => r.status() === 503, 'API 未独立关闭');
+    assert.equal((await context.request.get(`${base}/signin`)).status(), 200);
+    cli('console', false);
+    await new Promise((resolve, reject) => { const listener = createServer(); listener.on('error', reject); listener.listen(Number(new URL(base).port), '127.0.0.1', () => listener.close(resolve)); });
+  } finally { cli('console', true); cli('api', true); }
+  await waitFor(() => api('/auth/session').catch(() => null), Boolean, 'Web 恢复后会话未保留');
+  const deletedToken = await context.request.delete(`${base}/api/v1/api-tokens/${createdToken.id}?revision=${createdToken.revision}`, { headers: { Origin: base, 'X-CSRF-Token': session.csrf_token } });
+  assert.equal(deletedToken.status(), 204);
+  assert.equal((await context.request.get(`${base}/api/v1/api-tokens/verify`, { headers: authorization })).status(), 401);
   await page.goto(`${base}/settings/account`);
   await page.getByLabel('账号', { exact: true }).fill('changed');
   await page.getByRole('navigation', { name: '主导航' }).getByRole('link', { name: '节点', exact: true }).click();
@@ -457,8 +569,8 @@ try {
   await capture('mobile-menu');
   await page.keyboard.press('Escape');
   assert.deepEqual(errors, [], '浏览器运行错误');
-  writeFileSync(`${output}/result.json`, JSON.stringify({ pages: pages.length, themes: 2, widths: [320, 768, 1440], firewallWidths, firewallHeaderStates: ['normal', 'long_name', 'wrapped_status', 'loading', 'error'], containers: { native: true, restartRequests, logPolling: true, headerWidths: firewallWidths, singleNodeColumns: true, states: ['empty', 'partial', 'long', 'loading', 'error'] }, trustMigration: true, trustPriority: { ufwReload: true, executorRestartWithoutNode: true }, trustLayout: { groupedSources: true, partialFamilies: true, widths: firewallWidths, cssZoom: 200 }, errors }, null, 2));
-  console.log('界面验收通过：10 页面、深浅主题、容器真实操作与日志及 5 种页面状态、防火墙布局、互信迁移、浮层与未提交修改。');
+  writeFileSync(`${output}/result.json`, JSON.stringify({ pages: pages.length, themes: 2, widths: [320, 768, 1440], firewallWidths, firewallHeaderStates: ['normal', 'long_name', 'wrapped_status', 'loading', 'error'], api: { tokenCreatedInBrowser: true, authenticatedJSON: true, metrics: true, independentSwitches: true, releasedPort: true, revoked: true }, databases: { presentationData: 'injected', tabs: 6, operationRecovery: true, connectionForms: true }, containers: { native: true, restartRequests, logPolling: true, headerWidths: firewallWidths, singleNodeColumns: true, states: ['empty', 'partial', 'long', 'loading', 'error'] }, trustMigration: true, trustPriority: { ufwReload: true, executorRestartWithoutNode: true }, trustLayout: { groupedSources: true, partialFamilies: true, widths: firewallWidths, cssZoom: 200 }, errors }, null, 2));
+  console.log(`界面验收通过：${pages.length} 页面、深浅主题、API 令牌接入与独立启停、数据库页面与操作恢复、容器、防火墙及互信。`);
 } catch (error) {
   try {
     const response = await context.request.get(`${base}/api/v1/nodes`);

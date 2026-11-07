@@ -202,6 +202,9 @@ func (n *Node) merge(ctx context.Context, d Directory, bootstrap bool) error {
 	if e = n.mergeNetworkTx(ctx, tx, d, known, revoked); e != nil {
 		return e
 	}
+	if e = n.mergeDatabaseClusters(ctx, tx, d.Databases, known, revoked); e != nil {
+		return e
+	}
 	if e = tx.Commit(); e != nil {
 		return e
 	}

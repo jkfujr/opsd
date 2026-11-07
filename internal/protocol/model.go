@@ -225,6 +225,7 @@ type OperationAction struct {
 	Deployment     *DeploymentAction `json:"deployment,omitempty"`
 	Component      *ComponentAction  `json:"component,omitempty"`
 	Container      *ContainerAction  `json:"container,omitempty"`
+	Database       *DatabaseAction   `json:"database,omitempty"`
 }
 
 type DeploymentAction struct {

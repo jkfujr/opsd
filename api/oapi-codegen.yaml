@@ -52,3 +52,18 @@ output-options:
     - getContainer
     - changeContainer
     - getContainerLogs
+    - listAPITokens
+    - createAPIToken
+    - updateAPIToken
+    - deleteAPIToken
+    - regenerateAPIToken
+    - verifyAPIToken
+    - getMonitoringCurrent
+    - discoverDatabases
+    - saveDatabaseInstance
+    - listDatabaseClusters
+    - createDatabaseCluster
+    - getDatabaseCluster
+    - updateDatabaseCluster
+    - changeDatabase
+    - getDatabaseBackups

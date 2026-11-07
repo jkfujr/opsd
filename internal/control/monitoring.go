@@ -56,26 +56,10 @@ func (s *Server) GetOverview(w http.ResponseWriter, r *http.Request) {
 	s.resultError(w, r, 200, cluster.Overview{UpdatedAt: s.now(), Nodes: items, Summary: monitoring.Aggregate(readings, s.now()), PendingOperations: pending, Unavailable: unavailable}, e)
 }
 func (s *Server) GetMonitoringHistory(w http.ResponseWriter, r *http.Request, _ httpapi.GetMonitoringHistoryParams) {
-	duration := 24 * time.Hour
-	if r.URL.Query().Get("range") == "7d" {
-		duration = 7 * 24 * time.Hour
-	}
-	now := s.now()
-	q := cluster.HistoryQuery{From: now.Add(-duration), To: now}
-	target := r.URL.Query().Get("node_id")
-	targets := []string{target}
-	if target == "" {
-		targets = nil
-		nodes, e := s.nodes(r.Context())
-		if e != nil {
-			s.operationError(w, r, e)
-			return
-		}
-		for _, n := range nodes {
-			if n.RevokedAt == nil {
-				targets = append(targets, n.Id)
-			}
-		}
+	targets, q, e := s.historyTargets(r)
+	if e != nil {
+		s.operationError(w, r, e)
+		return
 	}
 	c, e := s.node.Config(r.Context())
 	if e != nil {
@@ -84,11 +68,15 @@ func (s *Server) GetMonitoringHistory(w http.ResponseWriter, r *http.Request, _ 
 	}
 	buckets := map[int64]monitoring.Summary{}
 	unavailable := []string{}
+	nodeHistory := []httpapi.MonitoringNodeHistory{}
 	for _, id := range targets {
 		metrics, err := s.node.History(r.Context(), id, q)
 		if err != nil {
 			unavailable = append(unavailable, id)
 			continue
+		}
+		if r.URL.Query().Get("group_by") == "node" {
+			nodeHistory = append(nodeHistory, httpapi.MonitoringNodeHistory{NodeId: id, Items: convertHTTP[[]httpapi.Metrics](metrics)})
 		}
 		latest := map[int64]protocol.Metrics{}
 		for _, m := range metrics {
@@ -116,5 +104,9 @@ func (s *Server) GetMonitoringHistory(w http.ResponseWriter, r *http.Request, _ 
 		}
 		points = append(points, monitoring.Point{CollectedAt: at, Summary: summary})
 	}
-	s.resultError(w, r, 200, map[string]any{"items": points, "interval_minutes": c.IntervalMinutes, "unavailable": unavailable}, nil)
+	out := map[string]any{"items": points, "interval_minutes": c.IntervalMinutes, "unavailable": unavailable, "checked_at": s.now().UTC()}
+	if r.URL.Query().Get("group_by") == "node" {
+		out["nodes"] = nodeHistory
+	}
+	s.resultError(w, r, 200, out, nil)
 }

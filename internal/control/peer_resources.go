@@ -21,6 +21,9 @@ func (s *Server) nodes(ctx context.Context) ([]httpapi.Node, error) {
 		revoked[r.ID] = true
 	}
 	for _, m := range d.Members {
+		if a := access(ctx); a != nil && !a.Token.Allows(a.Module, "read", m.ID, m.Region) {
+			continue
+		}
 		n := httpapi.Node{Id: m.ID, Name: m.Name, PublicKey: m.Public, Local: m.ID == s.node.ID, Connected: s.node.Connected(m.ID), Writable: !revoked[m.ID]}
 		n.Writable = n.Writable && n.Connected
 		n.Region = &m.Region
@@ -93,7 +96,15 @@ func (s *Server) submit(w http.ResponseWriter, r *http.Request, target, kind str
 		s.fail(w, r, 422, "invalid_request", "缺少请求标识")
 		return
 	}
-	op, e := s.node.Submit(r.Context(), target, cluster.Request{ID: id, Kind: kind, Payload: b, Key: key})
+	if actor(r) != "" {
+		id = ""
+		key = r.Header.Get("Idempotency-Key")
+		if key == "" {
+			s.fail(w, r, 422, "invalid_request", "缺少请求标识")
+			return
+		}
+	}
+	op, e := s.node.Submit(r.Context(), target, cluster.Request{Actor: actor(r), ID: id, Kind: kind, Payload: b, Key: key})
 	s.resultError(w, r, 202, op, e)
 }
 func (s *Server) resultError(w http.ResponseWriter, r *http.Request, status int, value any, e error) {

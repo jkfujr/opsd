@@ -38,7 +38,7 @@ jobs:
       - name: 后端测试
         run: |
           docker pull busybox:1.37.0
-          OPSD_DOCKER_TEST=1 npm test
+          OPSD_DOCKER_TEST=1 OPSD_DATABASE_TEST=1 npm test
       - name: 原生互信规则与新连接
         run: |
           sudo apt-get -o Acquire::Retries=1 -o Acquire::http::Timeout=20 -o Acquire::https::Timeout=20 update -q
@@ -64,6 +64,7 @@ jobs:
           sudo systemctl start opsd-executor.service opsd.service
           sudo /opt/opsd/bin/opsd install -n '重复安装保留账号' --address http://127.0.0.1:1
           sudo /opt/opsd/bin/opsd console --enabled=true
+          sudo /opt/opsd/bin/opsd api --enabled=true
           docker run -d --name opsd-ui-container --label com.docker.compose.project=ui-demo --label com.docker.compose.service=web busybox:1.37.0 sh -c 'trap "exit 0" TERM INT; while :; do echo "界面验收容器输出"; echo "界面验收错误输出" >&2; sleep 1; done'
           npx playwright install --with-deps chromium
       - name: 生产界面与交互
@@ -78,6 +79,12 @@ jobs:
         with:
           name: ui-check
           path: artifacts/ui
+          if-no-files-found: ignore
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: database-check
+          path: artifacts/database-result.json
           if-no-files-found: ignore
       - uses: actions/upload-artifact@v4
         with:

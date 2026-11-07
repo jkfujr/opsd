@@ -9,10 +9,12 @@ import (
 	"errors"
 	"fmt"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/jkfujr/opsd/internal/account"
+	"github.com/jkfujr/opsd/internal/apiauth"
 	"github.com/jkfujr/opsd/internal/firewall"
 	"github.com/jkfujr/opsd/internal/operations"
 	"github.com/jkfujr/opsd/internal/protocol"
@@ -21,6 +23,12 @@ import (
 func (n *Node) dispatch(ctx context.Context, origin, method string, body json.RawMessage) (any, error) {
 	if !n.Active(ctx, origin) {
 		return nil, fault("forbidden", "节点未加入或已撤销")
+	}
+	if strings.HasPrefix(method, "api_token.") {
+		return n.tokenDispatch(ctx, method, body)
+	}
+	if validateManagedDatabaseKind(method) {
+		return n.databaseDispatch(ctx, origin, method, body)
 	}
 	switch method {
 	case "containers.read", "container.inspect", "container.logs":
@@ -162,6 +170,9 @@ func (n *Node) Submit(ctx context.Context, target string, r Request) (Operation,
 	return out, e
 }
 func (n *Node) enqueue(ctx context.Context, origin string, r Request) (Operation, error) {
+	if strings.HasPrefix(r.Actor, "token:") {
+		origin = r.Actor
+	}
 	if r.ID == "" && r.Key != "" {
 		sum := sha256.Sum256([]byte(origin + "\x00" + r.Key))
 		r.ID = n.ID + "_" + hex.EncodeToString(sum[:])
@@ -170,6 +181,28 @@ func (n *Node) enqueue(ctx context.Context, origin string, r Request) (Operation
 		return Operation{}, fault("invalid_request", "请求标识或内容无效")
 	}
 	switch r.Kind {
+	case "database_step":
+		var a protocol.DatabaseAction
+		if e := json.Unmarshal(r.Payload, &a); e != nil {
+			return Operation{}, e
+		}
+		if e := a.Validate(); e != nil {
+			return Operation{}, fault("invalid_request", e.Error())
+		}
+		if r.ResourceID == "" {
+			return Operation{}, fault("invalid_request", "数据库步骤缺少所属集群")
+		}
+	case "database":
+		var input DatabaseSubmission
+		if e := json.Unmarshal(r.Payload, &input); e != nil {
+			return Operation{}, e
+		}
+		if input.Cluster.Coordinator != n.ID {
+			return Operation{}, fault("forbidden", "数据库变更须由所属协调节点受理")
+		}
+		if e := validateDatabaseSubmission(input); e != nil {
+			return Operation{}, e
+		}
 	case "container":
 		var action protocol.ContainerAction
 		if e := json.Unmarshal(r.Payload, &action); e != nil {
@@ -230,6 +263,12 @@ func (n *Node) enqueue(ctx context.Context, origin string, r Request) (Operation
 		return Operation{}, fault("invalid_request", "未知修改类型")
 	}
 	digest := sha256.Sum256(append([]byte(r.Kind+"\x00"), r.Payload...))
+	if r.Kind == "database" {
+		var input DatabaseSubmission
+		_ = json.Unmarshal(r.Payload, &input)
+		fixed, _ := json.Marshal(input.Change)
+		digest = sha256.Sum256(append([]byte(r.Kind+"\x00"), fixed...))
+	}
 	encrypted, e := seal(r.Payload, []string{n.age.Recipient().String()})
 	if e != nil {
 		return Operation{}, e
@@ -257,6 +296,14 @@ func (n *Node) enqueue(ctx context.Context, origin string, r Request) (Operation
 		return Operation{}, e
 	}
 	op := Operation{Key: r.Key, OperationRecord: protocol.OperationRecord{ID: r.ID, State: protocol.Accepted, Revision: 1, Decision: "undecided", Steps: []protocol.OperationStep{}}, NodeID: n.ID, Subject: r.Kind, Actor: origin, CreatedAt: n.Now().UTC(), UpdatedAt: n.Now().UTC(), Executor: "node"}
+	if r.Kind == "database_step" {
+		op.ResourceID = r.ResourceID
+	}
+	if r.Kind == "database" {
+		var input DatabaseSubmission
+		_ = json.Unmarshal(r.Payload, &input)
+		op.ResourceID = input.Cluster.ID
+	}
 	if r.Kind == "firewall" {
 		var p protocol.ChangePlan
 		_ = json.Unmarshal(r.Payload, &p)
@@ -404,7 +451,7 @@ func (n *Node) advance() {
 		}
 		_ = n.saveOperation(ctx, &op, "finished")
 	}
-	if phase == "queued" && !n.Active(ctx, origin) {
+	if phase == "queued" && !strings.HasPrefix(origin, "token:") && !n.Active(ctx, origin) {
 		finish(protocol.Rejected, fault("forbidden", "请求来源已撤销"))
 		return
 	}
@@ -431,7 +478,11 @@ func (n *Node) advance() {
 		finish(protocol.Rejected, e)
 		return
 	}
-	if kind != "firewall" && kind != "component" && kind != "firewall_config" && kind != "container" {
+	if kind == "database" {
+		n.advanceDatabase(ctx, &op, plain)
+		return
+	}
+	if kind != "firewall" && kind != "component" && kind != "firewall_config" && kind != "container" && kind != "database_step" {
 		e = n.applyLocal(ctx, kind, plain, &op)
 		if e != nil {
 			finish(protocol.Rejected, e)
@@ -445,7 +496,11 @@ func (n *Node) advance() {
 	if claimed {
 		// 先记下发送意图。进程中断后只查询/封存同一 ID，不重新发送未知结果的动作。
 		action := protocol.OperationAction{Kind: kind}
-		if kind == "container" {
+		if kind == "database_step" {
+			action.Kind = "database"
+			action.Database = &protocol.DatabaseAction{}
+			e = json.Unmarshal(plain, action.Database)
+		} else if kind == "container" {
 			action.Container = &protocol.ContainerAction{}
 			e = json.Unmarshal(plain, action.Container)
 		} else if kind == "firewall_config" {
@@ -674,13 +729,16 @@ func (n *Node) decide(ctx context.Context, method string, d OperationDecision) (
 	if e != nil {
 		return op, e
 	}
+	if op.Subject == "database" {
+		return n.decideDatabase(ctx, method, d, op)
+	}
 	var p protocol.Payload
 	switch method {
 	case "operation.confirm":
 		p = &protocol.OperationConfirm{OperationID: d.ID, ExpectedRevision: d.ExpectedRevision - 1}
 	case "operation.recover":
 		p = &protocol.OperationRecover{OperationID: d.ID, ExpectedRevision: d.ExpectedRevision}
-		if op.Subject == "container" {
+		if op.Subject == "container" || op.Subject == "database_step" {
 			p = &protocol.OperationRecover{OperationID: d.ID, ExpectedRevision: d.ExpectedRevision - 1}
 		}
 	case "operation.resolve":
@@ -753,12 +811,13 @@ func (n *Node) cancelQueued(ctx context.Context, id string) (Operation, error) {
 }
 
 type ListQuery struct {
-	Key       string            `json:"key,omitempty"`
-	Positions map[string]uint64 `json:"positions,omitempty"`
-	Pending   bool              `json:"pending"`
-	State     string            `json:"state"`
-	Cursor    uint64            `json:"cursor"`
-	Limit     int               `json:"limit"`
+	Authorization *apiauth.Token    `json:"authorization,omitempty"`
+	Key           string            `json:"key,omitempty"`
+	Positions     map[string]uint64 `json:"positions,omitempty"`
+	Pending       bool              `json:"pending"`
+	State         string            `json:"state"`
+	Cursor        uint64            `json:"cursor"`
+	Limit         int               `json:"limit"`
 }
 type OperationList struct {
 	NextPositions map[string]uint64 `json:"next_positions,omitempty"`
@@ -771,11 +830,44 @@ func (n *Node) localOperations(ctx context.Context, q ListQuery) (OperationList,
 	if q.Limit < 1 || q.Limit > 100 {
 		q.Limit = 50
 	}
-	query := "SELECT body FROM queue WHERE 1=1"
+	query := "SELECT body FROM queue WHERE kind<>'database_step'"
 	args := []any{}
+	if q.Authorization != nil {
+		m, e := n.Member(ctx, n.ID)
+		if e != nil {
+			return OperationList{}, e
+		}
+		parts := []string{}
+		for _, pair := range [][2]string{{"name", "nodes"}, {"container", "containers"}, {"firewall", "firewall"}, {"firewall_config", "firewall"}, {"component", "firewall"}} {
+			if q.Authorization.Allows(pair[1], "read", n.ID, m.Region) {
+				parts = append(parts, "kind=?")
+				args = append(args, pair[0])
+			}
+		}
+		for _, g := range q.Authorization.Grants {
+			if g.Module == "databases" {
+				if g.Scope == "all" {
+					parts = append(parts, "kind='database'")
+				} else {
+					for _, id := range g.Resources {
+						parts = append(parts, "(kind='database' AND json_extract(body,'$.resource_id')=?)")
+						args = append(args, id)
+					}
+				}
+			}
+		}
+		if len(parts) == 0 {
+			return OperationList{Items: []Operation{}}, nil
+		}
+		query += " AND (" + strings.Join(parts, " OR ") + ")"
+	}
 	if q.Key != "" {
 		query += " AND request_key=?"
 		args = append(args, q.Key)
+		if q.Authorization != nil {
+			query += " AND json_extract(body,'$.actor')=?"
+			args = append(args, q.Authorization.Actor())
+		}
 	}
 	if q.Pending {
 		query += " AND terminal=0"
@@ -814,9 +906,22 @@ func (n *Node) localOperations(ctx context.Context, q ListQuery) (OperationList,
 }
 func (n *Node) ListOperations(ctx context.Context, target string, q ListQuery) (OperationList, error) {
 	if target != "" {
+		if q.Authorization != nil {
+			m, e := n.Member(ctx, target)
+			if e != nil {
+				return OperationList{}, e
+			}
+			clusters, e := n.DatabaseClusters(ctx)
+			if e != nil {
+				return OperationList{}, e
+			}
+			if !operationTargetAllowed(*q.Authorization, m, clusters) {
+				return OperationList{}, fault("forbidden", "节点超出操作授权范围")
+			}
+		}
 		var out OperationList
 		e := n.Call(ctx, target, "operation.list", q, &out)
-		if e != nil && target != n.ID {
+		if e != nil && target != n.ID && q.Authorization == nil {
 			return n.archivedOperations(ctx, target, q)
 		}
 		return out, e
@@ -841,6 +946,9 @@ func (n *Node) ListOperations(ctx context.Context, target string, q ListQuery) (
 	}
 	for _, m := range d.Members {
 		if revoked[m.ID] {
+			continue
+		}
+		if q.Authorization != nil && !operationTargetAllowed(*q.Authorization, m, d.Databases) {
 			continue
 		}
 		select {

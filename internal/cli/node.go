@@ -35,7 +35,7 @@ import (
 
 func Run(args []string) error {
 	if len(args) == 0 {
-		return fmt.Errorf("用法：opsd version | install | node | network | console | account | executor | operation | recover")
+		return fmt.Errorf("用法：opsd version | install | node | network | console | api | account | executor | operation | recover")
 	}
 	switch args[0] {
 	case "version", "--version":
@@ -57,7 +57,7 @@ func Run(args []string) error {
 		return operation(args[1:], false)
 	case "recover":
 		return operation(args[1:], true)
-	case "console", "account":
+	case "console", "api", "account":
 		return localChange(args[0], args[1:])
 	default:
 		return fmt.Errorf("未知命令")
@@ -94,7 +94,7 @@ func serveNode(args []string) error {
 		return e
 	}
 	defer n.Close()
-	s, e := control.New(ctx, n.DB, control.Options{Node: n, Assets: frontend.Assets(), NodeVersion: buildinfo.Version, FrontendVersion: frontend.Version()})
+	s, e := control.New(ctx, n.DB, control.Options{EnforceListenerState: true, Node: n, Assets: frontend.Assets(), NodeVersion: buildinfo.Version, FrontendVersion: frontend.Version()})
 	if e != nil {
 		return e
 	}
@@ -123,12 +123,12 @@ func serveNode(args []string) error {
 	n.Configure = func(ctx context.Context, next cluster.Config) (func(bool), error) {
 		webMu.Lock()
 		var candidate net.Listener
-		if next.Console && (web == nil || listen != next.ConsoleListen) {
+		if (next.Console || next.API) && (web == nil || listen != next.ConsoleListen) {
 			var err error
 			candidate, err = net.Listen("tcp", next.ConsoleListen)
 			if err != nil {
 				webMu.Unlock()
-				return nil, &cluster.Fault{Code: "conflict", Message: "控制台监听地址不可用"}
+				return nil, &cluster.Fault{Code: "conflict", Message: "Web 监听地址不可用"}
 			}
 		}
 		return func(commit bool) {
@@ -139,7 +139,7 @@ func serveNode(args []string) error {
 				}
 				return
 			}
-			if web != nil && (!next.Console || candidate != nil) {
+			if web != nil && (!(next.Console || next.API) || candidate != nil) {
 				web.Close()
 				web = nil
 			}
@@ -392,7 +392,7 @@ func localChange(kind string, args []string) error {
 		return e
 	}
 	request := cluster.Request{ID: cluster.NewOperationID(self.ID), Kind: kind}
-	if kind == "console" {
+	if kind == "console" || kind == "api" {
 		request.Payload, _ = json.Marshal(map[string]bool{"enabled": *enabled})
 	} else {
 		if *password == "" && *entrance == "" {

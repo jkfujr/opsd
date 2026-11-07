@@ -16,6 +16,7 @@ import (
 )
 
 type FirewallWrite struct {
+	Actor            string                   `json:"actor,omitempty"`
 	ExpectedRevision uint64                   `json:"expected_revision"`
 	Change           *protocol.FirewallChange `json:"change,omitempty"`
 	Key              string                   `json:"key"`
@@ -55,6 +56,9 @@ func (n *Node) FirewallConfig(ctx context.Context) (protocol.ManagedFirewallStat
 }
 
 func (n *Node) writeFirewall(ctx context.Context, origin string, request FirewallWrite, maintenance bool) (FirewallSaved, error) {
+	if request.Actor != "" {
+		origin = request.Actor
+	}
 	var out FirewallSaved
 	if request.Key == "" || len(request.Key) > 128 {
 		return out, fault("invalid_request", "缺少有效请求标识")

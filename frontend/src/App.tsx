@@ -13,6 +13,8 @@ import { Drawer, DrawerContent, DrawerHeader, DrawerBody, DrawerTitle } from '@a
 import { Account, Appearance, Sessions, Version } from './pages/Settings';
 import { Firewall } from './pages/Firewall';
 import { Containers } from './pages/Containers';
+import { APISettings } from './pages/APISettings';
+import { Databases, DatabaseDetail } from './pages/Databases';
 import { FirewallSettings } from './network';
 import { OperationsProvider, OperationsButton } from './operations';
 
@@ -22,14 +24,15 @@ function Layout() {
   return <UnsavedChangesProvider><OperationsProvider key={scope}><LayoutContent /></OperationsProvider></UnsavedChangesProvider>;
 }
 
-const settings = [['account', '账号'], ['sessions', '会话'], ['appearance', '外观'], ['version', '版本']];
-const navigation = [['/', '概览', 'overview'], ['/nodes', '节点', 'nodes'], ['/firewall', '防火墙', 'firewall'], ['/containers', '容器', 'containers'], ['/settings', '设置', 'settings']];
+const settings = [['account', '账号'], ['sessions', '会话'], ['api', 'API'], ['appearance', '外观'], ['version', '版本']];
+const navigation = [['/', '概览', 'overview'], ['/nodes', '节点', 'nodes'], ['/firewall', '防火墙', 'firewall'], ['/containers', '容器', 'containers'], ['/databases', '数据库', 'databases'], ['/settings', '设置', 'settings']];
 function NavIcon({ name }: { name: string }) {
   const paths: Record<string, React.ReactNode> = {
     overview: <><rect x="3" y="3" width="7" height="7" rx="1" /><rect x="14" y="3" width="7" height="7" rx="1" /><rect x="3" y="14" width="7" height="7" rx="1" /><rect x="14" y="14" width="7" height="7" rx="1" /></>,
     nodes: <><rect x="3" y="3" width="18" height="7" rx="2" /><rect x="3" y="14" width="18" height="7" rx="2" /><path d="M7 6.5h.01M7 17.5h.01M12 6.5h5M12 17.5h5" /></>,
     firewall: <><path d="M12 3 4 6v5c0 5 8 10 8 10s8-5 8-10V6z" /><path d="M9 12h6M12 9v6" /></>,
     containers: <><path d="m12 3 9 5v8l-9 5-9-5V8zM3 8l9 5 9-5M12 13v8M7.5 5.5l9 5" /></>,
+    databases: <><ellipse cx="12" cy="5" rx="8" ry="3" /><path d="M4 5v14c0 4 16 4 16 0V5M4 12c0 4 16 4 16 0" /></>,
     settings: <><path d="M4 7h16M4 17h16" /><circle cx="9" cy="7" r="3" /><circle cx="15" cy="17" r="3" /></>,
   };
   return <svg aria-hidden="true" viewBox="0 0 24 24" className="size-4.5 shrink-0" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">{paths[name]}</svg>;
@@ -47,7 +50,7 @@ function LayoutContent() {
   const location = useLocation();
   const [menu, setMenu] = useState(false);
   useEffect(() => setMenu(false), [location.pathname]);
-  const title = location.pathname === '/firewall/settings' ? '防火墙设置' : location.pathname.startsWith('/settings/') ? settings.find(([path]) => location.pathname === `/settings/${path}`)?.[1] ?? '设置' : location.pathname.startsWith('/nodes/') ? '节点详情' : navigation.find(([path]) => path === location.pathname)?.[1] ?? '设置';
+  const title = location.pathname === '/firewall/settings' ? '防火墙设置' : location.pathname.startsWith('/settings/') ? settings.find(([path]) => location.pathname === `/settings/${path}`)?.[1] ?? '设置' : location.pathname.startsWith('/databases/') ? '数据库详情' : location.pathname.startsWith('/nodes/') ? '节点详情' : navigation.find(([path]) => path === location.pathname)?.[1] ?? '设置';
   const logout = useMutation({ mutationFn: async () => unwrap(await api.DELETE('/auth/session', { params: { header: { 'X-CSRF-Token': session.csrf_token } } })), onSuccess: () => { queryClient.clear(); window.location.assign(session.login_address); } });
   return <div className="min-h-screen bg-background-muted text-foreground">
     <aside className="fixed inset-y-0 left-0 z-30 hidden w-56 overflow-y-auto border-r border-border bg-background lg:block"><Sidebar /></aside>
@@ -68,11 +71,14 @@ const router = createBrowserRouter([{ Component: SessionBoundary, children: [
     { path: 'nodes/:id', Component: NodeDetail },
     { path: 'firewall', Component: Firewall },
     { path: 'containers', Component: Containers },
+    { path: 'databases', Component: Databases },
+    { path: 'databases/:id', Component: DatabaseDetail },
     { path: 'firewall/settings', Component: FirewallSettings },
     { path: 'settings', Component: SettingsLayout, children: [
       { index: true, element: <Navigate to="account" replace /> },
       { path: 'account', Component: Account },
       { path: 'sessions', Component: Sessions },
+      { path: 'api', Component: APISettings },
       { path: 'nodes', element: <Navigate to="/nodes" replace /> },
       { path: 'appearance', Component: Appearance },
       { path: 'version', Component: Version },

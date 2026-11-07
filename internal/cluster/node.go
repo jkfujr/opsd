@@ -67,6 +67,8 @@ type Node struct {
 	ObservePublic func(context.Context, protocol.AddressFamily) []protocol.AddressObservation
 	dockerMu      sync.Mutex
 	dockerReads   map[string]*containerRead
+	databaseMu    sync.Mutex
+	databaseReads map[string]*managedDatabaseReadEntry
 }
 
 func Defaults(c Config) Config {
@@ -390,6 +392,10 @@ func (n *Node) Directory(ctx context.Context) (Directory, error) {
 		return d, err
 	}
 	if e = n.networkDirectory(ctx, &d); e != nil {
+		return d, e
+	}
+	d.Databases, e = n.DatabaseClusters(ctx)
+	if e != nil {
 		return d, e
 	}
 	return d, nil

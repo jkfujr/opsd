@@ -616,6 +616,214 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api-tokens": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 列出 API 令牌 */
+        get: operations["listAPITokens"];
+        put?: never;
+        /** 创建 API 令牌 */
+        post: operations["createAPIToken"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api-tokens/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** 删除 API 令牌 */
+        delete: operations["deleteAPIToken"];
+        options?: never;
+        head?: never;
+        /** 编辑 API 令牌 */
+        patch: operations["updateAPIToken"];
+        trace?: never;
+    };
+    "/api-tokens/{id}/regenerate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 重新生成 API 令牌 */
+        post: operations["regenerateAPIToken"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api-tokens/verify": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 核验当前 API 令牌 */
+        get: operations["verifyAPIToken"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/monitoring/current": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 读取当前监控数据 */
+        get: operations["getMonitoringCurrent"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/nodes/{id}/databases/discover": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 发现本机数据库实例 */
+        post: operations["discoverDatabases"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/nodes/{id}/databases/instances/{instance_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** 保存本机数据库连接 */
+        put: operations["saveDatabaseInstance"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/databases/clusters": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 列出数据库集群 */
+        get: operations["listDatabaseClusters"];
+        put?: never;
+        /** 登记数据库集群 */
+        post: operations["createDatabaseCluster"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/databases/clusters/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 读取数据库集群 */
+        get: operations["getDatabaseCluster"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** 编辑数据库集群 */
+        patch: operations["updateDatabaseCluster"];
+        trace?: never;
+    };
+    "/databases/clusters/{id}/changes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 受理数据库变更 */
+        post: operations["changeDatabase"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/databases/clusters/{id}/backups": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 读取数据库备份状态 */
+        get: operations["getDatabaseBackups"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/metrics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 读取 Prometheus 或 OpenMetrics 指标 */
+        get: operations["getMetrics"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -681,6 +889,9 @@ export interface components {
             items: components["schemas"]["MonitoringPoint"][];
             interval_minutes: number;
             unavailable?: string[];
+            nodes?: components["schemas"]["MonitoringNodeHistory"][];
+            /** Format: date-time */
+            checked_at?: string;
         };
         MonitoringSettings: {
             /** @default 5 */
@@ -1144,7 +1355,7 @@ export interface components {
             /** @enum {string} */
             executor: "node";
             /** @enum {string} */
-            subject: "firewall" | "component" | "config" | "name" | "account" | "firewall_config" | "container";
+            subject: "firewall" | "component" | "config" | "name" | "account" | "firewall_config" | "container" | "database" | "database_step";
             state: components["schemas"]["OperationState"];
             /** Format: int64 */
             revision: number;
@@ -1168,6 +1379,7 @@ export interface components {
             queue_sequence?: number;
             actor?: string;
             idempotency_key?: string;
+            resource_id?: string;
         };
         OperationList: {
             items: components["schemas"]["Operation"][];
@@ -1285,6 +1497,7 @@ export interface components {
             last_synced_at?: string;
             /** @enum {string} */
             address_mode?: "auto" | "manual";
+            api?: boolean;
         };
         NodeAccount: {
             username: string;
@@ -1507,6 +1720,288 @@ export interface components {
             /** Format: date-time */
             checked_at: string;
         };
+        APIGrant: {
+            /** @enum {string} */
+            module: "monitoring" | "nodes" | "containers" | "firewall" | "databases";
+            /** @enum {string} */
+            level: "read" | "manage";
+            /** @enum {string} */
+            scope: "all" | "nodes" | "regions" | "clusters";
+            resources: string[];
+        };
+        APITokenInput: {
+            name: string;
+            enabled: boolean;
+            /** Format: int64 */
+            revision: number;
+            grants: components["schemas"]["APIGrant"][];
+            /** Format: date-time */
+            expires_at?: string;
+            source_ips: string[];
+        };
+        APIToken: {
+            name: string;
+            enabled: boolean;
+            /** Format: int64 */
+            revision: number;
+            grants: components["schemas"]["APIGrant"][];
+            /** Format: date-time */
+            expires_at?: string;
+            source_ips: string[];
+            id: string;
+            owner: string;
+            /** Format: date-time */
+            created_at: string;
+        };
+        APITokenCreated: {
+            token: components["schemas"]["APIToken"];
+            value: string;
+        };
+        APITokenList: {
+            items: components["schemas"]["APIToken"][];
+        };
+        TokenRevision: {
+            /** Format: int64 */
+            revision: number;
+        };
+        MonitoringNode: {
+            node_id: string;
+            name: string;
+            region: string;
+            /** @enum {string} */
+            state: "ready" | "partial" | "offline";
+            /** Format: date-time */
+            checked_at: string;
+            metrics?: components["schemas"]["Metrics"];
+        };
+        MonitoringCurrent: {
+            items: components["schemas"]["MonitoringNode"][];
+            summary: components["schemas"]["MonitoringSummary"];
+            /** Format: date-time */
+            checked_at: string;
+        };
+        MonitoringNodeHistory: {
+            node_id: string;
+            items: components["schemas"]["Metrics"][];
+        };
+        DatabaseGrant: {
+            database: string;
+            privileges: string[];
+        };
+        DatabaseSchema: {
+            name: string;
+            charset: string;
+            collation: string;
+            /** Format: double */
+            bytes: number;
+            protected: boolean;
+        };
+        DatabaseUser: {
+            name: string;
+            host: string;
+            protected: boolean;
+            grants: components["schemas"]["DatabaseGrant"][];
+        };
+        DatabaseProxyServer: {
+            hostgroup: number;
+            host: string;
+            port: number;
+            state: string;
+        };
+        DatabaseProxyPool: {
+            hostgroup: number;
+            host: string;
+            port: number;
+            /** Format: double */
+            used: number;
+            /** Format: double */
+            free: number;
+            /** Format: double */
+            errors: number;
+        };
+        DatabaseProxyUser: {
+            name: string;
+            active: boolean;
+            hostgroup: number;
+            state: string;
+            protected: boolean;
+        };
+        DatabaseStatus: {
+            /** @enum {string} */
+            state: "ready" | "unavailable" | "mismatch";
+            version?: string;
+            cluster_id?: string;
+            cluster_name?: string;
+            configured_members?: string;
+            actual_members?: string;
+            member_address?: string;
+            cluster_size?: number;
+            primary?: boolean;
+            ready?: boolean;
+            synced?: boolean;
+            read_only?: boolean;
+            /** Format: double */
+            connections?: number;
+            /** Format: double */
+            receive_queue?: number;
+            /** Format: double */
+            send_queue?: number;
+            /** Format: double */
+            flow_control?: number;
+            databases?: components["schemas"]["DatabaseSchema"][];
+            users?: components["schemas"]["DatabaseUser"][];
+            servers?: components["schemas"]["DatabaseProxyServer"][];
+            pools?: components["schemas"]["DatabaseProxyPool"][];
+            proxy_users?: components["schemas"]["DatabaseProxyUser"][];
+            pending_changes?: boolean;
+            /** Format: date-time */
+            checked_at: string;
+            error?: components["schemas"]["NetworkError"];
+        };
+        DatabaseInstance: {
+            id: string;
+            node_id: string;
+            name: string;
+            /** @enum {string} */
+            kind: "galera" | "proxysql";
+            address: string;
+            socket?: string;
+            username: string;
+            credentials_available: boolean;
+            container_id?: string;
+            running: boolean;
+            protected_users?: string[];
+            backup_root?: string;
+        };
+        DatabaseInstanceInput: {
+            id?: string;
+            node_id?: string;
+            name: string;
+            /** @enum {string} */
+            kind: "galera" | "proxysql";
+            address: string;
+            socket?: string;
+            username: string;
+            credentials_available?: boolean;
+            container_id?: string;
+            running?: boolean;
+            protected_users: string[];
+            backup_root?: string;
+            password?: string;
+        };
+        DiscoveredDatabaseInstance: {
+            id: string;
+            node_id: string;
+            name: string;
+            /** @enum {string} */
+            kind: "galera" | "proxysql";
+            address: string;
+            socket?: string;
+            username: string;
+            credentials_available: boolean;
+            container_id?: string;
+            running: boolean;
+            protected_users?: string[];
+            backup_root?: string;
+            status?: components["schemas"]["DatabaseStatus"];
+        };
+        DatabaseDiscoveryList: {
+            items: components["schemas"]["DiscoveredDatabaseInstance"][];
+        };
+        DatabaseRef: {
+            node_id: string;
+            instance_id: string;
+            name: string;
+            address: string;
+        };
+        ManagedDatabaseCluster: {
+            id: string;
+            name: string;
+            coordinator: string;
+            cluster_id: string;
+            /** Format: int64 */
+            revision: number;
+            members: components["schemas"]["DatabaseRef"][];
+            proxies: components["schemas"]["DatabaseRef"][];
+            workbench_url: string;
+            deleted: boolean;
+            /** Format: date-time */
+            updated_at: string;
+        };
+        DatabaseClusterInput: {
+            id?: string;
+            name: string;
+            coordinator: string;
+            cluster_id: string;
+            /** Format: int64 */
+            revision: number;
+            members: components["schemas"]["DatabaseRef"][];
+            proxies: components["schemas"]["DatabaseRef"][];
+            workbench_url: string;
+            deleted?: boolean;
+            /** Format: date-time */
+            updated_at?: string;
+        };
+        ManagedDatabaseMember: {
+            node_id: string;
+            instance_id: string;
+            name: string;
+            address: string;
+            status: components["schemas"]["DatabaseStatus"];
+        };
+        ManagedDatabaseStatus: {
+            cluster: components["schemas"]["ManagedDatabaseCluster"];
+            members: components["schemas"]["ManagedDatabaseMember"][];
+            proxies: components["schemas"]["ManagedDatabaseMember"][];
+            /** Format: date-time */
+            checked_at: string;
+        };
+        ManagedDatabaseList: {
+            items: components["schemas"]["ManagedDatabaseStatus"][];
+        };
+        DatabaseProxySelection: {
+            node_id: string;
+            instance_id: string;
+            hostgroup: number;
+        };
+        DatabaseChange: {
+            cluster_id?: string;
+            /** Format: int64 */
+            expected_revision: number;
+            /** @enum {string} */
+            kind: "create_database" | "delete_database" | "create_user" | "password" | "delete_user" | "grant" | "revoke" | "sync_user";
+            database?: string;
+            /** @enum {string} */
+            charset?: "utf8mb4" | "utf8mb3" | "latin1" | "ascii";
+            user?: string;
+            host?: string;
+            password?: string;
+            privileges?: string[];
+            grants?: components["schemas"]["DatabaseGrant"][];
+            proxies: components["schemas"]["DatabaseProxySelection"][];
+        };
+        DatabaseBackup: {
+            name: string;
+            schedule: string;
+            state: string;
+            /** Format: date-time */
+            last_run?: string;
+            /** Format: date-time */
+            last_success?: string;
+            artifacts: string[];
+            error?: string;
+        };
+        DatabaseNodeBackups: {
+            node_id: string;
+            instance_id: string;
+            items: components["schemas"]["DatabaseBackup"][];
+            error?: string;
+        };
+        DatabaseBackupList: {
+            items: components["schemas"]["DatabaseNodeBackups"][];
+            /** Format: date-time */
+            checked_at: string;
+        };
     };
     responses: {
         /** @description 会话失效 */
@@ -1652,8 +2147,8 @@ export interface operations {
     logout: {
         parameters: {
             query?: never;
-            header: {
-                "X-CSRF-Token": string;
+            header?: {
+                "X-CSRF-Token"?: string;
             };
             path?: never;
             cookie?: never;
@@ -1708,8 +2203,8 @@ export interface operations {
     revokeSession: {
         parameters: {
             query?: never;
-            header: {
-                "X-CSRF-Token": string;
+            header?: {
+                "X-CSRF-Token"?: string;
             };
             path: {
                 id: string;
@@ -1796,8 +2291,8 @@ export interface operations {
     renameNode: {
         parameters: {
             query?: never;
-            header: {
-                "X-CSRF-Token": string;
+            header?: {
+                "X-CSRF-Token"?: string;
             };
             path: {
                 id: string;
@@ -1832,8 +2327,8 @@ export interface operations {
     revokeNode: {
         parameters: {
             query?: never;
-            header: {
-                "X-CSRF-Token": string;
+            header?: {
+                "X-CSRF-Token"?: string;
             };
             path: {
                 id: string;
@@ -1892,8 +2387,8 @@ export interface operations {
     createEnrollmentToken: {
         parameters: {
             query?: never;
-            header: {
-                "X-CSRF-Token": string;
+            header?: {
+                "X-CSRF-Token"?: string;
             };
             path?: never;
             cookie?: never;
@@ -1922,8 +2417,8 @@ export interface operations {
     revokeEnrollmentToken: {
         parameters: {
             query?: never;
-            header: {
-                "X-CSRF-Token": string;
+            header?: {
+                "X-CSRF-Token"?: string;
             };
             path: {
                 id: string;
@@ -1983,7 +2478,7 @@ export interface operations {
         parameters: {
             query?: never;
             header: {
-                "X-CSRF-Token": string;
+                "X-CSRF-Token"?: string;
                 "Idempotency-Key": string;
             };
             path: {
@@ -2115,8 +2610,8 @@ export interface operations {
     confirmOperation: {
         parameters: {
             query?: never;
-            header: {
-                "X-CSRF-Token": string;
+            header?: {
+                "X-CSRF-Token"?: string;
             };
             path: {
                 id: string;
@@ -2151,8 +2646,8 @@ export interface operations {
     recoverOperation: {
         parameters: {
             query?: never;
-            header: {
-                "X-CSRF-Token": string;
+            header?: {
+                "X-CSRF-Token"?: string;
             };
             path: {
                 id: string;
@@ -2187,8 +2682,8 @@ export interface operations {
     resolveOperation: {
         parameters: {
             query?: never;
-            header: {
-                "X-CSRF-Token": string;
+            header?: {
+                "X-CSRF-Token"?: string;
             };
             path: {
                 id: string;
@@ -2251,8 +2746,8 @@ export interface operations {
     changeAccount: {
         parameters: {
             query?: never;
-            header: {
-                "X-CSRF-Token": string;
+            header?: {
+                "X-CSRF-Token"?: string;
             };
             path?: never;
             cookie?: never;
@@ -2286,7 +2781,7 @@ export interface operations {
         parameters: {
             query?: never;
             header: {
-                "X-CSRF-Token": string;
+                "X-CSRF-Token"?: string;
                 "Idempotency-Key": string;
             };
             path: {
@@ -2380,6 +2875,10 @@ export interface operations {
             query?: {
                 range?: "24h" | "7d";
                 node_id?: string;
+                node_ids?: string;
+                from?: string;
+                to?: string;
+                group_by?: string;
             };
             header?: never;
             path?: never;
@@ -2441,7 +2940,7 @@ export interface operations {
         parameters: {
             query?: never;
             header: {
-                "X-CSRF-Token": string;
+                "X-CSRF-Token"?: string;
                 "Idempotency-Key": string;
             };
             path: {
@@ -2510,7 +3009,7 @@ export interface operations {
         parameters: {
             query?: never;
             header: {
-                "X-CSRF-Token": string;
+                "X-CSRF-Token"?: string;
                 "Idempotency-Key": string;
             };
             path: {
@@ -2547,8 +3046,8 @@ export interface operations {
     revealNodePassword: {
         parameters: {
             query?: never;
-            header: {
-                "X-CSRF-Token": string;
+            header?: {
+                "X-CSRF-Token"?: string;
             };
             path: {
                 id: string;
@@ -2611,8 +3110,8 @@ export interface operations {
     cancelOperation: {
         parameters: {
             query?: never;
-            header: {
-                "X-CSRF-Token": string;
+            header?: {
+                "X-CSRF-Token"?: string;
             };
             path: {
                 id: string;
@@ -2645,7 +3144,7 @@ export interface operations {
         parameters: {
             query?: never;
             header: {
-                "X-CSRF-Token": string;
+                "X-CSRF-Token"?: string;
                 "Idempotency-Key": string;
             };
             path: {
@@ -2711,8 +3210,8 @@ export interface operations {
     changePublicAddresses: {
         parameters: {
             query?: never;
-            header: {
-                "X-CSRF-Token": string;
+            header?: {
+                "X-CSRF-Token"?: string;
             };
             path: {
                 id: string;
@@ -2747,8 +3246,8 @@ export interface operations {
     refreshPublicAddresses: {
         parameters: {
             query?: never;
-            header: {
-                "X-CSRF-Token": string;
+            header?: {
+                "X-CSRF-Token"?: string;
             };
             path: {
                 id: string;
@@ -2807,8 +3306,8 @@ export interface operations {
     changePeerTrust: {
         parameters: {
             query?: never;
-            header: {
-                "X-CSRF-Token": string;
+            header?: {
+                "X-CSRF-Token"?: string;
             };
             path?: never;
             cookie?: never;
@@ -2999,7 +3498,7 @@ export interface operations {
         parameters: {
             query?: never;
             header: {
-                "X-CSRF-Token": string;
+                "X-CSRF-Token"?: string;
                 "Idempotency-Key": string;
             };
             path: {
@@ -3030,6 +3529,473 @@ export interface operations {
             422: components["responses"]["InvalidRequest"];
             500: components["responses"]["InternalError"];
             /** @description 节点或数据库不可用 */
+            503: components["responses"]["Unavailable"];
+        };
+    };
+    listAPITokens: {
+        parameters: {
+            query?: {
+                node_id?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 请求成功 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["APITokenList"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["InvalidRequest"];
+            503: components["responses"]["Unavailable"];
+        };
+    };
+    createAPIToken: {
+        parameters: {
+            query?: {
+                node_id?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["APITokenInput"];
+            };
+        };
+        responses: {
+            /** @description 请求成功 */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["APITokenCreated"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["InvalidRequest"];
+            503: components["responses"]["Unavailable"];
+        };
+    };
+    deleteAPIToken: {
+        parameters: {
+            query: {
+                node_id?: string;
+                revision: number;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 请求成功 */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["InvalidRequest"];
+            503: components["responses"]["Unavailable"];
+        };
+    };
+    updateAPIToken: {
+        parameters: {
+            query?: {
+                node_id?: string;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["APITokenInput"];
+            };
+        };
+        responses: {
+            /** @description 请求成功 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["APIToken"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["InvalidRequest"];
+            503: components["responses"]["Unavailable"];
+        };
+    };
+    regenerateAPIToken: {
+        parameters: {
+            query?: {
+                node_id?: string;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TokenRevision"];
+            };
+        };
+        responses: {
+            /** @description 请求成功 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["APITokenCreated"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["InvalidRequest"];
+            503: components["responses"]["Unavailable"];
+        };
+    };
+    verifyAPIToken: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 请求成功 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["APIToken"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["InvalidRequest"];
+            503: components["responses"]["Unavailable"];
+        };
+    };
+    getMonitoringCurrent: {
+        parameters: {
+            query?: {
+                node_id?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 请求成功 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MonitoringCurrent"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["InvalidRequest"];
+            503: components["responses"]["Unavailable"];
+        };
+    };
+    discoverDatabases: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 请求成功 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DatabaseDiscoveryList"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["InvalidRequest"];
+            503: components["responses"]["Unavailable"];
+        };
+    };
+    saveDatabaseInstance: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                instance_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DatabaseInstanceInput"];
+            };
+        };
+        responses: {
+            /** @description 请求成功 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DiscoveredDatabaseInstance"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["InvalidRequest"];
+            503: components["responses"]["Unavailable"];
+        };
+    };
+    listDatabaseClusters: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 请求成功 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ManagedDatabaseList"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["InvalidRequest"];
+            503: components["responses"]["Unavailable"];
+        };
+    };
+    createDatabaseCluster: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DatabaseClusterInput"];
+            };
+        };
+        responses: {
+            /** @description 请求成功 */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ManagedDatabaseCluster"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["InvalidRequest"];
+            503: components["responses"]["Unavailable"];
+        };
+    };
+    getDatabaseCluster: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 请求成功 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ManagedDatabaseStatus"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["InvalidRequest"];
+            503: components["responses"]["Unavailable"];
+        };
+    };
+    updateDatabaseCluster: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DatabaseClusterInput"];
+            };
+        };
+        responses: {
+            /** @description 请求成功 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ManagedDatabaseCluster"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["InvalidRequest"];
+            503: components["responses"]["Unavailable"];
+        };
+    };
+    changeDatabase: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DatabaseChange"];
+            };
+        };
+        responses: {
+            /** @description 请求成功 */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Operation"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["InvalidRequest"];
+            503: components["responses"]["Unavailable"];
+        };
+    };
+    getDatabaseBackups: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 请求成功 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DatabaseBackupList"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["InvalidRequest"];
+            503: components["responses"]["Unavailable"];
+        };
+    };
+    getMetrics: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 授权范围内的当前指标 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": string;
+                    "application/openmetrics-text": string;
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
             503: components["responses"]["Unavailable"];
         };
     };

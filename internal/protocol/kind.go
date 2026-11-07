@@ -4,6 +4,14 @@ import "fmt"
 
 func newPayload(kind Kind) (Payload, error) {
 	switch kind {
+	case "database.discover":
+		return &DatabaseDiscovery{}, nil
+	case "database.discovered":
+		return &DatabaseDiscovered{}, nil
+	case "database.read":
+		return &DatabaseRead{}, nil
+	case "database.read.result":
+		return &DatabaseReadResult{}, nil
 	case "docker.read":
 		return &DockerRead{}, nil
 	case "docker.read.result":

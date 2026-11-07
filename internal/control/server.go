@@ -22,11 +22,12 @@ import (
 func (s *Server) cookieName() string { return "opsd_session_" + s.node.ID }
 
 type Options struct {
-	Assets          fs.FS
-	Node            *cluster.Node
-	NodeVersion     string
-	FrontendVersion string
-	Now             func() time.Time
+	EnforceListenerState bool
+	Assets               fs.FS
+	Node                 *cluster.Node
+	NodeVersion          string
+	FrontendVersion      string
+	Now                  func() time.Time
 }
 type subscriber struct {
 	session string
@@ -67,10 +68,46 @@ func (s *Server) Handler() http.Handler {
 		s.fail(w, r, 422, "invalid_request", "请求参数无效")
 	}})
 	mux.HandleFunc("GET /api/v1/events", s.events)
+	mux.HandleFunc("GET /metrics", s.metrics)
 	mux.HandleFunc("/", s.page)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Cache-Control", "no-store")
 		w.Header().Set("X-Content-Type-Options", "nosniff")
+		config, configErr := s.node.Config(r.Context())
+		if configErr != nil {
+			s.operationError(w, r, configErr)
+			return
+		}
+		_, hasAuthorization := r.Header["Authorization"]
+		if hasAuthorization || r.URL.Path == "/metrics" {
+			if !config.API {
+				s.fail(w, r, 503, "dependency_unavailable", "API 已关闭")
+				return
+			}
+			parts := strings.Fields(r.Header.Get("Authorization"))
+			if len(r.Header.Values("Authorization")) != 1 || len(parts) != 2 || !strings.EqualFold(parts[0], "Bearer") {
+				s.fail(w, r, 401, "unauthenticated", "请提供 Bearer 令牌")
+				return
+			}
+			verifyCtx, verifyCancel := context.WithTimeout(r.Context(), 4*time.Second)
+			token, e := s.node.VerifyAPIToken(verifyCtx, parts[1], remoteIP(r))
+			verifyCancel()
+			if e != nil {
+				s.operationError(w, r, e)
+				return
+			}
+			r, e = s.authorizeAPI(r, token)
+			if e != nil {
+				s.operationError(w, r, e)
+				return
+			}
+			mux.ServeHTTP(w, r)
+			return
+		}
+		if s.options.EnforceListenerState && !config.Console {
+			http.NotFound(w, r)
+			return
+		}
 		if strings.HasPrefix(r.URL.Path, "/api/") && r.URL.Path != "/api/v1/auth/login" {
 			session, err := s.authenticate(r)
 			if err != nil {
@@ -144,7 +181,11 @@ func (s *Server) body(w http.ResponseWriter, r *http.Request, value any) bool {
 		s.fail(w, r, 422, "invalid_request", "请求须使用 JSON")
 		return false
 	}
-	reader := http.MaxBytesReader(w, r.Body, 16*1024)
+	limit := int64(16 * 1024)
+	if strings.HasPrefix(r.URL.Path, "/api/v1/api-tokens") || strings.HasPrefix(r.URL.Path, "/api/v1/databases/") || strings.Contains(r.URL.Path, "/databases/") {
+		limit = 256 * 1024
+	}
+	reader := http.MaxBytesReader(w, r.Body, limit)
 	decoder := json.NewDecoder(reader)
 	decoder.DisallowUnknownFields()
 	if err := decoder.Decode(value); err != nil {
@@ -186,7 +227,7 @@ func (s *Server) page(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if path != entrance {
-		if path != "/" && path != "/containers" && path != "/firewall" && path != "/firewall/settings" && path != "/nodes" && !strings.HasPrefix(path, "/nodes/") && path != "/settings" && !strings.HasPrefix(path, "/settings/") {
+		if path != "/" && path != "/containers" && path != "/databases" && !strings.HasPrefix(path, "/databases/") && path != "/firewall" && path != "/firewall/settings" && path != "/nodes" && !strings.HasPrefix(path, "/nodes/") && path != "/settings" && !strings.HasPrefix(path, "/settings/") {
 			http.NotFound(w, r)
 			return
 		}

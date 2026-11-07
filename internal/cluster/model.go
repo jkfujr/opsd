@@ -36,11 +36,12 @@ type Revocation struct {
 	Signature []byte `json:"signature"`
 }
 type Directory struct {
-	Admissions  []Member        `json:"admissions"`
-	Members     []Member        `json:"members"`
-	Revocations []Revocation    `json:"revocations"`
-	Addresses   []AddressRecord `json:"addresses,omitempty"`
-	Trust       *TrustPolicy    `json:"trust,omitempty"`
+	Databases   []ManagedDatabaseCluster `json:"databases,omitempty"`
+	Admissions  []Member                 `json:"admissions"`
+	Members     []Member                 `json:"members"`
+	Revocations []Revocation             `json:"revocations"`
+	Addresses   []AddressRecord          `json:"addresses,omitempty"`
+	Trust       *TrustPolicy             `json:"trust,omitempty"`
 }
 type Config struct {
 	Cached           bool          `json:"cached,omitempty"`
@@ -52,6 +53,7 @@ type Config struct {
 	Region           string        `json:"region"`
 	Listen           string        `json:"listen"`
 	Console          bool          `json:"console"`
+	API              bool          `json:"api"`
 	ConsoleListen    string        `json:"console_listen"`
 	PreferredStorage string        `json:"preferred_storage"`
 	IntervalMinutes  int           `json:"interval_minutes"`
@@ -100,13 +102,16 @@ type Record struct {
 	Signature     []byte    `json:"signature"`
 }
 type Request struct {
-	ID      string          `json:"id"`
-	Kind    string          `json:"kind"`
-	Payload json.RawMessage `json:"payload"`
-	Key     string          `json:"key,omitempty"`
+	ResourceID string          `json:"resource_id,omitempty"`
+	Actor      string          `json:"actor,omitempty"`
+	ID         string          `json:"id"`
+	Kind       string          `json:"kind"`
+	Payload    json.RawMessage `json:"payload"`
+	Key        string          `json:"key,omitempty"`
 }
 type Operation struct {
-	Key string `json:"idempotency_key,omitempty"`
+	ResourceID string `json:"resource_id,omitempty"`
+	Key        string `json:"idempotency_key,omitempty"`
 	protocol.OperationRecord
 	NodeID            string    `json:"node_id"`
 	Sequence          uint64    `json:"queue_sequence"`

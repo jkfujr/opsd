@@ -46,7 +46,7 @@ function OperationsDrawer({ open, onOpenChange, selected, onSelect }: { open: bo
   const detailSubject = detail.data?.subject;
   useEffect(() => {
     if (!detailNode || !detailID) return;
-    const key = detailSubject === 'container' ? ['containers'] : detailSubject === 'firewall_config' || detailSubject === 'firewall' || detailSubject === 'component' ? ['firewall', detailNode] : ['nodes', detailNode, detailSubject === 'account' ? 'account' : 'settings'];
+    const key = detailSubject === 'database' ? ['databases'] : detailSubject === 'container' ? ['containers'] : detailSubject === 'firewall_config' || detailSubject === 'firewall' || detailSubject === 'component' ? ['firewall', detailNode] : ['nodes', detailNode, detailSubject === 'account' ? 'account' : 'settings'];
     void queryClient.invalidateQueries({ queryKey: key });
   }, [detailID, detailRevision, detailNode, detailSubject]);
   const names = new Map(nodes.data?.items.map((n) => [n.id, n.name]) ?? []);
@@ -77,7 +77,7 @@ function OperationDetail({ operation: op }: { operation: Operation }) {
     return unwrap(await api.POST('/operations/{id}/recover', { params, body: { expected_revision: op.revision } }));
   }, onSuccess: () => { setResolve(false); invalidateOperations(); }, onError: () => invalidateOperations() });
   const left = op.confirmation_remaining_seconds;
-  const steps: Record<string, string> = { pending: '待执行', applying: '应用中', applied: '已读回', reverting: '撤销中', reverted: '已撤销', completed: '已完成', failed: '未完成', unknown: '待核对' };
+  const steps: Record<string, string> = { pending: '待执行', intent: '准备发送', applying: '应用中', applied: '已读回', reverting: '撤销中', reverted: '已撤销', completed: '已完成', failed: '未完成', unknown: '待核对' };
   return <div className="space-y-4">
     <div className="flex flex-wrap justify-between gap-3"><h2 className="font-semibold text-foreground-intense">{operationStates[op.state]}</h2><span className="text-sm text-foreground-muted">{op.result_pending_sync ? '结果待同步' : date(op.last_observed_at)}</span></div>
     {op.state === 'awaiting_confirmation' && <p className="text-sm">{op.result_pending_sync ? '等待节点核对确认状态' : left !== undefined && left > 0 ? `剩余 ${left} 秒` : '正在核对超时结果'}</p>}
@@ -90,6 +90,6 @@ function OperationDetail({ operation: op }: { operation: Operation }) {
       {['attention_required', 'prepared'].includes(op.state) && <BusyButton variant="outline" busy={mutation.isPending && mutation.variables === 'recover'} disabled={mutation.isPending || op.result_pending_sync} onClick={() => mutation.mutate('recover')}>{op.subject === 'container' ? '核对状态' : '重新处理'}</BusyButton>}
       {op.state === 'attention_required' && <Button variant="ghost" disabled={mutation.isPending || op.result_pending_sync} onClick={() => setResolve(true)}>接受现状</Button>}
     </div>
-    <Confirm open={resolve} title={op.subject === 'container' ? '接受当前容器状态并结束操作？' : '接受当前规则并结束操作？'} description="将记录为已人工处理。" busy={mutation.isPending} error={mutation.error} confirmLabel="接受现状" onCancel={() => setResolve(false)} onConfirm={() => mutation.mutate('resolve')} />
+    <Confirm open={resolve} title={op.subject === 'database' ? '接受当前数据库状态并结束操作？' : op.subject === 'container' ? '接受当前容器状态并结束操作？' : '接受当前规则并结束操作？'} description="将记录为已人工处理。" busy={mutation.isPending} error={mutation.error} confirmLabel="接受现状" onCancel={() => setResolve(false)} onConfirm={() => mutation.mutate('resolve')} />
   </div>;
 }

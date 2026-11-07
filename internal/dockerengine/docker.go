@@ -120,7 +120,7 @@ func health(status string) string {
 }
 func readOnly(labels map[string]string) string {
 	if labels["opsd.storage"] != "" {
-		return "通过存储设置管理"
+		return "通过 OPSD 数据设置管理"
 	}
 	if labels["com.docker.swarm.task.id"] != "" {
 		return "由 Swarm 管理"

@@ -68,6 +68,75 @@ func (e APIErrorCode) Valid() bool {
 	}
 }
 
+// Defines values for APIGrantLevel.
+const (
+	Manage APIGrantLevel = "manage"
+	Read   APIGrantLevel = "read"
+)
+
+// Valid indicates whether the value is a known member of the APIGrantLevel enum.
+func (e APIGrantLevel) Valid() bool {
+	switch e {
+	case Manage:
+		return true
+	case Read:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for APIGrantModule.
+const (
+	APIGrantModuleContainers APIGrantModule = "containers"
+	APIGrantModuleDatabases  APIGrantModule = "databases"
+	APIGrantModuleFirewall   APIGrantModule = "firewall"
+	APIGrantModuleMonitoring APIGrantModule = "monitoring"
+	APIGrantModuleNodes      APIGrantModule = "nodes"
+)
+
+// Valid indicates whether the value is a known member of the APIGrantModule enum.
+func (e APIGrantModule) Valid() bool {
+	switch e {
+	case APIGrantModuleContainers:
+		return true
+	case APIGrantModuleDatabases:
+		return true
+	case APIGrantModuleFirewall:
+		return true
+	case APIGrantModuleMonitoring:
+		return true
+	case APIGrantModuleNodes:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for APIGrantScope.
+const (
+	APIGrantScopeAll      APIGrantScope = "all"
+	APIGrantScopeClusters APIGrantScope = "clusters"
+	APIGrantScopeNodes    APIGrantScope = "nodes"
+	APIGrantScopeRegions  APIGrantScope = "regions"
+)
+
+// Valid indicates whether the value is a known member of the APIGrantScope enum.
+func (e APIGrantScope) Valid() bool {
+	switch e {
+	case APIGrantScopeAll:
+		return true
+	case APIGrantScopeClusters:
+		return true
+	case APIGrantScopeNodes:
+		return true
+	case APIGrantScopeRegions:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for AddressFamily.
 const (
 	Ipv4 AddressFamily = "ipv4"
@@ -170,6 +239,123 @@ func (e ContainerActionRequestAction) Valid() bool {
 	case Start:
 		return true
 	case Stop:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for DatabaseChangeCharset.
+const (
+	Ascii   DatabaseChangeCharset = "ascii"
+	Latin1  DatabaseChangeCharset = "latin1"
+	Utf8mb3 DatabaseChangeCharset = "utf8mb3"
+	Utf8mb4 DatabaseChangeCharset = "utf8mb4"
+)
+
+// Valid indicates whether the value is a known member of the DatabaseChangeCharset enum.
+func (e DatabaseChangeCharset) Valid() bool {
+	switch e {
+	case Ascii:
+		return true
+	case Latin1:
+		return true
+	case Utf8mb3:
+		return true
+	case Utf8mb4:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for DatabaseChangeKind.
+const (
+	CreateDatabase DatabaseChangeKind = "create_database"
+	CreateUser     DatabaseChangeKind = "create_user"
+	DeleteDatabase DatabaseChangeKind = "delete_database"
+	DeleteUser     DatabaseChangeKind = "delete_user"
+	Grant          DatabaseChangeKind = "grant"
+	Password       DatabaseChangeKind = "password"
+	Revoke         DatabaseChangeKind = "revoke"
+	SyncUser       DatabaseChangeKind = "sync_user"
+)
+
+// Valid indicates whether the value is a known member of the DatabaseChangeKind enum.
+func (e DatabaseChangeKind) Valid() bool {
+	switch e {
+	case CreateDatabase:
+		return true
+	case CreateUser:
+		return true
+	case DeleteDatabase:
+		return true
+	case DeleteUser:
+		return true
+	case Grant:
+		return true
+	case Password:
+		return true
+	case Revoke:
+		return true
+	case SyncUser:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for DatabaseInstanceInputKind.
+const (
+	DatabaseInstanceInputKindGalera   DatabaseInstanceInputKind = "galera"
+	DatabaseInstanceInputKindProxysql DatabaseInstanceInputKind = "proxysql"
+)
+
+// Valid indicates whether the value is a known member of the DatabaseInstanceInputKind enum.
+func (e DatabaseInstanceInputKind) Valid() bool {
+	switch e {
+	case DatabaseInstanceInputKindGalera:
+		return true
+	case DatabaseInstanceInputKindProxysql:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for DatabaseStatusState.
+const (
+	DatabaseStatusStateMismatch    DatabaseStatusState = "mismatch"
+	DatabaseStatusStateReady       DatabaseStatusState = "ready"
+	DatabaseStatusStateUnavailable DatabaseStatusState = "unavailable"
+)
+
+// Valid indicates whether the value is a known member of the DatabaseStatusState enum.
+func (e DatabaseStatusState) Valid() bool {
+	switch e {
+	case DatabaseStatusStateMismatch:
+		return true
+	case DatabaseStatusStateReady:
+		return true
+	case DatabaseStatusStateUnavailable:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for DiscoveredDatabaseInstanceKind.
+const (
+	DiscoveredDatabaseInstanceKindGalera   DiscoveredDatabaseInstanceKind = "galera"
+	DiscoveredDatabaseInstanceKindProxysql DiscoveredDatabaseInstanceKind = "proxysql"
+)
+
+// Valid indicates whether the value is a known member of the DiscoveredDatabaseInstanceKind enum.
+func (e DiscoveredDatabaseInstanceKind) Valid() bool {
+	switch e {
+	case DiscoveredDatabaseInstanceKindGalera:
+		return true
+	case DiscoveredDatabaseInstanceKindProxysql:
 		return true
 	default:
 		return false
@@ -335,6 +521,27 @@ func (e ManagedPolicyAction) Valid() bool {
 	}
 }
 
+// Defines values for MonitoringNodeState.
+const (
+	MonitoringNodeStateOffline MonitoringNodeState = "offline"
+	MonitoringNodeStatePartial MonitoringNodeState = "partial"
+	MonitoringNodeStateReady   MonitoringNodeState = "ready"
+)
+
+// Valid indicates whether the value is a known member of the MonitoringNodeState enum.
+func (e MonitoringNodeState) Valid() bool {
+	switch e {
+	case MonitoringNodeStateOffline:
+		return true
+	case MonitoringNodeStatePartial:
+		return true
+	case MonitoringNodeStateReady:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for MonitoringReadingFirewall.
 const (
 	MonitoringReadingFirewallDisabled MonitoringReadingFirewall = "disabled"
@@ -464,6 +671,8 @@ const (
 	OperationSubjectComponent      OperationSubject = "component"
 	OperationSubjectConfig         OperationSubject = "config"
 	OperationSubjectContainer      OperationSubject = "container"
+	OperationSubjectDatabase       OperationSubject = "database"
+	OperationSubjectDatabaseStep   OperationSubject = "database_step"
 	OperationSubjectFirewall       OperationSubject = "firewall"
 	OperationSubjectFirewallConfig OperationSubject = "firewall_config"
 	OperationSubjectName           OperationSubject = "name"
@@ -479,6 +688,10 @@ func (e OperationSubject) Valid() bool {
 	case OperationSubjectConfig:
 		return true
 	case OperationSubjectContainer:
+		return true
+	case OperationSubjectDatabase:
+		return true
+	case OperationSubjectDatabaseStep:
 		return true
 	case OperationSubjectFirewall:
 		return true
@@ -858,6 +1071,57 @@ type APIError struct {
 // APIErrorCode defines model for APIError.Code.
 type APIErrorCode string
 
+// APIGrant defines model for APIGrant.
+type APIGrant struct {
+	Level     APIGrantLevel  `json:"level"`
+	Module    APIGrantModule `json:"module"`
+	Resources []string       `json:"resources"`
+	Scope     APIGrantScope  `json:"scope"`
+}
+
+// APIGrantLevel defines model for APIGrant.Level.
+type APIGrantLevel string
+
+// APIGrantModule defines model for APIGrant.Module.
+type APIGrantModule string
+
+// APIGrantScope defines model for APIGrant.Scope.
+type APIGrantScope string
+
+// APIToken defines model for APIToken.
+type APIToken struct {
+	CreatedAt time.Time  `json:"created_at"`
+	Enabled   bool       `json:"enabled"`
+	ExpiresAt *time.Time `json:"expires_at,omitempty"`
+	Grants    []APIGrant `json:"grants"`
+	Id        string     `json:"id"`
+	Name      string     `json:"name"`
+	Owner     string     `json:"owner"`
+	Revision  int64      `json:"revision"`
+	SourceIps []string   `json:"source_ips"`
+}
+
+// APITokenCreated defines model for APITokenCreated.
+type APITokenCreated struct {
+	Token APIToken `json:"token"`
+	Value string   `json:"value"`
+}
+
+// APITokenInput defines model for APITokenInput.
+type APITokenInput struct {
+	Enabled   bool       `json:"enabled"`
+	ExpiresAt *time.Time `json:"expires_at,omitempty"`
+	Grants    []APIGrant `json:"grants"`
+	Name      string     `json:"name"`
+	Revision  int64      `json:"revision"`
+	SourceIps []string   `json:"source_ips"`
+}
+
+// APITokenList defines model for APITokenList.
+type APITokenList struct {
+	Items []APIToken `json:"items"`
+}
+
 // Account defines model for Account.
 type Account struct {
 	Username string `json:"username"`
@@ -1011,6 +1275,207 @@ type CurrentSession struct {
 	Session      Session `json:"session"`
 }
 
+// DatabaseBackup defines model for DatabaseBackup.
+type DatabaseBackup struct {
+	Artifacts   []string   `json:"artifacts"`
+	Error       *string    `json:"error,omitempty"`
+	LastRun     *time.Time `json:"last_run,omitempty"`
+	LastSuccess *time.Time `json:"last_success,omitempty"`
+	Name        string     `json:"name"`
+	Schedule    string     `json:"schedule"`
+	State       string     `json:"state"`
+}
+
+// DatabaseBackupList defines model for DatabaseBackupList.
+type DatabaseBackupList struct {
+	CheckedAt time.Time             `json:"checked_at"`
+	Items     []DatabaseNodeBackups `json:"items"`
+}
+
+// DatabaseChange defines model for DatabaseChange.
+type DatabaseChange struct {
+	Charset          *DatabaseChangeCharset   `json:"charset,omitempty"`
+	ClusterId        *string                  `json:"cluster_id,omitempty"`
+	Database         *string                  `json:"database,omitempty"`
+	ExpectedRevision int64                    `json:"expected_revision"`
+	Grants           *[]DatabaseGrant         `json:"grants,omitempty"`
+	Host             *string                  `json:"host,omitempty"`
+	Kind             DatabaseChangeKind       `json:"kind"`
+	Password         *string                  `json:"password,omitempty"`
+	Privileges       *[]string                `json:"privileges,omitempty"`
+	Proxies          []DatabaseProxySelection `json:"proxies"`
+	User             *string                  `json:"user,omitempty"`
+}
+
+// DatabaseChangeCharset defines model for DatabaseChange.Charset.
+type DatabaseChangeCharset string
+
+// DatabaseChangeKind defines model for DatabaseChange.Kind.
+type DatabaseChangeKind string
+
+// DatabaseClusterInput defines model for DatabaseClusterInput.
+type DatabaseClusterInput struct {
+	ClusterId    string        `json:"cluster_id"`
+	Coordinator  string        `json:"coordinator"`
+	Deleted      *bool         `json:"deleted,omitempty"`
+	Id           *string       `json:"id,omitempty"`
+	Members      []DatabaseRef `json:"members"`
+	Name         string        `json:"name"`
+	Proxies      []DatabaseRef `json:"proxies"`
+	Revision     int64         `json:"revision"`
+	UpdatedAt    *time.Time    `json:"updated_at,omitempty"`
+	WorkbenchUrl string        `json:"workbench_url"`
+}
+
+// DatabaseDiscoveryList defines model for DatabaseDiscoveryList.
+type DatabaseDiscoveryList struct {
+	Items []DiscoveredDatabaseInstance `json:"items"`
+}
+
+// DatabaseGrant defines model for DatabaseGrant.
+type DatabaseGrant struct {
+	Database   string   `json:"database"`
+	Privileges []string `json:"privileges"`
+}
+
+// DatabaseInstanceInput defines model for DatabaseInstanceInput.
+type DatabaseInstanceInput struct {
+	Address              string                    `json:"address"`
+	BackupRoot           *string                   `json:"backup_root,omitempty"`
+	ContainerId          *string                   `json:"container_id,omitempty"`
+	CredentialsAvailable *bool                     `json:"credentials_available,omitempty"`
+	Id                   *string                   `json:"id,omitempty"`
+	Kind                 DatabaseInstanceInputKind `json:"kind"`
+	Name                 string                    `json:"name"`
+	NodeId               *string                   `json:"node_id,omitempty"`
+	Password             *string                   `json:"password,omitempty"`
+	ProtectedUsers       []string                  `json:"protected_users"`
+	Running              *bool                     `json:"running,omitempty"`
+	Socket               *string                   `json:"socket,omitempty"`
+	Username             string                    `json:"username"`
+}
+
+// DatabaseInstanceInputKind defines model for DatabaseInstanceInput.Kind.
+type DatabaseInstanceInputKind string
+
+// DatabaseNodeBackups defines model for DatabaseNodeBackups.
+type DatabaseNodeBackups struct {
+	Error      *string          `json:"error,omitempty"`
+	InstanceId string           `json:"instance_id"`
+	Items      []DatabaseBackup `json:"items"`
+	NodeId     string           `json:"node_id"`
+}
+
+// DatabaseProxyPool defines model for DatabaseProxyPool.
+type DatabaseProxyPool struct {
+	Errors    float64 `json:"errors"`
+	Free      float64 `json:"free"`
+	Host      string  `json:"host"`
+	Hostgroup int     `json:"hostgroup"`
+	Port      int     `json:"port"`
+	Used      float64 `json:"used"`
+}
+
+// DatabaseProxySelection defines model for DatabaseProxySelection.
+type DatabaseProxySelection struct {
+	Hostgroup  int    `json:"hostgroup"`
+	InstanceId string `json:"instance_id"`
+	NodeId     string `json:"node_id"`
+}
+
+// DatabaseProxyServer defines model for DatabaseProxyServer.
+type DatabaseProxyServer struct {
+	Host      string `json:"host"`
+	Hostgroup int    `json:"hostgroup"`
+	Port      int    `json:"port"`
+	State     string `json:"state"`
+}
+
+// DatabaseProxyUser defines model for DatabaseProxyUser.
+type DatabaseProxyUser struct {
+	Active    bool   `json:"active"`
+	Hostgroup int    `json:"hostgroup"`
+	Name      string `json:"name"`
+	Protected bool   `json:"protected"`
+	State     string `json:"state"`
+}
+
+// DatabaseRef defines model for DatabaseRef.
+type DatabaseRef struct {
+	Address    string `json:"address"`
+	InstanceId string `json:"instance_id"`
+	Name       string `json:"name"`
+	NodeId     string `json:"node_id"`
+}
+
+// DatabaseSchema defines model for DatabaseSchema.
+type DatabaseSchema struct {
+	Bytes     float64 `json:"bytes"`
+	Charset   string  `json:"charset"`
+	Collation string  `json:"collation"`
+	Name      string  `json:"name"`
+	Protected bool    `json:"protected"`
+}
+
+// DatabaseStatus defines model for DatabaseStatus.
+type DatabaseStatus struct {
+	ActualMembers     *string                `json:"actual_members,omitempty"`
+	CheckedAt         time.Time              `json:"checked_at"`
+	ClusterId         *string                `json:"cluster_id,omitempty"`
+	ClusterName       *string                `json:"cluster_name,omitempty"`
+	ClusterSize       *int                   `json:"cluster_size,omitempty"`
+	ConfiguredMembers *string                `json:"configured_members,omitempty"`
+	Connections       *float64               `json:"connections,omitempty"`
+	Databases         *[]DatabaseSchema      `json:"databases,omitempty"`
+	Error             *NetworkError          `json:"error,omitempty"`
+	FlowControl       *float64               `json:"flow_control,omitempty"`
+	MemberAddress     *string                `json:"member_address,omitempty"`
+	PendingChanges    *bool                  `json:"pending_changes,omitempty"`
+	Pools             *[]DatabaseProxyPool   `json:"pools,omitempty"`
+	Primary           *bool                  `json:"primary,omitempty"`
+	ProxyUsers        *[]DatabaseProxyUser   `json:"proxy_users,omitempty"`
+	ReadOnly          *bool                  `json:"read_only,omitempty"`
+	Ready             *bool                  `json:"ready,omitempty"`
+	ReceiveQueue      *float64               `json:"receive_queue,omitempty"`
+	SendQueue         *float64               `json:"send_queue,omitempty"`
+	Servers           *[]DatabaseProxyServer `json:"servers,omitempty"`
+	State             DatabaseStatusState    `json:"state"`
+	Synced            *bool                  `json:"synced,omitempty"`
+	Users             *[]DatabaseUser        `json:"users,omitempty"`
+	Version           *string                `json:"version,omitempty"`
+}
+
+// DatabaseStatusState defines model for DatabaseStatus.State.
+type DatabaseStatusState string
+
+// DatabaseUser defines model for DatabaseUser.
+type DatabaseUser struct {
+	Grants    []DatabaseGrant `json:"grants"`
+	Host      string          `json:"host"`
+	Name      string          `json:"name"`
+	Protected bool            `json:"protected"`
+}
+
+// DiscoveredDatabaseInstance defines model for DiscoveredDatabaseInstance.
+type DiscoveredDatabaseInstance struct {
+	Address              string                         `json:"address"`
+	BackupRoot           *string                        `json:"backup_root,omitempty"`
+	ContainerId          *string                        `json:"container_id,omitempty"`
+	CredentialsAvailable bool                           `json:"credentials_available"`
+	Id                   string                         `json:"id"`
+	Kind                 DiscoveredDatabaseInstanceKind `json:"kind"`
+	Name                 string                         `json:"name"`
+	NodeId               string                         `json:"node_id"`
+	ProtectedUsers       *[]string                      `json:"protected_users,omitempty"`
+	Running              bool                           `json:"running"`
+	Socket               *string                        `json:"socket,omitempty"`
+	Status               *DatabaseStatus                `json:"status,omitempty"`
+	Username             string                         `json:"username"`
+}
+
+// DiscoveredDatabaseInstanceKind defines model for DiscoveredDatabaseInstance.Kind.
+type DiscoveredDatabaseInstanceKind string
+
 // DockerNodeState defines model for DockerNodeState.
 type DockerNodeState struct {
 	CheckedAt time.Time            `json:"checked_at"`
@@ -1085,6 +1550,42 @@ type LoginRequest struct {
 	Entrance string  `json:"entrance"`
 	Password *string `json:"password,omitempty"`
 	Username string  `json:"username"`
+}
+
+// ManagedDatabaseCluster defines model for ManagedDatabaseCluster.
+type ManagedDatabaseCluster struct {
+	ClusterId    string        `json:"cluster_id"`
+	Coordinator  string        `json:"coordinator"`
+	Deleted      bool          `json:"deleted"`
+	Id           string        `json:"id"`
+	Members      []DatabaseRef `json:"members"`
+	Name         string        `json:"name"`
+	Proxies      []DatabaseRef `json:"proxies"`
+	Revision     int64         `json:"revision"`
+	UpdatedAt    time.Time     `json:"updated_at"`
+	WorkbenchUrl string        `json:"workbench_url"`
+}
+
+// ManagedDatabaseList defines model for ManagedDatabaseList.
+type ManagedDatabaseList struct {
+	Items []ManagedDatabaseStatus `json:"items"`
+}
+
+// ManagedDatabaseMember defines model for ManagedDatabaseMember.
+type ManagedDatabaseMember struct {
+	Address    string         `json:"address"`
+	InstanceId string         `json:"instance_id"`
+	Name       string         `json:"name"`
+	NodeId     string         `json:"node_id"`
+	Status     DatabaseStatus `json:"status"`
+}
+
+// ManagedDatabaseStatus defines model for ManagedDatabaseStatus.
+type ManagedDatabaseStatus struct {
+	CheckedAt time.Time               `json:"checked_at"`
+	Cluster   ManagedDatabaseCluster  `json:"cluster"`
+	Members   []ManagedDatabaseMember `json:"members"`
+	Proxies   []ManagedDatabaseMember `json:"proxies"`
 }
 
 // ManagedFirewallChange defines model for ManagedFirewallChange.
@@ -1172,11 +1673,39 @@ type MonitoringCoverage struct {
 	Network int `json:"network"`
 }
 
+// MonitoringCurrent defines model for MonitoringCurrent.
+type MonitoringCurrent struct {
+	CheckedAt time.Time         `json:"checked_at"`
+	Items     []MonitoringNode  `json:"items"`
+	Summary   MonitoringSummary `json:"summary"`
+}
+
 // MonitoringHistory defines model for MonitoringHistory.
 type MonitoringHistory struct {
-	IntervalMinutes int               `json:"interval_minutes"`
-	Items           []MonitoringPoint `json:"items"`
-	Unavailable     *[]string         `json:"unavailable,omitempty"`
+	CheckedAt       *time.Time               `json:"checked_at,omitempty"`
+	IntervalMinutes int                      `json:"interval_minutes"`
+	Items           []MonitoringPoint        `json:"items"`
+	Nodes           *[]MonitoringNodeHistory `json:"nodes,omitempty"`
+	Unavailable     *[]string                `json:"unavailable,omitempty"`
+}
+
+// MonitoringNode defines model for MonitoringNode.
+type MonitoringNode struct {
+	CheckedAt time.Time           `json:"checked_at"`
+	Metrics   *Metrics            `json:"metrics,omitempty"`
+	Name      string              `json:"name"`
+	NodeId    string              `json:"node_id"`
+	Region    string              `json:"region"`
+	State     MonitoringNodeState `json:"state"`
+}
+
+// MonitoringNodeState defines model for MonitoringNode.State.
+type MonitoringNodeState string
+
+// MonitoringNodeHistory defines model for MonitoringNodeHistory.
+type MonitoringNodeHistory struct {
+	Items  []Metrics `json:"items"`
+	NodeId string    `json:"node_id"`
 }
 
 // MonitoringPoint defines model for MonitoringPoint.
@@ -1252,6 +1781,7 @@ type NodeAccountChange struct {
 type NodeConfig struct {
 	Address          string                  `json:"address"`
 	AddressMode      *NodeConfigAddressMode  `json:"address_mode,omitempty"`
+	Api              *bool                   `json:"api,omitempty"`
 	Cached           *bool                   `json:"cached,omitempty"`
 	Console          bool                    `json:"console"`
 	ConsoleListen    string                  `json:"console_listen"`
@@ -1304,6 +1834,7 @@ type Operation struct {
 	NodeId                       string            `json:"node_id"`
 	PlanId                       *string           `json:"plan_id,omitempty"`
 	QueueSequence                *int64            `json:"queue_sequence,omitempty"`
+	ResourceId                   *string           `json:"resource_id,omitempty"`
 	ResultPendingSync            bool              `json:"result_pending_sync"`
 	Revision                     int64             `json:"revision"`
 	State                        OperationState    `json:"state"`
@@ -1552,6 +2083,11 @@ type StorageStatus struct {
 // StorageStatusState defines model for StorageStatus.State.
 type StorageStatusState string
 
+// TokenRevision defines model for TokenRevision.
+type TokenRevision struct {
+	Revision int64 `json:"revision"`
+}
+
 // TrustMember defines model for TrustMember.
 type TrustMember struct {
 	Id   string `json:"id"`
@@ -1585,14 +2121,40 @@ type Unauthorized = APIError
 // Unavailable defines model for Unavailable.
 type Unavailable = APIError
 
+// ListAPITokensParams defines parameters for ListAPITokens.
+type ListAPITokensParams struct {
+	NodeId *string `form:"node_id,omitempty" json:"node_id,omitempty"`
+}
+
+// CreateAPITokenParams defines parameters for CreateAPIToken.
+type CreateAPITokenParams struct {
+	NodeId *string `form:"node_id,omitempty" json:"node_id,omitempty"`
+}
+
+// DeleteAPITokenParams defines parameters for DeleteAPIToken.
+type DeleteAPITokenParams struct {
+	NodeId   *string `form:"node_id,omitempty" json:"node_id,omitempty"`
+	Revision int64   `form:"revision" json:"revision"`
+}
+
+// UpdateAPITokenParams defines parameters for UpdateAPIToken.
+type UpdateAPITokenParams struct {
+	NodeId *string `form:"node_id,omitempty" json:"node_id,omitempty"`
+}
+
+// RegenerateAPITokenParams defines parameters for RegenerateAPIToken.
+type RegenerateAPITokenParams struct {
+	NodeId *string `form:"node_id,omitempty" json:"node_id,omitempty"`
+}
+
 // LogoutParams defines parameters for Logout.
 type LogoutParams struct {
-	XCSRFToken string `json:"X-CSRF-Token"`
+	XCSRFToken *string `json:"X-CSRF-Token,omitempty"`
 }
 
 // RevokeSessionParams defines parameters for RevokeSession.
 type RevokeSessionParams struct {
-	XCSRFToken string `json:"X-CSRF-Token"`
+	XCSRFToken *string `json:"X-CSRF-Token,omitempty"`
 }
 
 // ListContainersParams defines parameters for ListContainers.
@@ -1602,20 +2164,34 @@ type ListContainersParams struct {
 	Search *string `form:"search,omitempty" json:"search,omitempty"`
 }
 
+// ChangeDatabaseParams defines parameters for ChangeDatabase.
+type ChangeDatabaseParams struct {
+	IdempotencyKey string `json:"Idempotency-Key"`
+}
+
 // CreateEnrollmentTokenParams defines parameters for CreateEnrollmentToken.
 type CreateEnrollmentTokenParams struct {
-	XCSRFToken string `json:"X-CSRF-Token"`
+	XCSRFToken *string `json:"X-CSRF-Token,omitempty"`
 }
 
 // RevokeEnrollmentTokenParams defines parameters for RevokeEnrollmentToken.
 type RevokeEnrollmentTokenParams struct {
-	XCSRFToken string `json:"X-CSRF-Token"`
+	XCSRFToken *string `json:"X-CSRF-Token,omitempty"`
+}
+
+// GetMonitoringCurrentParams defines parameters for GetMonitoringCurrent.
+type GetMonitoringCurrentParams struct {
+	NodeId *string `form:"node_id,omitempty" json:"node_id,omitempty"`
 }
 
 // GetMonitoringHistoryParams defines parameters for GetMonitoringHistory.
 type GetMonitoringHistoryParams struct {
-	Range  *GetMonitoringHistoryParamsRange `form:"range,omitempty" json:"range,omitempty"`
-	NodeId *string                          `form:"node_id,omitempty" json:"node_id,omitempty"`
+	Range   *GetMonitoringHistoryParamsRange `form:"range,omitempty" json:"range,omitempty"`
+	NodeId  *string                          `form:"node_id,omitempty" json:"node_id,omitempty"`
+	NodeIds *string                          `form:"node_ids,omitempty" json:"node_ids,omitempty"`
+	From    *string                          `form:"from,omitempty" json:"from,omitempty"`
+	To      *string                          `form:"to,omitempty" json:"to,omitempty"`
+	GroupBy *string                          `form:"group_by,omitempty" json:"group_by,omitempty"`
 }
 
 // GetMonitoringHistoryParamsRange defines parameters for GetMonitoringHistory.
@@ -1623,18 +2199,18 @@ type GetMonitoringHistoryParamsRange string
 
 // RenameNodeParams defines parameters for RenameNode.
 type RenameNodeParams struct {
-	XCSRFToken string `json:"X-CSRF-Token"`
+	XCSRFToken *string `json:"X-CSRF-Token,omitempty"`
 }
 
 // ChangeNodeAccountParams defines parameters for ChangeNodeAccount.
 type ChangeNodeAccountParams struct {
-	XCSRFToken     string `json:"X-CSRF-Token"`
-	IdempotencyKey string `json:"Idempotency-Key"`
+	XCSRFToken     *string `json:"X-CSRF-Token,omitempty"`
+	IdempotencyKey string  `json:"Idempotency-Key"`
 }
 
 // RevealNodePasswordParams defines parameters for RevealNodePassword.
 type RevealNodePasswordParams struct {
-	XCSRFToken string `json:"X-CSRF-Token"`
+	XCSRFToken *string `json:"X-CSRF-Token,omitempty"`
 }
 
 // GetContainerParams defines parameters for GetContainer.
@@ -1644,8 +2220,8 @@ type GetContainerParams struct {
 
 // ChangeContainerParams defines parameters for ChangeContainer.
 type ChangeContainerParams struct {
-	XCSRFToken     string `json:"X-CSRF-Token"`
-	IdempotencyKey string `json:"Idempotency-Key"`
+	XCSRFToken     *string `json:"X-CSRF-Token,omitempty"`
+	IdempotencyKey string  `json:"Idempotency-Key"`
 }
 
 // GetContainerLogsParams defines parameters for GetContainerLogs.
@@ -1656,41 +2232,41 @@ type GetContainerLogsParams struct {
 
 // ChangeFirewallConfigParams defines parameters for ChangeFirewallConfig.
 type ChangeFirewallConfigParams struct {
-	XCSRFToken     string `json:"X-CSRF-Token"`
-	IdempotencyKey string `json:"Idempotency-Key"`
+	XCSRFToken     *string `json:"X-CSRF-Token,omitempty"`
+	IdempotencyKey string  `json:"Idempotency-Key"`
 }
 
 // InstallFirewallParams defines parameters for InstallFirewall.
 type InstallFirewallParams struct {
-	XCSRFToken     string `json:"X-CSRF-Token"`
-	IdempotencyKey string `json:"Idempotency-Key"`
+	XCSRFToken     *string `json:"X-CSRF-Token,omitempty"`
+	IdempotencyKey string  `json:"Idempotency-Key"`
 }
 
 // SyncFirewallConfigParams defines parameters for SyncFirewallConfig.
 type SyncFirewallConfigParams struct {
-	XCSRFToken     string `json:"X-CSRF-Token"`
-	IdempotencyKey string `json:"Idempotency-Key"`
+	XCSRFToken     *string `json:"X-CSRF-Token,omitempty"`
+	IdempotencyKey string  `json:"Idempotency-Key"`
 }
 
 // ChangePublicAddressesParams defines parameters for ChangePublicAddresses.
 type ChangePublicAddressesParams struct {
-	XCSRFToken string `json:"X-CSRF-Token"`
+	XCSRFToken *string `json:"X-CSRF-Token,omitempty"`
 }
 
 // RefreshPublicAddressesParams defines parameters for RefreshPublicAddresses.
 type RefreshPublicAddressesParams struct {
-	XCSRFToken string `json:"X-CSRF-Token"`
+	XCSRFToken *string `json:"X-CSRF-Token,omitempty"`
 }
 
 // RevokeNodeParams defines parameters for RevokeNode.
 type RevokeNodeParams struct {
-	XCSRFToken string `json:"X-CSRF-Token"`
+	XCSRFToken *string `json:"X-CSRF-Token,omitempty"`
 }
 
 // ChangeNodeSettingsParams defines parameters for ChangeNodeSettings.
 type ChangeNodeSettingsParams struct {
-	XCSRFToken     string `json:"X-CSRF-Token"`
-	IdempotencyKey string `json:"Idempotency-Key"`
+	XCSRFToken     *string `json:"X-CSRF-Token,omitempty"`
+	IdempotencyKey string  `json:"Idempotency-Key"`
 }
 
 // ListOperationsParams defines parameters for ListOperations.
@@ -1711,36 +2287,54 @@ type ListPendingOperationsParams struct {
 
 // CancelOperationParams defines parameters for CancelOperation.
 type CancelOperationParams struct {
-	XCSRFToken string `json:"X-CSRF-Token"`
+	XCSRFToken *string `json:"X-CSRF-Token,omitempty"`
 }
 
 // ConfirmOperationParams defines parameters for ConfirmOperation.
 type ConfirmOperationParams struct {
-	XCSRFToken string `json:"X-CSRF-Token"`
+	XCSRFToken *string `json:"X-CSRF-Token,omitempty"`
 }
 
 // RecoverOperationParams defines parameters for RecoverOperation.
 type RecoverOperationParams struct {
-	XCSRFToken string `json:"X-CSRF-Token"`
+	XCSRFToken *string `json:"X-CSRF-Token,omitempty"`
 }
 
 // ResolveOperationParams defines parameters for ResolveOperation.
 type ResolveOperationParams struct {
-	XCSRFToken string `json:"X-CSRF-Token"`
+	XCSRFToken *string `json:"X-CSRF-Token,omitempty"`
 }
 
 // ChangePeerTrustParams defines parameters for ChangePeerTrust.
 type ChangePeerTrustParams struct {
-	XCSRFToken string `json:"X-CSRF-Token"`
+	XCSRFToken *string `json:"X-CSRF-Token,omitempty"`
 }
 
 // ChangeAccountParams defines parameters for ChangeAccount.
 type ChangeAccountParams struct {
-	XCSRFToken string `json:"X-CSRF-Token"`
+	XCSRFToken *string `json:"X-CSRF-Token,omitempty"`
 }
+
+// CreateAPITokenJSONRequestBody defines body for CreateAPIToken for application/json ContentType.
+type CreateAPITokenJSONRequestBody = APITokenInput
+
+// UpdateAPITokenJSONRequestBody defines body for UpdateAPIToken for application/json ContentType.
+type UpdateAPITokenJSONRequestBody = APITokenInput
+
+// RegenerateAPITokenJSONRequestBody defines body for RegenerateAPIToken for application/json ContentType.
+type RegenerateAPITokenJSONRequestBody = TokenRevision
 
 // LoginJSONRequestBody defines body for Login for application/json ContentType.
 type LoginJSONRequestBody = LoginRequest
+
+// CreateDatabaseClusterJSONRequestBody defines body for CreateDatabaseCluster for application/json ContentType.
+type CreateDatabaseClusterJSONRequestBody = DatabaseClusterInput
+
+// UpdateDatabaseClusterJSONRequestBody defines body for UpdateDatabaseCluster for application/json ContentType.
+type UpdateDatabaseClusterJSONRequestBody = DatabaseClusterInput
+
+// ChangeDatabaseJSONRequestBody defines body for ChangeDatabase for application/json ContentType.
+type ChangeDatabaseJSONRequestBody = DatabaseChange
 
 // RenameNodeJSONRequestBody defines body for RenameNode for application/json ContentType.
 type RenameNodeJSONRequestBody = NodePatch
@@ -1750,6 +2344,9 @@ type ChangeNodeAccountJSONRequestBody = NodeAccountChange
 
 // ChangeContainerJSONRequestBody defines body for ChangeContainer for application/json ContentType.
 type ChangeContainerJSONRequestBody = ContainerActionRequest
+
+// SaveDatabaseInstanceJSONRequestBody defines body for SaveDatabaseInstance for application/json ContentType.
+type SaveDatabaseInstanceJSONRequestBody = DatabaseInstanceInput
 
 // ChangeFirewallConfigJSONRequestBody defines body for ChangeFirewallConfig for application/json ContentType.
 type ChangeFirewallConfigJSONRequestBody = FirewallConfigPatch
@@ -1783,6 +2380,24 @@ type ChangeAccountJSONRequestBody = AccountChange
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
+	// ListAPITokens 列出 API 令牌
+	// (GET /api-tokens)
+	ListAPITokens(w http.ResponseWriter, r *http.Request, params ListAPITokensParams)
+	// CreateAPIToken 创建 API 令牌
+	// (POST /api-tokens)
+	CreateAPIToken(w http.ResponseWriter, r *http.Request, params CreateAPITokenParams)
+	// VerifyAPIToken 核验当前 API 令牌
+	// (GET /api-tokens/verify)
+	VerifyAPIToken(w http.ResponseWriter, r *http.Request)
+	// DeleteAPIToken 删除 API 令牌
+	// (DELETE /api-tokens/{id})
+	DeleteAPIToken(w http.ResponseWriter, r *http.Request, id string, params DeleteAPITokenParams)
+	// UpdateAPIToken 编辑 API 令牌
+	// (PATCH /api-tokens/{id})
+	UpdateAPIToken(w http.ResponseWriter, r *http.Request, id string, params UpdateAPITokenParams)
+	// RegenerateAPIToken 重新生成 API 令牌
+	// (POST /api-tokens/{id}/regenerate)
+	RegenerateAPIToken(w http.ResponseWriter, r *http.Request, id string, params RegenerateAPITokenParams)
 	// Login 登录
 	// (POST /auth/login)
 	Login(w http.ResponseWriter, r *http.Request)
@@ -1801,6 +2416,24 @@ type ServerInterface interface {
 	// ListContainers 读取各节点容器和 Docker 状态
 	// (GET /containers)
 	ListContainers(w http.ResponseWriter, r *http.Request, params ListContainersParams)
+	// ListDatabaseClusters 列出数据库集群
+	// (GET /databases/clusters)
+	ListDatabaseClusters(w http.ResponseWriter, r *http.Request)
+	// CreateDatabaseCluster 登记数据库集群
+	// (POST /databases/clusters)
+	CreateDatabaseCluster(w http.ResponseWriter, r *http.Request)
+	// GetDatabaseCluster 读取数据库集群
+	// (GET /databases/clusters/{id})
+	GetDatabaseCluster(w http.ResponseWriter, r *http.Request, id string)
+	// UpdateDatabaseCluster 编辑数据库集群
+	// (PATCH /databases/clusters/{id})
+	UpdateDatabaseCluster(w http.ResponseWriter, r *http.Request, id string)
+	// GetDatabaseBackups 读取数据库备份状态
+	// (GET /databases/clusters/{id}/backups)
+	GetDatabaseBackups(w http.ResponseWriter, r *http.Request, id string)
+	// ChangeDatabase 受理数据库变更
+	// (POST /databases/clusters/{id}/changes)
+	ChangeDatabase(w http.ResponseWriter, r *http.Request, id string, params ChangeDatabaseParams)
 	// ListEnrollmentTokens 读取接入码状态
 	// (GET /enrollment-tokens)
 	ListEnrollmentTokens(w http.ResponseWriter, r *http.Request)
@@ -1810,6 +2443,9 @@ type ServerInterface interface {
 	// RevokeEnrollmentToken 撤销接入码
 	// (DELETE /enrollment-tokens/{id})
 	RevokeEnrollmentToken(w http.ResponseWriter, r *http.Request, id string, params RevokeEnrollmentTokenParams)
+	// GetMonitoringCurrent 读取当前监控数据
+	// (GET /monitoring/current)
+	GetMonitoringCurrent(w http.ResponseWriter, r *http.Request, params GetMonitoringCurrentParams)
 	// GetMonitoringHistory 读取监控历史
 	// (GET /monitoring/history)
 	GetMonitoringHistory(w http.ResponseWriter, r *http.Request, params GetMonitoringHistoryParams)
@@ -1840,6 +2476,12 @@ type ServerInterface interface {
 	// GetContainerLogs 读取最近容器日志
 	// (GET /nodes/{id}/containers/{container_id}/logs)
 	GetContainerLogs(w http.ResponseWriter, r *http.Request, id string, containerId string, params GetContainerLogsParams)
+	// DiscoverDatabases 发现本机数据库实例
+	// (POST /nodes/{id}/databases/discover)
+	DiscoverDatabases(w http.ResponseWriter, r *http.Request, id string)
+	// SaveDatabaseInstance 保存本机数据库连接
+	// (PUT /nodes/{id}/databases/instances/{instance_id})
+	SaveDatabaseInstance(w http.ResponseWriter, r *http.Request, id string, instanceId string)
 	// ReadFirewall 读取 OPSD 防火墙配置及应用状态
 	// (GET /nodes/{id}/firewall)
 	ReadFirewall(w http.ResponseWriter, r *http.Request, id string)
@@ -1929,6 +2571,225 @@ type ServerInterfaceWrapper struct {
 
 type MiddlewareFunc func(http.Handler) http.Handler
 
+// ListAPITokens operation middleware
+func (siw *ServerInterfaceWrapper) ListAPITokens(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListAPITokensParams
+
+	// ------------- Optional query parameter "node_id" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "node_id", r.URL.Query(), &params.NodeId, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "node_id"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "node_id", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListAPITokens(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateAPIToken operation middleware
+func (siw *ServerInterfaceWrapper) CreateAPIToken(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params CreateAPITokenParams
+
+	// ------------- Optional query parameter "node_id" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "node_id", r.URL.Query(), &params.NodeId, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "node_id"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "node_id", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateAPIToken(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// VerifyAPIToken operation middleware
+func (siw *ServerInterfaceWrapper) VerifyAPIToken(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.VerifyAPIToken(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeleteAPIToken operation middleware
+func (siw *ServerInterfaceWrapper) DeleteAPIToken(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params DeleteAPITokenParams
+
+	// ------------- Optional query parameter "node_id" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "node_id", r.URL.Query(), &params.NodeId, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "node_id"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "node_id", Err: err})
+		}
+		return
+	}
+
+	// ------------- Required query parameter "revision" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, true, "revision", r.URL.Query(), &params.Revision, runtime.BindQueryParameterOptions{Type: "integer", Format: "int64"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "revision"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "revision", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteAPIToken(w, r, id, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdateAPIToken operation middleware
+func (siw *ServerInterfaceWrapper) UpdateAPIToken(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params UpdateAPITokenParams
+
+	// ------------- Optional query parameter "node_id" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "node_id", r.URL.Query(), &params.NodeId, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "node_id"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "node_id", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateAPIToken(w, r, id, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// RegenerateAPIToken operation middleware
+func (siw *ServerInterfaceWrapper) RegenerateAPIToken(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params RegenerateAPITokenParams
+
+	// ------------- Optional query parameter "node_id" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "node_id", r.URL.Query(), &params.NodeId, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "node_id"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "node_id", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RegenerateAPIToken(w, r, id, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // Login operation middleware
 func (siw *ServerInterfaceWrapper) Login(w http.ResponseWriter, r *http.Request) {
 
@@ -1954,7 +2815,7 @@ func (siw *ServerInterfaceWrapper) Logout(w http.ResponseWriter, r *http.Request
 
 	headers := r.Header
 
-	// ------------- Required header parameter "X-CSRF-Token" -------------
+	// ------------- Optional header parameter "X-CSRF-Token" -------------
 	if valueList, found := headers[http.CanonicalHeaderKey("X-CSRF-Token")]; found {
 		var XCSRFToken string
 		n := len(valueList)
@@ -1963,18 +2824,14 @@ func (siw *ServerInterfaceWrapper) Logout(w http.ResponseWriter, r *http.Request
 			return
 		}
 
-		err = runtime.BindStyledParameterWithOptions("simple", "X-CSRF-Token", valueList[0], &XCSRFToken, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		err = runtime.BindStyledParameterWithOptions("simple", "X-CSRF-Token", valueList[0], &XCSRFToken, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
 		if err != nil {
 			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-CSRF-Token", Err: err})
 			return
 		}
 
-		params.XCSRFToken = XCSRFToken
+		params.XCSRFToken = &XCSRFToken
 
-	} else {
-		err := fmt.Errorf("Header parameter X-CSRF-Token is required, but not found")
-		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "X-CSRF-Token", Err: err})
-		return
 	}
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -2036,7 +2893,7 @@ func (siw *ServerInterfaceWrapper) RevokeSession(w http.ResponseWriter, r *http.
 
 	headers := r.Header
 
-	// ------------- Required header parameter "X-CSRF-Token" -------------
+	// ------------- Optional header parameter "X-CSRF-Token" -------------
 	if valueList, found := headers[http.CanonicalHeaderKey("X-CSRF-Token")]; found {
 		var XCSRFToken string
 		n := len(valueList)
@@ -2045,18 +2902,14 @@ func (siw *ServerInterfaceWrapper) RevokeSession(w http.ResponseWriter, r *http.
 			return
 		}
 
-		err = runtime.BindStyledParameterWithOptions("simple", "X-CSRF-Token", valueList[0], &XCSRFToken, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		err = runtime.BindStyledParameterWithOptions("simple", "X-CSRF-Token", valueList[0], &XCSRFToken, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
 		if err != nil {
 			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-CSRF-Token", Err: err})
 			return
 		}
 
-		params.XCSRFToken = XCSRFToken
+		params.XCSRFToken = &XCSRFToken
 
-	} else {
-		err := fmt.Errorf("Header parameter X-CSRF-Token is required, but not found")
-		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "X-CSRF-Token", Err: err})
-		return
 	}
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -2129,6 +2982,166 @@ func (siw *ServerInterfaceWrapper) ListContainers(w http.ResponseWriter, r *http
 	handler.ServeHTTP(w, r)
 }
 
+// ListDatabaseClusters operation middleware
+func (siw *ServerInterfaceWrapper) ListDatabaseClusters(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListDatabaseClusters(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateDatabaseCluster operation middleware
+func (siw *ServerInterfaceWrapper) CreateDatabaseCluster(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateDatabaseCluster(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetDatabaseCluster operation middleware
+func (siw *ServerInterfaceWrapper) GetDatabaseCluster(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetDatabaseCluster(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdateDatabaseCluster operation middleware
+func (siw *ServerInterfaceWrapper) UpdateDatabaseCluster(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateDatabaseCluster(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetDatabaseBackups operation middleware
+func (siw *ServerInterfaceWrapper) GetDatabaseBackups(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetDatabaseBackups(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ChangeDatabase operation middleware
+func (siw *ServerInterfaceWrapper) ChangeDatabase(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ChangeDatabaseParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey string
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ChangeDatabase(w, r, id, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // ListEnrollmentTokens operation middleware
 func (siw *ServerInterfaceWrapper) ListEnrollmentTokens(w http.ResponseWriter, r *http.Request) {
 
@@ -2154,7 +3167,7 @@ func (siw *ServerInterfaceWrapper) CreateEnrollmentToken(w http.ResponseWriter, 
 
 	headers := r.Header
 
-	// ------------- Required header parameter "X-CSRF-Token" -------------
+	// ------------- Optional header parameter "X-CSRF-Token" -------------
 	if valueList, found := headers[http.CanonicalHeaderKey("X-CSRF-Token")]; found {
 		var XCSRFToken string
 		n := len(valueList)
@@ -2163,18 +3176,14 @@ func (siw *ServerInterfaceWrapper) CreateEnrollmentToken(w http.ResponseWriter, 
 			return
 		}
 
-		err = runtime.BindStyledParameterWithOptions("simple", "X-CSRF-Token", valueList[0], &XCSRFToken, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		err = runtime.BindStyledParameterWithOptions("simple", "X-CSRF-Token", valueList[0], &XCSRFToken, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
 		if err != nil {
 			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-CSRF-Token", Err: err})
 			return
 		}
 
-		params.XCSRFToken = XCSRFToken
+		params.XCSRFToken = &XCSRFToken
 
-	} else {
-		err := fmt.Errorf("Header parameter X-CSRF-Token is required, but not found")
-		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "X-CSRF-Token", Err: err})
-		return
 	}
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -2208,7 +3217,7 @@ func (siw *ServerInterfaceWrapper) RevokeEnrollmentToken(w http.ResponseWriter, 
 
 	headers := r.Header
 
-	// ------------- Required header parameter "X-CSRF-Token" -------------
+	// ------------- Optional header parameter "X-CSRF-Token" -------------
 	if valueList, found := headers[http.CanonicalHeaderKey("X-CSRF-Token")]; found {
 		var XCSRFToken string
 		n := len(valueList)
@@ -2217,22 +3226,51 @@ func (siw *ServerInterfaceWrapper) RevokeEnrollmentToken(w http.ResponseWriter, 
 			return
 		}
 
-		err = runtime.BindStyledParameterWithOptions("simple", "X-CSRF-Token", valueList[0], &XCSRFToken, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		err = runtime.BindStyledParameterWithOptions("simple", "X-CSRF-Token", valueList[0], &XCSRFToken, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
 		if err != nil {
 			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-CSRF-Token", Err: err})
 			return
 		}
 
-		params.XCSRFToken = XCSRFToken
+		params.XCSRFToken = &XCSRFToken
 
-	} else {
-		err := fmt.Errorf("Header parameter X-CSRF-Token is required, but not found")
-		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "X-CSRF-Token", Err: err})
-		return
 	}
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.RevokeEnrollmentToken(w, r, id, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetMonitoringCurrent operation middleware
+func (siw *ServerInterfaceWrapper) GetMonitoringCurrent(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetMonitoringCurrentParams
+
+	// ------------- Optional query parameter "node_id" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "node_id", r.URL.Query(), &params.NodeId, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "node_id"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "node_id", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetMonitoringCurrent(w, r, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -2273,6 +3311,58 @@ func (siw *ServerInterfaceWrapper) GetMonitoringHistory(w http.ResponseWriter, r
 			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "node_id"})
 		} else {
 			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "node_id", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "node_ids" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "node_ids", r.URL.Query(), &params.NodeIds, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "node_ids"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "node_ids", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "from" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "from", r.URL.Query(), &params.From, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "from"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "from", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "to" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "to", r.URL.Query(), &params.To, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "to"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "to", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "group_by" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "group_by", r.URL.Query(), &params.GroupBy, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "group_by"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "group_by", Err: err})
 		}
 		return
 	}
@@ -2348,7 +3438,7 @@ func (siw *ServerInterfaceWrapper) RenameNode(w http.ResponseWriter, r *http.Req
 
 	headers := r.Header
 
-	// ------------- Required header parameter "X-CSRF-Token" -------------
+	// ------------- Optional header parameter "X-CSRF-Token" -------------
 	if valueList, found := headers[http.CanonicalHeaderKey("X-CSRF-Token")]; found {
 		var XCSRFToken string
 		n := len(valueList)
@@ -2357,18 +3447,14 @@ func (siw *ServerInterfaceWrapper) RenameNode(w http.ResponseWriter, r *http.Req
 			return
 		}
 
-		err = runtime.BindStyledParameterWithOptions("simple", "X-CSRF-Token", valueList[0], &XCSRFToken, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		err = runtime.BindStyledParameterWithOptions("simple", "X-CSRF-Token", valueList[0], &XCSRFToken, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
 		if err != nil {
 			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-CSRF-Token", Err: err})
 			return
 		}
 
-		params.XCSRFToken = XCSRFToken
+		params.XCSRFToken = &XCSRFToken
 
-	} else {
-		err := fmt.Errorf("Header parameter X-CSRF-Token is required, but not found")
-		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "X-CSRF-Token", Err: err})
-		return
 	}
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -2428,7 +3514,7 @@ func (siw *ServerInterfaceWrapper) ChangeNodeAccount(w http.ResponseWriter, r *h
 
 	headers := r.Header
 
-	// ------------- Required header parameter "X-CSRF-Token" -------------
+	// ------------- Optional header parameter "X-CSRF-Token" -------------
 	if valueList, found := headers[http.CanonicalHeaderKey("X-CSRF-Token")]; found {
 		var XCSRFToken string
 		n := len(valueList)
@@ -2437,18 +3523,14 @@ func (siw *ServerInterfaceWrapper) ChangeNodeAccount(w http.ResponseWriter, r *h
 			return
 		}
 
-		err = runtime.BindStyledParameterWithOptions("simple", "X-CSRF-Token", valueList[0], &XCSRFToken, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		err = runtime.BindStyledParameterWithOptions("simple", "X-CSRF-Token", valueList[0], &XCSRFToken, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
 		if err != nil {
 			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-CSRF-Token", Err: err})
 			return
 		}
 
-		params.XCSRFToken = XCSRFToken
+		params.XCSRFToken = &XCSRFToken
 
-	} else {
-		err := fmt.Errorf("Header parameter X-CSRF-Token is required, but not found")
-		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "X-CSRF-Token", Err: err})
-		return
 	}
 
 	// ------------- Required header parameter "Idempotency-Key" -------------
@@ -2505,7 +3587,7 @@ func (siw *ServerInterfaceWrapper) RevealNodePassword(w http.ResponseWriter, r *
 
 	headers := r.Header
 
-	// ------------- Required header parameter "X-CSRF-Token" -------------
+	// ------------- Optional header parameter "X-CSRF-Token" -------------
 	if valueList, found := headers[http.CanonicalHeaderKey("X-CSRF-Token")]; found {
 		var XCSRFToken string
 		n := len(valueList)
@@ -2514,18 +3596,14 @@ func (siw *ServerInterfaceWrapper) RevealNodePassword(w http.ResponseWriter, r *
 			return
 		}
 
-		err = runtime.BindStyledParameterWithOptions("simple", "X-CSRF-Token", valueList[0], &XCSRFToken, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		err = runtime.BindStyledParameterWithOptions("simple", "X-CSRF-Token", valueList[0], &XCSRFToken, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
 		if err != nil {
 			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-CSRF-Token", Err: err})
 			return
 		}
 
-		params.XCSRFToken = XCSRFToken
+		params.XCSRFToken = &XCSRFToken
 
-	} else {
-		err := fmt.Errorf("Header parameter X-CSRF-Token is required, but not found")
-		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "X-CSRF-Token", Err: err})
-		return
 	}
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -2619,7 +3697,7 @@ func (siw *ServerInterfaceWrapper) ChangeContainer(w http.ResponseWriter, r *htt
 
 	headers := r.Header
 
-	// ------------- Required header parameter "X-CSRF-Token" -------------
+	// ------------- Optional header parameter "X-CSRF-Token" -------------
 	if valueList, found := headers[http.CanonicalHeaderKey("X-CSRF-Token")]; found {
 		var XCSRFToken string
 		n := len(valueList)
@@ -2628,18 +3706,14 @@ func (siw *ServerInterfaceWrapper) ChangeContainer(w http.ResponseWriter, r *htt
 			return
 		}
 
-		err = runtime.BindStyledParameterWithOptions("simple", "X-CSRF-Token", valueList[0], &XCSRFToken, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		err = runtime.BindStyledParameterWithOptions("simple", "X-CSRF-Token", valueList[0], &XCSRFToken, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
 		if err != nil {
 			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-CSRF-Token", Err: err})
 			return
 		}
 
-		params.XCSRFToken = XCSRFToken
+		params.XCSRFToken = &XCSRFToken
 
-	} else {
-		err := fmt.Errorf("Header parameter X-CSRF-Token is required, but not found")
-		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "X-CSRF-Token", Err: err})
-		return
 	}
 
 	// ------------- Required header parameter "Idempotency-Key" -------------
@@ -2740,6 +3814,67 @@ func (siw *ServerInterfaceWrapper) GetContainerLogs(w http.ResponseWriter, r *ht
 	handler.ServeHTTP(w, r)
 }
 
+// DiscoverDatabases operation middleware
+func (siw *ServerInterfaceWrapper) DiscoverDatabases(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DiscoverDatabases(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// SaveDatabaseInstance operation middleware
+func (siw *ServerInterfaceWrapper) SaveDatabaseInstance(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "instance_id" -------------
+	var instanceId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "instance_id", r.PathValue("instance_id"), &instanceId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "instance_id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.SaveDatabaseInstance(w, r, id, instanceId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // ReadFirewall operation middleware
 func (siw *ServerInterfaceWrapper) ReadFirewall(w http.ResponseWriter, r *http.Request) {
 
@@ -2786,7 +3921,7 @@ func (siw *ServerInterfaceWrapper) ChangeFirewallConfig(w http.ResponseWriter, r
 
 	headers := r.Header
 
-	// ------------- Required header parameter "X-CSRF-Token" -------------
+	// ------------- Optional header parameter "X-CSRF-Token" -------------
 	if valueList, found := headers[http.CanonicalHeaderKey("X-CSRF-Token")]; found {
 		var XCSRFToken string
 		n := len(valueList)
@@ -2795,18 +3930,14 @@ func (siw *ServerInterfaceWrapper) ChangeFirewallConfig(w http.ResponseWriter, r
 			return
 		}
 
-		err = runtime.BindStyledParameterWithOptions("simple", "X-CSRF-Token", valueList[0], &XCSRFToken, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		err = runtime.BindStyledParameterWithOptions("simple", "X-CSRF-Token", valueList[0], &XCSRFToken, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
 		if err != nil {
 			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-CSRF-Token", Err: err})
 			return
 		}
 
-		params.XCSRFToken = XCSRFToken
+		params.XCSRFToken = &XCSRFToken
 
-	} else {
-		err := fmt.Errorf("Header parameter X-CSRF-Token is required, but not found")
-		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "X-CSRF-Token", Err: err})
-		return
 	}
 
 	// ------------- Required header parameter "Idempotency-Key" -------------
@@ -2863,7 +3994,7 @@ func (siw *ServerInterfaceWrapper) InstallFirewall(w http.ResponseWriter, r *htt
 
 	headers := r.Header
 
-	// ------------- Required header parameter "X-CSRF-Token" -------------
+	// ------------- Optional header parameter "X-CSRF-Token" -------------
 	if valueList, found := headers[http.CanonicalHeaderKey("X-CSRF-Token")]; found {
 		var XCSRFToken string
 		n := len(valueList)
@@ -2872,18 +4003,14 @@ func (siw *ServerInterfaceWrapper) InstallFirewall(w http.ResponseWriter, r *htt
 			return
 		}
 
-		err = runtime.BindStyledParameterWithOptions("simple", "X-CSRF-Token", valueList[0], &XCSRFToken, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		err = runtime.BindStyledParameterWithOptions("simple", "X-CSRF-Token", valueList[0], &XCSRFToken, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
 		if err != nil {
 			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-CSRF-Token", Err: err})
 			return
 		}
 
-		params.XCSRFToken = XCSRFToken
+		params.XCSRFToken = &XCSRFToken
 
-	} else {
-		err := fmt.Errorf("Header parameter X-CSRF-Token is required, but not found")
-		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "X-CSRF-Token", Err: err})
-		return
 	}
 
 	// ------------- Required header parameter "Idempotency-Key" -------------
@@ -2966,7 +4093,7 @@ func (siw *ServerInterfaceWrapper) SyncFirewallConfig(w http.ResponseWriter, r *
 
 	headers := r.Header
 
-	// ------------- Required header parameter "X-CSRF-Token" -------------
+	// ------------- Optional header parameter "X-CSRF-Token" -------------
 	if valueList, found := headers[http.CanonicalHeaderKey("X-CSRF-Token")]; found {
 		var XCSRFToken string
 		n := len(valueList)
@@ -2975,18 +4102,14 @@ func (siw *ServerInterfaceWrapper) SyncFirewallConfig(w http.ResponseWriter, r *
 			return
 		}
 
-		err = runtime.BindStyledParameterWithOptions("simple", "X-CSRF-Token", valueList[0], &XCSRFToken, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		err = runtime.BindStyledParameterWithOptions("simple", "X-CSRF-Token", valueList[0], &XCSRFToken, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
 		if err != nil {
 			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-CSRF-Token", Err: err})
 			return
 		}
 
-		params.XCSRFToken = XCSRFToken
+		params.XCSRFToken = &XCSRFToken
 
-	} else {
-		err := fmt.Errorf("Header parameter X-CSRF-Token is required, but not found")
-		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "X-CSRF-Token", Err: err})
-		return
 	}
 
 	// ------------- Required header parameter "Idempotency-Key" -------------
@@ -3069,7 +4192,7 @@ func (siw *ServerInterfaceWrapper) ChangePublicAddresses(w http.ResponseWriter, 
 
 	headers := r.Header
 
-	// ------------- Required header parameter "X-CSRF-Token" -------------
+	// ------------- Optional header parameter "X-CSRF-Token" -------------
 	if valueList, found := headers[http.CanonicalHeaderKey("X-CSRF-Token")]; found {
 		var XCSRFToken string
 		n := len(valueList)
@@ -3078,18 +4201,14 @@ func (siw *ServerInterfaceWrapper) ChangePublicAddresses(w http.ResponseWriter, 
 			return
 		}
 
-		err = runtime.BindStyledParameterWithOptions("simple", "X-CSRF-Token", valueList[0], &XCSRFToken, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		err = runtime.BindStyledParameterWithOptions("simple", "X-CSRF-Token", valueList[0], &XCSRFToken, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
 		if err != nil {
 			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-CSRF-Token", Err: err})
 			return
 		}
 
-		params.XCSRFToken = XCSRFToken
+		params.XCSRFToken = &XCSRFToken
 
-	} else {
-		err := fmt.Errorf("Header parameter X-CSRF-Token is required, but not found")
-		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "X-CSRF-Token", Err: err})
-		return
 	}
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -3123,7 +4242,7 @@ func (siw *ServerInterfaceWrapper) RefreshPublicAddresses(w http.ResponseWriter,
 
 	headers := r.Header
 
-	// ------------- Required header parameter "X-CSRF-Token" -------------
+	// ------------- Optional header parameter "X-CSRF-Token" -------------
 	if valueList, found := headers[http.CanonicalHeaderKey("X-CSRF-Token")]; found {
 		var XCSRFToken string
 		n := len(valueList)
@@ -3132,18 +4251,14 @@ func (siw *ServerInterfaceWrapper) RefreshPublicAddresses(w http.ResponseWriter,
 			return
 		}
 
-		err = runtime.BindStyledParameterWithOptions("simple", "X-CSRF-Token", valueList[0], &XCSRFToken, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		err = runtime.BindStyledParameterWithOptions("simple", "X-CSRF-Token", valueList[0], &XCSRFToken, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
 		if err != nil {
 			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-CSRF-Token", Err: err})
 			return
 		}
 
-		params.XCSRFToken = XCSRFToken
+		params.XCSRFToken = &XCSRFToken
 
-	} else {
-		err := fmt.Errorf("Header parameter X-CSRF-Token is required, but not found")
-		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "X-CSRF-Token", Err: err})
-		return
 	}
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -3177,7 +4292,7 @@ func (siw *ServerInterfaceWrapper) RevokeNode(w http.ResponseWriter, r *http.Req
 
 	headers := r.Header
 
-	// ------------- Required header parameter "X-CSRF-Token" -------------
+	// ------------- Optional header parameter "X-CSRF-Token" -------------
 	if valueList, found := headers[http.CanonicalHeaderKey("X-CSRF-Token")]; found {
 		var XCSRFToken string
 		n := len(valueList)
@@ -3186,18 +4301,14 @@ func (siw *ServerInterfaceWrapper) RevokeNode(w http.ResponseWriter, r *http.Req
 			return
 		}
 
-		err = runtime.BindStyledParameterWithOptions("simple", "X-CSRF-Token", valueList[0], &XCSRFToken, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		err = runtime.BindStyledParameterWithOptions("simple", "X-CSRF-Token", valueList[0], &XCSRFToken, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
 		if err != nil {
 			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-CSRF-Token", Err: err})
 			return
 		}
 
-		params.XCSRFToken = XCSRFToken
+		params.XCSRFToken = &XCSRFToken
 
-	} else {
-		err := fmt.Errorf("Header parameter X-CSRF-Token is required, but not found")
-		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "X-CSRF-Token", Err: err})
-		return
 	}
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -3257,7 +4368,7 @@ func (siw *ServerInterfaceWrapper) ChangeNodeSettings(w http.ResponseWriter, r *
 
 	headers := r.Header
 
-	// ------------- Required header parameter "X-CSRF-Token" -------------
+	// ------------- Optional header parameter "X-CSRF-Token" -------------
 	if valueList, found := headers[http.CanonicalHeaderKey("X-CSRF-Token")]; found {
 		var XCSRFToken string
 		n := len(valueList)
@@ -3266,18 +4377,14 @@ func (siw *ServerInterfaceWrapper) ChangeNodeSettings(w http.ResponseWriter, r *
 			return
 		}
 
-		err = runtime.BindStyledParameterWithOptions("simple", "X-CSRF-Token", valueList[0], &XCSRFToken, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		err = runtime.BindStyledParameterWithOptions("simple", "X-CSRF-Token", valueList[0], &XCSRFToken, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
 		if err != nil {
 			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-CSRF-Token", Err: err})
 			return
 		}
 
-		params.XCSRFToken = XCSRFToken
+		params.XCSRFToken = &XCSRFToken
 
-	} else {
-		err := fmt.Errorf("Header parameter X-CSRF-Token is required, but not found")
-		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "X-CSRF-Token", Err: err})
-		return
 	}
 
 	// ------------- Required header parameter "Idempotency-Key" -------------
@@ -3530,7 +4637,7 @@ func (siw *ServerInterfaceWrapper) CancelOperation(w http.ResponseWriter, r *htt
 
 	headers := r.Header
 
-	// ------------- Required header parameter "X-CSRF-Token" -------------
+	// ------------- Optional header parameter "X-CSRF-Token" -------------
 	if valueList, found := headers[http.CanonicalHeaderKey("X-CSRF-Token")]; found {
 		var XCSRFToken string
 		n := len(valueList)
@@ -3539,18 +4646,14 @@ func (siw *ServerInterfaceWrapper) CancelOperation(w http.ResponseWriter, r *htt
 			return
 		}
 
-		err = runtime.BindStyledParameterWithOptions("simple", "X-CSRF-Token", valueList[0], &XCSRFToken, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		err = runtime.BindStyledParameterWithOptions("simple", "X-CSRF-Token", valueList[0], &XCSRFToken, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
 		if err != nil {
 			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-CSRF-Token", Err: err})
 			return
 		}
 
-		params.XCSRFToken = XCSRFToken
+		params.XCSRFToken = &XCSRFToken
 
-	} else {
-		err := fmt.Errorf("Header parameter X-CSRF-Token is required, but not found")
-		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "X-CSRF-Token", Err: err})
-		return
 	}
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -3584,7 +4687,7 @@ func (siw *ServerInterfaceWrapper) ConfirmOperation(w http.ResponseWriter, r *ht
 
 	headers := r.Header
 
-	// ------------- Required header parameter "X-CSRF-Token" -------------
+	// ------------- Optional header parameter "X-CSRF-Token" -------------
 	if valueList, found := headers[http.CanonicalHeaderKey("X-CSRF-Token")]; found {
 		var XCSRFToken string
 		n := len(valueList)
@@ -3593,18 +4696,14 @@ func (siw *ServerInterfaceWrapper) ConfirmOperation(w http.ResponseWriter, r *ht
 			return
 		}
 
-		err = runtime.BindStyledParameterWithOptions("simple", "X-CSRF-Token", valueList[0], &XCSRFToken, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		err = runtime.BindStyledParameterWithOptions("simple", "X-CSRF-Token", valueList[0], &XCSRFToken, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
 		if err != nil {
 			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-CSRF-Token", Err: err})
 			return
 		}
 
-		params.XCSRFToken = XCSRFToken
+		params.XCSRFToken = &XCSRFToken
 
-	} else {
-		err := fmt.Errorf("Header parameter X-CSRF-Token is required, but not found")
-		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "X-CSRF-Token", Err: err})
-		return
 	}
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -3638,7 +4737,7 @@ func (siw *ServerInterfaceWrapper) RecoverOperation(w http.ResponseWriter, r *ht
 
 	headers := r.Header
 
-	// ------------- Required header parameter "X-CSRF-Token" -------------
+	// ------------- Optional header parameter "X-CSRF-Token" -------------
 	if valueList, found := headers[http.CanonicalHeaderKey("X-CSRF-Token")]; found {
 		var XCSRFToken string
 		n := len(valueList)
@@ -3647,18 +4746,14 @@ func (siw *ServerInterfaceWrapper) RecoverOperation(w http.ResponseWriter, r *ht
 			return
 		}
 
-		err = runtime.BindStyledParameterWithOptions("simple", "X-CSRF-Token", valueList[0], &XCSRFToken, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		err = runtime.BindStyledParameterWithOptions("simple", "X-CSRF-Token", valueList[0], &XCSRFToken, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
 		if err != nil {
 			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-CSRF-Token", Err: err})
 			return
 		}
 
-		params.XCSRFToken = XCSRFToken
+		params.XCSRFToken = &XCSRFToken
 
-	} else {
-		err := fmt.Errorf("Header parameter X-CSRF-Token is required, but not found")
-		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "X-CSRF-Token", Err: err})
-		return
 	}
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -3692,7 +4787,7 @@ func (siw *ServerInterfaceWrapper) ResolveOperation(w http.ResponseWriter, r *ht
 
 	headers := r.Header
 
-	// ------------- Required header parameter "X-CSRF-Token" -------------
+	// ------------- Optional header parameter "X-CSRF-Token" -------------
 	if valueList, found := headers[http.CanonicalHeaderKey("X-CSRF-Token")]; found {
 		var XCSRFToken string
 		n := len(valueList)
@@ -3701,18 +4796,14 @@ func (siw *ServerInterfaceWrapper) ResolveOperation(w http.ResponseWriter, r *ht
 			return
 		}
 
-		err = runtime.BindStyledParameterWithOptions("simple", "X-CSRF-Token", valueList[0], &XCSRFToken, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		err = runtime.BindStyledParameterWithOptions("simple", "X-CSRF-Token", valueList[0], &XCSRFToken, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
 		if err != nil {
 			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-CSRF-Token", Err: err})
 			return
 		}
 
-		params.XCSRFToken = XCSRFToken
+		params.XCSRFToken = &XCSRFToken
 
-	} else {
-		err := fmt.Errorf("Header parameter X-CSRF-Token is required, but not found")
-		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "X-CSRF-Token", Err: err})
-		return
 	}
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -3765,7 +4856,7 @@ func (siw *ServerInterfaceWrapper) ChangePeerTrust(w http.ResponseWriter, r *htt
 
 	headers := r.Header
 
-	// ------------- Required header parameter "X-CSRF-Token" -------------
+	// ------------- Optional header parameter "X-CSRF-Token" -------------
 	if valueList, found := headers[http.CanonicalHeaderKey("X-CSRF-Token")]; found {
 		var XCSRFToken string
 		n := len(valueList)
@@ -3774,18 +4865,14 @@ func (siw *ServerInterfaceWrapper) ChangePeerTrust(w http.ResponseWriter, r *htt
 			return
 		}
 
-		err = runtime.BindStyledParameterWithOptions("simple", "X-CSRF-Token", valueList[0], &XCSRFToken, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		err = runtime.BindStyledParameterWithOptions("simple", "X-CSRF-Token", valueList[0], &XCSRFToken, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
 		if err != nil {
 			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-CSRF-Token", Err: err})
 			return
 		}
 
-		params.XCSRFToken = XCSRFToken
+		params.XCSRFToken = &XCSRFToken
 
-	} else {
-		err := fmt.Errorf("Header parameter X-CSRF-Token is required, but not found")
-		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "X-CSRF-Token", Err: err})
-		return
 	}
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -3838,7 +4925,7 @@ func (siw *ServerInterfaceWrapper) ChangeAccount(w http.ResponseWriter, r *http.
 
 	headers := r.Header
 
-	// ------------- Required header parameter "X-CSRF-Token" -------------
+	// ------------- Optional header parameter "X-CSRF-Token" -------------
 	if valueList, found := headers[http.CanonicalHeaderKey("X-CSRF-Token")]; found {
 		var XCSRFToken string
 		n := len(valueList)
@@ -3847,18 +4934,14 @@ func (siw *ServerInterfaceWrapper) ChangeAccount(w http.ResponseWriter, r *http.
 			return
 		}
 
-		err = runtime.BindStyledParameterWithOptions("simple", "X-CSRF-Token", valueList[0], &XCSRFToken, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		err = runtime.BindStyledParameterWithOptions("simple", "X-CSRF-Token", valueList[0], &XCSRFToken, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
 		if err != nil {
 			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-CSRF-Token", Err: err})
 			return
 		}
 
-		params.XCSRFToken = XCSRFToken
+		params.XCSRFToken = &XCSRFToken
 
-	} else {
-		err := fmt.Errorf("Header parameter X-CSRF-Token is required, but not found")
-		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "X-CSRF-Token", Err: err})
-		return
 	}
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -4006,15 +5089,28 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 		ErrorHandlerFunc:   options.ErrorHandlerFunc,
 	}
 
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api-tokens", wrapper.ListAPITokens)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api-tokens", wrapper.CreateAPIToken)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api-tokens/verify", wrapper.VerifyAPIToken)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api-tokens/{id}", wrapper.DeleteAPIToken)
+	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/api-tokens/{id}", wrapper.UpdateAPIToken)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api-tokens/{id}/regenerate", wrapper.RegenerateAPIToken)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/auth/login", wrapper.Login)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/auth/session", wrapper.Logout)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/auth/session", wrapper.GetSession)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/auth/sessions", wrapper.ListSessions)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/auth/sessions/{id}", wrapper.RevokeSession)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/containers", wrapper.ListContainers)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/databases/clusters", wrapper.ListDatabaseClusters)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/databases/clusters", wrapper.CreateDatabaseCluster)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/databases/clusters/{id}", wrapper.GetDatabaseCluster)
+	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/databases/clusters/{id}", wrapper.UpdateDatabaseCluster)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/databases/clusters/{id}/backups", wrapper.GetDatabaseBackups)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/databases/clusters/{id}/changes", wrapper.ChangeDatabase)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/enrollment-tokens", wrapper.ListEnrollmentTokens)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/enrollment-tokens", wrapper.CreateEnrollmentToken)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/enrollment-tokens/{id}", wrapper.RevokeEnrollmentToken)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/monitoring/current", wrapper.GetMonitoringCurrent)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/monitoring/history", wrapper.GetMonitoringHistory)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/nodes", wrapper.ListNodes)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/nodes/{id}", wrapper.GetNode)
@@ -4025,6 +5121,8 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/nodes/{id}/containers/{container_id}", wrapper.GetContainer)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/nodes/{id}/containers/{container_id}/actions", wrapper.ChangeContainer)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/nodes/{id}/containers/{container_id}/logs", wrapper.GetContainerLogs)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/nodes/{id}/databases/discover", wrapper.DiscoverDatabases)
+	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/nodes/{id}/databases/instances/{instance_id}", wrapper.SaveDatabaseInstance)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/nodes/{id}/firewall", wrapper.ReadFirewall)
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/nodes/{id}/firewall", wrapper.ChangeFirewallConfig)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/nodes/{id}/firewall/install", wrapper.InstallFirewall)
@@ -4068,6 +5166,557 @@ type NotFoundJSONResponse APIError
 type UnauthorizedJSONResponse APIError
 
 type UnavailableJSONResponse APIError
+
+type ListAPITokensRequestObject struct {
+	Params ListAPITokensParams
+}
+
+type ListAPITokensResponseObject interface {
+	VisitListAPITokensResponse(w http.ResponseWriter) error
+}
+
+type ListAPITokens200JSONResponse APITokenList
+
+func (response ListAPITokens200JSONResponse) VisitListAPITokensResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListAPITokens401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response ListAPITokens401JSONResponse) VisitListAPITokensResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListAPITokens403JSONResponse struct{ ForbiddenJSONResponse }
+
+func (response ListAPITokens403JSONResponse) VisitListAPITokensResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListAPITokens409JSONResponse struct{ ConflictJSONResponse }
+
+func (response ListAPITokens409JSONResponse) VisitListAPITokensResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListAPITokens422JSONResponse struct{ InvalidRequestJSONResponse }
+
+func (response ListAPITokens422JSONResponse) VisitListAPITokensResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListAPITokens503JSONResponse struct{ UnavailableJSONResponse }
+
+func (response ListAPITokens503JSONResponse) VisitListAPITokensResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(503)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateAPITokenRequestObject struct {
+	Params CreateAPITokenParams
+	Body   *CreateAPITokenJSONRequestBody
+}
+
+type CreateAPITokenResponseObject interface {
+	VisitCreateAPITokenResponse(w http.ResponseWriter) error
+}
+
+type CreateAPIToken201JSONResponse APITokenCreated
+
+func (response CreateAPIToken201JSONResponse) VisitCreateAPITokenResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateAPIToken401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response CreateAPIToken401JSONResponse) VisitCreateAPITokenResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateAPIToken403JSONResponse struct{ ForbiddenJSONResponse }
+
+func (response CreateAPIToken403JSONResponse) VisitCreateAPITokenResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateAPIToken409JSONResponse struct{ ConflictJSONResponse }
+
+func (response CreateAPIToken409JSONResponse) VisitCreateAPITokenResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateAPIToken422JSONResponse struct{ InvalidRequestJSONResponse }
+
+func (response CreateAPIToken422JSONResponse) VisitCreateAPITokenResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateAPIToken503JSONResponse struct{ UnavailableJSONResponse }
+
+func (response CreateAPIToken503JSONResponse) VisitCreateAPITokenResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(503)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type VerifyAPITokenRequestObject struct {
+}
+
+type VerifyAPITokenResponseObject interface {
+	VisitVerifyAPITokenResponse(w http.ResponseWriter) error
+}
+
+type VerifyAPIToken200JSONResponse APIToken
+
+func (response VerifyAPIToken200JSONResponse) VisitVerifyAPITokenResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type VerifyAPIToken401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response VerifyAPIToken401JSONResponse) VisitVerifyAPITokenResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type VerifyAPIToken403JSONResponse struct{ ForbiddenJSONResponse }
+
+func (response VerifyAPIToken403JSONResponse) VisitVerifyAPITokenResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type VerifyAPIToken409JSONResponse struct{ ConflictJSONResponse }
+
+func (response VerifyAPIToken409JSONResponse) VisitVerifyAPITokenResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type VerifyAPIToken422JSONResponse struct{ InvalidRequestJSONResponse }
+
+func (response VerifyAPIToken422JSONResponse) VisitVerifyAPITokenResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type VerifyAPIToken503JSONResponse struct{ UnavailableJSONResponse }
+
+func (response VerifyAPIToken503JSONResponse) VisitVerifyAPITokenResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(503)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteAPITokenRequestObject struct {
+	Id     string `json:"id"`
+	Params DeleteAPITokenParams
+}
+
+type DeleteAPITokenResponseObject interface {
+	VisitDeleteAPITokenResponse(w http.ResponseWriter) error
+}
+
+type DeleteAPIToken204Response struct {
+}
+
+func (response DeleteAPIToken204Response) VisitDeleteAPITokenResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type DeleteAPIToken401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response DeleteAPIToken401JSONResponse) VisitDeleteAPITokenResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteAPIToken403JSONResponse struct{ ForbiddenJSONResponse }
+
+func (response DeleteAPIToken403JSONResponse) VisitDeleteAPITokenResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteAPIToken409JSONResponse struct{ ConflictJSONResponse }
+
+func (response DeleteAPIToken409JSONResponse) VisitDeleteAPITokenResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteAPIToken422JSONResponse struct{ InvalidRequestJSONResponse }
+
+func (response DeleteAPIToken422JSONResponse) VisitDeleteAPITokenResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteAPIToken503JSONResponse struct{ UnavailableJSONResponse }
+
+func (response DeleteAPIToken503JSONResponse) VisitDeleteAPITokenResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(503)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateAPITokenRequestObject struct {
+	Id     string `json:"id"`
+	Params UpdateAPITokenParams
+	Body   *UpdateAPITokenJSONRequestBody
+}
+
+type UpdateAPITokenResponseObject interface {
+	VisitUpdateAPITokenResponse(w http.ResponseWriter) error
+}
+
+type UpdateAPIToken200JSONResponse APIToken
+
+func (response UpdateAPIToken200JSONResponse) VisitUpdateAPITokenResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateAPIToken401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response UpdateAPIToken401JSONResponse) VisitUpdateAPITokenResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateAPIToken403JSONResponse struct{ ForbiddenJSONResponse }
+
+func (response UpdateAPIToken403JSONResponse) VisitUpdateAPITokenResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateAPIToken409JSONResponse struct{ ConflictJSONResponse }
+
+func (response UpdateAPIToken409JSONResponse) VisitUpdateAPITokenResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateAPIToken422JSONResponse struct{ InvalidRequestJSONResponse }
+
+func (response UpdateAPIToken422JSONResponse) VisitUpdateAPITokenResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateAPIToken503JSONResponse struct{ UnavailableJSONResponse }
+
+func (response UpdateAPIToken503JSONResponse) VisitUpdateAPITokenResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(503)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RegenerateAPITokenRequestObject struct {
+	Id     string `json:"id"`
+	Params RegenerateAPITokenParams
+	Body   *RegenerateAPITokenJSONRequestBody
+}
+
+type RegenerateAPITokenResponseObject interface {
+	VisitRegenerateAPITokenResponse(w http.ResponseWriter) error
+}
+
+type RegenerateAPIToken200JSONResponse APITokenCreated
+
+func (response RegenerateAPIToken200JSONResponse) VisitRegenerateAPITokenResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RegenerateAPIToken401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response RegenerateAPIToken401JSONResponse) VisitRegenerateAPITokenResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RegenerateAPIToken403JSONResponse struct{ ForbiddenJSONResponse }
+
+func (response RegenerateAPIToken403JSONResponse) VisitRegenerateAPITokenResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RegenerateAPIToken409JSONResponse struct{ ConflictJSONResponse }
+
+func (response RegenerateAPIToken409JSONResponse) VisitRegenerateAPITokenResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RegenerateAPIToken422JSONResponse struct{ InvalidRequestJSONResponse }
+
+func (response RegenerateAPIToken422JSONResponse) VisitRegenerateAPITokenResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RegenerateAPIToken503JSONResponse struct{ UnavailableJSONResponse }
+
+func (response RegenerateAPIToken503JSONResponse) VisitRegenerateAPITokenResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(503)
+	_, err := buf.WriteTo(w)
+	return err
+}
 
 type LoginRequestObject struct {
 	Body *LoginJSONRequestBody
@@ -4790,6 +6439,644 @@ func (response ListContainers503JSONResponse) VisitListContainersResponse(w http
 	return err
 }
 
+type ListDatabaseClustersRequestObject struct {
+}
+
+type ListDatabaseClustersResponseObject interface {
+	VisitListDatabaseClustersResponse(w http.ResponseWriter) error
+}
+
+type ListDatabaseClusters200JSONResponse ManagedDatabaseList
+
+func (response ListDatabaseClusters200JSONResponse) VisitListDatabaseClustersResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListDatabaseClusters401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response ListDatabaseClusters401JSONResponse) VisitListDatabaseClustersResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListDatabaseClusters403JSONResponse struct{ ForbiddenJSONResponse }
+
+func (response ListDatabaseClusters403JSONResponse) VisitListDatabaseClustersResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListDatabaseClusters404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response ListDatabaseClusters404JSONResponse) VisitListDatabaseClustersResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListDatabaseClusters409JSONResponse struct{ ConflictJSONResponse }
+
+func (response ListDatabaseClusters409JSONResponse) VisitListDatabaseClustersResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListDatabaseClusters422JSONResponse struct{ InvalidRequestJSONResponse }
+
+func (response ListDatabaseClusters422JSONResponse) VisitListDatabaseClustersResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListDatabaseClusters503JSONResponse struct{ UnavailableJSONResponse }
+
+func (response ListDatabaseClusters503JSONResponse) VisitListDatabaseClustersResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(503)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateDatabaseClusterRequestObject struct {
+	Body *CreateDatabaseClusterJSONRequestBody
+}
+
+type CreateDatabaseClusterResponseObject interface {
+	VisitCreateDatabaseClusterResponse(w http.ResponseWriter) error
+}
+
+type CreateDatabaseCluster201JSONResponse ManagedDatabaseCluster
+
+func (response CreateDatabaseCluster201JSONResponse) VisitCreateDatabaseClusterResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateDatabaseCluster401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response CreateDatabaseCluster401JSONResponse) VisitCreateDatabaseClusterResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateDatabaseCluster403JSONResponse struct{ ForbiddenJSONResponse }
+
+func (response CreateDatabaseCluster403JSONResponse) VisitCreateDatabaseClusterResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateDatabaseCluster404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response CreateDatabaseCluster404JSONResponse) VisitCreateDatabaseClusterResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateDatabaseCluster409JSONResponse struct{ ConflictJSONResponse }
+
+func (response CreateDatabaseCluster409JSONResponse) VisitCreateDatabaseClusterResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateDatabaseCluster422JSONResponse struct{ InvalidRequestJSONResponse }
+
+func (response CreateDatabaseCluster422JSONResponse) VisitCreateDatabaseClusterResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateDatabaseCluster503JSONResponse struct{ UnavailableJSONResponse }
+
+func (response CreateDatabaseCluster503JSONResponse) VisitCreateDatabaseClusterResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(503)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetDatabaseClusterRequestObject struct {
+	Id string `json:"id"`
+}
+
+type GetDatabaseClusterResponseObject interface {
+	VisitGetDatabaseClusterResponse(w http.ResponseWriter) error
+}
+
+type GetDatabaseCluster200JSONResponse ManagedDatabaseStatus
+
+func (response GetDatabaseCluster200JSONResponse) VisitGetDatabaseClusterResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetDatabaseCluster401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response GetDatabaseCluster401JSONResponse) VisitGetDatabaseClusterResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetDatabaseCluster403JSONResponse struct{ ForbiddenJSONResponse }
+
+func (response GetDatabaseCluster403JSONResponse) VisitGetDatabaseClusterResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetDatabaseCluster404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response GetDatabaseCluster404JSONResponse) VisitGetDatabaseClusterResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetDatabaseCluster409JSONResponse struct{ ConflictJSONResponse }
+
+func (response GetDatabaseCluster409JSONResponse) VisitGetDatabaseClusterResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetDatabaseCluster422JSONResponse struct{ InvalidRequestJSONResponse }
+
+func (response GetDatabaseCluster422JSONResponse) VisitGetDatabaseClusterResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetDatabaseCluster503JSONResponse struct{ UnavailableJSONResponse }
+
+func (response GetDatabaseCluster503JSONResponse) VisitGetDatabaseClusterResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(503)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateDatabaseClusterRequestObject struct {
+	Id   string `json:"id"`
+	Body *UpdateDatabaseClusterJSONRequestBody
+}
+
+type UpdateDatabaseClusterResponseObject interface {
+	VisitUpdateDatabaseClusterResponse(w http.ResponseWriter) error
+}
+
+type UpdateDatabaseCluster200JSONResponse ManagedDatabaseCluster
+
+func (response UpdateDatabaseCluster200JSONResponse) VisitUpdateDatabaseClusterResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateDatabaseCluster401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response UpdateDatabaseCluster401JSONResponse) VisitUpdateDatabaseClusterResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateDatabaseCluster403JSONResponse struct{ ForbiddenJSONResponse }
+
+func (response UpdateDatabaseCluster403JSONResponse) VisitUpdateDatabaseClusterResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateDatabaseCluster404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response UpdateDatabaseCluster404JSONResponse) VisitUpdateDatabaseClusterResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateDatabaseCluster409JSONResponse struct{ ConflictJSONResponse }
+
+func (response UpdateDatabaseCluster409JSONResponse) VisitUpdateDatabaseClusterResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateDatabaseCluster422JSONResponse struct{ InvalidRequestJSONResponse }
+
+func (response UpdateDatabaseCluster422JSONResponse) VisitUpdateDatabaseClusterResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateDatabaseCluster503JSONResponse struct{ UnavailableJSONResponse }
+
+func (response UpdateDatabaseCluster503JSONResponse) VisitUpdateDatabaseClusterResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(503)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetDatabaseBackupsRequestObject struct {
+	Id string `json:"id"`
+}
+
+type GetDatabaseBackupsResponseObject interface {
+	VisitGetDatabaseBackupsResponse(w http.ResponseWriter) error
+}
+
+type GetDatabaseBackups200JSONResponse DatabaseBackupList
+
+func (response GetDatabaseBackups200JSONResponse) VisitGetDatabaseBackupsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetDatabaseBackups401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response GetDatabaseBackups401JSONResponse) VisitGetDatabaseBackupsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetDatabaseBackups403JSONResponse struct{ ForbiddenJSONResponse }
+
+func (response GetDatabaseBackups403JSONResponse) VisitGetDatabaseBackupsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetDatabaseBackups404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response GetDatabaseBackups404JSONResponse) VisitGetDatabaseBackupsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetDatabaseBackups409JSONResponse struct{ ConflictJSONResponse }
+
+func (response GetDatabaseBackups409JSONResponse) VisitGetDatabaseBackupsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetDatabaseBackups422JSONResponse struct{ InvalidRequestJSONResponse }
+
+func (response GetDatabaseBackups422JSONResponse) VisitGetDatabaseBackupsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetDatabaseBackups503JSONResponse struct{ UnavailableJSONResponse }
+
+func (response GetDatabaseBackups503JSONResponse) VisitGetDatabaseBackupsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(503)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangeDatabaseRequestObject struct {
+	Id     string `json:"id"`
+	Params ChangeDatabaseParams
+	Body   *ChangeDatabaseJSONRequestBody
+}
+
+type ChangeDatabaseResponseObject interface {
+	VisitChangeDatabaseResponse(w http.ResponseWriter) error
+}
+
+type ChangeDatabase202JSONResponse Operation
+
+func (response ChangeDatabase202JSONResponse) VisitChangeDatabaseResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(202)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangeDatabase401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response ChangeDatabase401JSONResponse) VisitChangeDatabaseResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangeDatabase403JSONResponse struct{ ForbiddenJSONResponse }
+
+func (response ChangeDatabase403JSONResponse) VisitChangeDatabaseResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangeDatabase404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response ChangeDatabase404JSONResponse) VisitChangeDatabaseResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangeDatabase409JSONResponse struct{ ConflictJSONResponse }
+
+func (response ChangeDatabase409JSONResponse) VisitChangeDatabaseResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangeDatabase422JSONResponse struct{ InvalidRequestJSONResponse }
+
+func (response ChangeDatabase422JSONResponse) VisitChangeDatabaseResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangeDatabase503JSONResponse struct{ UnavailableJSONResponse }
+
+func (response ChangeDatabase503JSONResponse) VisitChangeDatabaseResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(503)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type ListEnrollmentTokensRequestObject struct {
 }
 
@@ -5133,6 +7420,98 @@ func (response RevokeEnrollmentToken500JSONResponse) VisitRevokeEnrollmentTokenR
 type RevokeEnrollmentToken503JSONResponse struct{ UnavailableJSONResponse }
 
 func (response RevokeEnrollmentToken503JSONResponse) VisitRevokeEnrollmentTokenResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(503)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetMonitoringCurrentRequestObject struct {
+	Params GetMonitoringCurrentParams
+}
+
+type GetMonitoringCurrentResponseObject interface {
+	VisitGetMonitoringCurrentResponse(w http.ResponseWriter) error
+}
+
+type GetMonitoringCurrent200JSONResponse MonitoringCurrent
+
+func (response GetMonitoringCurrent200JSONResponse) VisitGetMonitoringCurrentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetMonitoringCurrent401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response GetMonitoringCurrent401JSONResponse) VisitGetMonitoringCurrentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetMonitoringCurrent403JSONResponse struct{ ForbiddenJSONResponse }
+
+func (response GetMonitoringCurrent403JSONResponse) VisitGetMonitoringCurrentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetMonitoringCurrent409JSONResponse struct{ ConflictJSONResponse }
+
+func (response GetMonitoringCurrent409JSONResponse) VisitGetMonitoringCurrentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetMonitoringCurrent422JSONResponse struct{ InvalidRequestJSONResponse }
+
+func (response GetMonitoringCurrent422JSONResponse) VisitGetMonitoringCurrentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetMonitoringCurrent503JSONResponse struct{ UnavailableJSONResponse }
+
+func (response GetMonitoringCurrent503JSONResponse) VisitGetMonitoringCurrentResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response); err != nil {
@@ -6092,6 +8471,220 @@ func (response GetContainerLogs500JSONResponse) VisitGetContainerLogsResponse(w 
 type GetContainerLogs503JSONResponse struct{ UnavailableJSONResponse }
 
 func (response GetContainerLogs503JSONResponse) VisitGetContainerLogsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(503)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DiscoverDatabasesRequestObject struct {
+	Id string `json:"id"`
+}
+
+type DiscoverDatabasesResponseObject interface {
+	VisitDiscoverDatabasesResponse(w http.ResponseWriter) error
+}
+
+type DiscoverDatabases200JSONResponse DatabaseDiscoveryList
+
+func (response DiscoverDatabases200JSONResponse) VisitDiscoverDatabasesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DiscoverDatabases401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response DiscoverDatabases401JSONResponse) VisitDiscoverDatabasesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DiscoverDatabases403JSONResponse struct{ ForbiddenJSONResponse }
+
+func (response DiscoverDatabases403JSONResponse) VisitDiscoverDatabasesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DiscoverDatabases404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response DiscoverDatabases404JSONResponse) VisitDiscoverDatabasesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DiscoverDatabases409JSONResponse struct{ ConflictJSONResponse }
+
+func (response DiscoverDatabases409JSONResponse) VisitDiscoverDatabasesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DiscoverDatabases422JSONResponse struct{ InvalidRequestJSONResponse }
+
+func (response DiscoverDatabases422JSONResponse) VisitDiscoverDatabasesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DiscoverDatabases503JSONResponse struct{ UnavailableJSONResponse }
+
+func (response DiscoverDatabases503JSONResponse) VisitDiscoverDatabasesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(503)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SaveDatabaseInstanceRequestObject struct {
+	Id         string `json:"id"`
+	InstanceId string `json:"instance_id"`
+	Body       *SaveDatabaseInstanceJSONRequestBody
+}
+
+type SaveDatabaseInstanceResponseObject interface {
+	VisitSaveDatabaseInstanceResponse(w http.ResponseWriter) error
+}
+
+type SaveDatabaseInstance200JSONResponse DiscoveredDatabaseInstance
+
+func (response SaveDatabaseInstance200JSONResponse) VisitSaveDatabaseInstanceResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SaveDatabaseInstance401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response SaveDatabaseInstance401JSONResponse) VisitSaveDatabaseInstanceResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SaveDatabaseInstance403JSONResponse struct{ ForbiddenJSONResponse }
+
+func (response SaveDatabaseInstance403JSONResponse) VisitSaveDatabaseInstanceResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SaveDatabaseInstance404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response SaveDatabaseInstance404JSONResponse) VisitSaveDatabaseInstanceResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SaveDatabaseInstance409JSONResponse struct{ ConflictJSONResponse }
+
+func (response SaveDatabaseInstance409JSONResponse) VisitSaveDatabaseInstanceResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SaveDatabaseInstance422JSONResponse struct{ InvalidRequestJSONResponse }
+
+func (response SaveDatabaseInstance422JSONResponse) VisitSaveDatabaseInstanceResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SaveDatabaseInstance503JSONResponse struct{ UnavailableJSONResponse }
+
+func (response SaveDatabaseInstance503JSONResponse) VisitSaveDatabaseInstanceResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response); err != nil {
@@ -8905,6 +11498,24 @@ func (response GetVersion503JSONResponse) VisitGetVersionResponse(w http.Respons
 
 // StrictServerInterface represents all server handlers.
 type StrictServerInterface interface {
+	// ListAPITokens 列出 API 令牌
+	// (GET /api-tokens)
+	ListAPITokens(ctx context.Context, request ListAPITokensRequestObject) (ListAPITokensResponseObject, error)
+	// CreateAPIToken 创建 API 令牌
+	// (POST /api-tokens)
+	CreateAPIToken(ctx context.Context, request CreateAPITokenRequestObject) (CreateAPITokenResponseObject, error)
+	// VerifyAPIToken 核验当前 API 令牌
+	// (GET /api-tokens/verify)
+	VerifyAPIToken(ctx context.Context, request VerifyAPITokenRequestObject) (VerifyAPITokenResponseObject, error)
+	// DeleteAPIToken 删除 API 令牌
+	// (DELETE /api-tokens/{id})
+	DeleteAPIToken(ctx context.Context, request DeleteAPITokenRequestObject) (DeleteAPITokenResponseObject, error)
+	// UpdateAPIToken 编辑 API 令牌
+	// (PATCH /api-tokens/{id})
+	UpdateAPIToken(ctx context.Context, request UpdateAPITokenRequestObject) (UpdateAPITokenResponseObject, error)
+	// RegenerateAPIToken 重新生成 API 令牌
+	// (POST /api-tokens/{id}/regenerate)
+	RegenerateAPIToken(ctx context.Context, request RegenerateAPITokenRequestObject) (RegenerateAPITokenResponseObject, error)
 	// Login 登录
 	// (POST /auth/login)
 	Login(ctx context.Context, request LoginRequestObject) (LoginResponseObject, error)
@@ -8923,6 +11534,24 @@ type StrictServerInterface interface {
 	// ListContainers 读取各节点容器和 Docker 状态
 	// (GET /containers)
 	ListContainers(ctx context.Context, request ListContainersRequestObject) (ListContainersResponseObject, error)
+	// ListDatabaseClusters 列出数据库集群
+	// (GET /databases/clusters)
+	ListDatabaseClusters(ctx context.Context, request ListDatabaseClustersRequestObject) (ListDatabaseClustersResponseObject, error)
+	// CreateDatabaseCluster 登记数据库集群
+	// (POST /databases/clusters)
+	CreateDatabaseCluster(ctx context.Context, request CreateDatabaseClusterRequestObject) (CreateDatabaseClusterResponseObject, error)
+	// GetDatabaseCluster 读取数据库集群
+	// (GET /databases/clusters/{id})
+	GetDatabaseCluster(ctx context.Context, request GetDatabaseClusterRequestObject) (GetDatabaseClusterResponseObject, error)
+	// UpdateDatabaseCluster 编辑数据库集群
+	// (PATCH /databases/clusters/{id})
+	UpdateDatabaseCluster(ctx context.Context, request UpdateDatabaseClusterRequestObject) (UpdateDatabaseClusterResponseObject, error)
+	// GetDatabaseBackups 读取数据库备份状态
+	// (GET /databases/clusters/{id}/backups)
+	GetDatabaseBackups(ctx context.Context, request GetDatabaseBackupsRequestObject) (GetDatabaseBackupsResponseObject, error)
+	// ChangeDatabase 受理数据库变更
+	// (POST /databases/clusters/{id}/changes)
+	ChangeDatabase(ctx context.Context, request ChangeDatabaseRequestObject) (ChangeDatabaseResponseObject, error)
 	// ListEnrollmentTokens 读取接入码状态
 	// (GET /enrollment-tokens)
 	ListEnrollmentTokens(ctx context.Context, request ListEnrollmentTokensRequestObject) (ListEnrollmentTokensResponseObject, error)
@@ -8932,6 +11561,9 @@ type StrictServerInterface interface {
 	// RevokeEnrollmentToken 撤销接入码
 	// (DELETE /enrollment-tokens/{id})
 	RevokeEnrollmentToken(ctx context.Context, request RevokeEnrollmentTokenRequestObject) (RevokeEnrollmentTokenResponseObject, error)
+	// GetMonitoringCurrent 读取当前监控数据
+	// (GET /monitoring/current)
+	GetMonitoringCurrent(ctx context.Context, request GetMonitoringCurrentRequestObject) (GetMonitoringCurrentResponseObject, error)
 	// GetMonitoringHistory 读取监控历史
 	// (GET /monitoring/history)
 	GetMonitoringHistory(ctx context.Context, request GetMonitoringHistoryRequestObject) (GetMonitoringHistoryResponseObject, error)
@@ -8962,6 +11594,12 @@ type StrictServerInterface interface {
 	// GetContainerLogs 读取最近容器日志
 	// (GET /nodes/{id}/containers/{container_id}/logs)
 	GetContainerLogs(ctx context.Context, request GetContainerLogsRequestObject) (GetContainerLogsResponseObject, error)
+	// DiscoverDatabases 发现本机数据库实例
+	// (POST /nodes/{id}/databases/discover)
+	DiscoverDatabases(ctx context.Context, request DiscoverDatabasesRequestObject) (DiscoverDatabasesResponseObject, error)
+	// SaveDatabaseInstance 保存本机数据库连接
+	// (PUT /nodes/{id}/databases/instances/{instance_id})
+	SaveDatabaseInstance(ctx context.Context, request SaveDatabaseInstanceRequestObject) (SaveDatabaseInstanceResponseObject, error)
 	// ReadFirewall 读取 OPSD 防火墙配置及应用状态
 	// (GET /nodes/{id}/firewall)
 	ReadFirewall(ctx context.Context, request ReadFirewallRequestObject) (ReadFirewallResponseObject, error)
@@ -9079,6 +11717,184 @@ type strictHandler struct {
 	ssi         StrictServerInterface
 	middlewares []StrictMiddlewareFunc
 	options     StrictHTTPServerOptions
+}
+
+// ListAPITokens operation middleware
+func (sh *strictHandler) ListAPITokens(w http.ResponseWriter, r *http.Request, params ListAPITokensParams) {
+	var request ListAPITokensRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListAPITokens(ctx, request.(ListAPITokensRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListAPITokens")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListAPITokensResponseObject); ok {
+		if err := validResponse.VisitListAPITokensResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CreateAPIToken operation middleware
+func (sh *strictHandler) CreateAPIToken(w http.ResponseWriter, r *http.Request, params CreateAPITokenParams) {
+	var request CreateAPITokenRequestObject
+
+	request.Params = params
+
+	var body CreateAPITokenJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CreateAPIToken(ctx, request.(CreateAPITokenRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CreateAPIToken")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CreateAPITokenResponseObject); ok {
+		if err := validResponse.VisitCreateAPITokenResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// VerifyAPIToken operation middleware
+func (sh *strictHandler) VerifyAPIToken(w http.ResponseWriter, r *http.Request) {
+	var request VerifyAPITokenRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.VerifyAPIToken(ctx, request.(VerifyAPITokenRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "VerifyAPIToken")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(VerifyAPITokenResponseObject); ok {
+		if err := validResponse.VisitVerifyAPITokenResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// DeleteAPIToken operation middleware
+func (sh *strictHandler) DeleteAPIToken(w http.ResponseWriter, r *http.Request, id string, params DeleteAPITokenParams) {
+	var request DeleteAPITokenRequestObject
+
+	request.Id = id
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.DeleteAPIToken(ctx, request.(DeleteAPITokenRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DeleteAPIToken")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DeleteAPITokenResponseObject); ok {
+		if err := validResponse.VisitDeleteAPITokenResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// UpdateAPIToken operation middleware
+func (sh *strictHandler) UpdateAPIToken(w http.ResponseWriter, r *http.Request, id string, params UpdateAPITokenParams) {
+	var request UpdateAPITokenRequestObject
+
+	request.Id = id
+	request.Params = params
+
+	var body UpdateAPITokenJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.UpdateAPIToken(ctx, request.(UpdateAPITokenRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "UpdateAPIToken")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(UpdateAPITokenResponseObject); ok {
+		if err := validResponse.VisitUpdateAPITokenResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// RegenerateAPIToken operation middleware
+func (sh *strictHandler) RegenerateAPIToken(w http.ResponseWriter, r *http.Request, id string, params RegenerateAPITokenParams) {
+	var request RegenerateAPITokenRequestObject
+
+	request.Id = id
+	request.Params = params
+
+	var body RegenerateAPITokenJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.RegenerateAPIToken(ctx, request.(RegenerateAPITokenRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "RegenerateAPIToken")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(RegenerateAPITokenResponseObject); ok {
+		if err := validResponse.VisitRegenerateAPITokenResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
 }
 
 // Login operation middleware
@@ -9239,6 +12055,180 @@ func (sh *strictHandler) ListContainers(w http.ResponseWriter, r *http.Request, 
 	}
 }
 
+// ListDatabaseClusters operation middleware
+func (sh *strictHandler) ListDatabaseClusters(w http.ResponseWriter, r *http.Request) {
+	var request ListDatabaseClustersRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListDatabaseClusters(ctx, request.(ListDatabaseClustersRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListDatabaseClusters")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListDatabaseClustersResponseObject); ok {
+		if err := validResponse.VisitListDatabaseClustersResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CreateDatabaseCluster operation middleware
+func (sh *strictHandler) CreateDatabaseCluster(w http.ResponseWriter, r *http.Request) {
+	var request CreateDatabaseClusterRequestObject
+
+	var body CreateDatabaseClusterJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CreateDatabaseCluster(ctx, request.(CreateDatabaseClusterRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CreateDatabaseCluster")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CreateDatabaseClusterResponseObject); ok {
+		if err := validResponse.VisitCreateDatabaseClusterResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetDatabaseCluster operation middleware
+func (sh *strictHandler) GetDatabaseCluster(w http.ResponseWriter, r *http.Request, id string) {
+	var request GetDatabaseClusterRequestObject
+
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetDatabaseCluster(ctx, request.(GetDatabaseClusterRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetDatabaseCluster")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetDatabaseClusterResponseObject); ok {
+		if err := validResponse.VisitGetDatabaseClusterResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// UpdateDatabaseCluster operation middleware
+func (sh *strictHandler) UpdateDatabaseCluster(w http.ResponseWriter, r *http.Request, id string) {
+	var request UpdateDatabaseClusterRequestObject
+
+	request.Id = id
+
+	var body UpdateDatabaseClusterJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.UpdateDatabaseCluster(ctx, request.(UpdateDatabaseClusterRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "UpdateDatabaseCluster")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(UpdateDatabaseClusterResponseObject); ok {
+		if err := validResponse.VisitUpdateDatabaseClusterResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetDatabaseBackups operation middleware
+func (sh *strictHandler) GetDatabaseBackups(w http.ResponseWriter, r *http.Request, id string) {
+	var request GetDatabaseBackupsRequestObject
+
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetDatabaseBackups(ctx, request.(GetDatabaseBackupsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetDatabaseBackups")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetDatabaseBackupsResponseObject); ok {
+		if err := validResponse.VisitGetDatabaseBackupsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ChangeDatabase operation middleware
+func (sh *strictHandler) ChangeDatabase(w http.ResponseWriter, r *http.Request, id string, params ChangeDatabaseParams) {
+	var request ChangeDatabaseRequestObject
+
+	request.Id = id
+	request.Params = params
+
+	var body ChangeDatabaseJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ChangeDatabase(ctx, request.(ChangeDatabaseRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ChangeDatabase")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ChangeDatabaseResponseObject); ok {
+		if err := validResponse.VisitChangeDatabaseResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // ListEnrollmentTokens operation middleware
 func (sh *strictHandler) ListEnrollmentTokens(w http.ResponseWriter, r *http.Request) {
 	var request ListEnrollmentTokensRequestObject
@@ -9309,6 +12299,32 @@ func (sh *strictHandler) RevokeEnrollmentToken(w http.ResponseWriter, r *http.Re
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(RevokeEnrollmentTokenResponseObject); ok {
 		if err := validResponse.VisitRevokeEnrollmentTokenResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetMonitoringCurrent operation middleware
+func (sh *strictHandler) GetMonitoringCurrent(w http.ResponseWriter, r *http.Request, params GetMonitoringCurrentParams) {
+	var request GetMonitoringCurrentRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetMonitoringCurrent(ctx, request.(GetMonitoringCurrentRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetMonitoringCurrent")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetMonitoringCurrentResponseObject); ok {
+		if err := validResponse.VisitGetMonitoringCurrentResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -9597,6 +12613,66 @@ func (sh *strictHandler) GetContainerLogs(w http.ResponseWriter, r *http.Request
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(GetContainerLogsResponseObject); ok {
 		if err := validResponse.VisitGetContainerLogsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// DiscoverDatabases operation middleware
+func (sh *strictHandler) DiscoverDatabases(w http.ResponseWriter, r *http.Request, id string) {
+	var request DiscoverDatabasesRequestObject
+
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.DiscoverDatabases(ctx, request.(DiscoverDatabasesRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DiscoverDatabases")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DiscoverDatabasesResponseObject); ok {
+		if err := validResponse.VisitDiscoverDatabasesResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// SaveDatabaseInstance operation middleware
+func (sh *strictHandler) SaveDatabaseInstance(w http.ResponseWriter, r *http.Request, id string, instanceId string) {
+	var request SaveDatabaseInstanceRequestObject
+
+	request.Id = id
+	request.InstanceId = instanceId
+
+	var body SaveDatabaseInstanceJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.SaveDatabaseInstance(ctx, request.(SaveDatabaseInstanceRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "SaveDatabaseInstance")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(SaveDatabaseInstanceResponseObject); ok {
+		if err := validResponse.VisitSaveDatabaseInstanceResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

@@ -13,6 +13,9 @@
   "security": [
     {
       "SessionCookie": []
+    },
+    {
+      "BearerToken": []
     }
   ],
   "paths": {
@@ -159,7 +162,7 @@
           {
             "name": "X-CSRF-Token",
             "in": "header",
-            "required": true,
+            "required": false,
             "schema": {
               "type": "string"
             }
@@ -257,7 +260,7 @@
           {
             "name": "X-CSRF-Token",
             "in": "header",
-            "required": true,
+            "required": false,
             "schema": {
               "type": "string"
             }
@@ -414,7 +417,7 @@
           {
             "name": "X-CSRF-Token",
             "in": "header",
-            "required": true,
+            "required": false,
             "schema": {
               "type": "string"
             }
@@ -486,7 +489,7 @@
           {
             "name": "X-CSRF-Token",
             "in": "header",
-            "required": true,
+            "required": false,
             "schema": {
               "type": "string"
             }
@@ -580,7 +583,7 @@
           {
             "name": "X-CSRF-Token",
             "in": "header",
-            "required": true,
+            "required": false,
             "schema": {
               "type": "string"
             }
@@ -635,7 +638,7 @@
           {
             "name": "X-CSRF-Token",
             "in": "header",
-            "required": true,
+            "required": false,
             "schema": {
               "type": "string"
             }
@@ -710,7 +713,7 @@
           {
             "name": "X-CSRF-Token",
             "in": "header",
-            "required": true,
+            "required": false,
             "schema": {
               "type": "string"
             }
@@ -1040,7 +1043,7 @@
           {
             "name": "X-CSRF-Token",
             "in": "header",
-            "required": true,
+            "required": false,
             "schema": {
               "type": "string"
             }
@@ -1112,7 +1115,7 @@
           {
             "name": "X-CSRF-Token",
             "in": "header",
-            "required": true,
+            "required": false,
             "schema": {
               "type": "string"
             }
@@ -1184,7 +1187,7 @@
           {
             "name": "X-CSRF-Token",
             "in": "header",
-            "required": true,
+            "required": false,
             "schema": {
               "type": "string"
             }
@@ -1288,7 +1291,7 @@
           {
             "name": "X-CSRF-Token",
             "in": "header",
-            "required": true,
+            "required": false,
             "schema": {
               "type": "string"
             }
@@ -1360,7 +1363,7 @@
           {
             "name": "X-CSRF-Token",
             "in": "header",
-            "required": true,
+            "required": false,
             "schema": {
               "type": "string"
             }
@@ -1534,6 +1537,34 @@
               "type": "string",
               "minLength": 1
             }
+          },
+          {
+            "name": "node_ids",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "group_by",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
           }
         ]
       }
@@ -1588,7 +1619,7 @@
           {
             "name": "X-CSRF-Token",
             "in": "header",
-            "required": true,
+            "required": false,
             "schema": {
               "type": "string"
             }
@@ -1688,7 +1719,7 @@
           {
             "name": "X-CSRF-Token",
             "in": "header",
-            "required": true,
+            "required": false,
             "schema": {
               "type": "string"
             }
@@ -1753,7 +1784,7 @@
           {
             "name": "X-CSRF-Token",
             "in": "header",
-            "required": true,
+            "required": false,
             "schema": {
               "type": "string"
             }
@@ -1835,7 +1866,7 @@
           {
             "name": "X-CSRF-Token",
             "in": "header",
-            "required": true,
+            "required": false,
             "schema": {
               "type": "string"
             }
@@ -1880,7 +1911,7 @@
           {
             "name": "X-CSRF-Token",
             "in": "header",
-            "required": true,
+            "required": false,
             "schema": {
               "type": "string"
             }
@@ -2008,7 +2039,7 @@
           {
             "name": "X-CSRF-Token",
             "in": "header",
-            "required": true,
+            "required": false,
             "schema": {
               "type": "string"
             }
@@ -2077,7 +2108,7 @@
           {
             "name": "X-CSRF-Token",
             "in": "header",
-            "required": true,
+            "required": false,
             "schema": {
               "type": "string"
             }
@@ -2166,7 +2197,7 @@
           {
             "name": "X-CSRF-Token",
             "in": "header",
-            "required": true,
+            "required": false,
             "schema": {
               "type": "string"
             }
@@ -2565,7 +2596,7 @@
           {
             "name": "X-CSRF-Token",
             "in": "header",
-            "required": true,
+            "required": false,
             "schema": {
               "type": "string"
             }
@@ -2626,6 +2657,888 @@
           }
         }
       }
+    },
+    "/api-tokens": {
+      "get": {
+        "operationId": "listAPITokens",
+        "summary": "列出 API 令牌",
+        "tags": [
+          "api"
+        ],
+        "responses": {
+          "200": {
+            "description": "请求成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APITokenList"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/InvalidRequest"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        },
+        "parameters": [
+          {
+            "name": "node_id",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "SessionCookie": []
+          }
+        ]
+      },
+      "post": {
+        "operationId": "createAPIToken",
+        "summary": "创建 API 令牌",
+        "tags": [
+          "api"
+        ],
+        "responses": {
+          "201": {
+            "description": "请求成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APITokenCreated"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/InvalidRequest"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        },
+        "parameters": [
+          {
+            "name": "node_id",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/APITokenInput"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "SessionCookie": []
+          }
+        ]
+      }
+    },
+    "/api-tokens/{id}": {
+      "patch": {
+        "operationId": "updateAPIToken",
+        "summary": "编辑 API 令牌",
+        "tags": [
+          "api"
+        ],
+        "responses": {
+          "200": {
+            "description": "请求成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIToken"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/InvalidRequest"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "node_id",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/APITokenInput"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "SessionCookie": []
+          }
+        ]
+      },
+      "delete": {
+        "operationId": "deleteAPIToken",
+        "summary": "删除 API 令牌",
+        "tags": [
+          "api"
+        ],
+        "responses": {
+          "204": {
+            "description": "请求成功"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/InvalidRequest"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "node_id",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "revision",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "security": [
+          {
+            "SessionCookie": []
+          }
+        ]
+      }
+    },
+    "/api-tokens/{id}/regenerate": {
+      "post": {
+        "operationId": "regenerateAPIToken",
+        "summary": "重新生成 API 令牌",
+        "tags": [
+          "api"
+        ],
+        "responses": {
+          "200": {
+            "description": "请求成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APITokenCreated"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/InvalidRequest"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "node_id",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TokenRevision"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "SessionCookie": []
+          }
+        ]
+      }
+    },
+    "/api-tokens/verify": {
+      "get": {
+        "operationId": "verifyAPIToken",
+        "summary": "核验当前 API 令牌",
+        "tags": [
+          "api"
+        ],
+        "responses": {
+          "200": {
+            "description": "请求成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIToken"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/InvalidRequest"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        },
+        "parameters": [],
+        "security": [
+          {
+            "BearerToken": []
+          }
+        ]
+      }
+    },
+    "/monitoring/current": {
+      "get": {
+        "operationId": "getMonitoringCurrent",
+        "summary": "读取当前监控数据",
+        "tags": [
+          "api"
+        ],
+        "responses": {
+          "200": {
+            "description": "请求成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MonitoringCurrent"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/InvalidRequest"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        },
+        "parameters": [
+          {
+            "name": "node_id",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/nodes/{id}/databases/discover": {
+      "post": {
+        "operationId": "discoverDatabases",
+        "summary": "发现本机数据库实例",
+        "tags": [
+          "databases"
+        ],
+        "responses": {
+          "200": {
+            "description": "请求成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DatabaseDiscoveryList"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/InvalidRequest"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "SessionCookie": []
+          }
+        ]
+      }
+    },
+    "/nodes/{id}/databases/instances/{instance_id}": {
+      "put": {
+        "operationId": "saveDatabaseInstance",
+        "summary": "保存本机数据库连接",
+        "tags": [
+          "databases"
+        ],
+        "responses": {
+          "200": {
+            "description": "请求成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DiscoveredDatabaseInstance"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/InvalidRequest"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "instance_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DatabaseInstanceInput"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "SessionCookie": []
+          }
+        ]
+      }
+    },
+    "/databases/clusters": {
+      "get": {
+        "operationId": "listDatabaseClusters",
+        "summary": "列出数据库集群",
+        "tags": [
+          "databases"
+        ],
+        "responses": {
+          "200": {
+            "description": "请求成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ManagedDatabaseList"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/InvalidRequest"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        },
+        "parameters": []
+      },
+      "post": {
+        "operationId": "createDatabaseCluster",
+        "summary": "登记数据库集群",
+        "tags": [
+          "databases"
+        ],
+        "responses": {
+          "201": {
+            "description": "请求成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ManagedDatabaseCluster"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/InvalidRequest"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        },
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DatabaseClusterInput"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "SessionCookie": []
+          }
+        ]
+      }
+    },
+    "/databases/clusters/{id}": {
+      "get": {
+        "operationId": "getDatabaseCluster",
+        "summary": "读取数据库集群",
+        "tags": [
+          "databases"
+        ],
+        "responses": {
+          "200": {
+            "description": "请求成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ManagedDatabaseStatus"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/InvalidRequest"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      },
+      "patch": {
+        "operationId": "updateDatabaseCluster",
+        "summary": "编辑数据库集群",
+        "tags": [
+          "databases"
+        ],
+        "responses": {
+          "200": {
+            "description": "请求成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ManagedDatabaseCluster"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/InvalidRequest"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DatabaseClusterInput"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "SessionCookie": []
+          }
+        ]
+      }
+    },
+    "/databases/clusters/{id}/changes": {
+      "post": {
+        "operationId": "changeDatabase",
+        "summary": "受理数据库变更",
+        "tags": [
+          "databases"
+        ],
+        "responses": {
+          "202": {
+            "description": "请求成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Operation"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/InvalidRequest"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DatabaseChange"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/databases/clusters/{id}/backups": {
+      "get": {
+        "operationId": "getDatabaseBackups",
+        "summary": "读取数据库备份状态",
+        "tags": [
+          "databases"
+        ],
+        "responses": {
+          "200": {
+            "description": "请求成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DatabaseBackupList"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/InvalidRequest"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/metrics": {
+      "servers": [
+        {
+          "url": "/"
+        }
+      ],
+      "get": {
+        "operationId": "getMetrics",
+        "summary": "读取 Prometheus 或 OpenMetrics 指标",
+        "tags": [
+          "monitoring"
+        ],
+        "security": [
+          {
+            "BearerToken": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "授权范围内的当前指标",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "application/openmetrics-text": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -2635,6 +3548,10 @@
         "in": "cookie",
         "name": "opsd_session",
         "description": "HttpOnly、SameSite=Lax，七天绝对有效期；写请求同时校验同源与 CSRF。"
+      },
+      "BearerToken": {
+        "type": "http",
+        "scheme": "bearer"
       }
     },
     "schemas": {
@@ -2874,6 +3791,16 @@
             "items": {
               "type": "string"
             }
+          },
+          "nodes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MonitoringNodeHistory"
+            }
+          },
+          "checked_at": {
+            "type": "string",
+            "format": "date-time"
           }
         },
         "required": [
@@ -4668,7 +5595,9 @@
               "name",
               "account",
               "firewall_config",
-              "container"
+              "container",
+              "database",
+              "database_step"
             ]
           },
           "state": {
@@ -4733,6 +5662,9 @@
             "type": "string"
           },
           "idempotency_key": {
+            "type": "string"
+          },
+          "resource_id": {
             "type": "string"
           }
         },
@@ -5180,6 +6112,9 @@
               "auto",
               "manual"
             ]
+          },
+          "api": {
+            "type": "boolean"
           }
         },
         "required": [
@@ -6075,6 +7010,1112 @@
           "container_id",
           "text",
           "truncated",
+          "checked_at"
+        ]
+      },
+      "APIGrant": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "module": {
+            "type": "string",
+            "enum": [
+              "monitoring",
+              "nodes",
+              "containers",
+              "firewall",
+              "databases"
+            ]
+          },
+          "level": {
+            "type": "string",
+            "enum": [
+              "read",
+              "manage"
+            ]
+          },
+          "scope": {
+            "type": "string",
+            "enum": [
+              "all",
+              "nodes",
+              "regions",
+              "clusters"
+            ]
+          },
+          "resources": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "module",
+          "level",
+          "scope",
+          "resources"
+        ]
+      },
+      "APITokenInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "revision": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "grants": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/APIGrant"
+            }
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "source_ips": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "name",
+          "enabled",
+          "revision",
+          "grants",
+          "source_ips"
+        ]
+      },
+      "APIToken": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "revision": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "grants": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/APIGrant"
+            }
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "source_ips": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "id": {
+            "type": "string"
+          },
+          "owner": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "owner",
+          "name",
+          "enabled",
+          "revision",
+          "grants",
+          "source_ips",
+          "created_at"
+        ]
+      },
+      "APITokenCreated": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "token": {
+            "$ref": "#/components/schemas/APIToken"
+          },
+          "value": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "token",
+          "value"
+        ]
+      },
+      "APITokenList": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/APIToken"
+            }
+          }
+        },
+        "required": [
+          "items"
+        ]
+      },
+      "TokenRevision": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "revision": {
+            "type": "integer",
+            "format": "int64"
+          }
+        },
+        "required": [
+          "revision"
+        ]
+      },
+      "MonitoringNode": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "node_id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "region": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "ready",
+              "partial",
+              "offline"
+            ]
+          },
+          "checked_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "metrics": {
+            "$ref": "#/components/schemas/Metrics"
+          }
+        },
+        "required": [
+          "node_id",
+          "name",
+          "region",
+          "state",
+          "checked_at"
+        ]
+      },
+      "MonitoringCurrent": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MonitoringNode"
+            }
+          },
+          "summary": {
+            "$ref": "#/components/schemas/MonitoringSummary"
+          },
+          "checked_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "items",
+          "summary",
+          "checked_at"
+        ]
+      },
+      "MonitoringNodeHistory": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "node_id": {
+            "type": "string"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Metrics"
+            }
+          }
+        },
+        "required": [
+          "node_id",
+          "items"
+        ]
+      },
+      "DatabaseGrant": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "database": {
+            "type": "string"
+          },
+          "privileges": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "database",
+          "privileges"
+        ]
+      },
+      "DatabaseSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "charset": {
+            "type": "string"
+          },
+          "collation": {
+            "type": "string"
+          },
+          "bytes": {
+            "type": "number",
+            "format": "double"
+          },
+          "protected": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "name",
+          "charset",
+          "collation",
+          "bytes",
+          "protected"
+        ]
+      },
+      "DatabaseUser": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "host": {
+            "type": "string"
+          },
+          "protected": {
+            "type": "boolean"
+          },
+          "grants": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DatabaseGrant"
+            }
+          }
+        },
+        "required": [
+          "name",
+          "host",
+          "protected",
+          "grants"
+        ]
+      },
+      "DatabaseProxyServer": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "hostgroup": {
+            "type": "integer"
+          },
+          "host": {
+            "type": "string"
+          },
+          "port": {
+            "type": "integer"
+          },
+          "state": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "hostgroup",
+          "host",
+          "port",
+          "state"
+        ]
+      },
+      "DatabaseProxyPool": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "hostgroup": {
+            "type": "integer"
+          },
+          "host": {
+            "type": "string"
+          },
+          "port": {
+            "type": "integer"
+          },
+          "used": {
+            "type": "number",
+            "format": "double"
+          },
+          "free": {
+            "type": "number",
+            "format": "double"
+          },
+          "errors": {
+            "type": "number",
+            "format": "double"
+          }
+        },
+        "required": [
+          "hostgroup",
+          "host",
+          "port",
+          "used",
+          "free",
+          "errors"
+        ]
+      },
+      "DatabaseProxyUser": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "active": {
+            "type": "boolean"
+          },
+          "hostgroup": {
+            "type": "integer"
+          },
+          "state": {
+            "type": "string"
+          },
+          "protected": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "name",
+          "active",
+          "hostgroup",
+          "state",
+          "protected"
+        ]
+      },
+      "DatabaseStatus": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "state": {
+            "type": "string",
+            "enum": [
+              "ready",
+              "unavailable",
+              "mismatch"
+            ]
+          },
+          "version": {
+            "type": "string"
+          },
+          "cluster_id": {
+            "type": "string"
+          },
+          "cluster_name": {
+            "type": "string"
+          },
+          "configured_members": {
+            "type": "string"
+          },
+          "actual_members": {
+            "type": "string"
+          },
+          "member_address": {
+            "type": "string"
+          },
+          "cluster_size": {
+            "type": "integer"
+          },
+          "primary": {
+            "type": "boolean"
+          },
+          "ready": {
+            "type": "boolean"
+          },
+          "synced": {
+            "type": "boolean"
+          },
+          "read_only": {
+            "type": "boolean"
+          },
+          "connections": {
+            "type": "number",
+            "format": "double"
+          },
+          "receive_queue": {
+            "type": "number",
+            "format": "double"
+          },
+          "send_queue": {
+            "type": "number",
+            "format": "double"
+          },
+          "flow_control": {
+            "type": "number",
+            "format": "double"
+          },
+          "databases": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DatabaseSchema"
+            }
+          },
+          "users": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DatabaseUser"
+            }
+          },
+          "servers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DatabaseProxyServer"
+            }
+          },
+          "pools": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DatabaseProxyPool"
+            }
+          },
+          "proxy_users": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DatabaseProxyUser"
+            }
+          },
+          "pending_changes": {
+            "type": "boolean"
+          },
+          "checked_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "error": {
+            "$ref": "#/components/schemas/NetworkError"
+          }
+        },
+        "required": [
+          "state",
+          "checked_at"
+        ]
+      },
+      "DatabaseInstance": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "node_id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "galera",
+              "proxysql"
+            ]
+          },
+          "address": {
+            "type": "string"
+          },
+          "socket": {
+            "type": "string"
+          },
+          "username": {
+            "type": "string"
+          },
+          "credentials_available": {
+            "type": "boolean"
+          },
+          "container_id": {
+            "type": "string"
+          },
+          "running": {
+            "type": "boolean"
+          },
+          "protected_users": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "backup_root": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "node_id",
+          "name",
+          "kind",
+          "address",
+          "username",
+          "credentials_available",
+          "running"
+        ]
+      },
+      "DatabaseInstanceInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "node_id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "galera",
+              "proxysql"
+            ]
+          },
+          "address": {
+            "type": "string"
+          },
+          "socket": {
+            "type": "string"
+          },
+          "username": {
+            "type": "string"
+          },
+          "credentials_available": {
+            "type": "boolean"
+          },
+          "container_id": {
+            "type": "string"
+          },
+          "running": {
+            "type": "boolean"
+          },
+          "protected_users": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "backup_root": {
+            "type": "string"
+          },
+          "password": {
+            "type": "string",
+            "writeOnly": true
+          }
+        },
+        "required": [
+          "name",
+          "kind",
+          "address",
+          "username",
+          "protected_users"
+        ]
+      },
+      "DiscoveredDatabaseInstance": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "node_id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "galera",
+              "proxysql"
+            ]
+          },
+          "address": {
+            "type": "string"
+          },
+          "socket": {
+            "type": "string"
+          },
+          "username": {
+            "type": "string"
+          },
+          "credentials_available": {
+            "type": "boolean"
+          },
+          "container_id": {
+            "type": "string"
+          },
+          "running": {
+            "type": "boolean"
+          },
+          "protected_users": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "backup_root": {
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/DatabaseStatus"
+          }
+        },
+        "required": [
+          "id",
+          "node_id",
+          "name",
+          "kind",
+          "address",
+          "username",
+          "credentials_available",
+          "running"
+        ]
+      },
+      "DatabaseDiscoveryList": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DiscoveredDatabaseInstance"
+            }
+          }
+        },
+        "required": [
+          "items"
+        ]
+      },
+      "DatabaseRef": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "node_id": {
+            "type": "string"
+          },
+          "instance_id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "address": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "node_id",
+          "instance_id",
+          "name",
+          "address"
+        ]
+      },
+      "ManagedDatabaseCluster": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "coordinator": {
+            "type": "string"
+          },
+          "cluster_id": {
+            "type": "string"
+          },
+          "revision": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "members": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DatabaseRef"
+            }
+          },
+          "proxies": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DatabaseRef"
+            }
+          },
+          "workbench_url": {
+            "type": "string"
+          },
+          "deleted": {
+            "type": "boolean"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "coordinator",
+          "cluster_id",
+          "revision",
+          "members",
+          "proxies",
+          "workbench_url",
+          "deleted",
+          "updated_at"
+        ]
+      },
+      "DatabaseClusterInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "coordinator": {
+            "type": "string"
+          },
+          "cluster_id": {
+            "type": "string"
+          },
+          "revision": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "members": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DatabaseRef"
+            }
+          },
+          "proxies": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DatabaseRef"
+            }
+          },
+          "workbench_url": {
+            "type": "string"
+          },
+          "deleted": {
+            "type": "boolean"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "name",
+          "coordinator",
+          "cluster_id",
+          "revision",
+          "members",
+          "proxies",
+          "workbench_url"
+        ]
+      },
+      "ManagedDatabaseMember": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "node_id": {
+            "type": "string"
+          },
+          "instance_id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "address": {
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/DatabaseStatus"
+          }
+        },
+        "required": [
+          "node_id",
+          "instance_id",
+          "name",
+          "address",
+          "status"
+        ]
+      },
+      "ManagedDatabaseStatus": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "cluster": {
+            "$ref": "#/components/schemas/ManagedDatabaseCluster"
+          },
+          "members": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ManagedDatabaseMember"
+            }
+          },
+          "proxies": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ManagedDatabaseMember"
+            }
+          },
+          "checked_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "cluster",
+          "members",
+          "proxies",
+          "checked_at"
+        ]
+      },
+      "ManagedDatabaseList": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ManagedDatabaseStatus"
+            }
+          }
+        },
+        "required": [
+          "items"
+        ]
+      },
+      "DatabaseProxySelection": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "node_id": {
+            "type": "string"
+          },
+          "instance_id": {
+            "type": "string"
+          },
+          "hostgroup": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "node_id",
+          "instance_id",
+          "hostgroup"
+        ]
+      },
+      "DatabaseChange": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "cluster_id": {
+            "type": "string"
+          },
+          "expected_revision": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "create_database",
+              "delete_database",
+              "create_user",
+              "password",
+              "delete_user",
+              "grant",
+              "revoke",
+              "sync_user"
+            ]
+          },
+          "database": {
+            "type": "string"
+          },
+          "charset": {
+            "type": "string",
+            "enum": [
+              "utf8mb4",
+              "utf8mb3",
+              "latin1",
+              "ascii"
+            ]
+          },
+          "user": {
+            "type": "string"
+          },
+          "host": {
+            "type": "string"
+          },
+          "password": {
+            "type": "string",
+            "writeOnly": true
+          },
+          "privileges": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "grants": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DatabaseGrant"
+            }
+          },
+          "proxies": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DatabaseProxySelection"
+            }
+          }
+        },
+        "required": [
+          "expected_revision",
+          "kind",
+          "proxies"
+        ]
+      },
+      "DatabaseBackup": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "schedule": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string"
+          },
+          "last_run": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "last_success": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "artifacts": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "error": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "schedule",
+          "state",
+          "artifacts"
+        ]
+      },
+      "DatabaseNodeBackups": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "node_id": {
+            "type": "string"
+          },
+          "instance_id": {
+            "type": "string"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DatabaseBackup"
+            }
+          },
+          "error": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "node_id",
+          "instance_id",
+          "items"
+        ]
+      },
+      "DatabaseBackupList": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DatabaseNodeBackups"
+            }
+          },
+          "checked_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "items",
           "checked_at"
         ]
       }

@@ -17,6 +17,7 @@ type Engine struct {
 	Clock      func() (string, int64, error)
 	Install    func(context.Context, *Local, func() error) error
 	Containers ContainerRuntime
+	Databases  DatabaseRuntime
 }
 
 func (e *Engine) clock() (string, int64, error) {
@@ -89,6 +90,9 @@ func (e *Engine) Run(ctx context.Context, id string) error {
 	}
 	if l.Action.Kind == "container" {
 		return e.container(ctx, &l, boot)
+	}
+	if l.Action.Kind == "database" {
+		return e.database(ctx, &l)
 	}
 	p := l.Action.Firewall
 	if target := l.Action.FirewallConfig; target != nil {

@@ -28,7 +28,7 @@ func (c *Collector) Collect(stream string) protocol.Metrics {
 	}
 	m, raw := collect()
 	if before, ok := c.previous[stream]; ok {
-		if stream != "live" || raw.at.Sub(before.at) <= 10*time.Second {
+		if stream != "live" || raw.at.Sub(before.at) <= time.Minute {
 			rates(&m, before, raw)
 		}
 	}

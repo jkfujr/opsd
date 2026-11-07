@@ -39,6 +39,7 @@ export function SessionBoundary() {
           if (resource === 'operations') void queryClient.invalidateQueries({ queryKey: ['operations'] });
           if (resource === 'firewall') void queryClient.invalidateQueries({ queryKey: node_id ? ['firewall', node_id] : ['firewall'] });
           if (resource === 'containers') void queryClient.invalidateQueries({ queryKey: ['containers'] });
+          if (resource === 'databases') void queryClient.invalidateQueries({ queryKey: ['databases'] });
           if (resource === 'settings' || resource === 'account') void queryClient.invalidateQueries({ queryKey: ['nodes', node_id, resource] });
           if (resource === 'settings') void queryClient.invalidateQueries({ queryKey: ['nodes', node_id, 'storage'] });
           if (['tokens', 'sessions', 'monitoring'].includes(resource)) void queryClient.invalidateQueries({ queryKey: [resource] });

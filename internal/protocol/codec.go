@@ -202,6 +202,9 @@ func validatePayload(payload Payload) error {
 
 func (action OperationAction) validate() error {
 	count := 0
+	if action.Database != nil {
+		count++
+	}
 	if action.FirewallConfig != nil {
 		count++
 	}
@@ -221,6 +224,11 @@ func (action OperationAction) validate() error {
 		return fmt.Errorf("操作必须包含且只包含一种业务载荷")
 	}
 	switch action.Kind {
+	case "database":
+		if action.Database == nil {
+			return fmt.Errorf("数据库操作缺少参数")
+		}
+		return action.Database.Validate()
 	case "container":
 		if action.Container == nil {
 			return fmt.Errorf("容器操作缺少参数")

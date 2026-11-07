@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"github.com/jkfujr/opsd/internal/databaseengine"
 	"github.com/jkfujr/opsd/internal/dockerengine"
 	"sync"
 	"time"
@@ -30,7 +31,7 @@ type Services struct {
 func NewServices(db *sql.DB) *Services {
 	m := firewall.New()
 	docker := dockerengine.New()
-	engine := &operations.Engine{Store: operations.Store{DB: db}, Manager: m, Containers: docker}
+	engine := &operations.Engine{Store: operations.Store{DB: db}, Manager: m, Containers: docker, Databases: databaseengine.Manager{}}
 	engine.Install = func(ctx context.Context, l *operations.Local, persist func() error) error {
 		if l.ComponentState == nil {
 			l.ComponentState = &firewall.InstallState{Backend: l.Action.Component.Backend}
@@ -55,6 +56,10 @@ func NewServices(db *sql.DB) *Services {
 }
 func (s *Services) Handle(ctx context.Context, payload protocol.Payload) (protocol.Payload, error) {
 	switch body := payload.(type) {
+	case *protocol.DatabaseDiscovery:
+		return s.discoverDatabases(ctx)
+	case *protocol.DatabaseRead:
+		return s.readDatabase(ctx, *body)
 	case *protocol.DockerRead:
 		if s.Docker == nil {
 			return nil, fmt.Errorf("Docker 读取入口不可用")

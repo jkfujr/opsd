@@ -26,6 +26,8 @@ func (s *Server) operationError(w http.ResponseWriter, r *http.Request, e error)
 		code, message = "not_found", "记录不存在"
 	}
 	switch code {
+	case "unauthenticated":
+		status = 401
 	case "invalid_request":
 		status = 422
 	case "conflict", "node_busy":
@@ -66,6 +68,7 @@ func (s *Server) SyncFirewallConfig(w http.ResponseWriter, r *http.Request, id s
 	s.writeFirewallConfig(w, r, id, cluster.FirewallWrite{ExpectedRevision: body.ExpectedRevision, Key: r.Header.Get("Idempotency-Key")})
 }
 func (s *Server) writeFirewallConfig(w http.ResponseWriter, r *http.Request, id string, request cluster.FirewallWrite) {
+	request.Actor = actor(r)
 	var saved cluster.FirewallSaved
 	e := s.node.Call(r.Context(), id, "firewall.config.write", request, &saved)
 	var result httpapi.FirewallSaved
@@ -87,6 +90,9 @@ func (s *Server) ListOperations(w http.ResponseWriter, r *http.Request, _ httpap
 }
 func (s *Server) operationList(w http.ResponseWriter, r *http.Request, pending bool) {
 	q := cluster.ListQuery{Key: r.URL.Query().Get("idempotency_key"), Pending: pending, State: r.URL.Query().Get("state"), Limit: 50}
+	if a := access(r.Context()); a != nil {
+		q.Authorization = &a.Token
+	}
 	if v := r.URL.Query().Get("limit"); v != "" {
 		q.Limit, _ = strconv.Atoi(v)
 	}
