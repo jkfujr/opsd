@@ -161,9 +161,8 @@ try {
     await page.getByRole('status').filter({ hasText: '已保存' }).waitFor();
     await waitFor(() => menuLabels(otherPage), (items) => JSON.stringify(items) === JSON.stringify(navigationLabels), '恢复默认未同步');
     assert.deepEqual((await api('/settings/navigation')).order, navigationOrder);
-    const otherSession = await (await otherContext.request.get(`${base}/api/v1/auth/session`)).json();
-    assert.equal((await otherContext.request.delete(`${base}/api/v1/auth/session`, { headers: { Origin: base, 'X-CSRF-Token': otherSession.csrf_token } })).status(), 204);
-    await otherPage.goto(`${base}/signin`);
+    await otherPage.getByRole('button', { name: '退出', exact: true }).click();
+    await otherPage.waitForURL(`${base}/signin`);
     await otherPage.getByLabel('账号', { exact: true }).fill('ui-check');
     await otherPage.getByLabel('密码', { exact: true }).fill(password);
     await otherPage.getByRole('button', { name: '登录', exact: true }).click();
