@@ -313,12 +313,12 @@ func proxyRuntimeFingerprint(users []map[string]string) string {
 	return fingerprint(projected)
 }
 func readProxy(ctx context.Context, s *session, c protocol.DatabaseConnection, out protocol.DatabaseState) (protocol.DatabaseState, error) {
-	v, e := rows(ctx, s, "SELECT @@version AS version")
+	v, e := rows(ctx, s, "SELECT @@version")
 	if e != nil {
 		return out, e
 	}
 	if len(v) > 0 {
-		out.Version = v[0]["version"]
+		out.Version = v[0]["@@version"]
 	}
 	layers, e := proxyLayers(ctx, s)
 	if e != nil {

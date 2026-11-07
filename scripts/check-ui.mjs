@@ -172,14 +172,20 @@ try {
 
     let release;
     const pending = new Promise((resolve) => { release = resolve; });
-    await page.route(`**/api/v1${firewallPath}`, async (route) => { await pending; await route.fulfill({ json: firewall }); });
+    const loadingRequests = [];
+    const loadingRoute = (route) => {
+      const request = (async () => { await pending; await route.fulfill({ json: firewall }); })();
+      loadingRequests.push(request);
+      return request;
+    };
+    await page.route(`**/api/v1${firewallPath}`, loadingRoute);
     await page.setViewportSize({ width: 1000, height: 1000 });
     try {
       await page.reload({ waitUntil: 'domcontentloaded' });
       await page.locator('.firewall-status [data-slot="skeleton"]').waitFor();
       await checkFirewallHeader();
       await capture(`${theme}-1000-firewall-loading`);
-    } finally { release(); await page.unrouteAll({ behavior: 'wait' }); }
+    } finally { release(); await page.unroute(`**/api/v1${firewallPath}`, loadingRoute); await Promise.all(loadingRequests); }
     await page.locator('.firewall-status').getByText('UFW', { exact: true }).waitFor();
 
     await page.route(`**/api/v1${firewallPath}`, (route) => route.fulfill({ status: 503, json: { code: 'dependency_unavailable', message: '防火墙读取失败' } }));
@@ -466,7 +472,8 @@ try {
       await page.getByRole('button', { name: '关闭令牌表单', exact: true }).click();
       await page.goto(`${base}/databases/${databaseID}`);
       for (const tab of ['概览', '成员', '库', '账号', '代理', '备份']) {
-        await page.getByRole('tab', { name: tab, exact: true }).click();
+        const target = page.getByRole('tab', { name: tab, exact: true });
+        if (await target.getAttribute('aria-selected') !== 'true') await target.click();
         if (tab === '备份') await page.getByText('备份目录空间不足', { exact: true }).waitFor();
         await capture(`${theme}-${width}-database-${tab}`);
       }
