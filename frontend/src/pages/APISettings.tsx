@@ -85,7 +85,15 @@ function TokenForm({ token, onClose, onCreated }: { token: Token | null; onClose
     if (token) { unwrap(await api.PATCH('/api-tokens/{id}', { params: { path: { id: token.id } }, body })); return null; }
     return unwrap(await api.POST('/api-tokens', { body }));
   }, onSuccess: (result) => { setDirty(false); void queryClient.invalidateQueries({ queryKey: ['api-tokens'] }); if (result) onCreated(result); else onClose(); }, onError: (error) => { if (!(error instanceof RequestError && [403, 409, 422].includes(error.status))) setUncertain(true); } });
-  const selectTemplate = (key: string) => { setTemplate(key); setName(templates[key].name); setPermissions(Object.fromEntries(modules.map(([module]) => [module, { level: templates[key].levels[module] ?? 'none', scope: 'all', resources: [] }])) as typeof permissions); setDirty(true); };
+  const selectTemplate = (key: string) => {
+    setTemplate(key); setName(templates[key].name);
+    setPermissions((previous) => {
+      const next = { ...previous };
+      for (const [module] of modules) next[module] = { level: templates[key].levels[module] ?? 'none', scope: 'all', resources: [] };
+      return next;
+    });
+    setDirty(true);
+  };
   const change = (module: Module, value: Partial<typeof permissions[Module]>) => { setPermissions({ ...permissions, [module]: { ...permissions[module], ...value } }); setDirty(true); };
   return <Dialog open onOpenChange={(open) => { if (!open && !save.isPending) onClose(); }}><DialogContent closeLabel="关闭令牌表单" className="w-full max-w-2xl"><DialogHeader><DialogTitle>{token ? '编辑令牌' : '创建令牌'}</DialogTitle></DialogHeader><DialogBody className="space-y-5 overflow-y-auto">
     <form id="api-token-form" className="space-y-5" onSubmit={(event) => { event.preventDefault(); save.mutate(); }}><fieldset disabled={save.isPending || uncertain} className="space-y-5"><div className="grid gap-4 sm:grid-cols-2"><TextField label="名称" value={name} onChange={(e) => { setName(e.target.value); setDirty(true); }} maxLength={128} required /><ChoiceField label="用途模板" value={template} options={Object.entries(templates).map(([key, value]) => [key, value.name])} onChange={selectTemplate} /></div>
