@@ -5,7 +5,6 @@ import (
 	"crypto/ed25519"
 	"crypto/rand"
 	"database/sql"
-	_ "embed"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -19,11 +18,8 @@ import (
 	"github.com/jkfujr/opsd/internal/identity"
 	"github.com/jkfujr/opsd/internal/monitoring"
 	"github.com/jkfujr/opsd/internal/protocol"
-	_ "modernc.org/sqlite"
+	"github.com/jkfujr/opsd/internal/storage"
 )
-
-//go:embed schema.sql
-var schema string
 
 type Options struct {
 	Config                       Config
@@ -118,14 +114,8 @@ func Open(ctx context.Context, path string, o Options) (*Node, error) {
 	if e := os.MkdirAll(filepath.Dir(path), 0700); e != nil {
 		return nil, e
 	}
-	db, e := sql.Open("sqlite", "file:"+filepath.ToSlash(path)+"?_pragma=foreign_keys(1)&_pragma=synchronous(FULL)&_pragma=busy_timeout(5000)&_pragma=journal_mode(WAL)")
+	db, e := storage.Open(ctx, path, storage.Node)
 	if e != nil {
-		return nil, e
-	}
-	db.SetMaxOpenConns(1)
-	db.SetMaxIdleConns(1)
-	if _, e = db.ExecContext(ctx, schema); e != nil {
-		db.Close()
 		return nil, e
 	}
 	n := &Node{DB: db, Executor: o.Executor, Now: o.Now, connections: map[string]*peer{}, dialing: map[string]chan struct{}{}, wake: make(chan struct{}, 1), changed: make(chan struct{}, 1), subscribers: map[chan Change]struct{}{}}

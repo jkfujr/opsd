@@ -924,7 +924,7 @@ export interface components {
         /** @enum {string} */
         OperationState: "accepted" | "prepared" | "applying" | "awaiting_confirmation" | "reverting" | "attention_required" | "succeeded" | "rejected" | "failed" | "reverted" | "resolved_manually";
         /** @enum {string} */
-        Backend: "ufw" | "firewalld" | "nftables" | "none" | "conflict" | "unknown";
+        Backend: "ufw" | "firewalld" | "nftables" | "iptables" | "none" | "conflict" | "unknown";
         FieldError: {
             field: string;
             message: string;
@@ -1029,7 +1029,7 @@ export interface components {
         };
         AddressObservation: {
             /** @enum {string} */
-            source: "peer" | "ipify";
+            source: "peer" | "ipify" | "local";
             address?: string;
             /** Format: date-time */
             observed_at: string;
@@ -1040,7 +1040,7 @@ export interface components {
             mode: "auto" | "manual";
             addresses: string[];
             /** @enum {string} */
-            state: "pending" | "confirmed" | "failed" | "conflict";
+            state: "pending" | "confirmed" | "failed" | "conflict" | "unavailable";
             observations: components["schemas"]["AddressObservation"][];
             /** Format: date-time */
             updated_at?: string;
@@ -1637,7 +1637,7 @@ export interface components {
             family: components["schemas"]["AddressFamily"];
             members: components["schemas"]["TrustMember"][];
             /** @enum {string} */
-            state: "pending" | "in_sync" | "failed" | "unsupported" | "removing" | "saved" | "confirmed" | "conflict";
+            state: "pending" | "in_sync" | "failed" | "unsupported" | "removing" | "saved" | "confirmed" | "conflict" | "unavailable";
             error?: string;
         };
         PeerTrustMigrationStatus: {

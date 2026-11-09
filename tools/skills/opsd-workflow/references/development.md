@@ -13,6 +13,8 @@
 
 本机 SQLite 保存身份、配置、账号、队列及待上传记录。附近 CouchDB 保存共享数据和历史；其不可用不阻塞本机控制。普通节点不保存其他节点完整历史。
 
+节点与执行器数据库统一通过 `storage.Open` 及 `internal/storage/migrations` 迁移。既有节点的首次迁移登记原结构，后续连续编号；不能重新初始化身份或队列。`state_cleanup.go` 分批整理已上传的重复防火墙状态，保留实际变化、每对象最新状态和未上传资料，不删除 CouchDB 签名历史。
+
 ## HTTP 与前端
 
 只修改 `api/openapi.json`，执行 `npm run generate` 生成 `internal/httpapi/api.gen.go` 和 `frontend/src/api/schema.gen.ts`，不手改生成类型或另写 DTO。`frontend/src/api/client.ts` 统一附加 CSRF，并禁止自动重试写入。

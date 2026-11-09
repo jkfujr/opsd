@@ -60,8 +60,11 @@ func ImportConfiguration(s protocol.FirewallState) (protocol.FirewallDefinition,
 }
 
 func ValidateConfiguration(d protocol.FirewallDefinition) error {
-	if d.Backend != "ufw" && d.Backend != "firewalld" && d.Backend != "nftables" && d.Backend != "none" {
+	if d.Backend != "ufw" && d.Backend != "firewalld" && d.Backend != "nftables" && d.Backend != "iptables" && d.Backend != "none" {
 		return Unsupported("防火墙后端无效")
+	}
+	if d.Backend == "iptables" && (len(d.Rules) > 0 || len(d.DefaultPolicies) > 0) {
+		return Unsupported("原生 iptables 普通规则只读")
 	}
 	ids := map[string]bool{}
 	for _, r := range d.Rules {

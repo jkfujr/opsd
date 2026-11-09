@@ -27,6 +27,9 @@ func (h trustNativeHost) Read(path string) ([]byte, error) { return os.ReadFile(
 func (h trustNativeHost) Replace(path string, before, after []byte) error {
 	return h.NativeHost.Replace(h.path(path), before, after)
 }
+func (h trustNativeHost) CreateOwned(path string, data []byte) error {
+	return h.NativeHost.CreateOwned(h.path(path), data)
+}
 func (h trustNativeHost) Exists(path string) bool { _, e := os.Stat(h.path(path)); return e == nil }
 func (h trustNativeHost) Run(ctx context.Context, name string, args ...string) ([]byte, error) {
 	if name == "systemctl" {
@@ -91,7 +94,7 @@ func TestPeerTrustNativeNetwork(t *testing.T) {
 			}
 		}
 	}
-	for _, backend := range []string{"ufw", "nftables"} {
+	for _, backend := range []string{"ufw", "nftables", "iptables"} {
 		t.Run(backend, func(t *testing.T) {
 			run("nft", "flush", "ruleset")
 			externalBefore := map[protocol.AddressFamily]string{}
@@ -138,6 +141,8 @@ func TestPeerTrustNativeNetwork(t *testing.T) {
 			sync := func(target protocol.PeerTrustTarget) {
 				if backend == "ufw" {
 					check(syncUFWTrust(t.Context(), h, target))
+				} else if backend == "iptables" {
+					check(syncIptablesTrust(t.Context(), h, target))
 				} else {
 					check(syncNFTTrust(t.Context(), h, target))
 				}
@@ -197,7 +202,11 @@ func TestPeerTrustNativeNetwork(t *testing.T) {
 							t.Fatal(e)
 						}
 						_, hooks, exists, e := readUFWTrustRuntime(string(raw), family)
-						if e != nil || enabled && !ufwTrustHooksCurrent(string(raw), family, hooks) || !enabled && (exists || len(hooks) > 0) {
+						current := ufwTrustHooksCurrent(string(raw), family, hooks)
+						if backend == "iptables" {
+							current = nativeTrustHooksCurrent(string(raw), hooks)
+						}
+						if e != nil || enabled && !current || !enabled && (exists || len(hooks) > 0) {
 							t.Fatalf("互信跳转不符：%v\n%s", e, raw)
 						}
 						if externalRules(string(raw)) != externalBefore[family] {
@@ -215,6 +224,12 @@ func TestPeerTrustNativeNetwork(t *testing.T) {
 				checkHooks(true)
 				probe(true)
 				for _, file := range []struct{ path, restore string }{{"/etc/ufw/before.rules", "iptables-restore"}, {"/etc/ufw/before6.rules", "ip6tables-restore"}} {
+					if backend == "iptables" {
+						file.path = "/etc/opsd/firewall/peer-trust.ipv4.rules"
+						if file.restore == "ip6tables-restore" {
+							file.path = "/etc/opsd/firewall/peer-trust.ipv6.rules"
+						}
+					}
 					before, e := h.Read(file.path)
 					if e != nil {
 						t.Fatal(e)
@@ -232,18 +247,20 @@ func TestPeerTrustNativeNetwork(t *testing.T) {
 				connection("9.9.9.9", "8.8.4.4", true)
 				connection("2606:4700::1111", "2606:4700::1001", false)
 				connection("2606:4700::9999", "2606:4700::1001", true)
-				write("/etc/ufw/ufw.conf", "ENABLED=no\n")
-				sync(replacement)
-				checkHooks(false)
-				connection("9.9.9.9", "8.8.4.4", false)
-				before, e := h.Read("/etc/ufw/before.rules")
-				if e != nil || !strings.Contains(string(before), "-s 9.9.9.9 -j ACCEPT") {
-					t.Fatal("停用时未保留互信持久配置", e)
+				if backend == "ufw" {
+					write("/etc/ufw/ufw.conf", "ENABLED=no\n")
+					sync(replacement)
+					checkHooks(false)
+					connection("9.9.9.9", "8.8.4.4", false)
+					before, e := h.Read("/etc/ufw/before.rules")
+					if e != nil || !strings.Contains(string(before), "-s 9.9.9.9 -j ACCEPT") {
+						t.Fatal("停用时未保留互信持久配置", e)
+					}
+					write("/etc/ufw/ufw.conf", "ENABLED=yes\n")
+					sync(target)
+					checkHooks(true)
+					probe(true)
 				}
-				write("/etc/ufw/ufw.conf", "ENABLED=yes\n")
-				sync(target)
-				checkHooks(true)
-				probe(true)
 			}
 			sync(protocol.PeerTrustTarget{Revision: 3})
 			probe(false)

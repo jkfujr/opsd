@@ -22,10 +22,13 @@ type Policy = components['schemas']['PeerTrustPolicy'];
 
 export const networkStates: Record<string, string> = {
   pending: '待应用', in_sync: '已生效', disabled: '已关闭', offline: '离线', failed: '失败', inactive: '未启用', unsupported: '未支持',
-  removing: '待撤除', saved: '已保存', confirmed: '已确认', conflict: '地址冲突', partial: '部分生效', empty: '未配置',
+  removing: '待撤除', saved: '已保存', confirmed: '已确认', conflict: '地址冲突', partial: '部分生效', empty: '未配置', unavailable: '无公网 IPv6',
 };
 
 function combinedTrustState(states: string[], fallback: string) {
+	const present=states.filter((state)=>state!=='unavailable');
+	if (!present.length && states.length) return 'unavailable';
+	states=present;
   if (!states.length) return fallback;
   if (states.includes('in_sync') && states.some((state) => state !== 'in_sync')) return 'partial';
   return ['failed', 'unsupported', 'conflict', 'removing', 'pending', 'saved', 'inactive'].find((state) => states.includes(state)) ?? states[0];

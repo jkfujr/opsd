@@ -1,6 +1,7 @@
 package cluster
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"database/sql"
@@ -180,6 +181,10 @@ func (n *Node) writeFirewall(ctx context.Context, origin string, request Firewal
 }
 
 func (n *Node) persistFirewall(ctx context.Context, tx *sql.Tx, state protocol.ManagedFirewallState, confirmed protocol.FirewallDefinition) error {
+	old, _, e := firewallState(ctx, tx)
+	if e != nil {
+		return e
+	}
 	b, e := json.Marshal(state)
 	if e != nil {
 		return e
@@ -188,7 +193,17 @@ func (n *Node) persistFirewall(ctx context.Context, tx *sql.Tx, state protocol.M
 	if _, e = tx.ExecContext(ctx, "INSERT INTO firewall_config(id,body,confirmed) VALUES(1,?,?) ON CONFLICT(id) DO UPDATE SET body=excluded.body,confirmed=excluded.confirmed", string(b), string(c)); e != nil {
 		return e
 	}
+	if bytes.Equal(firewallContent(old), firewallContent(state)) {
+		return nil
+	}
 	return n.appendTx(ctx, tx, "firewall", n.ID, state, n.Now())
+}
+
+// 检查时间只属于最新观测；签名历史记录配置、结果和错误的实际变化。
+func firewallContent(state protocol.ManagedFirewallState) []byte {
+	state.CheckedAt = nil
+	b, _ := json.Marshal(state)
+	return b
 }
 
 func (n *Node) firewallOperation(ctx context.Context, tx *sql.Tx, op Operation) error {

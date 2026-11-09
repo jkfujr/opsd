@@ -281,6 +281,11 @@ func reconcileObservation(current PublicFamily, observations []protocol.AddressO
 	}
 	switch len(values) {
 	case 0:
+		if len(observations) == 1 && observations[0].Source == "local" && observations[0].Error != nil && observations[0].Error.Code == "address_unavailable" {
+			current.State = "unavailable"
+			current.Addresses = []string{}
+			break
+		}
 		current.State = "failed"
 		current.Error = "公网地址发现失败"
 	case 1:
@@ -398,6 +403,12 @@ func (n *Node) observePublic(ctx context.Context, family protocol.AddressFamily)
 	}
 	result := []protocol.AddressObservation{}
 	now := n.Now().UTC()
+	if family == protocol.IPv6 {
+		available, err := publicaddress.HasIPv6()
+		if err == nil && !available {
+			return []protocol.AddressObservation{{Source: "local", ObservedAt: now, Error: &protocol.Error{Code: "address_unavailable", Message: "无公网 IPv6"}}}
+		}
+	}
 	if address, e := n.probePublic(ctx, family); e == nil {
 		result = append(result, protocol.AddressObservation{Source: "peer", Address: address, ObservedAt: now})
 	} else {

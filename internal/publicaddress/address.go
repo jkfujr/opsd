@@ -101,3 +101,27 @@ func Fingerprint() string {
 	sort.Strings(values)
 	return strings.Join(values, ",")
 }
+
+// HasIPv6 只检查本机地址和内核路由，不发送数据包。
+func HasIPv6() (bool, error) {
+	addresses, err := net.InterfaceAddrs()
+	if err != nil {
+		return false, err
+	}
+	for _, item := range addresses {
+		prefix, e := netip.ParsePrefix(item.String())
+		if e != nil || !prefix.Addr().Is6() {
+			continue
+		}
+		if _, e = Parse(prefix.Addr().String()); e != nil {
+			continue
+		}
+		connection, e := net.DialUDP("udp6", nil, &net.UDPAddr{IP: net.ParseIP("2606:4700:4700::1111"), Port: 53})
+		if e != nil {
+			return false, nil
+		}
+		connection.Close()
+		return true, nil
+	}
+	return false, nil
+}

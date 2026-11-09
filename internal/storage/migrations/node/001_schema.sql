@@ -1,3 +1,4 @@
+CREATE TABLE schema_migrations(version INTEGER PRIMARY KEY,name TEXT NOT NULL,applied_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')));
 CREATE TABLE IF NOT EXISTS node_identity(id INTEGER PRIMARY KEY CHECK(id=1),cluster TEXT NOT NULL,private_key BLOB NOT NULL,public_key BLOB NOT NULL,signing_key BLOB NOT NULL,age_key TEXT NOT NULL,sequence INTEGER NOT NULL DEFAULT 0,config TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS account(id INTEGER PRIMARY KEY CHECK(id=1),username TEXT NOT NULL,password_hash TEXT NOT NULL,entrance TEXT NOT NULL,revision INTEGER NOT NULL DEFAULT 1,secret TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS account_navigation(account_id INTEGER PRIMARY KEY CHECK(account_id=1) REFERENCES account(id),revision INTEGER NOT NULL,order_json TEXT NOT NULL);

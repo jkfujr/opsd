@@ -78,6 +78,11 @@ func (m *Manager) Detect(ctx context.Context) (protocol.Backend, error) {
 	if len(active) == 1 {
 		return active[0], nil
 	}
+	if m.Host.LookPath("iptables-save") {
+		if raw, err := m.Host.Run(ctx, "iptables-save", "-t", "filter"); err == nil && (strings.Contains(string(raw), "-A INPUT ") || strings.Contains(string(raw), ":"+trustChain+" ")) {
+			return "iptables", nil
+		}
+	}
 	// 未启用时只沿明确的持久配置识别归属，安装命令本身不是归属依据。
 	configured := []protocol.Backend{}
 	if m.Host.Exists("/etc/ufw/user.rules") && m.Host.Exists("/etc/ufw/ufw.conf") {
@@ -107,6 +112,8 @@ func (m *Manager) Adapter(backend protocol.Backend) (Adapter, error) {
 		return &Firewalld{Host: m.Host}, nil
 	case "nftables":
 		return &NFT{Host: m.Host}, nil
+	case "iptables":
+		return &Iptables{Host: m.Host}, nil
 	}
 	return nil, Unsupported("没有可用的防火墙管理器")
 }

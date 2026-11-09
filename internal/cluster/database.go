@@ -193,6 +193,9 @@ func (n *Node) storageLoop() {
 				d, e = n.selectDatabase(ctx)
 				if e == nil {
 					e = n.upload(ctx, d)
+					if e == nil {
+						e = n.compactFirewallRecords(ctx)
+					}
 				}
 			}
 		}
@@ -436,8 +439,10 @@ func (n *Node) archivedOperations(ctx context.Context, owner string, q ListQuery
 			if e = n.observe(ctx, "operation:"+op.ID, op.Revision); e != nil {
 				return out, e
 			}
-			if q.Key!=""&&op.Key!=q.Key{continue}
- if q.Pending && terminalState(op.State) {
+			if q.Key != "" && op.Key != q.Key {
+				continue
+			}
+			if q.Pending && terminalState(op.State) {
 				continue
 			}
 			if q.State != "" && string(op.State) != q.State {

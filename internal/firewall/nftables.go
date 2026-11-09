@@ -115,6 +115,11 @@ func (n *NFT) sources(ctx context.Context) (nftSources, error) {
 				if nftInputMetadata.MatchString(t) {
 					v := result.Chains[ref]
 					v.Input = true
+					if v.Policy == "" {
+						v.Policy = "allow"
+						v.Line = line
+						v.Position = i + 1
+					}
 					result.Chains[ref] = v
 				}
 				if m := nftPolicyLine.FindStringSubmatch(t); len(m) == 2 {

@@ -96,6 +96,9 @@ func (e *Engine) InspectFirewall(ctx context.Context, importCurrent bool) (*prot
 		return result, nil
 	}
 	result.InSync = len(steps) == 0
+	if s.Backend == "iptables" {
+		return result, nil
+	}
 	// 托管配置可以修复运行/永久差异，原生单步编辑的限制不用于页面保存。
 	result.Capabilities.EditRules = protocol.Capability{Supported: true}
 	result.Capabilities.Reorder = protocol.Capability{Supported: true}

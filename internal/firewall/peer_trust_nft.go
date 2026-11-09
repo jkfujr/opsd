@@ -28,7 +28,7 @@ func nftTrustFile(text, chain string, target protocol.PeerTrustTarget) (string, 
 			continue
 		}
 		inside = append(inside, line)
-		if nftPolicyMetadata.MatchString(strings.TrimSpace(line)) {
+		if nftPolicyMetadata.MatchString(strings.TrimSpace(line)) || nftInputMetadata.MatchString(strings.TrimSpace(line)) {
 			insert = len(inside)
 		}
 	}

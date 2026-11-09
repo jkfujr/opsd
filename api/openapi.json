@@ -3971,6 +3971,7 @@
           "ufw",
           "firewalld",
           "nftables",
+          "iptables",
           "none",
           "conflict",
           "unknown"
@@ -4377,7 +4378,8 @@
             "type": "string",
             "enum": [
               "peer",
-              "ipify"
+              "ipify",
+              "local"
             ]
           },
           "address": {
@@ -4419,7 +4421,8 @@
               "pending",
               "confirmed",
               "failed",
-              "conflict"
+              "conflict",
+              "unavailable"
             ]
           },
           "observations": {
@@ -6703,7 +6706,8 @@
               "removing",
               "saved",
               "confirmed",
-              "conflict"
+              "conflict",
+              "unavailable"
             ]
           },
           "error": {

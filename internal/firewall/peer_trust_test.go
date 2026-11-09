@@ -67,3 +67,20 @@ func TestNFTTrustPreservedByOrdinaryConfiguration(t *testing.T) {
 		t.Fatalf("互信未撤除：%v %s", e, text)
 	}
 }
+
+func TestNFTImplicitAcceptPolicyAndTrustPlacement(t *testing.T) {
+	base := "table inet filter {\n chain input {\n  type filter hook input priority filter;\n  tcp dport 22 accept\n }\n}\n"
+	h := &nativeFixture{files: map[string][]byte{"/etc/nftables.conf": []byte(base)}, run: func(string, ...string) ([]byte, error) { return []byte("/usr/sbin/nft -f /etc/nftables.conf"), nil }}
+	sources, err := (&NFT{Host: h}).sources(t.Context())
+	if err != nil || sources.Chains["inet/filter/input"].Policy != "allow" || !sources.Chains["inet/filter/input"].Input {
+		t.Fatal(sources, err)
+	}
+	text, err := nftTrustFile(base, "inet/filter/input", protocol.PeerTrustTarget{Enabled: true, IPv4: []string{"8.8.8.8"}})
+	if err != nil || strings.Index(text, "type filter") > strings.Index(text, trustMarker) {
+		t.Fatal(text, err)
+	}
+	text, err = nftConfiguredFile(text, "inet/filter/input", nil, "deny")
+	if err != nil || !strings.Contains(text, "priority filter; policy drop;") {
+		t.Fatal(text, err)
+	}
+}

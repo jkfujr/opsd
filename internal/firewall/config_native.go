@@ -23,7 +23,7 @@ func (m *Manager) PrepareConfiguration(ctx context.Context, s protocol.FirewallS
 		return prepareNFTConfiguration(ctx, &NFT{Host: m.Host}, s, d)
 	case "firewalld":
 		return prepareFirewalldConfiguration(ctx, &Firewalld{Host: m.Host}, s, d)
-	case "none":
+	case "none", "iptables":
 		return []Step{}, nil
 	}
 	return nil, Unsupported("没有可用的防火墙后端")
@@ -113,6 +113,10 @@ func nftConfiguredFile(text, chain string, target []protocol.FirewallRule, actio
 		t := strings.TrimSpace(line)
 		if nftPolicyLine.MatchString(t) {
 			out = append(out, nftPolicyLine.ReplaceAllString(line, "policy "+map[string]string{"allow": "accept", "deny": "drop"}[action]+";"))
+			continue
+		}
+		if nftInputMetadata.MatchString(t) {
+			out = append(out, strings.TrimRight(line, " \t")+" policy "+map[string]string{"allow": "accept", "deny": "drop"}[action]+";")
 			continue
 		}
 		if spec := parseNFTText(t, family); spec != nil && spec.Comment != trustMarker {

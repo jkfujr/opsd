@@ -40,6 +40,8 @@ func (m *Manager) SyncPeerTrust(ctx context.Context, target protocol.PeerTrustTa
 	switch backend {
 	case "ufw":
 		return syncUFWTrust(ctx, m.Host, target)
+	case "iptables":
+		return syncIptablesTrust(ctx, m.Host, target)
 	case "nftables":
 		return syncNFTTrust(ctx, m.Host, target)
 	case "firewalld":

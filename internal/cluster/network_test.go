@@ -10,6 +10,19 @@ import (
 	"github.com/jkfujr/opsd/internal/protocol"
 )
 
+func TestMissingIPv6IsNotDiscoveryFailure(t *testing.T) {
+	now := time.Now().UTC()
+	before := PublicFamily{Mode: "auto", Addresses: []string{"2606:4700::1111"}}
+	missing := reconcileObservation(before, []protocol.AddressObservation{{Source: "local", ObservedAt: now, Error: &protocol.Error{Code: "address_unavailable", Message: "无公网 IPv6"}}}, now)
+	if missing.State != "unavailable" || missing.Error != "" || len(missing.Addresses) != 0 {
+		t.Fatal(missing)
+	}
+	failed := reconcileObservation(before, []protocol.AddressObservation{{Source: "ipify", ObservedAt: now, Error: &protocol.Error{Code: "dependency_unavailable", Message: "连接超时"}}}, now)
+	if failed.State != "failed" || len(failed.Addresses) != 1 {
+		t.Fatal("发现超时丢失已有地址", failed)
+	}
+}
+
 func TestSingleNodeTrustIncludesItsAddressesAndPendingState(t *testing.T) {
 	n, _ := openTestNode(t)
 	if _, err := n.ChangeTrust(t.Context(), TrustPolicyPatch{Enabled: true}); err != nil {

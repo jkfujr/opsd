@@ -158,6 +158,7 @@ func (e AddressFamily) Valid() bool {
 // Defines values for AddressObservationSource.
 const (
 	Ipify AddressObservationSource = "ipify"
+	Local AddressObservationSource = "local"
 	Peer  AddressObservationSource = "peer"
 )
 
@@ -165,6 +166,8 @@ const (
 func (e AddressObservationSource) Valid() bool {
 	switch e {
 	case Ipify:
+		return true
+	case Local:
 		return true
 	case Peer:
 		return true
@@ -177,6 +180,7 @@ func (e AddressObservationSource) Valid() bool {
 const (
 	BackendConflict  Backend = "conflict"
 	BackendFirewalld Backend = "firewalld"
+	BackendIptables  Backend = "iptables"
 	BackendNftables  Backend = "nftables"
 	BackendNone      Backend = "none"
 	BackendUfw       Backend = "ufw"
@@ -189,6 +193,8 @@ func (e Backend) Valid() bool {
 	case BackendConflict:
 		return true
 	case BackendFirewalld:
+		return true
+	case BackendIptables:
 		return true
 	case BackendNftables:
 		return true
@@ -875,6 +881,7 @@ const (
 	PeerTrustRuleStatePending     PeerTrustRuleState = "pending"
 	PeerTrustRuleStateRemoving    PeerTrustRuleState = "removing"
 	PeerTrustRuleStateSaved       PeerTrustRuleState = "saved"
+	PeerTrustRuleStateUnavailable PeerTrustRuleState = "unavailable"
 	PeerTrustRuleStateUnsupported PeerTrustRuleState = "unsupported"
 )
 
@@ -894,6 +901,8 @@ func (e PeerTrustRuleState) Valid() bool {
 	case PeerTrustRuleStateRemoving:
 		return true
 	case PeerTrustRuleStateSaved:
+		return true
+	case PeerTrustRuleStateUnavailable:
 		return true
 	case PeerTrustRuleStateUnsupported:
 		return true
@@ -949,10 +958,11 @@ func (e PublicAddressMode) Valid() bool {
 
 // Defines values for PublicAddressState.
 const (
-	PublicAddressStateConfirmed PublicAddressState = "confirmed"
-	PublicAddressStateConflict  PublicAddressState = "conflict"
-	PublicAddressStateFailed    PublicAddressState = "failed"
-	PublicAddressStatePending   PublicAddressState = "pending"
+	PublicAddressStateConfirmed   PublicAddressState = "confirmed"
+	PublicAddressStateConflict    PublicAddressState = "conflict"
+	PublicAddressStateFailed      PublicAddressState = "failed"
+	PublicAddressStatePending     PublicAddressState = "pending"
+	PublicAddressStateUnavailable PublicAddressState = "unavailable"
 )
 
 // Valid indicates whether the value is a known member of the PublicAddressState enum.
@@ -965,6 +975,8 @@ func (e PublicAddressState) Valid() bool {
 	case PublicAddressStateFailed:
 		return true
 	case PublicAddressStatePending:
+		return true
+	case PublicAddressStateUnavailable:
 		return true
 	default:
 		return false

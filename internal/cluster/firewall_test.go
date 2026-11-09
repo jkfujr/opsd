@@ -20,6 +20,68 @@ type configExecutor struct {
 	fail        bool
 }
 
+func TestFirewallChecksKeepOnlyActualStateChanges(t *testing.T) {
+	n, _ := openTestNode(t)
+	d := protocol.FirewallDefinition{Backend: "ufw", Rules: []protocol.ManagedRule{}, DefaultPolicies: []protocol.ManagedPolicy{}}
+	x := &configExecutor{inspection: protocol.FirewallInspected{Target: &protocol.FirewallTarget{Revision: 1, Configuration: d}, Backend: "ufw", InSync: true, CheckedAt: time.Now().UTC()}}
+	n.Executor = x
+	for range 10 {
+		n.checkFirewall(t.Context())
+		x.inspection.CheckedAt = x.inspection.CheckedAt.Add(time.Second)
+	}
+	var count int
+	if err := n.DB.QueryRow("SELECT count(*) FROM records WHERE kind='firewall'").Scan(&count); err != nil || count != 1 {
+		t.Fatal("重复观测仍追加共享记录", count, err)
+	}
+	x.inspection.Error = &protocol.Error{Code: "dependency_unavailable", Message: "实际读取失败"}
+	n.checkFirewall(t.Context())
+	if err := n.DB.QueryRow("SELECT count(*) FROM records WHERE kind='firewall'").Scan(&count); err != nil || count != 2 {
+		t.Fatal("实际错误没有进入历史", count, err)
+	}
+}
+
+func TestFirewallCleanupKeepsChangesLatestAndPendingRecords(t *testing.T) {
+	n, _ := openTestNode(t)
+	ctx := t.Context()
+	ids := []string{}
+	for i, state := range []string{"in_sync", "in_sync", "in_sync", "in_sync", "failed", "failed", "failed", "in_sync", "in_sync", "in_sync"} {
+		at := time.Now().UTC().Add(time.Duration(i) * time.Second)
+		tx, err := n.DB.BeginTx(ctx, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err = n.appendTx(ctx, tx, "firewall", n.ID, protocol.ManagedFirewallState{State: state, CheckedAt: &at}, at); err != nil {
+			t.Fatal(err)
+		}
+		if err = tx.Commit(); err != nil {
+			t.Fatal(err)
+		}
+		var id string
+		if err = n.DB.QueryRow("SELECT id FROM records WHERE kind='firewall' ORDER BY sequence DESC LIMIT 1").Scan(&id); err != nil {
+			t.Fatal(err)
+		}
+		ids = append(ids, id)
+	}
+	if _, err := n.DB.Exec("UPDATE records SET uploaded=1 WHERE kind='firewall' AND id<>?", ids[1]); err != nil {
+		t.Fatal(err)
+	}
+	for range 2 {
+		if err := n.compactFirewallRecords(ctx); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for i, id := range ids {
+		var count int
+		if err := n.DB.QueryRow("SELECT count(*) FROM records WHERE id=?", id).Scan(&count); err != nil {
+			t.Fatal(err)
+		}
+		want := i == 0 || i == 1 || i == 3 || i == 4 || i == 6 || i == 7 || i == 9
+		if (count == 1) != want {
+			t.Fatalf("第%d条保留状态不符：%d", i, count)
+		}
+	}
+}
+
 func (x *configExecutor) Call(ctx context.Context, p protocol.Payload) (protocol.Payload, error) {
 	switch p := p.(type) {
 	case *protocol.FirewallInspect:
