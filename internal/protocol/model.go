@@ -4,7 +4,8 @@ package protocol
 import "time"
 
 const (
-	Version         = 1
+	Version         = 2
+	ContractVersion = 1
 	MaxMessageBytes = 8 * 1024 * 1024
 	MaxRecordBytes  = 60 * 1024
 )

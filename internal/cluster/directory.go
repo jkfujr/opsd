@@ -76,6 +76,12 @@ func (n *Node) merge(ctx context.Context, d Directory, bootstrap bool) error {
 	if e != nil {
 		return e
 	}
+	if !bootstrap {
+		d = directoryDelta(d, directorySummary(current))
+		if emptyDirectory(d) {
+			return nil
+		}
+	}
 	known := map[string]Member{}
 	revoked := map[string]bool{}
 	for _, m := range current.Members {
@@ -208,9 +214,14 @@ func (n *Node) merge(ctx context.Context, d Directory, bootstrap bool) error {
 	if e = tx.Commit(); e != nil {
 		return e
 	}
-	n.signalNetwork()
-	n.notifyChange(Change{Resource: "public_addresses"})
-	n.notifyChange(Change{Resource: "peer_trust"})
+	if changed || len(d.Addresses) > 0 || d.Trust != nil {
+		n.signalNetwork()
+		n.notifyChange(Change{Resource: "public_addresses"})
+		n.notifyChange(Change{Resource: "peer_trust"})
+	}
+	if len(d.Databases) > 0 {
+		n.notifyChange(Change{Resource: "databases"})
+	}
 	n.mu.Lock()
 	for id, p := range n.connections {
 		if revoked[id] || revoked[n.ID] {

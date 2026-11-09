@@ -56,14 +56,21 @@ func (n *Node) dispatch(ctx context.Context, origin, method string, body json.Ra
 	case "ping":
 		return n.Self(ctx)
 	case "directory":
-		var d Directory
-		if e := json.Unmarshal(body, &d); e != nil {
+		var exchange DirectoryExchange
+		if e := json.Unmarshal(body, &exchange); e != nil {
 			return nil, e
 		}
-		if e := n.merge(ctx, d, false); e != nil {
+		if len(exchange.Summary) > 6001 {
+			return nil, fault("invalid_request", "目录摘要过大")
+		}
+		if e := n.merge(ctx, exchange.Delta, false); e != nil {
 			return nil, e
 		}
-		return n.Directory(ctx)
+		d, e := n.Directory(ctx)
+		if e != nil {
+			return nil, e
+		}
+		return DirectoryExchange{Summary: directorySummary(d), Delta: directoryDelta(d, exchange.Summary)}, nil
 	case "config.read":
 		return n.Config(ctx)
 	case "account.read":
@@ -517,7 +524,7 @@ func (n *Node) advance() {
 			finish(protocol.Rejected, e)
 			return
 		}
-		result, e = n.Executor.Call(ctx, &protocol.OperationSubmit{OperationID: id, ContractVersion: protocol.Version, Action: action})
+		result, e = n.Executor.Call(ctx, &protocol.OperationSubmit{OperationID: id, ContractVersion: protocol.ContractVersion, Action: action})
 	} else {
 		result, e = n.Executor.Call(ctx, &protocol.OperationQuery{OperationID: id})
 		if e == nil {

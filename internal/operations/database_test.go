@@ -163,7 +163,7 @@ func TestDatabaseActionRejectsRemoteAndUntypedSQL(t *testing.T) {
 	for _, change := range []func(*protocol.DatabaseAction){func(a *protocol.DatabaseAction) { a.Connection.Address = "192.0.2.1:3306" }, func(a *protocol.DatabaseAction) { a.Kind = "sql" }, func(a *protocol.DatabaseAction) { a.User = "root" }, func(a *protocol.DatabaseAction) { a.PasswordHash = "plain" }} {
 		action := databaseAction()
 		change(action.Database)
-		if _, err := protocol.Encode(protocol.Message{RequestID: "validation", Payload: &protocol.OperationSubmit{OperationID: filepath.Base("typed-database"), ContractVersion: protocol.Version, Action: action}}); err == nil {
+		if _, err := protocol.Encode(protocol.Message{RequestID: "validation", Payload: &protocol.OperationSubmit{OperationID: filepath.Base("typed-database"), ContractVersion: protocol.ContractVersion, Action: action}}); err == nil {
 			t.Fatal("接受了范围外的数据库动作")
 		}
 	}

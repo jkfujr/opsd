@@ -88,7 +88,7 @@ func policyAction(t *testing.T, e *Engine) protocol.OperationAction {
 }
 func accept(t *testing.T, e *Engine, id string, a protocol.OperationAction) Local {
 	t.Helper()
-	l, created, err := e.Store.Receive(t.Context(), id, protocol.Version, a, "启动一")
+	l, created, err := e.Store.Receive(t.Context(), id, protocol.ContractVersion, a, "启动一")
 	if err != nil || !created {
 		t.Fatalf("受理失败：%v", err)
 	}
@@ -99,7 +99,7 @@ func TestReceiptIdentityAndSealedLateDelivery(t *testing.T) {
 	e, _, _ := operationFixture(t)
 	a := policyAction(t, e)
 	l := accept(t, e, "op1", a)
-	got, created, err := e.Store.Receive(t.Context(), "op1", protocol.Version, a, "启动一")
+	got, created, err := e.Store.Receive(t.Context(), "op1", protocol.ContractVersion, a, "启动一")
 	if err != nil || created || got.Record.Revision != l.Record.Revision {
 		t.Fatalf("重复投递未返回原结果：%+v %v", got, err)
 	}
@@ -107,17 +107,17 @@ func TestReceiptIdentityAndSealedLateDelivery(t *testing.T) {
 	p := *a.Firewall
 	p.Change.Action = "deny"
 	b.Firewall = &p
-	if _, _, err = e.Store.Receive(t.Context(), "op1", protocol.Version, b, "启动一"); firewall.Code(err) != "conflict" {
+	if _, _, err = e.Store.Receive(t.Context(), "op1", protocol.ContractVersion, b, "启动一"); firewall.Code(err) != "conflict" {
 		t.Fatalf("同标识异参数必须拒绝：%v", err)
 	}
-	if _, _, err = e.Store.Receive(t.Context(), "op2", protocol.Version, a, "启动一"); !errors.Is(err, ErrBusy) {
+	if _, _, err = e.Store.Receive(t.Context(), "op2", protocol.ContractVersion, a, "启动一"); !errors.Is(err, ErrBusy) {
 		t.Fatalf("节点不能并行写入：%v", err)
 	}
 	sealed, err := e.Store.Reconcile(t.Context(), "late")
 	if err != nil || sealed.Record.State != protocol.Rejected {
 		t.Fatal(err)
 	}
-	got, created, err = e.Store.Receive(t.Context(), "late", protocol.Version, a, "启动一")
+	got, created, err = e.Store.Receive(t.Context(), "late", protocol.ContractVersion, a, "启动一")
 	if err != nil || created || got.Action != nil || got.Record.State != protocol.Rejected {
 		t.Fatal("封存后晚到的请求不能执行")
 	}
@@ -281,7 +281,7 @@ func TestInterruptedBeforeWriteAndThirdValue(t *testing.T) {
 				t.Fatalf("不可盲重放或覆盖第三值：%+v %v", l.Record, h.writes)
 			}
 			if third {
-				if _, _, err = e.Store.Receive(t.Context(), "blocked", protocol.Version, a, "启动一"); !errors.Is(err, ErrBusy) {
+				if _, _, err = e.Store.Receive(t.Context(), "blocked", protocol.ContractVersion, a, "启动一"); !errors.Is(err, ErrBusy) {
 					t.Fatal("需处理操作仍应阻止新写入")
 				}
 				if _, err = e.Store.Request(t.Context(), "intent", "resolve", l.Record.Revision-1); firewall.Code(err) != "conflict" {

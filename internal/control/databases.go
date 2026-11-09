@@ -107,13 +107,17 @@ func (s *Server) ListDatabaseClusters(w http.ResponseWriter, r *http.Request) {
 	items, e := s.databaseStatuses(r.Context())
 	s.resultError(w, r, 200, httpapi.ManagedDatabaseList{Items: convertHTTP[[]httpapi.ManagedDatabaseStatus](items)}, e)
 }
-func (s *Server) GetDatabaseCluster(w http.ResponseWriter, r *http.Request, id string) {
+func (s *Server) GetDatabaseCluster(w http.ResponseWriter, r *http.Request, id string, params httpapi.GetDatabaseClusterParams) {
 	c, e := s.node.DatabaseCluster(r.Context(), id)
 	if e != nil {
 		s.operationError(w, r, e)
 		return
 	}
-	out, e := s.node.ManagedDatabaseStatus(r.Context(), c)
+	scope := "health"
+	if params.View != nil {
+		scope = string(*params.View)
+	}
+	out, e := s.node.ManagedDatabaseStatus(r.Context(), c, scope)
 	s.resultError(w, r, 200, convertHTTP[httpapi.ManagedDatabaseStatus](out), e)
 }
 func (s *Server) saveDatabaseDefinition(w http.ResponseWriter, r *http.Request, id string, create bool) {

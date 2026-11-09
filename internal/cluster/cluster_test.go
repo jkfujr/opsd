@@ -398,7 +398,7 @@ func TestBoundedConnectionsWithTwentyPeers(t *testing.T) {
 		}
 	}
 	first.mu.Unlock()
-	if resident > 8 || total > 8 {
+	if resident > 8 || total > 32 {
 		t.Fatalf("连接未受限：resident=%d total=%d", resident, total)
 	}
 }

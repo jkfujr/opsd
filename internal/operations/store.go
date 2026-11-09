@@ -147,7 +147,7 @@ func begin(ctx context.Context, db *sql.DB) (*sql.Conn, error) {
 }
 func finish(c *sql.Conn) { c.ExecContext(context.Background(), "ROLLBACK"); c.Close() }
 func (s Store) Receive(ctx context.Context, id string, version int, action protocol.OperationAction, bootID string) (Local, bool, error) {
-	if !validID.MatchString(id) || version != protocol.Version {
+	if !validID.MatchString(id) || version != protocol.ContractVersion {
 		return Local{}, false, firewall.Unsupported("操作标识或契约版本无效")
 	}
 	if _, e := protocol.Encode(protocol.Message{RequestID: "validation", Payload: &protocol.OperationSubmit{OperationID: id, ContractVersion: version, Action: action}}); e != nil {
@@ -230,7 +230,7 @@ func (s Store) Reconcile(ctx context.Context, id string) (Local, error) {
 	}
 	l.Record = protocol.OperationRecord{ID: id, State: protocol.Rejected, Revision: 1, Decision: "undecided", Steps: []protocol.OperationStep{}, Error: &protocol.Error{Code: "not_accepted", Message: "Agent 未受理，已封存该操作标识"}}
 	r, _ := json.Marshal(l.Record)
-	if _, e = c.ExecContext(ctx, "INSERT INTO operations(id,contract_version,record,terminal) VALUES(?,?,?,1)", id, protocol.Version, string(r)); e != nil {
+	if _, e = c.ExecContext(ctx, "INSERT INTO operations(id,contract_version,record,terminal) VALUES(?,?,?,1)", id, protocol.ContractVersion, string(r)); e != nil {
 		return l, e
 	}
 	_, e = c.ExecContext(ctx, "COMMIT")

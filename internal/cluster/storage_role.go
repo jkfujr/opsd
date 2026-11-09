@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/url"
+	"sort"
 	"strings"
 	"time"
 
@@ -145,13 +146,25 @@ func (n *Node) manageDatabase(ctx context.Context) error {
 			active[m.ID] = true
 		}
 	}
+	ids := []string{}
+	for id := range active {
+		ids = append(ids, id)
+	}
+	sort.Strings(ids)
+	neighbors := map[string]bool{}
+	for i, id := range ids {
+		if id == n.ID && len(ids) > 1 {
+			neighbors[ids[(i+1)%len(ids)]] = true
+			neighbors[ids[(i-1+len(ids))%len(ids)]] = true
+		}
+	}
 	for _, row := range jobs.Rows {
 		if !strings.HasPrefix(row.ID, "opsd_") {
 			continue
 		}
 		target, _ := row.Doc["opsd_target"].(string)
 		name, _ := row.Doc["opsd_database"].(string)
-		if !active[target] || (strings.HasPrefix(name, "opsd_metrics_") && !activeMetricDatabase(name, n.Now())) {
+		if !neighbors[target] || (strings.HasPrefix(name, "opsd_metrics_") && !activeMetricDatabase(name, n.Now())) {
 			rev, _ := row.Doc["_rev"].(string)
 			if _, e = d.request(ctx, "DELETE", "/_replicator/"+url.PathEscape(row.ID)+"?rev="+url.QueryEscape(rev), nil, nil); e != nil {
 				return e
@@ -174,7 +187,7 @@ func (n *Node) manageDatabase(ctx context.Context) error {
 		existing[row.ID] = true
 	}
 	for _, m := range dir.Members {
-		if m.ID == n.ID || !active[m.ID] {
+		if m.ID == n.ID || !neighbors[m.ID] {
 			continue
 		}
 		auth, err := n.savedCredentials(ctx, "access:"+m.ID)
@@ -217,7 +230,7 @@ func (n *Node) StorageStatus(ctx context.Context) (StorageStatus, error) {
 	} else {
 		result.State = "unavailable"
 	}
-	if n.storageError != "" {
+	if n.storageError != "" || n.maintenanceError != "" {
 		result.State = "pending"
 	}
 	n.storageMu.Unlock()

@@ -4,8 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"math/rand/v2"
 	"net/http"
 	"sort"
+	"sync"
 	"time"
 
 	"github.com/coder/websocket"
@@ -15,13 +17,16 @@ import (
 )
 
 type peer struct {
-	refs     int
-	channel  *transport.Channel
-	calls    *transport.Calls
-	id       string
-	resident bool
-	done     chan struct{}
-	last     time.Time
+	refs       int
+	channel    *transport.Channel
+	calls      *transport.Calls
+	id         string
+	resident   bool
+	outbound   bool
+	summary    map[string]string
+	exchangeMu sync.Mutex
+	done       chan struct{}
+	last       time.Time
 }
 
 func (n *Node) PeerHandler() http.Handler {
@@ -75,12 +80,6 @@ func (n *Node) accept(w http.ResponseWriter, r *http.Request) {
 			e = fault("forbidden", "集群身份不匹配")
 		}
 	}
-	var d Directory
-	if e == nil && !joining && len(hello.Directory) > 0 {
-		if e = json.Unmarshal(hello.Directory, &d); e == nil {
-			e = n.merge(r.Context(), d, false)
-		}
-	}
 	if e != nil {
 		n.sendFailure(r.Context(), channel, first.RequestID, e)
 		return
@@ -89,12 +88,15 @@ func (n *Node) accept(w http.ResponseWriter, r *http.Request) {
 	if e != nil {
 		return
 	}
-	d, e = n.Directory(r.Context())
-	if e != nil {
-		return
+	var directoryBody json.RawMessage
+	if joining {
+		d, err := n.Directory(r.Context())
+		if err != nil {
+			return
+		}
+		directoryBody, _ = json.Marshal(d)
 	}
 	memberBody, _ := json.Marshal(self)
-	directoryBody, _ := json.Marshal(d)
 	ctx, cancel = context.WithTimeout(r.Context(), 10*time.Second)
 	e = channel.Send(ctx, protocol.Message{RequestID: identity.Random(), ReplyTo: first.RequestID, Payload: &protocol.PeerHello{Member: memberBody, Directory: directoryBody, Resident: hello.Resident}})
 	cancel()
@@ -117,7 +119,15 @@ func (n *Node) attach(p *peer) bool {
 		return false
 	}
 	if old := n.connections[p.id]; old != nil {
-		return false
+		preferred := p.outbound == (n.ID < p.id)
+		if !preferred || old.outbound == p.outbound {
+			return false
+		}
+		p.resident = p.resident || old.resident
+		n.connections[p.id] = p
+		n.wg.Add(1)
+		old.channel.Close()
+		return true
 	}
 	residents, total := 0, 0
 	for _, c := range n.connections {
@@ -126,8 +136,21 @@ func (n *Node) attach(p *peer) bool {
 			residents++
 		}
 	}
-	if total >= 32 || (p.resident && residents >= 8) {
-		return false
+	if p.resident && residents >= 8 {
+		p.resident = false
+	}
+	if total >= 32 {
+		var oldest *peer
+		for _, candidate := range n.connections {
+			if !candidate.resident && candidate.refs == 0 && (oldest == nil || candidate.last.Before(oldest.last)) {
+				oldest = candidate
+			}
+		}
+		if oldest == nil {
+			return false
+		}
+		delete(n.connections, oldest.id)
+		oldest.channel.Close()
 	}
 	n.connections[p.id] = p
 	n.wg.Add(1)
@@ -145,15 +168,14 @@ func (n *Node) servePeer(ctx context.Context, p *peer) {
 		close(p.done)
 		n.mu.Unlock()
 	}()
-	slots := make(chan struct{}, 8)
+	ctx, cancelAll := context.WithCancel(ctx)
+	dispatch := n.startPeerDispatch(ctx, p)
+	defer func() { cancelAll(); p.channel.Close(); dispatch.wg.Wait() }()
 	for {
-		readCtx, cancel := context.WithTimeout(ctx, 45*time.Second)
+		readCtx, cancel := context.WithTimeout(ctx, 90*time.Second)
 		message, e := p.channel.Receive(readCtx)
 		cancel()
 		if e != nil {
-			return
-		}
-		if !n.Active(ctx, p.id) {
 			return
 		}
 		n.mu.Lock()
@@ -165,28 +187,17 @@ func (n *Node) servePeer(ctx context.Context, p *peer) {
 		if message.ReplyTo != "" {
 			continue
 		}
+		if !n.Active(ctx, p.id) {
+			return
+		}
 		body, ok := message.Payload.(*protocol.PeerCall)
 		if !ok {
 			return
 		}
-		select {
-		case slots <- struct{}{}:
-		case <-ctx.Done():
+		if !dispatch.enqueue(message, body) {
+			p.channel.Close()
 			return
 		}
-		go func(m protocol.Message, b *protocol.PeerCall) {
-			defer func() { <-slots }()
-			callCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
-			defer cancel()
-			value, e := n.dispatch(callCtx, p.id, b.Method, b.Body)
-			reply := &protocol.PeerReply{}
-			if e != nil {
-				reply.Error = wireError(e)
-			} else {
-				reply.Body, _ = json.Marshal(value)
-			}
-			_ = p.channel.Send(callCtx, protocol.Message{RequestID: identity.Random(), ReplyTo: m.RequestID, Payload: reply})
-		}(message, body)
 	}
 }
 func wireError(e error) *protocol.Error {
@@ -221,17 +232,8 @@ func (n *Node) dial(ctx context.Context, m Member, resident bool, token string) 
 		return nil, e
 	}
 	selfBody, _ := json.Marshal(self)
-	var dir json.RawMessage
-	if token == "" {
-		d, err := n.Directory(ctx)
-		if err != nil {
-			channel.Close()
-			return nil, err
-		}
-		dir, _ = json.Marshal(d)
-	}
 	id := identity.Random()
-	e = channel.Send(ctx, protocol.Message{RequestID: id, Payload: &protocol.PeerHello{Member: selfBody, Directory: dir, Resident: resident, Token: token}})
+	e = channel.Send(ctx, protocol.Message{RequestID: id, Payload: &protocol.PeerHello{Member: selfBody, Resident: resident, Token: token}})
 	if e != nil {
 		channel.Close()
 		return nil, e
@@ -251,21 +253,19 @@ func (n *Node) dial(ctx context.Context, m Member, resident bool, token string) 
 		return nil, fault("forbidden", "接入应答无效")
 	}
 	var remote Member
-	var d Directory
-	if json.Unmarshal(hello.Member, &remote) != nil || json.Unmarshal(hello.Directory, &d) != nil || remote.Public != m.Public {
+	if json.Unmarshal(hello.Member, &remote) != nil || remote.Public != m.Public || validateMember(remote) != nil {
 		channel.Close()
 		return nil, fault("forbidden", "节点身份不匹配")
 	}
 	if token != "" {
-		e = n.joinDirectory(ctx, d)
+		var d Directory
+		if e = json.Unmarshal(hello.Directory, &d); e == nil {
+			e = n.joinDirectory(ctx, d)
+		}
 		channel.Close()
 		return nil, e
 	}
-	if e = n.merge(ctx, d, false); e != nil {
-		channel.Close()
-		return nil, e
-	}
-	p := &peer{channel: channel, calls: transport.NewCalls(), id: m.ID, resident: resident, done: make(chan struct{}), last: n.Now()}
+	p := &peer{channel: channel, calls: transport.NewCalls(), id: m.ID, resident: resident, outbound: true, done: make(chan struct{}), last: n.Now()}
 	if !n.attach(p) {
 		channel.Close()
 		n.mu.Lock()
@@ -298,6 +298,17 @@ func (n *Node) connection(ctx context.Context, id string, resident bool) (*peer,
 		p := n.connections[id]
 		waiting := n.dialing[id]
 		if p != nil {
+			if resident && !p.resident {
+				count := 0
+				for _, connected := range n.connections {
+					if connected.resident {
+						count++
+					}
+				}
+				if count < 8 {
+					p.resident = true
+				}
+			}
 			n.mu.Unlock()
 			return p, nil
 		}
@@ -318,6 +329,10 @@ func (n *Node) connection(ctx context.Context, id string, resident bool) (*peer,
 			p, e = n.dial(ctx, m, resident, "")
 		}
 		n.mu.Lock()
+		if e != nil && n.connections[id] != nil {
+			p = n.connections[id]
+			e = nil
+		}
 		delete(n.dialing, id)
 		close(waiting)
 		n.mu.Unlock()
@@ -354,14 +369,8 @@ func (n *Node) Call(ctx context.Context, target, method string, body, out any) e
 	defer func() {
 		n.mu.Lock()
 		p.refs--
-		closePeer := !p.resident && p.refs == 0
-		if closePeer && n.connections[p.id] == p {
-			delete(n.connections, p.id)
-		}
+		p.last = n.Now()
 		n.mu.Unlock()
-		if closePeer {
-			p.channel.Close()
-		}
 	}()
 	message, e := p.calls.Call(ctx, p.channel, &protocol.PeerCall{Method: method, Body: b})
 	if e != nil {
@@ -394,14 +403,14 @@ func (n *Node) Connected(id string) bool {
 	return n.connections[id] != nil || (!n.seen[id].IsZero() && n.Now().Sub(n.seen[id]) < 15*time.Second)
 }
 func (n *Node) discovery() {
-	ticker := time.NewTicker(10 * time.Second)
-	defer ticker.Stop()
 	for {
 		n.exchange()
+		timer := time.NewTimer(time.Duration(9000+rand.IntN(2000)) * time.Millisecond)
 		select {
 		case <-n.ctx.Done():
+			timer.Stop()
 			return
-		case <-ticker.C:
+		case <-timer.C:
 		}
 	}
 }
@@ -435,22 +444,54 @@ func (n *Node) exchange() {
 			}
 		}
 	}
+	n.pruneConnections(neighbors)
+	var wg sync.WaitGroup
+	slots := make(chan struct{}, 4)
 	for id := range neighbors {
-		ctx, cancel := context.WithTimeout(n.ctx, 4*time.Second)
-		p, err := n.connection(ctx, id, true)
-		if err == nil {
-			b, _ := json.Marshal(d)
+		wg.Add(1)
+		go func(id string) {
+			defer wg.Done()
+			select {
+			case slots <- struct{}{}:
+			case <-n.ctx.Done():
+				return
+			}
+			defer func() { <-slots }()
+			ctx, cancel := context.WithTimeout(n.ctx, 4*time.Second)
+			defer cancel()
+			p, err := n.connection(ctx, id, true)
+			if err != nil {
+				return
+			}
+			p.exchangeMu.Lock()
+			defer p.exchangeMu.Unlock()
+			b, _ := json.Marshal(DirectoryExchange{Summary: directorySummary(d), Delta: directoryDelta(d, p.summary)})
 			message, err := p.calls.Call(ctx, p.channel, &protocol.PeerCall{Method: "directory", Body: b})
-			if err == nil {
-				if reply, ok := message.Payload.(*protocol.PeerReply); ok && reply.Error == nil {
-					var other Directory
-					if json.Unmarshal(reply.Body, &other) == nil {
-						_ = n.merge(ctx, other, false)
-					}
+			if err != nil {
+				return
+			}
+			if reply, ok := message.Payload.(*protocol.PeerReply); ok && reply.Error == nil {
+				var other DirectoryExchange
+				if json.Unmarshal(reply.Body, &other) == nil && n.merge(ctx, other.Delta, false) == nil {
+					p.summary = other.Summary
 				}
 			}
-		}
-		cancel()
+		}(id)
 	}
+	wg.Wait()
 	_ = n.Rewrap(n.ctx)
+}
+
+func (n *Node) pruneConnections(neighbors map[string]Member) {
+	n.mu.Lock()
+	for id, p := range n.connections {
+		if _, ok := neighbors[id]; !ok {
+			p.resident = false
+		}
+		if !p.resident && p.refs == 0 && n.Now().Sub(p.last) >= 60*time.Second {
+			delete(n.connections, id)
+			p.channel.Close()
+		}
+	}
+	n.mu.Unlock()
 }

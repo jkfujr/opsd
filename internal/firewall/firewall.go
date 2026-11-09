@@ -138,7 +138,7 @@ func (m *Manager) Preview(ctx context.Context, change protocol.FirewallChange) (
 	if err = validateChange(change); err != nil {
 		return protocol.ChangePlan{}, err
 	}
-	p := protocol.ChangePlan{ID: identity.Random(), ContractVersion: protocol.Version, CreatedAt: time.Now().UTC(), Backend: s.Backend, Change: change, Reasons: []string{}, AffectedScopes: []string{}}
+	p := protocol.ChangePlan{ID: identity.Random(), ContractVersion: protocol.ContractVersion, CreatedAt: time.Now().UTC(), Backend: s.Backend, Change: change, Reasons: []string{}, AffectedScopes: []string{}}
 	selector, err := selectChange(s, change)
 	if err != nil {
 		return p, err

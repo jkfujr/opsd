@@ -84,11 +84,12 @@ func TestRejectDamagedTruncatedAndOversizedRecords(t *testing.T) {
 		data    []byte
 		corrupt bool
 	}{
-		{"篡改", []byte{0, 0, 0, 2, '{', '}'}, true},
-		{"截断", []byte{0, 0, 0, 20, '{', '}'}, false},
-		{"逻辑超限", []byte{0, 128, 0, 1}, false},
+		{"篡改", frame(1, 2, 0, []byte("{}")), true},
+		{"截断", frame(1, 20, 0, []byte("{}")), false},
+		{"逻辑超限", frame(1, protocol.MaxMessageBytes+1, 0, []byte("a")), false},
 		{"记录超限", make([]byte, RecordBytes+1), false},
-		{"长度不匹配", []byte{0, 0, 0, 1, '{', '}'}, false},
+		{"长度不匹配", frame(1, 1, 0, []byte("{}")), false},
+		{"分片次序", frame(1, 20, 4, []byte("{}")), false},
 		{"版本不兼容", nil, false},
 	}
 	for _, item := range cases {
@@ -96,10 +97,8 @@ func TestRejectDamagedTruncatedAndOversizedRecords(t *testing.T) {
 			channel, received := pair(t)
 			plain := item.data
 			if item.name == "版本不兼容" {
-				body := []byte(`{"version":2,"kind":"heartbeat","request_id":"x","body":{"sent_at":"2026-10-27T00:00:00Z"}}`)
-				plain = make([]byte, 4+len(body))
-				binary.BigEndian.PutUint32(plain, uint32(len(body)))
-				copy(plain[4:], body)
+				body := []byte(`{"version":99,"kind":"heartbeat","request_id":"x","body":{"sent_at":"2026-10-27T00:00:00Z"}}`)
+				plain = frame(1, len(body), 0, body)
 			}
 			encrypted, err := channel.send.Encrypt(nil, nil, plain)
 			if err != nil {
@@ -123,5 +122,42 @@ func TestRejectDamagedTruncatedAndOversizedRecords(t *testing.T) {
 				t.Fatal("损坏消息未在期限内终止")
 			}
 		})
+	}
+}
+
+func frame(id uint64, total, offset int, body []byte) []byte {
+	out := make([]byte, 16+len(body))
+	binary.BigEndian.PutUint64(out, id)
+	binary.BigEndian.PutUint32(out[8:], uint32(total))
+	binary.BigEndian.PutUint32(out[12:], uint32(offset))
+	copy(out[16:], body)
+	return out
+}
+
+func TestSmallReplyPassesIncompleteLargeMessage(t *testing.T) {
+	c, received := pair(t)
+	large, e := protocol.Encode(protocol.Message{RequestID: "large", Payload: &protocol.RequestFailed{Error: protocol.Error{Code: "test", Message: strings.Repeat("x", RecordBytes*4)}}})
+	if e != nil {
+		t.Fatal(e)
+	}
+	small, e := protocol.Encode(protocol.Message{RequestID: "control", ReplyTo: "request", Payload: &protocol.RequestFailed{Error: protocol.Error{Code: "test", Message: "确认应答"}}})
+	if e != nil {
+		t.Fatal(e)
+	}
+	for _, part := range [][]byte{frame(1, len(large), 0, large[:RecordBytes-16]), frame(2, len(small), 0, small)} {
+		record, e := c.send.Encrypt(nil, nil, part)
+		if e != nil {
+			t.Fatal(e)
+		}
+		if e = c.socket.Write(t.Context(), websocket.MessageBinary, record); e != nil {
+			t.Fatal(e)
+		}
+	}
+	reply, e := c.Receive(t.Context())
+	if e != nil || reply.RequestID != "control" {
+		t.Fatal("小应答被大消息阻塞", reply.RequestID, e)
+	}
+	if e = <-received; e != nil {
+		t.Fatal(e)
 	}
 }

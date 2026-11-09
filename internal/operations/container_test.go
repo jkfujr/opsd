@@ -111,7 +111,7 @@ func TestContainerInterruptedStartReadsBackWithoutRepeating(t *testing.T) {
 	if local.Record.State != protocol.Succeeded || runtime.writes != 1 {
 		t.Fatal(local, runtime.writes)
 	}
-	_, created, err := e.Store.Receive(t.Context(), "container-start", protocol.Version, action, "启动一")
+	_, created, err := e.Store.Receive(t.Context(), "container-start", protocol.ContractVersion, action, "启动一")
 	if err != nil || created || runtime.writes != 1 {
 		t.Fatal("重复请求改变了结果", created, err)
 	}

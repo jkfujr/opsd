@@ -7,7 +7,6 @@ import (
 	"slices"
 	"sort"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/jkfujr/opsd/internal/cluster"
@@ -45,34 +44,19 @@ func (s *Server) currentReadings(ctx context.Context, target string) (httpapi.Mo
 	sort.Slice(selected, func(i, j int) bool { return selected[i].Id < selected[j].Id })
 	out.Items = make([]httpapi.MonitoringNode, len(selected))
 	readings := make([]monitoring.Reading, len(selected))
-	ctx, cancel := context.WithTimeout(ctx, 2600*time.Millisecond)
-	defer cancel()
-	var wg sync.WaitGroup
-	slots := make(chan struct{}, 8)
 	for i, n := range selected {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			reading := monitoring.Reading{NodeID: n.Id, State: "offline"}
-			select {
-			case slots <- struct{}{}:
-				reading = s.node.Reading(ctx, n.Id)
-				<-slots
-			case <-ctx.Done():
-			}
-			item := httpapi.MonitoringNode{NodeId: n.Id, Name: n.Name, State: httpapi.MonitoringNodeState(reading.State), CheckedAt: out.CheckedAt}
-			if n.Region != nil {
-				item.Region = *n.Region
-			}
-			if reading.Metrics != nil {
-				m := convertHTTP[httpapi.Metrics](reading.Metrics)
-				item.Metrics = &m
-			}
-			out.Items[i] = item
-			readings[i] = reading
-		}()
+		reading := s.node.Reading(ctx, n.Id)
+		item := httpapi.MonitoringNode{NodeId: n.Id, Name: n.Name, State: httpapi.MonitoringNodeState(reading.State), CheckedAt: out.CheckedAt, Read: convertHTTP[httpapi.ReadStatus](reading.Read)}
+		if n.Region != nil {
+			item.Region = *n.Region
+		}
+		if reading.Metrics != nil {
+			m := convertHTTP[httpapi.Metrics](reading.Metrics)
+			item.Metrics = &m
+		}
+		out.Items[i] = item
+		readings[i] = reading
 	}
-	wg.Wait()
 	out.Summary = convertHTTP[httpapi.MonitoringSummary](monitoring.Aggregate(readings, out.CheckedAt))
 	return out, nil
 }

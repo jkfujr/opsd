@@ -13,6 +13,7 @@ import (
 )
 
 type DatabaseConnection struct {
+	PoolKey        string   `json:"pool_key,omitempty"`
 	Kind           string   `json:"kind"`
 	Address        string   `json:"address"`
 	Socket         string   `json:"socket,omitempty"`
@@ -87,6 +88,7 @@ type DatabaseProxyUser struct {
 	Protected bool   `json:"protected"`
 }
 type DatabaseState struct {
+	Read              ReadStatus            `json:"read"`
 	State             string                `json:"state"`
 	Version           string                `json:"version"`
 	ClusterID         string                `json:"cluster_id"`
@@ -134,6 +136,7 @@ func (*DatabaseDiscovered) Kind() Kind { return "database.discovered" }
 func (*DatabaseDiscovered) isPayload() {}
 
 type DatabaseRead struct {
+	Scope      string             `json:"scope,omitempty"`
 	Connection DatabaseConnection `json:"connection"`
 	ClusterID  string             `json:"cluster_id,omitempty"`
 	User       string             `json:"user,omitempty"`

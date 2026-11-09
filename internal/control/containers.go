@@ -1,12 +1,10 @@
 package control
 
 import (
-	"context"
 	"encoding/json"
 	"net/http"
 	"sort"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/jkfujr/opsd/internal/cluster"
@@ -15,8 +13,7 @@ import (
 )
 
 func (s *Server) ListContainers(w http.ResponseWriter, r *http.Request, _ httpapi.ListContainersParams) {
-	ctx, cancel := context.WithTimeout(r.Context(), 4500*time.Millisecond)
-	defer cancel()
+	ctx := r.Context()
 	nodes, err := s.nodes(ctx)
 	if err != nil {
 		s.operationError(w, r, err)
@@ -24,34 +21,24 @@ func (s *Server) ListContainers(w http.ResponseWriter, r *http.Request, _ httpap
 	}
 	target, stateFilter, search := r.URL.Query().Get("node_id"), r.URL.Query().Get("state"), strings.ToLower(strings.TrimSpace(r.URL.Query().Get("search")))
 	out := httpapi.ContainerList{Items: []httpapi.ContainerListItem{}, Nodes: []httpapi.DockerNodeState{}}
-	var mu sync.Mutex
-	var wg sync.WaitGroup
-	slots := make(chan struct{}, 8)
 	for _, node := range nodes {
 		if node.RevokedAt != nil || target != "" && node.Id != target {
 			continue
 		}
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		func() {
 			snapshot := protocol.DockerState{State: "offline", Containers: []protocol.ContainerSummary{}, CheckedAt: s.now().UTC()}
-			select {
-			case slots <- struct{}{}:
-				err := s.node.Call(ctx, node.Id, "containers.read", nil, &snapshot)
-				<-slots
-				if err != nil {
-					snapshot.State = "offline"
-					snapshot.Error = &protocol.Error{Code: "node_unavailable", Message: "节点暂不可达"}
-				}
-			case <-ctx.Done():
-				snapshot.Error = &protocol.Error{Code: "node_unavailable", Message: "节点读取超时"}
+			read := s.node.CurrentRead(ctx, node.Id, "containers.read", nil, &snapshot, 3*time.Second)
+			if read.State != "ready" {
+				snapshot.State = read.State
+				snapshot.Error = read.Error
 			}
 			status := httpapi.DockerNodeState{NodeId: node.Id, NodeName: node.Name, EngineId: snapshot.EngineID, Version: snapshot.Version, State: httpapi.DockerNodeStateState(snapshot.State), CheckedAt: snapshot.CheckedAt}
+			status.Read = convertHTTP[httpapi.ReadStatus](read)
 			if snapshot.Error != nil {
 				status.Error = &httpapi.NetworkError{Code: snapshot.Error.Code, Message: snapshot.Error.Message}
 			}
 			items := []httpapi.ContainerListItem{}
-			if snapshot.State == "ready" {
+			if read.DataAt != nil {
 				for _, container := range snapshot.Containers {
 					matches := stateFilter == "" || container.State == stateFilter || stateFilter == "stopped" && (container.State == "created" || container.State == "exited" || container.State == "dead")
 					if !matches || search != "" && !strings.Contains(strings.ToLower(container.Name), search) {
@@ -66,13 +53,10 @@ func (s *Server) ListContainers(w http.ResponseWriter, r *http.Request, _ httpap
 					items = append(items, item)
 				}
 			}
-			mu.Lock()
 			out.Nodes = append(out.Nodes, status)
 			out.Items = append(out.Items, items...)
-			mu.Unlock()
 		}()
 	}
-	wg.Wait()
 	if target != "" && len(out.Nodes) == 0 {
 		s.operationError(w, r, &cluster.Fault{Code: "not_found", Message: "节点不存在或已撤销"})
 		return

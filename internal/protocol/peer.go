@@ -2,6 +2,14 @@ package protocol
 
 import "encoding/json"
 
+func ControlMethod(method string) bool {
+	switch method {
+	case "operation.get", "operation.confirm", "operation.cancel", "operation.recover", "operation.resolve", "ping", "api_token.verify":
+		return true
+	}
+	return false
+}
+
 type PeerHello struct {
 	Token       string          `json:"token,omitempty"`
 	Member      json.RawMessage `json:"member"`

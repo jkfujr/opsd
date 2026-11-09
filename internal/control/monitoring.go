@@ -1,19 +1,18 @@
 package control
 
 import (
-	"context"
 	"github.com/jkfujr/opsd/internal/cluster"
 	"github.com/jkfujr/opsd/internal/httpapi"
 	"github.com/jkfujr/opsd/internal/monitoring"
 	"github.com/jkfujr/opsd/internal/protocol"
 	"net/http"
-	"sync"
+	"slices"
+	"sort"
 	"time"
 )
 
 func (s *Server) GetOverview(w http.ResponseWriter, r *http.Request) {
-	ctx, cancel := context.WithTimeout(r.Context(), 2600*time.Millisecond)
-	defer cancel()
+	ctx := r.Context()
 	nodes, e := s.nodes(ctx)
 	if e != nil {
 		s.operationError(w, r, e)
@@ -21,37 +20,14 @@ func (s *Server) GetOverview(w http.ResponseWriter, r *http.Request) {
 	}
 	items := []cluster.OverviewNode{}
 	readings := []monitoring.Reading{}
-	slots := make(chan struct{}, 8)
-	var wg sync.WaitGroup
-	var mu sync.Mutex
 	for _, node := range nodes {
 		if node.RevokedAt != nil {
 			continue
 		}
-		select {
-		case slots <- struct{}{}:
-		case <-ctx.Done():
-			mu.Lock()
-			items = append(items, cluster.OverviewNode{Node: node, Reading: monitoring.Reading{NodeID: node.Id, State: "offline", Firewall: "unknown"}})
-			mu.Unlock()
-			continue
-		}
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			defer func() { <-slots }()
-			ctx, cancel := context.WithTimeout(ctx, 2500*time.Millisecond)
-			defer cancel()
-			reading := s.node.Reading(ctx, node.Id)
-			node.Connected = reading.State == "ready" || reading.State == "partial"
-			node.Writable = node.Connected
-			mu.Lock()
-			items = append(items, cluster.OverviewNode{Node: node, Reading: reading})
-			readings = append(readings, reading)
-			mu.Unlock()
-		}()
+		reading := s.node.Reading(ctx, node.Id)
+		items = append(items, cluster.OverviewNode{Node: node, Reading: reading})
+		readings = append(readings, reading)
 	}
-	wg.Wait()
 	pending, unavailable := s.node.PendingKnown()
 	s.resultError(w, r, 200, cluster.Overview{UpdatedAt: s.now(), Nodes: items, Summary: monitoring.Aggregate(readings, s.now()), PendingOperations: pending, Unavailable: unavailable}, e)
 }
@@ -69,24 +45,29 @@ func (s *Server) GetMonitoringHistory(w http.ResponseWriter, r *http.Request, _ 
 	buckets := map[int64]monitoring.Summary{}
 	unavailable := []string{}
 	nodeHistory := []httpapi.MonitoringNodeHistory{}
+	step := int64(c.IntervalMinutes * 60)
+	if count := int64(q.To.Sub(q.From).Seconds()) / step; count > 720 {
+		step *= (count + 719) / 720
+	}
+	byNode := map[string]map[int64]protocol.Metrics{}
+	unavailable = s.node.ReadHistory(r.Context(), targets, q, func(id string, m protocol.Metrics) {
+		if byNode[id] == nil {
+			byNode[id] = map[int64]protocol.Metrics{}
+		}
+		bucket := m.CollectedAt.Unix() / step
+		if old, ok := byNode[id][bucket]; !ok || m.CollectedAt.After(old.CollectedAt) {
+			byNode[id][bucket] = m
+		}
+	})
 	for _, id := range targets {
-		metrics, err := s.node.History(r.Context(), id, q)
-		if err != nil {
-			unavailable = append(unavailable, id)
-			continue
-		}
-		if r.URL.Query().Get("group_by") == "node" {
-			nodeHistory = append(nodeHistory, httpapi.MonitoringNodeHistory{NodeId: id, Items: convertHTTP[[]httpapi.Metrics](metrics)})
-		}
-		latest := map[int64]protocol.Metrics{}
-		for _, m := range metrics {
-			bucket := m.CollectedAt.Unix() / int64(c.IntervalMinutes*60)
-			if old, ok := latest[bucket]; !ok || m.CollectedAt.After(old.CollectedAt) {
-				latest[bucket] = m
-			}
-		}
-		for bucket, m := range latest {
+		metrics := []httpapi.Metrics{}
+		for bucket, m := range byNode[id] {
 			buckets[bucket] = monitoring.Combine(buckets[bucket], monitoring.Aggregate([]monitoring.Reading{{NodeID: id, State: "ready", Metrics: &m}}, m.CollectedAt))
+			metrics = append(metrics, convertHTTP[httpapi.Metrics](m))
+		}
+		sort.Slice(metrics, func(i, j int) bool { return metrics[i].CollectedAt.Before(metrics[j].CollectedAt) })
+		if r.URL.Query().Get("group_by") == "node" && !slices.Contains(unavailable, id) {
+			nodeHistory = append(nodeHistory, httpapi.MonitoringNodeHistory{NodeId: id, Items: metrics})
 		}
 	}
 	if len(unavailable) == len(targets) && len(targets) > 0 {
@@ -94,7 +75,6 @@ func (s *Server) GetMonitoringHistory(w http.ResponseWriter, r *http.Request, _ 
 		return
 	}
 	points := []monitoring.Point{}
-	step := int64(c.IntervalMinutes * 60)
 	for t := q.From.Unix() / step; t <= q.To.Unix()/step; t++ {
 		at := time.Unix(t*step, 0).UTC()
 		summary := buckets[t]
@@ -104,7 +84,7 @@ func (s *Server) GetMonitoringHistory(w http.ResponseWriter, r *http.Request, _ 
 		}
 		points = append(points, monitoring.Point{CollectedAt: at, Summary: summary})
 	}
-	out := map[string]any{"items": points, "interval_minutes": c.IntervalMinutes, "unavailable": unavailable, "checked_at": s.now().UTC()}
+	out := map[string]any{"items": points, "interval_minutes": step / 60, "unavailable": unavailable, "checked_at": s.now().UTC()}
 	if r.URL.Query().Get("group_by") == "node" {
 		out["nodes"] = nodeHistory
 	}

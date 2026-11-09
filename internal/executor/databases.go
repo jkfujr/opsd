@@ -34,6 +34,6 @@ func (s *Services) readDatabase(ctx context.Context, r protocol.DatabaseRead) (p
 		return out, e
 	}
 	var e error
-	out.State, e = manager.Read(ctx, r.Connection)
+	out.State, e = manager.Read(ctx, r.Connection, r.Scope)
 	return out, e
 }

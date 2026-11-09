@@ -11,7 +11,7 @@ export type Metrics = components['schemas']['Metrics'];
 export type OverviewNode = components['schemas']['OverviewNode'];
 type Point = components['schemas']['MonitoringPoint'];
 export const firewallNames = { enabled: '已启用', disabled: '已停用', none: '未安装', unknown: '未知' };
-export const readingNames = { ready: '', partial: '采集不完整', error: '采集失败', offline: '离线', unsupported: '无法采集' };
+export const readingNames = { ready: '', partial: '采集不完整', error: '采集失败', offline: '离线', unsupported: '无法采集', queued: '等待读取', reading: '读取中', stale: '待更新', timeout: '读取超时' };
 export const overviewQuery = { queryKey: ['overview'], retry: false, queryFn: async ({ signal }: { signal: AbortSignal }) => unwrap(await api.GET('/overview', { signal })), refetchInterval: 3000 };
 
 export function bytes(value?: number) {

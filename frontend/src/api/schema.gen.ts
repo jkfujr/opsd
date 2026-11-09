@@ -879,12 +879,13 @@ export interface components {
         MonitoringReading: {
             node_id: string;
             /** @enum {string} */
-            state: "ready" | "partial" | "error" | "offline" | "unsupported";
+            state: "ready" | "partial" | "error" | "offline" | "unsupported" | "queued" | "reading" | "stale" | "timeout";
             metrics?: components["schemas"]["Metrics"];
             error?: string;
             /** @enum {string} */
             firewall: "enabled" | "disabled" | "none" | "unknown";
             firewall_error?: string;
+            read: components["schemas"]["ReadStatus"];
         };
         OverviewNode: {
             node: components["schemas"]["Node"];
@@ -1720,10 +1721,11 @@ export interface components {
             engine_id: string;
             version: string;
             /** @enum {string} */
-            state: "ready" | "not_installed" | "unavailable" | "unsupported" | "offline";
+            state: "ready" | "not_installed" | "unavailable" | "unsupported" | "offline" | "queued" | "reading" | "stale" | "timeout" | "error";
             /** Format: date-time */
             checked_at: string;
             error?: components["schemas"]["NetworkError"];
+            read: components["schemas"]["ReadStatus"];
         };
         ContainerActionRequest: {
             engine_id: string;
@@ -1787,10 +1789,11 @@ export interface components {
             name: string;
             region: string;
             /** @enum {string} */
-            state: "ready" | "partial" | "offline";
+            state: "ready" | "partial" | "offline" | "queued" | "reading" | "stale" | "timeout" | "error";
             /** Format: date-time */
             checked_at: string;
             metrics?: components["schemas"]["Metrics"];
+            read: components["schemas"]["ReadStatus"];
         };
         MonitoringCurrent: {
             items: components["schemas"]["MonitoringNode"][];
@@ -1846,7 +1849,7 @@ export interface components {
         };
         DatabaseStatus: {
             /** @enum {string} */
-            state: "ready" | "unavailable" | "mismatch";
+            state: "ready" | "unavailable" | "mismatch" | "queued" | "reading" | "stale" | "timeout" | "error" | "offline";
             version?: string;
             cluster_id?: string;
             cluster_name?: string;
@@ -1875,6 +1878,7 @@ export interface components {
             /** Format: date-time */
             checked_at: string;
             error?: components["schemas"]["NetworkError"];
+            read: components["schemas"]["ReadStatus"];
         };
         DatabaseInstance: {
             id: string;
@@ -2026,6 +2030,15 @@ export interface components {
             order: components["schemas"]["NavigationItem"][];
             /** Format: int64 */
             revision: number;
+        };
+        ReadStatus: {
+            /** @enum {string} */
+            state: "queued" | "reading" | "ready" | "stale" | "timeout" | "error" | "offline";
+            /** Format: date-time */
+            data_at?: string;
+            /** Format: date-time */
+            attempted_at?: string;
+            error?: components["schemas"]["NetworkError"];
         };
     };
     responses: {
@@ -3880,7 +3893,9 @@ export interface operations {
     };
     getDatabaseCluster: {
         parameters: {
-            query?: never;
+            query?: {
+                view?: "health" | "schemas" | "users" | "proxies";
+            };
             header?: never;
             path: {
                 id: string;

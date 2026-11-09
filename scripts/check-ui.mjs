@@ -193,13 +193,14 @@ try {
   const checked = new Date().toISOString();
   const member = { node_id: id, instance_id: 'galera', name: 'MariaDB', address: '127.0.0.1:3306' };
   const proxy = { node_id: id, instance_id: 'proxy', name: 'ProxySQL', address: '127.0.0.1:6032' };
-  const databaseState = { state: 'ready', version: '11.8.9-MariaDB', cluster_id: 'ui-cluster', cluster_name: '业务集群', configured_members: 'gcomm://10.0.0.1,10.0.0.2', actual_members: '10.0.0.1:3306,10.0.0.2:3306', member_address: '10.0.0.1:3306', cluster_size: 2, primary: true, ready: true, synced: true, read_only: false, connections: 12, receive_queue: 0, send_queue: 0, flow_control: 0.01, checked_at: checked, databases: [{ name: 'mysql', charset: 'utf8mb4', collation: 'utf8mb4_general_ci', bytes: 4096, protected: true }, { name: 'business', charset: 'utf8mb4', collation: 'utf8mb4_unicode_ci', bytes: 1048576, protected: false }], users: [{ name: 'root', host: 'localhost', protected: true, grants: [] }, { name: 'business', host: '%', protected: false, grants: [{ database: 'business', privileges: ['SELECT', 'INSERT'] }] }], servers: [], pools: [], proxy_users: [], pending_changes: false };
+  const databaseState = { read: { state: 'ready', data_at: checked, attempted_at: checked }, state: 'ready', version: '11.8.9-MariaDB', cluster_id: 'ui-cluster', cluster_name: '业务集群', configured_members: 'gcomm://10.0.0.1,10.0.0.2', actual_members: '10.0.0.1:3306,10.0.0.2:3306', member_address: '10.0.0.1:3306', cluster_size: 2, primary: true, ready: true, synced: true, read_only: false, connections: 12, receive_queue: 0, send_queue: 0, flow_control: 0.01, checked_at: checked, databases: [{ name: 'mysql', charset: 'utf8mb4', collation: 'utf8mb4_general_ci', bytes: 4096, protected: true }, { name: 'business', charset: 'utf8mb4', collation: 'utf8mb4_unicode_ci', bytes: 1048576, protected: false }], users: [{ name: 'root', host: 'localhost', protected: true, grants: [] }, { name: 'business', host: '%', protected: false, grants: [{ database: 'business', privileges: ['SELECT', 'INSERT'] }] }], servers: [], pools: [], proxy_users: [], pending_changes: false };
   const definition = { id: databaseID, name: '业务 Galera', coordinator: id, cluster_id: 'ui-cluster', revision: 1, members: [member], proxies: [proxy], workbench_url: 'https://example.com/sql' };
   const databaseValue = { cluster: definition, checked_at: checked, members: [{ ...member, status: databaseState }], proxies: [{ ...proxy, status: { ...databaseState, version: '3.0.3', servers: [{ hostgroup: 10, host: '10.0.0.1', port: 3306, state: 'ONLINE' }], pools: [{ hostgroup: 10, host: '10.0.0.1', port: 3306, used: 3, free: 7, errors: 0 }], proxy_users: [{ name: 'business', active: true, hostgroup: 10, state: 'in_sync', protected: false }] } }] };
   const databasePath = `/databases/clusters/${databaseID}`;
+  const databaseURL = (url) => url.pathname === `/api/v1${databasePath}`;
   const databaseListRoute = (route) => route.request().method() === 'GET' ? route.fulfill({ json: { items: [databaseValue] } }) : route.continue();
   await page.route('**/api/v1/databases/clusters', databaseListRoute);
-  await page.route(`**/api/v1${databasePath}`, (route) => route.fulfill({ json: databaseValue }));
+  await page.route(databaseURL, (route) => route.fulfill({ json: databaseValue }));
   await page.route(`**/api/v1${databasePath}/backups`, (route) => route.fulfill({ json: { items: [{ node_id: id, instance_id: 'galera', items: [{ name: 'daily', schedule: '*-*-* 03:00:00', state: 'failed', last_run: checked, last_success: checked, artifacts: ['/backup/daily/business.sql.zst'], error: '备份目录空间不足' }] }] } }));
   const pages = [['overview', '/'], ['nodes', '/nodes'], ['detail', `/nodes/${id}`], ['containers', '/containers'], ['firewall', `/firewall?node=${id}`], ['firewall-settings', '/firewall/settings'], ['databases', '/databases'], ['database-detail', `/databases/${databaseID}`], ['storage', '/storage'], ['api', '/settings/api'], ['account', '/settings/account'], ['sessions', '/settings/sessions'], ['appearance', '/settings/appearance'], ['version', '/settings/version']];
   for (const theme of ['light', 'dark']) {
@@ -310,7 +311,7 @@ try {
   await page.getByRole('dialog').waitFor({ state: 'hidden' });
   await page.setViewportSize({ width: 1440, height: 1000 });
   await page.goto(`${base}/containers`);
-  const containerList = await api('/containers');
+  const containerList = await waitFor(() => api('/containers'), (value) => value.nodes.some((item) => item.state === 'ready'), '容器读取未完成');
   const nativeContainer = containerList.items.find((item) => item.name === 'opsd-ui-container');
   assert(nativeContainer, '实际 Docker 容器未显示');
   assert.deepEqual(await page.getByRole('columnheader').allTextContents(), ['容器', '状态', '节点', '镜像', '端口', '操作']);
@@ -606,11 +607,11 @@ try {
   await page.unroute(`**/api/v1${databasePath}/changes`);
   await page.unroute('**/api/v1/operations/ui-database-operation');
   await page.unroute('**/api/v1/operations/ui-database-operation/recover');
-  await page.route(`**/api/v1${databasePath}`, (route) => route.fulfill({ status: 503, json: { code: 'dependency_unavailable', message: '数据库协调节点暂不可达' } }));
+  await page.route(databaseURL, (route) => route.fulfill({ status: 503, json: { code: 'dependency_unavailable', message: '数据库协调节点暂不可达' } }));
   await page.reload();
   await page.getByRole('alert').filter({ hasText: '数据库协调节点暂不可达' }).waitFor();
   await capture('database-read-error');
-  await page.unroute(`**/api/v1${databasePath}`);
+  await page.unroute(databaseURL);
   await page.unroute('**/api/v1/databases/clusters');
   await page.unroute(`**/api/v1${databasePath}/backups`);
 

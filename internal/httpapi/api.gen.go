@@ -331,17 +331,35 @@ func (e DatabaseInstanceInputKind) Valid() bool {
 
 // Defines values for DatabaseStatusState.
 const (
+	DatabaseStatusStateError       DatabaseStatusState = "error"
 	DatabaseStatusStateMismatch    DatabaseStatusState = "mismatch"
+	DatabaseStatusStateOffline     DatabaseStatusState = "offline"
+	DatabaseStatusStateQueued      DatabaseStatusState = "queued"
+	DatabaseStatusStateReading     DatabaseStatusState = "reading"
 	DatabaseStatusStateReady       DatabaseStatusState = "ready"
+	DatabaseStatusStateStale       DatabaseStatusState = "stale"
+	DatabaseStatusStateTimeout     DatabaseStatusState = "timeout"
 	DatabaseStatusStateUnavailable DatabaseStatusState = "unavailable"
 )
 
 // Valid indicates whether the value is a known member of the DatabaseStatusState enum.
 func (e DatabaseStatusState) Valid() bool {
 	switch e {
+	case DatabaseStatusStateError:
+		return true
 	case DatabaseStatusStateMismatch:
 		return true
+	case DatabaseStatusStateOffline:
+		return true
+	case DatabaseStatusStateQueued:
+		return true
+	case DatabaseStatusStateReading:
+		return true
 	case DatabaseStatusStateReady:
+		return true
+	case DatabaseStatusStateStale:
+		return true
+	case DatabaseStatusStateTimeout:
 		return true
 	case DatabaseStatusStateUnavailable:
 		return true
@@ -370,9 +388,14 @@ func (e DiscoveredDatabaseInstanceKind) Valid() bool {
 
 // Defines values for DockerNodeStateState.
 const (
+	DockerNodeStateStateError        DockerNodeStateState = "error"
 	DockerNodeStateStateNotInstalled DockerNodeStateState = "not_installed"
 	DockerNodeStateStateOffline      DockerNodeStateState = "offline"
+	DockerNodeStateStateQueued       DockerNodeStateState = "queued"
+	DockerNodeStateStateReading      DockerNodeStateState = "reading"
 	DockerNodeStateStateReady        DockerNodeStateState = "ready"
+	DockerNodeStateStateStale        DockerNodeStateState = "stale"
+	DockerNodeStateStateTimeout      DockerNodeStateState = "timeout"
 	DockerNodeStateStateUnavailable  DockerNodeStateState = "unavailable"
 	DockerNodeStateStateUnsupported  DockerNodeStateState = "unsupported"
 )
@@ -380,11 +403,21 @@ const (
 // Valid indicates whether the value is a known member of the DockerNodeStateState enum.
 func (e DockerNodeStateState) Valid() bool {
 	switch e {
+	case DockerNodeStateStateError:
+		return true
 	case DockerNodeStateStateNotInstalled:
 		return true
 	case DockerNodeStateStateOffline:
 		return true
+	case DockerNodeStateStateQueued:
+		return true
+	case DockerNodeStateStateReading:
+		return true
 	case DockerNodeStateStateReady:
+		return true
+	case DockerNodeStateStateStale:
+		return true
+	case DockerNodeStateStateTimeout:
 		return true
 	case DockerNodeStateStateUnavailable:
 		return true
@@ -529,19 +562,34 @@ func (e ManagedPolicyAction) Valid() bool {
 
 // Defines values for MonitoringNodeState.
 const (
+	MonitoringNodeStateError   MonitoringNodeState = "error"
 	MonitoringNodeStateOffline MonitoringNodeState = "offline"
 	MonitoringNodeStatePartial MonitoringNodeState = "partial"
+	MonitoringNodeStateQueued  MonitoringNodeState = "queued"
+	MonitoringNodeStateReading MonitoringNodeState = "reading"
 	MonitoringNodeStateReady   MonitoringNodeState = "ready"
+	MonitoringNodeStateStale   MonitoringNodeState = "stale"
+	MonitoringNodeStateTimeout MonitoringNodeState = "timeout"
 )
 
 // Valid indicates whether the value is a known member of the MonitoringNodeState enum.
 func (e MonitoringNodeState) Valid() bool {
 	switch e {
+	case MonitoringNodeStateError:
+		return true
 	case MonitoringNodeStateOffline:
 		return true
 	case MonitoringNodeStatePartial:
 		return true
+	case MonitoringNodeStateQueued:
+		return true
+	case MonitoringNodeStateReading:
+		return true
 	case MonitoringNodeStateReady:
+		return true
+	case MonitoringNodeStateStale:
+		return true
+	case MonitoringNodeStateTimeout:
 		return true
 	default:
 		return false
@@ -577,7 +625,11 @@ const (
 	MonitoringReadingStateError       MonitoringReadingState = "error"
 	MonitoringReadingStateOffline     MonitoringReadingState = "offline"
 	MonitoringReadingStatePartial     MonitoringReadingState = "partial"
+	MonitoringReadingStateQueued      MonitoringReadingState = "queued"
+	MonitoringReadingStateReading     MonitoringReadingState = "reading"
 	MonitoringReadingStateReady       MonitoringReadingState = "ready"
+	MonitoringReadingStateStale       MonitoringReadingState = "stale"
+	MonitoringReadingStateTimeout     MonitoringReadingState = "timeout"
 	MonitoringReadingStateUnsupported MonitoringReadingState = "unsupported"
 )
 
@@ -590,7 +642,15 @@ func (e MonitoringReadingState) Valid() bool {
 		return true
 	case MonitoringReadingStatePartial:
 		return true
+	case MonitoringReadingStateQueued:
+		return true
+	case MonitoringReadingStateReading:
+		return true
 	case MonitoringReadingStateReady:
+		return true
+	case MonitoringReadingStateStale:
+		return true
+	case MonitoringReadingStateTimeout:
 		return true
 	case MonitoringReadingStateUnsupported:
 		return true
@@ -1001,6 +1061,39 @@ func (e PublicFamilyPatchMode) Valid() bool {
 	}
 }
 
+// Defines values for ReadStatusState.
+const (
+	ReadStatusStateError   ReadStatusState = "error"
+	ReadStatusStateOffline ReadStatusState = "offline"
+	ReadStatusStateQueued  ReadStatusState = "queued"
+	ReadStatusStateReading ReadStatusState = "reading"
+	ReadStatusStateReady   ReadStatusState = "ready"
+	ReadStatusStateStale   ReadStatusState = "stale"
+	ReadStatusStateTimeout ReadStatusState = "timeout"
+)
+
+// Valid indicates whether the value is a known member of the ReadStatusState enum.
+func (e ReadStatusState) Valid() bool {
+	switch e {
+	case ReadStatusStateError:
+		return true
+	case ReadStatusStateOffline:
+		return true
+	case ReadStatusStateQueued:
+		return true
+	case ReadStatusStateReading:
+		return true
+	case ReadStatusStateReady:
+		return true
+	case ReadStatusStateStale:
+		return true
+	case ReadStatusStateTimeout:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for ResolveOperationAcceptCurrent.
 const (
 	True ResolveOperationAcceptCurrent = true
@@ -1079,6 +1172,30 @@ func (e StorageStatusState) Valid() bool {
 	case StorageStatusStateReady:
 		return true
 	case StorageStatusStateUnavailable:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetDatabaseClusterParamsView.
+const (
+	Health  GetDatabaseClusterParamsView = "health"
+	Proxies GetDatabaseClusterParamsView = "proxies"
+	Schemas GetDatabaseClusterParamsView = "schemas"
+	Users   GetDatabaseClusterParamsView = "users"
+)
+
+// Valid indicates whether the value is a known member of the GetDatabaseClusterParamsView enum.
+func (e GetDatabaseClusterParamsView) Valid() bool {
+	switch e {
+	case Health:
+		return true
+	case Proxies:
+		return true
+	case Schemas:
+		return true
+	case Users:
 		return true
 	default:
 		return false
@@ -1479,6 +1596,7 @@ type DatabaseStatus struct {
 	Pools             *[]DatabaseProxyPool   `json:"pools,omitempty"`
 	Primary           *bool                  `json:"primary,omitempty"`
 	ProxyUsers        *[]DatabaseProxyUser   `json:"proxy_users,omitempty"`
+	Read              ReadStatus             `json:"read"`
 	ReadOnly          *bool                  `json:"read_only,omitempty"`
 	Ready             *bool                  `json:"ready,omitempty"`
 	ReceiveQueue      *float64               `json:"receive_queue,omitempty"`
@@ -1528,6 +1646,7 @@ type DockerNodeState struct {
 	Error     *NetworkError        `json:"error,omitempty"`
 	NodeId    string               `json:"node_id"`
 	NodeName  string               `json:"node_name"`
+	Read      ReadStatus           `json:"read"`
 	State     DockerNodeStateState `json:"state"`
 	Version   string               `json:"version"`
 }
@@ -1740,6 +1859,7 @@ type MonitoringNode struct {
 	Metrics   *Metrics            `json:"metrics,omitempty"`
 	Name      string              `json:"name"`
 	NodeId    string              `json:"node_id"`
+	Read      ReadStatus          `json:"read"`
 	Region    string              `json:"region"`
 	State     MonitoringNodeState `json:"state"`
 }
@@ -1766,6 +1886,7 @@ type MonitoringReading struct {
 	FirewallError *string                   `json:"firewall_error,omitempty"`
 	Metrics       *Metrics                  `json:"metrics,omitempty"`
 	NodeId        string                    `json:"node_id"`
+	Read          ReadStatus                `json:"read"`
 	State         MonitoringReadingState    `json:"state"`
 }
 
@@ -2069,6 +2190,17 @@ type PublicFamilyPatch struct {
 // PublicFamilyPatchMode defines model for PublicFamilyPatch.Mode.
 type PublicFamilyPatchMode string
 
+// ReadStatus defines model for ReadStatus.
+type ReadStatus struct {
+	AttemptedAt *time.Time      `json:"attempted_at,omitempty"`
+	DataAt      *time.Time      `json:"data_at,omitempty"`
+	Error       *NetworkError   `json:"error,omitempty"`
+	State       ReadStatusState `json:"state"`
+}
+
+// ReadStatusState defines model for ReadStatus.State.
+type ReadStatusState string
+
 // ReplicationStatus defines model for ReplicationStatus.
 type ReplicationStatus struct {
 	ErrorCount int64  `json:"error_count"`
@@ -2217,6 +2349,14 @@ type ListContainersParams struct {
 	State  *string `form:"state,omitempty" json:"state,omitempty"`
 	Search *string `form:"search,omitempty" json:"search,omitempty"`
 }
+
+// GetDatabaseClusterParams defines parameters for GetDatabaseCluster.
+type GetDatabaseClusterParams struct {
+	View *GetDatabaseClusterParamsView `form:"view,omitempty" json:"view,omitempty"`
+}
+
+// GetDatabaseClusterParamsView defines parameters for GetDatabaseCluster.
+type GetDatabaseClusterParamsView string
 
 // ChangeDatabaseParams defines parameters for ChangeDatabase.
 type ChangeDatabaseParams struct {
@@ -2486,7 +2626,7 @@ type ServerInterface interface {
 	CreateDatabaseCluster(w http.ResponseWriter, r *http.Request)
 	// GetDatabaseCluster 读取数据库集群
 	// (GET /databases/clusters/{id})
-	GetDatabaseCluster(w http.ResponseWriter, r *http.Request, id string)
+	GetDatabaseCluster(w http.ResponseWriter, r *http.Request, id string, params GetDatabaseClusterParams)
 	// UpdateDatabaseCluster 编辑数据库集群
 	// (PATCH /databases/clusters/{id})
 	UpdateDatabaseCluster(w http.ResponseWriter, r *http.Request, id string)
@@ -3093,8 +3233,24 @@ func (siw *ServerInterfaceWrapper) GetDatabaseCluster(w http.ResponseWriter, r *
 		return
 	}
 
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetDatabaseClusterParams
+
+	// ------------- Optional query parameter "view" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "view", r.URL.Query(), &params.View, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "view"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "view", Err: err})
+		}
+		return
+	}
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.GetDatabaseCluster(w, r, id)
+		siw.Handler.GetDatabaseCluster(w, r, id, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -6776,7 +6932,8 @@ func (response CreateDatabaseCluster503JSONResponse) VisitCreateDatabaseClusterR
 }
 
 type GetDatabaseClusterRequestObject struct {
-	Id string `json:"id"`
+	Id     string `json:"id"`
+	Params GetDatabaseClusterParams
 }
 
 type GetDatabaseClusterResponseObject interface {
@@ -12482,10 +12639,11 @@ func (sh *strictHandler) CreateDatabaseCluster(w http.ResponseWriter, r *http.Re
 }
 
 // GetDatabaseCluster operation middleware
-func (sh *strictHandler) GetDatabaseCluster(w http.ResponseWriter, r *http.Request, id string) {
+func (sh *strictHandler) GetDatabaseCluster(w http.ResponseWriter, r *http.Request, id string, params GetDatabaseClusterParams) {
 	var request GetDatabaseClusterRequestObject
 
 	request.Id = id
+	request.Params = params
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
 		return sh.ssi.GetDatabaseCluster(ctx, request.(GetDatabaseClusterRequestObject))

@@ -115,7 +115,7 @@ func TestManagedImportPersistsAndOnlyConfirmedTargetCanAutoApply(t *testing.T) {
 		t.Fatalf("重新导入覆盖了确认配置：%+v %v", again, err)
 	}
 	action.FirewallConfig.Automatic = true
-	if _, _, err = e.Store.Receive(t.Context(), "unconfirmed", protocol.Version, action, "启动一"); firewall.Code(err) != "conflict" {
+	if _, _, err = e.Store.Receive(t.Context(), "unconfirmed", protocol.ContractVersion, action, "启动一"); firewall.Code(err) != "conflict" {
 		t.Fatalf("未确认配置可自动应用：%v", err)
 	}
 }
@@ -126,7 +126,7 @@ func TestManagedConfigurationConfirmationFailureAndRecovery(t *testing.T) {
 			e, _, clock := operationFixture(t)
 			h, action := managedAction(t, e, mode != "inactive")
 			accept(t, e, "managed", action)
-			if _, created, err := e.Store.Receive(t.Context(), "managed", protocol.Version, action, "启动一"); err != nil || created {
+			if _, created, err := e.Store.Receive(t.Context(), "managed", protocol.ContractVersion, action, "启动一"); err != nil || created {
 				t.Fatalf("重复受理：%v", err)
 			}
 			ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)

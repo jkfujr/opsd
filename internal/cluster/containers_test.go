@@ -118,7 +118,7 @@ func TestContainerProtocolActionIsTyped(t *testing.T) {
 		raw, _ := json.Marshal(a)
 		var b protocol.OperationAction
 		_ = json.Unmarshal(raw, &b)
-		if _, err := protocol.Encode(protocol.Message{RequestID: "typed", Payload: &protocol.OperationSubmit{OperationID: "op", ContractVersion: protocol.Version, Action: b}}); err == nil {
+		if _, err := protocol.Encode(protocol.Message{RequestID: "typed", Payload: &protocol.OperationSubmit{OperationID: "op", ContractVersion: protocol.ContractVersion, Action: b}}); err == nil {
 			t.Fatal("接受了非类型化容器动作", value)
 		}
 	}

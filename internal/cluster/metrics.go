@@ -48,6 +48,7 @@ func (n *Node) metrics(ctx context.Context, stream string) (protocol.MonitoringR
 		n.liveMu.Lock()
 		entry.value = v
 		entry.err = e
+		entry.at = n.Now()
 		close(entry.done)
 		entry.done = nil
 		n.liveMu.Unlock()
@@ -136,7 +137,12 @@ func (n *Node) History(ctx context.Context, target string, q HistoryQuery) ([]pr
 	if target == n.ID {
 		return n.localHistory(ctx, q)
 	}
-	return n.archivedMetrics(ctx, target, q)
+	items := []protocol.Metrics{}
+	failed := n.ReadHistory(ctx, []string{target}, q, func(_ string, m protocol.Metrics) { items = append(items, m) })
+	if len(failed) > 0 {
+		return nil, fault("dependency_unavailable", "监控历史不可用")
+	}
+	return items, nil
 }
 
 type Overview struct {
@@ -157,10 +163,25 @@ func (n *Node) Reading(ctx context.Context, id string) monitoring.Reading {
 		protocol.MonitoringResult
 		Pending []Operation `json:"pending_operations"`
 	}
-	if e := n.Call(ctx, id, "metrics", nil, &m); e != nil {
+	status := n.CurrentRead(ctx, id, "metrics", nil, &m, 3*time.Second)
+	r.Read = status
+	if status.DataAt == nil || status.State != "ready" {
+		r.State = status.State
+		r.Error = ""
+		if status.Error != nil {
+			r.Error = status.Error.Message
+		}
+		if status.DataAt != nil {
+			r.Metrics = &m.Metrics
+		}
 		n.liveMu.Lock()
-		if old, ok := n.readings[id]; ok {
-			r.Metrics = old.Metrics
+		if n.readings == nil {
+			n.readings = map[string]monitoring.Reading{}
+			n.pending = map[string][]Operation{}
+		}
+		n.readings[id] = r
+		if _, ok := n.pending[id]; !ok {
+			n.pending[id] = nil
 		}
 		n.liveMu.Unlock()
 		return r
@@ -185,6 +206,10 @@ func (n *Node) Reading(ctx context.Context, id string) monitoring.Reading {
 func (n *Node) PendingKnown() ([]Operation, []string) {
 	n.liveMu.Lock()
 	pending := map[string][]Operation{}
+	states := map[string]string{}
+	for id, r := range n.readings {
+		states[id] = r.Read.State
+	}
 	for id, ops := range n.pending {
 		pending[id] = append([]Operation(nil), ops...)
 	}
@@ -193,10 +218,10 @@ func (n *Node) PendingKnown() ([]Operation, []string) {
 	unavailable := []string{}
 	for id, ops := range pending {
 		for _, op := range ops {
-			op.ResultPendingSync = !n.Connected(id)
+			op.ResultPendingSync = !n.Connected(id) || states[id] != "ready"
 			out = append(out, op)
 		}
-		if !n.Connected(id) {
+		if !n.Connected(id) || states[id] != "ready" {
 			unavailable = append(unavailable, id)
 		}
 	}

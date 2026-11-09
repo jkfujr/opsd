@@ -347,7 +347,7 @@ func TestDatabaseNativeClusterAPIAndDashboard(t *testing.T) {
 		t.Fatal(e)
 	}
 	for _, node := range nodes[1:] {
-		if e = a.node.Call(t.Context(), node.node.ID, "directory", directory, nil); e != nil {
+		if e = a.node.Call(t.Context(), node.node.ID, "directory", cluster.DirectoryExchange{Delta: directory}, nil); e != nil {
 			t.Fatal(e)
 		}
 	}
@@ -390,6 +390,13 @@ func TestDatabaseNativeClusterAPIAndDashboard(t *testing.T) {
 	user := map[string]any{"expected_revision": registered.Revision, "kind": "create_user", "user": "opsd_business", "host": "%", "password": businessPassword, "grants": []protocol.DatabaseGrant{{Database: "opsd_ci_business", Privileges: []string{"SELECT", "INSERT"}}}, "proxies": proxies}
 	op = nativeSubmit(t, c, raw, registered.ID, "create-user", user)
 	nativeOperation(t, b, raw, op.ID, protocol.Succeeded)
+	limited := f.galera[0]
+	limited.Username = "opsd_business"
+	limited.Password = businessPassword
+	health, healthErr := manager.Read(t.Context(), limited, "health")
+	if healthErr != nil || health.State != "ready" || len(health.Users) != 0 || len(health.Databases) != 0 {
+		t.Fatal("健康摘要依赖账号或库详情权限", healthErr, health.State)
+	}
 	for _, port := range f.proxyPorts {
 		connection := protocol.DatabaseConnection{Kind: "galera", Address: fmt.Sprintf("127.0.0.1:%d", port), Username: "opsd_business", Password: businessPassword}
 		db := nativeSQL(t, connection)

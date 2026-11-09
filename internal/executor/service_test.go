@@ -52,7 +52,7 @@ func TestManualRequestPersistsBeforeReplacingExitingWorker(t *testing.T) {
 	defer db.Close()
 	store := operations.Store{DB: db}
 	a := protocol.OperationAction{Kind: "component", Component: &protocol.ComponentAction{Component: "firewall", Action: "install", Backend: "ufw"}}
-	l, _, err := store.Receive(t.Context(), "manual", protocol.Version, a, "boot")
+	l, _, err := store.Receive(t.Context(), "manual", protocol.ContractVersion, a, "boot")
 	if err != nil {
 		t.Fatal(err)
 	}

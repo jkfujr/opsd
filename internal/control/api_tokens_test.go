@@ -92,7 +92,7 @@ func joinAPINodes(t *testing.T, nodes ...*apiNode) {
 		t.Fatal(e)
 	}
 	for _, entry := range nodes[1:] {
-		if e = nodes[0].node.Call(t.Context(), entry.node.ID, "directory", d, nil); e != nil {
+		if e = nodes[0].node.Call(t.Context(), entry.node.ID, "directory", cluster.DirectoryExchange{Delta: d}, nil); e != nil {
 			t.Fatal(e)
 		}
 	}
@@ -191,8 +191,19 @@ func TestAPITokensAcrossEntriesScopesAndOwnerFailure(t *testing.T) {
 	}
 	for _, entry := range []*apiNode{a, b, c} {
 		var current httpapi.MonitoringCurrent
-		if code := apiCall(t, http.DefaultClient, entry.web.URL, "GET", "/api/v1/monitoring/current", created.Value, "", "", nil, &current); code != 200 || len(current.Items) != 2 || current.Summary.Metrics.CpuUsage == nil || *current.Summary.Metrics.CpuUsage != 65 {
-			t.Fatal("跨入口地域过滤或加权错误", code, len(current.Items))
+		deadline := time.Now().Add(3 * time.Second)
+		for {
+			code := apiCall(t, http.DefaultClient, entry.web.URL, "GET", "/api/v1/monitoring/current", created.Value, "", "", nil, &current)
+			if code != 200 || len(current.Items) != 2 {
+				t.Fatal("跨入口地域过滤错误", code, len(current.Items))
+			}
+			if current.Summary.Metrics.CpuUsage != nil && *current.Summary.Metrics.CpuUsage == 65 {
+				break
+			}
+			if time.Now().After(deadline) {
+				t.Fatal("共享读取未取得实际数据", current.Items)
+			}
+			time.Sleep(10 * time.Millisecond)
 		}
 		for _, item := range current.Items {
 			if item.NodeId == b.node.ID || item.Region != "日本" {
@@ -232,7 +243,7 @@ func TestAPITokensAcrossEntriesScopesAndOwnerFailure(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, entry := range []*apiNode{a, b} {
-		if err = c.node.Call(t.Context(), entry.node.ID, "directory", directory, nil); err != nil {
+		if err = c.node.Call(t.Context(), entry.node.ID, "directory", cluster.DirectoryExchange{Delta: directory}, nil); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -355,8 +366,19 @@ func TestAPIWriteIdentityPaginationAndConsoleSeparation(t *testing.T) {
 		t.Fatal(e)
 	}
 	var containers httpapi.ContainerList
-	if code := apiCall(t, http.DefaultClient, c.web.URL, "GET", "/api/v1/containers", monitor, "", "", nil, &containers); code != 200 || len(containers.Nodes) != 1 || len(containers.Items) != 1 {
-		t.Fatal("关闭网页后 API 不可用或容器范围错误", code)
+	deadline := time.Now().Add(3 * time.Second)
+	for {
+		code := apiCall(t, http.DefaultClient, c.web.URL, "GET", "/api/v1/containers", monitor, "", "", nil, &containers)
+		if code != 200 || len(containers.Nodes) != 1 {
+			t.Fatal("关闭网页后 API 不可用或容器范围错误", code)
+		}
+		if len(containers.Items) == 1 {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("容器共享读取未完成", containers.Nodes)
+		}
+		time.Sleep(10 * time.Millisecond)
 	}
 	if code := apiCall(t, http.DefaultClient, c.web.URL, "POST", "/api/v1/nodes/"+b.node.ID+"/containers/"+strings.Repeat("b", 64)+"/actions", monitor, "write", "", map[string]string{"action": "restart", "engine_id": "test-engine"}, nil); code != 403 {
 		t.Fatal("读取令牌执行了容器变更", code)

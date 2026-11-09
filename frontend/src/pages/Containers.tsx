@@ -21,7 +21,7 @@ type Action = components['schemas']['ContainerActionRequest']['action'];
 const actions: Record<Action, string> = { start: '启动', stop: '停止', restart: '重启' };
 const states: Record<string, string> = { running: '运行中', exited: '已停止', created: '未启动', paused: '已暂停', restarting: '重启中', removing: '移除中', dead: '异常' };
 const health: Record<string, string> = { healthy: '健康', unhealthy: '不健康', starting: '检查中' };
-const runtimeStates = { ready: '可用', not_installed: '未安装 Docker', unavailable: 'Docker 不可用', unsupported: '暂不支持', offline: '节点离线' };
+const runtimeStates = { ready: '可用', not_installed: '未安装 Docker', unavailable: 'Docker 不可用', unsupported: '暂不支持', offline: '节点离线', queued: '等待读取', reading: '读取中', stale: '待更新', timeout: '读取超时', error: '读取失败' };
 
 function useVisible() {
   const [visible, setVisible] = useState(document.visibilityState !== 'hidden');
@@ -47,7 +47,7 @@ export function Containers() {
   const node = params.get('node') ?? '', state = params.get('state') ?? '', search = params.get('search') ?? '';
   const visible = useVisible();
   const nodes = useQuery(nodesQuery);
-  const query = useQuery({ queryKey: ['containers', 'list', node, state, search], enabled: visible, queryFn: async ({ signal }) => unwrap(await api.GET('/containers', { signal, params: { query: { node_id: node || undefined, state: state || undefined, search: search || undefined } } })), refetchInterval: visible ? 5000 : false });
+  const query = useQuery({ queryKey: ['containers', 'list', node, state, search], enabled: visible, queryFn: async ({ signal }) => unwrap(await api.GET('/containers', { signal, params: { query: { node_id: node || undefined, state: state || undefined, search: search || undefined } } })), refetchInterval: visible ? 3000 : false });
   const [refreshing, setRefreshing] = useState(false);
   const refresh = async () => { setRefreshing(true); try { await query.refetch(); } finally { setRefreshing(false); } };
   const [detail, setDetail] = useState<Container | null>(null);

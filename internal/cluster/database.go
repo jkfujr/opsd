@@ -174,36 +174,63 @@ func (n *Node) selectDatabase(ctx context.Context) (*database, error) {
 func (n *Node) storageLoop() {
 	ticker := time.NewTicker(5 * time.Second)
 	defer ticker.Stop()
-	nextSample := time.Time{}
-	nextManage := time.Time{}
 	for {
 		ctx, cancel := context.WithTimeout(n.ctx, 20*time.Second)
-		c, e := n.Config(ctx)
+		d, e := n.selectDatabase(ctx)
 		if e == nil {
-			if !n.Now().Before(nextSample) {
-				_ = n.sample(ctx)
-				nextSample = n.Now().Add(time.Duration(c.IntervalMinutes) * time.Minute)
-			}
-			if c.Storage.Enabled && !n.Now().Before(nextManage) {
-				e = n.manageDatabase(ctx)
-				nextManage = n.Now().Add(30 * time.Second)
-			}
-			if e == nil {
-				var d *database
-				d, e = n.selectDatabase(ctx)
-				if e == nil {
-					e = n.upload(ctx, d)
-					if e == nil {
-						e = n.compactFirewallRecords(ctx)
-					}
-				}
-			}
+			e = n.upload(ctx, d)
+		}
+		if e == nil {
+			e = n.compactFirewallRecords(ctx)
 		}
 		n.storageMu.Lock()
+		n.storageError = ""
 		if e != nil {
 			n.storageError = "数据尚未同步"
-		} else {
-			n.storageError = ""
+		}
+		n.storageMu.Unlock()
+		cancel()
+		select {
+		case <-n.ctx.Done():
+			return
+		case <-ticker.C:
+		}
+	}
+}
+
+func (n *Node) sampleLoop() {
+	for {
+		ctx, cancel := context.WithTimeout(n.ctx, 10*time.Second)
+		c, e := n.Config(ctx)
+		interval := 5 * time.Minute
+		if e == nil {
+			interval = time.Duration(c.IntervalMinutes) * time.Minute
+			_ = n.sample(ctx)
+		}
+		cancel()
+		timer := time.NewTimer(interval)
+		select {
+		case <-n.ctx.Done():
+			timer.Stop()
+			return
+		case <-timer.C:
+		}
+	}
+}
+
+func (n *Node) maintenanceLoop() {
+	ticker := time.NewTicker(30 * time.Second)
+	defer ticker.Stop()
+	for {
+		ctx, cancel := context.WithTimeout(n.ctx, 25*time.Second)
+		c, e := n.Config(ctx)
+		if e == nil && c.Storage.Enabled {
+			e = n.manageDatabase(ctx)
+		}
+		n.storageMu.Lock()
+		n.maintenanceError = ""
+		if e != nil {
+			n.maintenanceError = "数据库维护未完成"
 		}
 		n.storageMu.Unlock()
 		cancel()
@@ -341,63 +368,6 @@ func (n *Node) latest(ctx context.Context, owner, kind, object string) (Record, 
 	}
 	_, e = n.DB.ExecContext(ctx, "INSERT INTO observed_versions(id,sequence) VALUES(?,?) ON CONFLICT(id) DO UPDATE SET sequence=MAX(sequence,excluded.sequence)", key, r.Sequence)
 	return r, e
-}
-func (n *Node) archivedMetrics(ctx context.Context, owner string, q HistoryQuery) ([]protocol.Metrics, error) {
-	d, e := n.selectDatabase(ctx)
-	if e != nil {
-		return nil, e
-	}
-	items := []protocol.Metrics{}
-	from := q.From.UTC().Truncate(24 * time.Hour)
-	for day := from; !day.After(q.To) && day.Before(from.AddDate(0, 0, 8)); day = day.AddDate(0, 0, 1) {
-		name := "opsd_metrics_" + day.Format("20060102")
-		if !activeMetricDatabase(name, n.Now()) {
-			continue
-		}
-		prefix := owner + "~metrics~"
-		start, _ := json.Marshal(prefix)
-		end, _ := json.Marshal(prefix + "\ufff0")
-		cursor := ""
-		for {
-			values := url.Values{"include_docs": {"true"}, "limit": {"200"}, "startkey": {string(start)}, "endkey": {string(end)}}
-			if cursor != "" {
-				b, _ := json.Marshal(cursor)
-				values.Set("startkey", string(b))
-				values.Set("skip", "1")
-			}
-			var response struct {
-				Rows []struct {
-					ID  string `json:"id"`
-					Doc Record `json:"doc"`
-				} `json:"rows"`
-			}
-			status, err := d.request(ctx, "GET", "/"+name+"/_all_docs?"+values.Encode(), nil, &response)
-			if status == 404 {
-				break
-			}
-			if err != nil {
-				return nil, err
-			}
-			for _, row := range response.Rows {
-				r := row.Doc
-				if e = n.Verify(ctx, r); e != nil {
-					return nil, e
-				}
-				var m protocol.Metrics
-				if e = json.Unmarshal(r.Data, &m); e != nil {
-					return nil, e
-				}
-				if !m.CollectedAt.Before(q.From) && !m.CollectedAt.After(q.To) {
-					items = append(items, m)
-				}
-			}
-			if len(response.Rows) < 200 {
-				break
-			}
-			cursor = response.Rows[len(response.Rows)-1].ID
-		}
-	}
-	return items, nil
 }
 func (n *Node) archivedOperations(ctx context.Context, owner string, q ListQuery) (OperationList, error) {
 	d, e := n.selectDatabase(ctx)

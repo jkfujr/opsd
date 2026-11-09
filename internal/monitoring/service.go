@@ -15,12 +15,13 @@ type Target struct {
 	Connected, Supported bool
 }
 type Reading struct {
-	NodeID        string            `json:"node_id"`
-	State         string            `json:"state"`
-	Metrics       *protocol.Metrics `json:"metrics,omitempty"`
-	Error         string            `json:"error,omitempty"`
-	Firewall      string            `json:"firewall"`
-	FirewallError string            `json:"firewall_error,omitempty"`
+	Read          protocol.ReadStatus `json:"read"`
+	NodeID        string              `json:"node_id"`
+	State         string              `json:"state"`
+	Metrics       *protocol.Metrics   `json:"metrics,omitempty"`
+	Error         string              `json:"error,omitempty"`
+	Firewall      string              `json:"firewall"`
+	FirewallError string              `json:"firewall_error,omitempty"`
 }
 type Coverage struct {
 	CPU     int `json:"cpu"`

@@ -28,43 +28,46 @@ type Options struct {
 	Now                          func() time.Time
 }
 type Node struct {
-	DB            *sql.DB
-	ID            string
-	Key           identity.Key
-	signing       ed25519.PrivateKey
-	age           *age.X25519Identity
-	cluster       string
-	Executor      Executor
-	Now           func() time.Time
-	mu            sync.Mutex
-	connections   map[string]*peer
-	dialing       map[string]chan struct{}
-	ctx           context.Context
-	cancel        context.CancelFunc
-	wg            sync.WaitGroup
-	wake          chan struct{}
-	changed       chan struct{}
-	collector     monitoring.Collector
-	liveMu        sync.Mutex
-	live          *liveRead
-	storageMu     sync.Mutex
-	storage       *database
-	storageError  string
-	Configure     func(context.Context, Config) (func(bool), error)
-	subscribers   map[chan Change]struct{}
-	readings      map[string]monitoring.Reading
-	pending       map[string][]Operation
-	seen          map[string]time.Time
-	closed        bool
-	started       bool
-	eventSequence atomic.Uint64
-	addressMu     sync.Mutex
-	networkWake   chan struct{}
-	ObservePublic func(context.Context, protocol.AddressFamily) []protocol.AddressObservation
-	dockerMu      sync.Mutex
-	dockerReads   map[string]*containerRead
-	databaseMu    sync.Mutex
-	databaseReads map[string]*managedDatabaseReadEntry
+	DB               *sql.DB
+	ID               string
+	Key              identity.Key
+	signing          ed25519.PrivateKey
+	age              *age.X25519Identity
+	cluster          string
+	Executor         Executor
+	Now              func() time.Time
+	mu               sync.Mutex
+	connections      map[string]*peer
+	dialing          map[string]chan struct{}
+	ctx              context.Context
+	cancel           context.CancelFunc
+	wg               sync.WaitGroup
+	wake             chan struct{}
+	changed          chan struct{}
+	collector        monitoring.Collector
+	liveMu           sync.Mutex
+	live             *liveRead
+	storageMu        sync.Mutex
+	storage          *database
+	storageError     string
+	maintenanceError string
+	Configure        func(context.Context, Config) (func(bool), error)
+	subscribers      map[chan Change]struct{}
+	readings         map[string]monitoring.Reading
+	pending          map[string][]Operation
+	seen             map[string]time.Time
+	closed           bool
+	started          bool
+	eventSequence    atomic.Uint64
+	addressMu        sync.Mutex
+	networkWake      chan struct{}
+	ObservePublic    func(context.Context, protocol.AddressFamily) []protocol.AddressObservation
+	dockerMu         sync.Mutex
+	dockerReads      map[string]*containerRead
+	databaseMu       sync.Mutex
+	databaseReads    map[string]*managedDatabaseReadEntry
+	current          map[string]*currentRead
+	readSlots        chan struct{}
 }
 
 func Defaults(c Config) Config {
@@ -215,11 +218,13 @@ func (n *Node) Start() {
 		return
 	}
 	n.started = true
-	n.wg.Add(5)
+	n.wg.Add(7)
 	n.mu.Unlock()
 	go func() { defer n.wg.Done(); n.discovery() }()
 	go func() { defer n.wg.Done(); n.queueLoop() }()
 	go func() { defer n.wg.Done(); n.storageLoop() }()
+	go func() { defer n.wg.Done(); n.sampleLoop() }()
+	go func() { defer n.wg.Done(); n.maintenanceLoop() }()
 	go func() { defer n.wg.Done(); n.firewallLoop() }()
 	go func() { defer n.wg.Done(); n.networkLoop() }()
 }

@@ -158,8 +158,8 @@ func (s *Server) authenticate(r *http.Request) (sessionContext, error) {
 	value.session.ExpiresAt = time.Unix(expires, 0).UTC()
 	value.session.LastSeenAt = time.Unix(last, 0).UTC()
 	value.session.Current = true
-	if s.now().Unix() > last {
-		_, err = s.db.ExecContext(r.Context(), "UPDATE sessions SET last_seen_at=? WHERE id=?", s.now().Unix(), value.session.Id)
+	if s.now().Unix()-last >= 60 {
+		_, err = s.db.ExecContext(r.Context(), "UPDATE sessions SET last_seen_at=? WHERE id=? AND last_seen_at<?", s.now().Unix(), value.session.Id, s.now().Unix()-59)
 	}
 	return value, err
 }
@@ -218,6 +218,7 @@ func (s *Server) page(w http.ResponseWriter, r *http.Request) {
 	}
 	path := r.URL.Path
 	if strings.HasPrefix(path, "/assets/") && s.options.Assets != nil {
+		w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
 		http.FileServerFS(s.options.Assets).ServeHTTP(w, r)
 		return
 	}

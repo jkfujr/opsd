@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/coder/websocket"
@@ -19,17 +20,26 @@ const RecordBytes = 60 * 1024
 var ErrAuthentication = errors.New("身份或协议不匹配")
 
 type Channel struct {
-	socket          *websocket.Conn
-	send, receive   *noise.CipherState
-	writeMu, readMu sync.Mutex
-	PeerPublic      []byte
+	socket        *websocket.Conn
+	send, receive *noise.CipherState
+	readMu        sync.Mutex
+	writeSlot     chan struct{}
+	sequence      atomic.Uint64
+	fragments     map[uint64]*fragment
+	fragmentBytes int
+	PeerPublic    []byte
+}
+
+type fragment struct {
+	total int
+	body  []byte
 }
 
 func Handshake(ctx context.Context, socket *websocket.Conn, key identity.Key, peer []byte, initiator bool) (*Channel, error) {
 	socket.SetReadLimit(65535)
 	state, err := noise.NewHandshakeState(noise.Config{
 		CipherSuite: noise.NewCipherSuite(noise.DH25519, noise.CipherChaChaPoly, noise.HashSHA256),
-		Pattern:     noise.HandshakeIK, Initiator: initiator, Prologue: []byte("OPSD/node/v1"),
+		Pattern:     noise.HandshakeIK, Initiator: initiator, Prologue: []byte("OPSD/node/v2"),
 		StaticKeypair: noise.DHKey{Private: key.Private, Public: key.Public}, PeerStatic: peer,
 	})
 	if err != nil {
@@ -75,7 +85,7 @@ func Handshake(ctx context.Context, socket *websocket.Conn, key identity.Key, pe
 			return nil, err
 		}
 	}
-	channel := &Channel{socket: socket, send: first, receive: second, PeerPublic: append([]byte(nil), state.PeerStatic()...)}
+	channel := &Channel{socket: socket, send: first, receive: second, writeSlot: make(chan struct{}, 1), PeerPublic: append([]byte(nil), state.PeerStatic()...)}
 	if !initiator {
 		channel.send, channel.receive = second, first
 	}
@@ -100,23 +110,36 @@ func (c *Channel) Send(ctx context.Context, message protocol.Message) error {
 	if err != nil {
 		return err
 	}
-	c.writeMu.Lock()
-	defer c.writeMu.Unlock()
-	plain := make([]byte, 4+len(data))
-	binary.BigEndian.PutUint32(plain, uint32(len(data)))
-	copy(plain[4:], data)
-	for len(plain) > 0 {
-		size := min(RecordBytes, len(plain))
-		record, err := c.send.Encrypt(nil, nil, plain[:size])
-		if err != nil {
-			c.Close()
-			return err
+	id := c.sequence.Add(1)
+	if id == 0 {
+		c.Close()
+		return fmt.Errorf("消息序号已耗尽")
+	}
+	for offset := 0; offset < len(data); {
+		size := min(RecordBytes-16, len(data)-offset)
+		plain := make([]byte, 16+size)
+		binary.BigEndian.PutUint64(plain, id)
+		binary.BigEndian.PutUint32(plain[8:], uint32(len(data)))
+		binary.BigEndian.PutUint32(plain[12:], uint32(offset))
+		copy(plain[16:], data[offset:offset+size])
+		select {
+		case c.writeSlot <- struct{}{}:
+		case <-ctx.Done():
+			if offset > 0 {
+				c.Close()
+			}
+			return ctx.Err()
 		}
-		if err := c.socket.Write(ctx, websocket.MessageBinary, record); err != nil {
-			c.Close()
-			return err
+		record, e := c.send.Encrypt(nil, nil, plain)
+		if e == nil {
+			e = c.socket.Write(ctx, websocket.MessageBinary, record)
 		}
-		plain = plain[size:]
+		<-c.writeSlot
+		if e != nil {
+			c.Close()
+			return e
+		}
+		offset += size
 	}
 	return nil
 }
@@ -124,37 +147,49 @@ func (c *Channel) Send(ctx context.Context, message protocol.Message) error {
 func (c *Channel) Receive(ctx context.Context) (protocol.Message, error) {
 	c.readMu.Lock()
 	defer c.readMu.Unlock()
-	data, err := c.readRecord(ctx)
-	if err != nil {
-		return protocol.Message{}, err
+	if c.fragments == nil {
+		c.fragments = map[uint64]*fragment{}
 	}
-	if len(data) < 4 {
-		c.Close()
-		return protocol.Message{}, fmt.Errorf("消息长度前缀不完整")
-	}
-	size := int(binary.BigEndian.Uint32(data[:4]))
-	if size <= 0 || size > protocol.MaxMessageBytes {
-		c.Close()
-		return protocol.Message{}, fmt.Errorf("消息长度超限")
-	}
-	body := make([]byte, 0, size)
-	body = append(body, data[4:]...)
-	for len(body) < size {
-		data, err = c.readRecord(ctx)
+	for {
+		data, err := c.readRecord(ctx)
 		if err != nil {
 			return protocol.Message{}, err
 		}
-		body = append(body, data...)
+		if len(data) <= 16 {
+			c.Close()
+			return protocol.Message{}, fmt.Errorf("消息分片不完整")
+		}
+		id := binary.BigEndian.Uint64(data)
+		total, offset := int(binary.BigEndian.Uint32(data[8:])), int(binary.BigEndian.Uint32(data[12:]))
+		if id == 0 || total <= 0 || total > protocol.MaxMessageBytes || offset+len(data)-16 > total {
+			c.Close()
+			return protocol.Message{}, fmt.Errorf("消息分片范围无效")
+		}
+		part := c.fragments[id]
+		if part == nil {
+			if offset != 0 || len(c.fragments) >= 64 || c.fragmentBytes+total > 34*1024*1024 {
+				c.Close()
+				return protocol.Message{}, fmt.Errorf("待接收消息数量或长度超限")
+			}
+			part = &fragment{total: total, body: make([]byte, 0, total)}
+			c.fragments[id] = part
+			c.fragmentBytes += total
+		}
+		if part.total != total || len(part.body) != offset {
+			c.Close()
+			return protocol.Message{}, fmt.Errorf("消息分片顺序无效")
+		}
+		part.body = append(part.body, data[16:]...)
+		if len(part.body) == total {
+			delete(c.fragments, id)
+			c.fragmentBytes -= total
+			message, e := protocol.Decode(part.body)
+			if e != nil {
+				c.Close()
+			}
+			return message, e
+		}
 	}
-	if len(body) != size {
-		c.Close()
-		return protocol.Message{}, fmt.Errorf("消息记录长度不匹配")
-	}
-	message, err := protocol.Decode(body)
-	if err != nil {
-		c.Close()
-	}
-	return message, err
 }
 
 func (c *Channel) readRecord(ctx context.Context) ([]byte, error) {

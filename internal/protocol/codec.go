@@ -122,7 +122,7 @@ func validatePayload(payload Payload) error {
 		return body.Plan.Change.validate()
 	case *OperationSubmit:
 		operationID = body.OperationID
-		if body.ContractVersion != Version {
+		if body.ContractVersion != ContractVersion {
 			return fmt.Errorf("不支持操作契约版本：%d", body.ContractVersion)
 		}
 		if err := body.Action.validate(); err != nil {
@@ -243,7 +243,7 @@ func (action OperationAction) validate() error {
 		if action.Firewall == nil {
 			return fmt.Errorf("防火墙操作缺少预览")
 		}
-		if action.Firewall.ID == "" || action.Firewall.ContractVersion != Version {
+		if action.Firewall.ID == "" || action.Firewall.ContractVersion != ContractVersion {
 			return fmt.Errorf("预览标识或版本无效")
 		}
 		return action.Firewall.Change.validate()

@@ -220,25 +220,28 @@ func (n *Node) mergeDatabaseClusters(ctx context.Context, tx *sql.Tx, items []Ma
 }
 func (n *Node) databaseConnection(ctx context.Context, id string, version ...uint64) (protocol.DatabaseConnection, error) {
 	var b string
+	var revision uint64
 	var secret Secret
 	var c protocol.DatabaseConnection
-	query := "SELECT connection FROM managed_database_instances WHERE id=?"
+	query := "SELECT connection,COALESCE(json_extract(body,'$.revision'),0) FROM managed_database_instances WHERE id=?"
 	args := []any{id}
 	if len(version) > 0 && version[0] > 0 {
-		query = "SELECT connection FROM managed_database_versions WHERE id=? AND revision=?"
+		query = "SELECT connection,revision FROM managed_database_versions WHERE id=? AND revision=?"
 		args = append(args, version[0])
 	}
-	e := n.DB.QueryRowContext(ctx, query, args...).Scan(&b)
+	e := n.DB.QueryRowContext(ctx, query, args...).Scan(&b, &revision)
 	if e == nil {
 		e = json.Unmarshal([]byte(b), &secret)
 	}
 	if e != nil {
+		c.PoolKey = fmt.Sprintf("%s/%s/%d", n.ID, id, revision)
 		return c, e
 	}
 	plain, e := unseal(secret, n.age)
 	if e == nil {
 		e = json.Unmarshal(plain, &c)
 	}
+	c.PoolKey = fmt.Sprintf("%s/%s/%d", n.ID, id, revision)
 	return c, e
 }
 func (n *Node) databaseInstance(ctx context.Context, id string) (DatabaseInstance, error) {
@@ -306,11 +309,12 @@ func (n *Node) saveDatabaseInstance(ctx context.Context, input DatabaseInstanceI
 	}
 	e = tx.Commit()
 	if e == nil {
-		delete(n.databaseReads, i.ID)
+		n.databaseReads = nil
 	}
 	return i, e
 }
 func sameDatabaseConnection(a, b protocol.DatabaseConnection) bool {
+	a.PoolKey, b.PoolKey = "", ""
 	first, _ := json.Marshal(a)
 	second, _ := json.Marshal(b)
 	return string(first) == string(second)
@@ -378,7 +382,7 @@ func (n *Node) managedDatabaseRead(ctx context.Context, id string, backups bool,
 	if e != nil {
 		return protocol.DatabaseReadResult{}, e
 	}
-	reply, e := n.executeRead(ctx, &protocol.DatabaseRead{Connection: c, ClusterID: request.ExpectedClusterID, Backups: backups, User: user, Host: host})
+	reply, e := n.executeRead(ctx, &protocol.DatabaseRead{Scope: request.Scope, Connection: c, ClusterID: request.ExpectedClusterID, Backups: backups, User: user, Host: host})
 	if e != nil {
 		return protocol.DatabaseReadResult{}, e
 	}
@@ -405,8 +409,8 @@ func (n *Node) databaseDispatch(ctx context.Context, origin, method string, body
 	case "database.cluster.save":
 		return n.saveDatabaseCluster(ctx, request.Cluster)
 	case "database.read":
-		if !request.Backups && request.User == "" {
-			return n.cachedManagedDatabaseRead(ctx, request.InstanceID)
+		if !request.Backups && request.User == "" && request.InstanceRevision == 0 && request.ExpectedClusterID == "" {
+			return n.cachedManagedDatabaseRead(ctx, request.InstanceID, request.Scope)
 		}
 		return n.managedDatabaseRead(ctx, request.InstanceID, request.Backups, request.User, request.Host, request)
 	case "database.execute":
@@ -430,12 +434,12 @@ func (n *Node) databaseDispatch(ctx context.Context, origin, method string, body
 			op, e := n.enqueue(ctx, origin, Request{ID: request.OperationID, Actor: request.Actor, ResourceID: request.ResourceID, Kind: "database_step", Payload: data})
 			return &protocol.OperationUpdated{Record: op.OperationRecord}, e
 		}
-		return n.executeRead(ctx, &protocol.OperationSubmit{OperationID: request.OperationID, ContractVersion: protocol.Version, Action: protocol.OperationAction{Kind: "database", Database: &a}})
+		return n.executeRead(ctx, &protocol.OperationSubmit{OperationID: request.OperationID, ContractVersion: protocol.ContractVersion, Action: protocol.OperationAction{Kind: "database", Database: &a}})
 	case "database.query":
 		if op, e := n.operation(ctx, request.OperationID); e == nil && op.Subject == "database_step" {
 			if op.State == protocol.Succeeded {
 				n.databaseMu.Lock()
-				delete(n.databaseReads, request.InstanceID)
+				n.databaseReads = nil
 				n.databaseMu.Unlock()
 			}
 			return &protocol.OperationQueryResult{OperationID: op.ID, Found: true, Record: &op.OperationRecord}, nil
@@ -443,7 +447,7 @@ func (n *Node) databaseDispatch(ctx context.Context, origin, method string, body
 		reply, e := n.executeRead(ctx, &protocol.OperationQuery{OperationID: request.OperationID})
 		if result, ok := reply.(*protocol.OperationQueryResult); ok && result.Record != nil && result.Record.State == protocol.Succeeded {
 			n.databaseMu.Lock()
-			delete(n.databaseReads, request.InstanceID)
+			n.databaseReads = nil
 			n.databaseMu.Unlock()
 		}
 		return reply, e
@@ -471,6 +475,7 @@ func (n *Node) databaseDispatch(ctx context.Context, origin, method string, body
 }
 
 type DatabaseRPC struct {
+	Scope             string                  `json:"scope,omitempty"`
 	Instance          DatabaseInstanceInput   `json:"instance"`
 	Cluster           ManagedDatabaseCluster  `json:"cluster"`
 	InstanceID        string                  `json:"instance_id"`
@@ -486,9 +491,9 @@ type DatabaseRPC struct {
 	Host              string                  `json:"host"`
 }
 
-func (n *Node) ManagedDatabaseStatus(ctx context.Context, c ManagedDatabaseCluster) (ManagedDatabaseStatus, error) {
+func (n *Node) ManagedDatabaseStatus(ctx context.Context, c ManagedDatabaseCluster, scope ...string) (ManagedDatabaseStatus, error) {
 	out := ManagedDatabaseStatus{Cluster: c, Members: []ManagedDatabaseMember{}, Proxies: []ManagedDatabaseMember{}, CheckedAt: n.Now().UTC()}
-	out.Members, out.Proxies = n.readManagedDatabaseGroup(ctx, c)
+	out.Members, out.Proxies = n.readManagedDatabaseGroup(ctx, c, scope...)
 	return out, nil
 }
 

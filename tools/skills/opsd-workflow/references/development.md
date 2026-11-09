@@ -15,6 +15,12 @@
 
 节点与执行器数据库统一通过 `storage.Open` 及 `internal/storage/migrations` 迁移。既有节点的首次迁移登记原结构，后续连续编号；不能重新初始化身份或队列。`state_cleanup.go` 分批整理已上传的重复防火墙状态，保留实际变化、每对象最新状态和未上传资料，不删除 CouchDB 签名历史。
 
+## 通信与读取
+
+`peer.go` 管理拨号、连接复用、常驻提升及空闲回收，`peer_dispatch.go` 维护普通与控制队列；接收循环先分发应答。`transport.Channel` 的协议分片可以交错，协议版本升级不改变持久操作契约。`directory_exchange.go` 按对象摘要生成差异；完整目录仅用于加入或对端缺少摘要。未知写入仍查询原请求，不因连接替换自动重发。
+
+`current_reads.go` 在入口共享当前资源，立即返回已有状态，目标独立刷新并从取得名额起计算期限；无页面请求后停止。`read.state` 区分排队、读取、已有数据、过期、超时、失败与离线。`database_reads.go` 按健康和页签分类，`databaseengine` 只负责本机 SQL 与有界连接池，写入前检查不复用展示缓存。`history.go` 复用请求内选库和公钥，批量分页后归并图表时间桶。采集、上传及 CouchDB 维护分别运行；承载节点采用双向环复制。
+
 ## HTTP 与前端
 
 只修改 `api/openapi.json`，执行 `npm run generate` 生成 `internal/httpapi/api.gen.go` 和 `frontend/src/api/schema.gen.ts`，不手改生成类型或另写 DTO。`frontend/src/api/client.ts` 统一附加 CSRF，并禁止自动重试写入。

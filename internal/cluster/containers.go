@@ -55,6 +55,7 @@ func (n *Node) readContainer(ctx context.Context, payload protocol.Payload, ttl 
 		cancel()
 		n.dockerMu.Lock()
 		entry.value, entry.err = value, err
+		entry.at = n.Now()
 		entry.done = nil
 		close(done)
 		n.dockerMu.Unlock()

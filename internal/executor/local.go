@@ -21,20 +21,27 @@ import (
 	"github.com/jkfujr/opsd/internal/protocol"
 )
 
-type Client struct{ HTTP *http.Client }
+type Client struct{ HTTP, Control *http.Client }
 
 func NewClient(socket string) *Client {
-	return &Client{HTTP: &http.Client{Transport: &http.Transport{DialContext: func(ctx context.Context, _, _ string) (net.Conn, error) {
-		return (&net.Dialer{}).DialContext(ctx, "unix", socket)
-	}, MaxConnsPerHost: 4, MaxIdleConnsPerHost: 2}, Timeout: 35 * time.Second}}
+	create := func(limit int) *http.Client {
+		return &http.Client{Transport: &http.Transport{DialContext: func(ctx context.Context, _, _ string) (net.Conn, error) {
+			return (&net.Dialer{}).DialContext(ctx, "unix", socket)
+		}, MaxConnsPerHost: limit, MaxIdleConnsPerHost: limit, IdleConnTimeout: time.Minute}, Timeout: 35 * time.Second}
+	}
+	return &Client{HTTP: create(6), Control: create(2)}
 }
-func (c *Client) request(ctx context.Context, path string, b []byte) ([]byte, error) {
+func (c *Client) request(ctx context.Context, path string, b []byte, control ...bool) ([]byte, error) {
 	r, e := http.NewRequestWithContext(ctx, "POST", "http://executor"+path, bytes.NewReader(b))
 	if e != nil {
 		return nil, e
 	}
 	r.Header.Set("Content-Type", "application/json")
-	response, e := c.HTTP.Do(r)
+	client := c.HTTP
+	if len(control) > 0 && control[0] && c.Control != nil {
+		client = c.Control
+	}
+	response, e := client.Do(r)
 	if e != nil {
 		return nil, e
 	}
@@ -56,7 +63,12 @@ func (c *Client) Call(ctx context.Context, p protocol.Payload) (protocol.Payload
 	if e != nil {
 		return nil, e
 	}
-	reply, e := c.request(ctx, "/rpc", b)
+	control := false
+	switch p.(type) {
+	case *protocol.OperationQuery, *protocol.OperationConfirm, *protocol.OperationRecover, *protocol.OperationResolve:
+		control = true
+	}
+	reply, e := c.request(ctx, "/rpc", b, control)
 	if e != nil {
 		return nil, e
 	}

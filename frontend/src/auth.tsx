@@ -24,30 +24,28 @@ export function SessionBoundary() {
     const events = new EventSource('/api/v1/events', { withCredentials: true });
     const seen = new Map<string, number>();
     let connected = false;
-    const refresh = () => { void queryClient.invalidateQueries({ type: 'active' }); };
+    const refresh = () => { void queryClient.invalidateQueries({ type: 'active' }, { cancelRefetch: false }); };
     events.addEventListener('ready', () => { if (connected) { seen.clear(); refresh(); } connected = true; });
     events.addEventListener('invalidate', (event) => {
       try {
         const data = JSON.parse((event as MessageEvent).data);
         const changes: { resource: string; node_id?: string; revision?: number }[] = data.changes ?? [data];
+        const predicates: ((key: readonly unknown[]) => boolean)[] = [];
         for (const { resource, node_id, revision } of changes) {
           const key = `${resource}/${node_id ?? ''}`;
           if (revision && revision <= (seen.get(key) ?? 0)) continue;
           if (revision) seen.set(key, revision);
-          if (resource === 'all') { refresh(); continue; }
-          if (resource === 'nodes') void queryClient.invalidateQueries({ predicate: (q) => q.queryKey[0] === 'nodes' && q.queryKey.length <= 2 && (!node_id || q.queryKey.length === 1 || q.queryKey[1] === node_id) });
-          if (resource === 'operations') void queryClient.invalidateQueries({ queryKey: ['operations'] });
-          if (resource === 'firewall') void queryClient.invalidateQueries({ queryKey: node_id ? ['firewall', node_id] : ['firewall'] });
-          if (resource === 'containers') void queryClient.invalidateQueries({ queryKey: ['containers'] });
-          if (resource === 'databases') void queryClient.invalidateQueries({ queryKey: ['databases'] });
-          if (resource === 'navigation') void queryClient.invalidateQueries({ queryKey: ['navigation', node_id] });
-          if (resource === 'settings' || resource === 'account') void queryClient.invalidateQueries({ queryKey: ['nodes', node_id, resource] });
-          if (resource === 'settings') void queryClient.invalidateQueries({ queryKey: ['nodes', node_id, 'storage'] });
-          if (['tokens', 'sessions', 'monitoring'].includes(resource)) void queryClient.invalidateQueries({ queryKey: [resource] });
-          if (resource === 'peer_trust' || resource === 'nodes') void queryClient.invalidateQueries({ queryKey: ['peer-trust'] });
-          if (resource === 'public_addresses') void queryClient.invalidateQueries({ queryKey: node_id ? ['public-addresses', node_id] : ['public-addresses'] });
-          if (['nodes', 'firewall', 'operations', 'monitoring'].includes(resource)) void queryClient.invalidateQueries({ queryKey: ['overview'] });
+          predicates.push((key) => resource === 'all'
+            || resource === 'nodes' && key[0] === 'nodes' && key.length <= 2 && (!node_id || key.length === 1 || key[1] === node_id)
+            || ['operations', 'containers', 'databases', 'tokens', 'sessions', 'monitoring'].includes(resource) && key[0] === resource
+            || resource === 'firewall' && key[0] === 'firewall' && (!node_id || key[1] === node_id)
+            || resource === 'navigation' && key[0] === 'navigation' && key[1] === node_id
+            || ['settings', 'account'].includes(resource) && key[0] === 'nodes' && key[1] === node_id && (key[2] === resource || resource === 'settings' && key[2] === 'storage')
+            || ['peer_trust', 'nodes'].includes(resource) && key[0] === 'peer-trust'
+            || resource === 'public_addresses' && key[0] === 'public-addresses' && (!node_id || key[1] === node_id)
+            || ['nodes', 'firewall', 'operations', 'monitoring'].includes(resource) && key[0] === 'overview');
         }
+        if (predicates.length) void queryClient.invalidateQueries({ predicate: (q) => predicates.some((matches) => matches(q.queryKey)) }, { cancelRefetch: false });
       } catch { /* 无效事件不触发全页面重复读取。 */ }
     });
     events.onerror = () => { if (queryClient.isMutating({ mutationKey: ['account-change'] }) === 0) void api.GET('/auth/session').catch(() => {}); };

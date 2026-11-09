@@ -30,10 +30,10 @@ type Observation struct {
 }
 type session struct {
 	*sql.Conn
-	db *sql.DB
+	release func()
 }
 
-func (s *session) Close() { s.Conn.Close(); s.db.Close() }
+func (s *session) Close() { s.Conn.Close(); s.release() }
 func connect(ctx context.Context, c protocol.DatabaseConnection) (*session, error) {
 	if e := c.Validate(); e != nil {
 		return nil, e
@@ -52,24 +52,21 @@ func connect(ctx context.Context, c protocol.DatabaseConnection) (*session, erro
 		config.Net = "unix"
 		config.Addr = c.Socket
 	}
-	connector, e := mysql.NewConnector(config)
+	db, release, e := pooledDatabase(fingerprint(c), config)
 	if e != nil {
-		return nil, fmt.Errorf("数据库连接配置无效")
+		return nil, e
 	}
-	db := sql.OpenDB(connector)
-	db.SetMaxOpenConns(1)
-	db.SetMaxIdleConns(1)
 	conn, e := db.Conn(ctx)
 	if e != nil {
-		db.Close()
+		release()
 		return nil, clean(e)
 	}
 	if e = conn.PingContext(ctx); e != nil {
 		conn.Close()
-		db.Close()
+		release()
 		return nil, clean(e)
 	}
-	return &session{conn, db}, nil
+	return &session{Conn: conn, release: release}, nil
 }
 func clean(e error) error {
 	if e == nil {
@@ -190,7 +187,17 @@ func checkGalera(ctx context.Context, s *session, expected string) error {
 	}
 	return nil
 }
-func (Manager) Read(ctx context.Context, c protocol.DatabaseConnection) (protocol.DatabaseState, error) {
+func (Manager) Read(ctx context.Context, c protocol.DatabaseConnection, scopes ...string) (protocol.DatabaseState, error) {
+	scope := "all"
+	if len(scopes) > 0 {
+		scope = scopes[0]
+		if scope == "" {
+			scope = "health"
+		}
+	}
+	if !slices.Contains([]string{"all", "health", "schemas", "users", "proxies"}, scope) {
+		return protocol.DatabaseState{}, fmt.Errorf("数据库读取范围无效")
+	}
 	out := protocol.DatabaseState{State: "unavailable", CheckedAt: time.Now().UTC(), Databases: []protocol.DatabaseSchema{}, Users: []protocol.DatabaseUser{}, Servers: []protocol.DatabaseProxyServer{}, Pools: []protocol.DatabaseProxyPool{}, ProxyUsers: []protocol.DatabaseProxyUser{}}
 	s, e := connect(ctx, c)
 	if e != nil {
@@ -198,7 +205,7 @@ func (Manager) Read(ctx context.Context, c protocol.DatabaseConnection) (protoco
 	}
 	defer s.Close()
 	if c.Kind == "proxysql" {
-		return readProxy(ctx, s, c, out)
+		return readProxy(ctx, s, c, out, scope)
 	}
 	v, e := status(ctx, s)
 	if e != nil {
@@ -227,48 +234,52 @@ func (Manager) Read(ctx context.Context, c protocol.DatabaseConnection) (protoco
 	if !out.Ready || !out.Primary || !out.Synced {
 		out.State = "unavailable"
 	}
-	dbs, e := rows(ctx, s, "SELECT s.SCHEMA_NAME,s.DEFAULT_CHARACTER_SET_NAME,s.DEFAULT_COLLATION_NAME,COALESCE(SUM(t.DATA_LENGTH+t.INDEX_LENGTH),0) AS bytes FROM information_schema.SCHEMATA s LEFT JOIN information_schema.TABLES t ON t.TABLE_SCHEMA=s.SCHEMA_NAME GROUP BY s.SCHEMA_NAME,s.DEFAULT_CHARACTER_SET_NAME,s.DEFAULT_COLLATION_NAME ORDER BY s.SCHEMA_NAME")
-	if e != nil {
-		return out, e
-	}
-	for _, d := range dbs {
-		out.Databases = append(out.Databases, protocol.DatabaseSchema{Name: d["schema_name"], Charset: d["default_character_set_name"], Collation: d["default_collation_name"], Bytes: uint64(number(d["bytes"])), Protected: protocol.SystemDatabase(d["schema_name"])})
-	}
-	users, e := rows(ctx, s, "SELECT User,Host FROM mysql.user ORDER BY User,Host")
-	if e != nil {
-		return out, e
-	}
-	grants, e := rows(ctx, s, "SELECT GRANTEE,TABLE_SCHEMA,PRIVILEGE_TYPE FROM information_schema.SCHEMA_PRIVILEGES ORDER BY GRANTEE,TABLE_SCHEMA,PRIVILEGE_TYPE")
-	if e != nil {
-		return out, e
-	}
-	global, e := rows(ctx, s, "SELECT GRANTEE FROM information_schema.USER_PRIVILEGES WHERE PRIVILEGE_TYPE<>'USAGE'")
-	if e != nil {
-		return out, e
-	}
-	protected := map[string]bool{}
-	for _, g := range global {
-		protected[g["grantee"]] = true
-	}
-	byUser := map[string][]protocol.DatabaseGrant{}
-	for _, g := range grants {
-		key := g["grantee"]
-		list := byUser[key]
-		if len(list) == 0 || list[len(list)-1].Database != g["table_schema"] {
-			list = append(list, protocol.DatabaseGrant{Database: g["table_schema"], Privileges: []string{}})
+	if scope == "all" || scope == "schemas" {
+		dbs, e := rows(ctx, s, "SELECT s.SCHEMA_NAME,s.DEFAULT_CHARACTER_SET_NAME,s.DEFAULT_COLLATION_NAME,COALESCE(SUM(t.DATA_LENGTH+t.INDEX_LENGTH),0) AS bytes FROM information_schema.SCHEMATA s LEFT JOIN information_schema.TABLES t ON t.TABLE_SCHEMA=s.SCHEMA_NAME GROUP BY s.SCHEMA_NAME,s.DEFAULT_CHARACTER_SET_NAME,s.DEFAULT_COLLATION_NAME ORDER BY s.SCHEMA_NAME")
+		if e != nil {
+			return out, e
 		}
-		i := len(list) - 1
-		list[i].Privileges = append(list[i].Privileges, g["privilege_type"])
-		byUser[key] = list
-	}
-	sst := strings.SplitN(vars["wsrep_sst_auth"], ":", 2)[0]
-	for _, u := range users {
-		key := literal(u["user"]) + "@" + literal(u["host"])
-		user := protocol.DatabaseUser{Name: u["user"], Host: u["host"], Protected: protocol.SystemDatabaseUser(u["user"], c) || u["user"] == sst || protected[key], Grants: byUser[key]}
-		if user.Grants == nil {
-			user.Grants = []protocol.DatabaseGrant{}
+		for _, d := range dbs {
+			out.Databases = append(out.Databases, protocol.DatabaseSchema{Name: d["schema_name"], Charset: d["default_character_set_name"], Collation: d["default_collation_name"], Bytes: uint64(number(d["bytes"])), Protected: protocol.SystemDatabase(d["schema_name"])})
 		}
-		out.Users = append(out.Users, user)
+	}
+	if scope == "all" || scope == "users" {
+		users, e := rows(ctx, s, "SELECT User,Host FROM mysql.user ORDER BY User,Host")
+		if e != nil {
+			return out, e
+		}
+		grants, e := rows(ctx, s, "SELECT GRANTEE,TABLE_SCHEMA,PRIVILEGE_TYPE FROM information_schema.SCHEMA_PRIVILEGES ORDER BY GRANTEE,TABLE_SCHEMA,PRIVILEGE_TYPE")
+		if e != nil {
+			return out, e
+		}
+		global, e := rows(ctx, s, "SELECT GRANTEE FROM information_schema.USER_PRIVILEGES WHERE PRIVILEGE_TYPE<>'USAGE'")
+		if e != nil {
+			return out, e
+		}
+		protected := map[string]bool{}
+		for _, g := range global {
+			protected[g["grantee"]] = true
+		}
+		byUser := map[string][]protocol.DatabaseGrant{}
+		for _, g := range grants {
+			key := g["grantee"]
+			list := byUser[key]
+			if len(list) == 0 || list[len(list)-1].Database != g["table_schema"] {
+				list = append(list, protocol.DatabaseGrant{Database: g["table_schema"], Privileges: []string{}})
+			}
+			i := len(list) - 1
+			list[i].Privileges = append(list[i].Privileges, g["privilege_type"])
+			byUser[key] = list
+		}
+		sst := strings.SplitN(vars["wsrep_sst_auth"], ":", 2)[0]
+		for _, u := range users {
+			key := literal(u["user"]) + "@" + literal(u["host"])
+			user := protocol.DatabaseUser{Name: u["user"], Host: u["host"], Protected: protocol.SystemDatabaseUser(u["user"], c) || u["user"] == sst || protected[key], Grants: byUser[key]}
+			if user.Grants == nil {
+				user.Grants = []protocol.DatabaseGrant{}
+			}
+			out.Users = append(out.Users, user)
+		}
 	}
 	return out, nil
 }
@@ -312,7 +323,7 @@ func proxyRuntimeFingerprint(users []map[string]string) string {
 	})
 	return fingerprint(projected)
 }
-func readProxy(ctx context.Context, s *session, c protocol.DatabaseConnection, out protocol.DatabaseState) (protocol.DatabaseState, error) {
+func readProxy(ctx context.Context, s *session, c protocol.DatabaseConnection, out protocol.DatabaseState, scope string) (protocol.DatabaseState, error) {
 	v, e := rows(ctx, s, "SELECT @@version")
 	if e != nil {
 		return out, e
@@ -320,24 +331,26 @@ func readProxy(ctx context.Context, s *session, c protocol.DatabaseConnection, o
 	if len(v) > 0 {
 		out.Version = v[0]["@@version"]
 	}
-	layers, e := proxyLayers(ctx, s)
-	if e != nil {
-		return out, e
-	}
-	out.PendingChanges = proxyRuntimeFingerprint(layers[0]) != proxyRuntimeFingerprint(layers[1]) || fingerprint(layers[0]) != fingerprint(layers[2])
-	for _, u := range layers[0] {
-		state := "in_sync"
-		if out.PendingChanges {
-			state = "pending"
+	if scope == "all" || scope == "proxies" {
+		layers, e := proxyLayers(ctx, s)
+		if e != nil {
+			return out, e
 		}
-		out.ProxyUsers = append(out.ProxyUsers, protocol.DatabaseProxyUser{Name: u["username"], Active: u["active"] == "1", Hostgroup: int(number(u["default_hostgroup"])), State: state, Protected: protocol.SystemDatabaseUser(u["username"], c)})
-	}
-	servers, e := rows(ctx, s, "SELECT hostgroup_id,hostname,port,status FROM runtime_mysql_servers ORDER BY hostgroup_id,hostname,port")
-	if e != nil {
-		return out, e
-	}
-	for _, v := range servers {
-		out.Servers = append(out.Servers, protocol.DatabaseProxyServer{Hostgroup: int(number(v["hostgroup_id"])), Host: v["hostname"], Port: int(number(v["port"])), State: v["status"]})
+		out.PendingChanges = proxyRuntimeFingerprint(layers[0]) != proxyRuntimeFingerprint(layers[1]) || fingerprint(layers[0]) != fingerprint(layers[2])
+		for _, u := range layers[0] {
+			state := "in_sync"
+			if out.PendingChanges {
+				state = "pending"
+			}
+			out.ProxyUsers = append(out.ProxyUsers, protocol.DatabaseProxyUser{Name: u["username"], Active: u["active"] == "1", Hostgroup: int(number(u["default_hostgroup"])), State: state, Protected: protocol.SystemDatabaseUser(u["username"], c)})
+		}
+		servers, e := rows(ctx, s, "SELECT hostgroup_id,hostname,port,status FROM runtime_mysql_servers ORDER BY hostgroup_id,hostname,port")
+		if e != nil {
+			return out, e
+		}
+		for _, v := range servers {
+			out.Servers = append(out.Servers, protocol.DatabaseProxyServer{Hostgroup: int(number(v["hostgroup_id"])), Host: v["hostname"], Port: int(number(v["port"])), State: v["status"]})
+		}
 	}
 	pools, e := rows(ctx, s, "SELECT hostgroup,srv_host,srv_port,ConnUsed,ConnFree,ConnERR FROM stats_mysql_connection_pool ORDER BY hostgroup,srv_host,srv_port")
 	if e != nil {
