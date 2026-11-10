@@ -52,3 +52,13 @@ API 检查先读回原开关，使用临时的限定资源令牌核验 JSON、�
 规则比较忽略计数器，分别核对外部原生链、普通规则内容和普通规则的相对顺序；按策略已转交的精确 IP 规则单独记录。发现范围或复合端口规则在导入后移动时，如实记录具体规则与前后位置。
 
 切换公网前，通过现有防火墙入口配置 IPv4／IPv6 的实际通信端口，并确认原操作成功。随后在队列空闲时停止节点和执行器，用本机 `network` 设置通配监听及自动地址模式，再恢复两个服务；核对成员目录公布的 URL、实际监听、外网 TCP、`/peer` WebSocket 和添加节点弹窗中的接入地址。新节点实际安装加入与服务端入口连通分别记录，公开安装包继续沿用独立发布流程。
+
+## 1Panel 替代后的维护
+
+C001／C041／C052／C091 已移除面板程序和服务，应用仍由原 Docker 容器运行。维护前从当前实例读取容器、挂载与规则；`/1panel` 下的应用、数据库、配置、日志及 swap 继续保留。停用面板须先完成对应任务、证书和规则的替代，确认没有运行中的业务任务，再停止调度；实际访问正常后，仅移除已核对的系统服务、面板二进制和命令软链。
+
+C091 的任务 ID 为 `recording-move`，时区 Asia/Shanghai、每天 02:30、目录 `/`；脚本和 `/root/.config/rclone/rclone.conf` 保留原内容。再次迁移时先读回已有任务和旧调度状态，按原版本保存为停用任务，确认旧任务未运行后切换，再读取新计划和运行记录。原移动脚本只按业务计划执行，检查配置时不手动触发。
+
+C011 Certimate 工作流 `c001renewal0001` 每天 01:25 检查 `kagura-mea.com` 及通配证书，复用已有 DNS 凭据和专用 SSH 账号 `certimate-deploy`。C001 的 `/usr/local/libexec/certimate-c001-deploy` 源码为 [certimate_c001_deploy.py](../scripts/certimate_c001_deploy.py)，由 root 管理；sudoers 只允许该入口。脚本从 `/var/lib/certimate-deploy/incoming` 读取交付文件，核对密钥、有效期和域名后替换 OpenResty 与 PMail 的原证书，保留权限和所有者；nginx 配置检查失败时恢复原文件。实际服务已加载同一证书时跳过重载，否则分别读回 443／465 后确认结果。维护后核对工作流原运行与实际 TLS，不因应答未知重复签发或重启。
+
+C041 的普通规则配置为 `/etc/opsd/firewall/inherited.json`，按命令保存 `chains` 与 `references`；恢复入口为 `/usr/local/libexec/opsd-inherited-firewall`，源码为 [restore_panel_rules.py](../scripts/restore_panel_rules.py)。`opsd-inherited-firewall.service` 在 Docker、Galera 防火墙后、OPSD 执行器前启动并保持启用。只恢复配置中的 `1PANEL_*` 固定链及引用，使用 `--noflush`，读回一致时不修改；已有内容不一致时停止并报告。OPSD 互信、Docker 与 CODEX_GALERA 留在各自所属入口，普通 iptables 规则继续只读。重启恢复的整机验收与隔离网络中的规则恢复分别记录。

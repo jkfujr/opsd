@@ -30,7 +30,15 @@ Release 复用同提交成功工件，通过公开地址下载，检查实际安
 
 第二批 `66a2a64` 已通过 [CI 42759277088](https://github.com/jkfujr/opsd/actions/runs/42759277088)，四节点均已使用同一成功工件更新。四节点 online、40 个容器可读；五轮概览响应为 149～1076 ms（含当前网络传输）。四个 Galera 健康摘要不附带库和账号，分类读取分别返回各 7 个库、13 个账号；两个 ProxySQL 均可读。历史返回 289 个五分钟点，无不可用来源。线上脚本错误为 0；账号版本、身份、原容器及外部规则内容与相对顺序保留，队列与执行器未结束操作均为 0。结果保存在 `artifacts/optimization/batch2-browser.json` 与 `batch2-preservation.json`。
 
-第三批专注后端，停止旧前端新功能开发，功能验收改走 API。终端、Shell 任务、容器更新及 Compose 接口源码已写入，尚待本批 CI 与实际部署。
+第三批 `eceabeb` 已通过 [CI 42777079237](https://github.com/jkfujr/opsd/actions/runs/42777079237)，四节点已使用同一成功工件更新。CI 覆盖实际安装程序的任务执行、计划触发、幂等、禁止重入、取消和分页日志，容器镜像更新及挂载／网络保留，Compose 登记、拉取、启停、重建和更新，以及 root 终端的尺寸、Ctrl+C、断连与退出登录释放。匿名卷复用显式保留原读写模式，具名只读卷和通过 Mount API 创建的卷均已验证。旧前端停止新增功能，第三批验收使用 HTTP／WebSocket API。
+
+线上 API 已完成四节点 root 身份、37×101 终端尺寸、Ctrl+C 及进程释放；任务、Compose 和容器读取均为 ready，读到 3 个 Compose 项目、40 个容器。四节点当前程序与成功工件逐字节一致，节点和执行器实际进程均使用该程序，数据库版本为 node 3／executor 7，服务 active、NRestarts=0，检查时未结束操作均为 0。原节点身份、配置、账号版本、全部容器的 ID／状态／启动时间，以及外部原生规则内容和相对顺序保留；双栈互信的运行及永久结果全部为 in_sync。
+
+C091 的“录播移动”已先停用登记，再停止旧面板调度并启用 OPSD 任务 `recording-move`；3650 字节原脚本、`/` 工作目录、rclone 配置、Asia/Shanghai 和每天 02:30 均保留，下次执行为 2026-11-11 02:30。本次没有手动执行移动脚本，新任务运行记录为 0。C011 Certimate 的 `c001renewal0001` 工作流已启用，每天 01:25 检查 C001 的 `kagura-mea.com` 及通配证书；签发和 SSH 交付已成功，第二次运行复用了证书。C001 的 443／465 实际证书均匹配，CA 与主机名验证通过，有效期到 2027-02-08；两个原有 DSM 失败工作流保持原样。
+
+C041 的 20 条固定普通规则和 4 条入站引用已交给 `opsd-inherited-firewall.service`，隔离网络从空状态恢复成功，重复执行改动为 0，Docker／CODEX_GALERA 保留。旧 nftables 普通确认配置与当前只读 iptables 的差异仍报告 failed；固定普通规则由独立服务恢复。四节点的 1Panel 程序、命令软链和系统服务均已移除，应用、证书、配置目录及现有 swap 保留。三个 OpenResty 容器及挂载、启动时间保留，本机访问均为 200；C001 邮件站点与 C052 的外部访问为 200，C091 公网 80 在停用前后均为既有超时。
+
+结果保存在 `artifacts/optimization/batch3-api-ci.json`、`batch3-api.json`、`batch3-final-api.json`、`batch3-preservation.json`、`eceabeb-*-runtime.json`、`*-final-state.json` 和相关站点、证书及任务记录。未验证：录播移动下一次计划的实际运行、arm64 实机与整机重启。生产业务容器的镜像／Compose 变更未执行，相关写入由 CI 真实 Docker 验证；本批未公开发布安装包。上述成功结果直接复用，后续文档与已部署脚本归档不改变程序工件。
 
 2026-11-08；提交：`da421e16ad333c7e56f25b21eac2ae83dd8d3344`；环境：GitHub Ubuntu 24.04、Go 1.26.2、Node.js 24.14.1、Chromium、Docker，以及 C001／C041／C052／C091 四台 amd64 宿主机；覆盖项：账号菜单排序、存储入口、现有 CI、四个节点安装更新、生产数据库集群登记及线上读取。CI 结果复用此前同提交成功结果。
 
