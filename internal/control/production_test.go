@@ -277,10 +277,26 @@ func TestProductionBackendAPI(t *testing.T) {
 				t.Fatalf("容器配置 %s 改变", field)
 			}
 		}
-		a, _ := json.Marshal(before[0]["Mounts"])
-		b, _ := json.Marshal(after[0]["Mounts"])
+		mounts := func(value any) map[string]map[string]any {
+			out := map[string]map[string]any{}
+			for _, item := range value.([]any) {
+				m := item.(map[string]any)
+				// inspect 可调整返回顺序，并将默认 rw 显式写入 Mode。
+				modes := []string{}
+				for _, mode := range strings.Split(fmt.Sprint(m["Mode"]), ",") {
+					if mode != "" && mode != "rw" {
+						modes = append(modes, mode)
+					}
+				}
+				m["Mode"] = strings.Join(modes, ",")
+				out[m["Destination"].(string)] = m
+			}
+			return out
+		}
+		a, _ := json.Marshal(mounts(before[0]["Mounts"]))
+		b, _ := json.Marshal(mounts(after[0]["Mounts"]))
 		if !bytes.Equal(a, b) {
-			t.Fatal("挂载改变")
+			t.Fatalf("挂载改变：%s / %s", a, b)
 		}
 		if after[0]["HostConfig"].(map[string]any)["RestartPolicy"].(map[string]any)["Name"] != "unless-stopped" || after[0]["State"].(map[string]any)["Running"] != true {
 			t.Fatal("重启策略或运行状态改变")
@@ -385,7 +401,10 @@ func TestProductionBackendAPI(t *testing.T) {
 		ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
 		defer cancel()
 		var output strings.Builder
-		for !strings.Contains(output.String(), "37 101\r\n") || !strings.Contains(output.String(), "\r\n0\r\n") {
+		hasLine := func(line string) bool {
+			return strings.Contains(strings.ReplaceAll(output.String(), "\r", ""), "\n"+line+"\n")
+		}
+		for !hasLine("37 101") || !hasLine("0") {
 			frame, err := stream.Receive(ctx)
 			if err != nil {
 				t.Fatal("终端交互未取得结果", err, output.String())
@@ -402,7 +421,7 @@ func TestProductionBackendAPI(t *testing.T) {
 		if err := stream.Send(t.Context(), protocol.TerminalFrame{Type: "input", Data: []byte("printf '\\n中断完成\\n'\n")}); err != nil {
 			t.Fatal(err)
 		}
-		for !strings.Contains(output.String(), "\r\n中断完成\r\n") {
+		for !hasLine("中断完成") {
 			frame, err := stream.Receive(ctx)
 			if err != nil {
 				t.Fatal(err)
