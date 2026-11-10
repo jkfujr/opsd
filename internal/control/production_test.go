@@ -233,12 +233,15 @@ func TestProductionBackendAPI(t *testing.T) {
 		docker("tag", oldImage, "busybox:1.37.0")
 		name, network := "opsd-api-update", "opsd-api-network"
 		docker("network", "create", network)
+		readonly := name + "-readonly"
+		docker("volume", "create", readonly)
 		t.Cleanup(func() {
 			_ = exec.Command("docker", "rm", "-f", name).Run()
 			_ = exec.Command("docker", "network", "rm", network).Run()
+			_ = exec.Command("docker", "volume", "rm", readonly).Run()
 		})
 		dir := t.TempDir()
-		oldID := docker("run", "-d", "--name", name, "--network", network, "--network-alias", "service-api", "--restart", "unless-stopped", "--env", "OPSD_API_VALUE=配置保留", "--mount", "type=bind,src="+dir+",dst=/data", "--volume", "/cache", "--mount", "type=volume,dst=/readonly,readonly", "--mount", "type=volume,dst=/api-volume", "busybox:1.37.0", "sh", "-c", "while :; do sleep 1; done")
+		oldID := docker("run", "-d", "--name", name, "--network", network, "--network-alias", "service-api", "--restart", "unless-stopped", "--env", "OPSD_API_VALUE=配置保留", "--mount", "type=bind,src="+dir+",dst=/data", "--volume", "/cache", "--volume", readonly+":/readonly:ro", "--mount", "type=volume,dst=/api-volume", "busybox:1.37.0", "sh", "-c", "while :; do sleep 1; done")
 		var before []map[string]any
 		if err := json.Unmarshal([]byte(docker("inspect", oldID)), &before); err != nil {
 			t.Fatal(err)
