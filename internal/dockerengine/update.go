@@ -74,15 +74,26 @@ func prepareUpdate(ref protocol.ContainerRef, raw container.InspectResponse, id 
 		return state, err
 	}
 	covered := map[string]bool{}
-	for _, m := range state.HostConfig.Mounts {
-		covered[m.Target] = true
+	for i := range state.HostConfig.Mounts {
+		spec := &state.HostConfig.Mounts[i]
+		if string(spec.Type) == "volume" && spec.Source == "" {
+			for _, actual := range raw.Mounts {
+				if actual.Destination == spec.Target {
+					spec.Source = actual.Name
+				}
+			}
+		}
+		covered[spec.Target] = true
 	}
+	binds := []string{}
 	for _, bind := range state.HostConfig.Binds {
 		parts := strings.Split(bind, ":")
-		if len(parts) > 1 {
+		if len(parts) > 1 && strings.HasPrefix(parts[1], "/") {
 			covered[parts[1]] = true
+			binds = append(binds, bind)
 		}
 	}
+	state.HostConfig.Binds = binds
 	for _, m := range raw.Mounts {
 		if string(m.Type) == "volume" && !covered[m.Destination] {
 			bind := m.Name + ":" + m.Destination
