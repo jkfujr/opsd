@@ -7,7 +7,6 @@ import (
 	"github.com/containerd/errdefs"
 	"github.com/jkfujr/opsd/internal/protocol"
 	"github.com/moby/moby/api/types/container"
-	"github.com/moby/moby/api/types/mount"
 	"github.com/moby/moby/api/types/network"
 	"github.com/moby/moby/client"
 	"io"
@@ -85,8 +84,16 @@ func prepareUpdate(ref protocol.ContainerRef, raw container.InspectResponse, id 
 		}
 	}
 	for _, m := range raw.Mounts {
-		if m.Type == mount.TypeVolume && !covered[m.Destination] {
-			state.HostConfig.Mounts = append(state.HostConfig.Mounts, mount.Mount{Type: mount.TypeVolume, Source: m.Name, Target: m.Destination, ReadOnly: !m.RW, VolumeOptions: &mount.VolumeOptions{NoCopy: true}})
+		if string(m.Type) == "volume" && !covered[m.Destination] {
+			bind := m.Name + ":" + m.Destination
+			mode := m.Mode
+			if mode == "" && !m.RW {
+				mode = "ro"
+			}
+			if mode != "" {
+				bind += ":" + mode
+			}
+			state.HostConfig.Binds = append(state.HostConfig.Binds, bind)
 		}
 	}
 	if raw.NetworkSettings != nil && !state.HostConfig.NetworkMode.IsHost() && !state.HostConfig.NetworkMode.IsNone() && !state.HostConfig.NetworkMode.IsContainer() {

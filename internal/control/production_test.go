@@ -395,19 +395,19 @@ func TestProductionBackendAPI(t *testing.T) {
 			t.Fatal(err)
 		}
 		marker := filepath.Join(t.TempDir(), "pid")
-		if err := stream.Send(t.Context(), protocol.TerminalFrame{Type: "input", Data: []byte("id -u; stty size; echo $$ > " + marker + "; chmod 644 " + marker + "; printf '\\n终端已就绪\\n'\n")}); err != nil {
+		if err := stream.Send(t.Context(), protocol.TerminalFrame{Type: "input", Data: []byte("printf 'UID:%s;SIZE:%s\\n' \"$(id -u)\" \"$(stty size)\"; echo $$ > " + marker + "; chmod 644 " + marker + "\n")}); err != nil {
 			t.Fatal(err)
 		}
 		ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
 		defer cancel()
 		var output strings.Builder
-		hasLine := func(line string) bool {
-			return strings.Contains(strings.ReplaceAll(output.String(), "\r", ""), "\n"+line+"\n")
+		hasOutput := func(value string) bool {
+			return strings.Contains(strings.ReplaceAll(output.String(), "\r", ""), value)
 		}
-		for !hasLine("37 101") || !hasLine("0") {
+		for !hasOutput("UID:0;SIZE:37 101") {
 			frame, err := stream.Receive(ctx)
 			if err != nil {
-				t.Fatal("终端交互未取得结果", err, output.String())
+				t.Fatalf("终端交互未取得结果：%v %q", err, output.String())
 			}
 			output.Write(frame.Data)
 		}
@@ -418,10 +418,10 @@ func TestProductionBackendAPI(t *testing.T) {
 		if err := stream.Send(t.Context(), protocol.TerminalFrame{Type: "input", Data: []byte{3}}); err != nil {
 			t.Fatal(err)
 		}
-		if err := stream.Send(t.Context(), protocol.TerminalFrame{Type: "input", Data: []byte("printf '\\n中断完成\\n'\n")}); err != nil {
+		if err := stream.Send(t.Context(), protocol.TerminalFrame{Type: "input", Data: []byte("printf 'INTERRUPT:%s\\n' \"$?\"\n")}); err != nil {
 			t.Fatal(err)
 		}
-		for !hasLine("中断完成") {
+		for !hasOutput("INTERRUPT:130") {
 			frame, err := stream.Receive(ctx)
 			if err != nil {
 				t.Fatal(err)
