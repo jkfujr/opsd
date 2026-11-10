@@ -38,6 +38,7 @@ type Node struct {
 	Now              func() time.Time
 	mu               sync.Mutex
 	connections      map[string]*peer
+	retiring         map[*peer]struct{}
 	dialing          map[string]chan struct{}
 	ctx              context.Context
 	cancel           context.CancelFunc
@@ -236,6 +237,9 @@ func (n *Node) Close() error {
 	n.mu.Lock()
 	n.closed = true
 	for _, p := range n.connections {
+		p.channel.Close()
+	}
+	for p := range n.retiring {
 		p.channel.Close()
 	}
 	n.mu.Unlock()

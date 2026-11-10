@@ -18,6 +18,7 @@ type peerRequest struct {
 
 // 接收方只入队，处理中的业务不会阻塞双向应答分发。
 type peerDispatch struct {
+	peer              *peer
 	ordinary          chan peerRequest
 	control           chan peerRequest
 	bytes             atomic.Int64
@@ -28,7 +29,7 @@ type peerDispatch struct {
 }
 
 func (n *Node) startPeerDispatch(ctx context.Context, p *peer) *peerDispatch {
-	d := &peerDispatch{ordinary: make(chan peerRequest, 24), control: make(chan peerRequest, 16)}
+	d := &peerDispatch{peer: p, ordinary: make(chan peerRequest, 24), control: make(chan peerRequest, 16)}
 	for _, group := range []struct {
 		queue   chan peerRequest
 		workers int
@@ -75,6 +76,7 @@ func (n *Node) startPeerDispatch(ctx context.Context, p *peer) *peerDispatch {
 						}
 						replyBudget.Add(-size)
 						cancel()
+						p.incoming.Add(-1)
 					}
 				}
 			}(group.queue)
@@ -95,10 +97,12 @@ func (d *peerDispatch) enqueue(m protocol.Message, call *protocol.PeerCall) bool
 		budget.Add(-size)
 		return false
 	}
+	d.peer.incoming.Add(1)
 	select {
 	case queue <- peerRequest{m, call}:
 		return true
 	default:
+		d.peer.incoming.Add(-1)
 		budget.Add(-size)
 		return false
 	}

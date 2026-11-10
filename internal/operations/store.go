@@ -176,7 +176,7 @@ func (s Store) Receive(ctx context.Context, id string, version int, action proto
 		return l, false, e
 	}
 	var n int
-	query := "SELECT count(*) FROM operations WHERE terminal=0 AND json_extract(action,'$.kind')<>'shell'"
+	query := "SELECT count(*) FROM operations WHERE terminal=0 AND COALESCE(json_extract(action,'$.kind'),'')<>'shell'"
 	var args []any
 	if action.Kind == "shell" {
 		query = "SELECT count(*) FROM operations WHERE terminal=0 AND json_extract(action,'$.kind')='shell' AND json_extract(action,'$.shell.task_id')=?"

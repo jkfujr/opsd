@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"sort"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/coder/websocket"
@@ -27,6 +28,8 @@ type peer struct {
 	exchangeMu sync.Mutex
 	done       chan struct{}
 	last       time.Time
+	retiredAt  time.Time
+	incoming   atomic.Int64
 }
 
 func (n *Node) PeerHandler() http.Handler {
@@ -131,9 +134,16 @@ func (n *Node) attach(p *peer) bool {
 			return false
 		}
 		p.resident = p.resident || old.resident
+		if len(n.connections)+len(n.retiring) >= 32 {
+			return false
+		}
+		if n.retiring == nil {
+			n.retiring = map[*peer]struct{}{}
+		}
+		old.retiredAt = n.Now()
+		n.retiring[old] = struct{}{}
 		n.connections[p.id] = p
 		n.wg.Add(1)
-		old.channel.Close()
 		return true
 	}
 	residents, total := 0, 0
@@ -146,10 +156,10 @@ func (n *Node) attach(p *peer) bool {
 	if p.resident && residents >= 8 {
 		p.resident = false
 	}
-	if total >= 32 {
+	if total+len(n.retiring) >= 32 {
 		var oldest *peer
 		for _, candidate := range n.connections {
-			if !candidate.resident && candidate.refs == 0 && (oldest == nil || candidate.last.Before(oldest.last)) {
+			if !candidate.resident && candidate.refs == 0 && candidate.incoming.Load() == 0 && (oldest == nil || candidate.last.Before(oldest.last)) {
 				oldest = candidate
 			}
 		}
@@ -172,6 +182,7 @@ func (n *Node) servePeer(ctx context.Context, p *peer) {
 		if n.connections[p.id] == p {
 			delete(n.connections, p.id)
 		}
+		delete(n.retiring, p)
 		close(p.done)
 		n.mu.Unlock()
 	}()
@@ -495,8 +506,14 @@ func (n *Node) pruneConnections(neighbors map[string]Member) {
 		if _, ok := neighbors[id]; !ok {
 			p.resident = false
 		}
-		if !p.resident && p.refs == 0 && n.Now().Sub(p.last) >= 60*time.Second {
+		if !p.resident && p.refs == 0 && p.incoming.Load() == 0 && n.Now().Sub(p.last) >= 60*time.Second {
 			delete(n.connections, id)
+			p.channel.Close()
+		}
+	}
+	for p := range n.retiring {
+		if (p.refs == 0 && p.incoming.Load() == 0 && n.Now().Sub(p.last) >= 3*time.Second) || n.Now().Sub(p.retiredAt) >= 2*time.Minute {
+			delete(n.retiring, p)
 			p.channel.Close()
 		}
 	}

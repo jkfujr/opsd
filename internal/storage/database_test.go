@@ -33,7 +33,7 @@ func TestOpenAndReopen(t *testing.T) {
 						t.Fatal(err)
 					}
 				}
-				expectedVersion := 6
+				expectedVersion := 7
 				if kind == Node {
 					expectedVersion = 3
 				}
