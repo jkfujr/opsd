@@ -69,3 +69,13 @@ output-options:
     - updateDatabaseCluster
     - changeDatabase
     - getDatabaseBackups
+    - createNodeTerminal
+    - attachTerminal
+    - listScheduledTasks
+    - saveScheduledTask
+    - executeScheduledTask
+    - listScheduledTaskRuns
+    - readExecutionLogs
+    - listComposeProjects
+    - registerComposeProject
+    - changeComposeProject

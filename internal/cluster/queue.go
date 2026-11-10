@@ -30,6 +30,12 @@ func (n *Node) dispatch(ctx context.Context, origin, method string, body json.Ra
 	if validateManagedDatabaseKind(method) {
 		return n.databaseDispatch(ctx, origin, method, body)
 	}
+	if method == "tasks.list" || method == "task.run" || method == "task.runs" || method == "execution.logs" {
+		return n.taskDispatch(ctx, origin, method, body)
+	}
+	if method == "compose.list" {
+		return n.composeProjects(ctx)
+	}
 	switch method {
 	case "containers.read", "container.inspect", "container.logs":
 		return n.containerDispatch(ctx, method, body)
@@ -97,6 +103,9 @@ func (n *Node) dispatch(ctx context.Context, origin, method string, body json.Ra
 		var id string
 		if e := json.Unmarshal(body, &id); e != nil {
 			return nil, e
+		}
+		if op, e := n.operation(ctx, id); e == nil && op.Subject == "task_run" {
+			return n.cancelTask(ctx, id)
 		}
 		return n.cancelQueued(ctx, id)
 	case "operation.confirm", "operation.recover", "operation.resolve":
@@ -188,6 +197,53 @@ func (n *Node) enqueue(ctx context.Context, origin string, r Request) (Operation
 		return Operation{}, fault("invalid_request", "请求标识或内容无效")
 	}
 	switch r.Kind {
+	case "compose_register":
+		var selection ComposeSelection
+		if e := json.Unmarshal(r.Payload, &selection); e != nil {
+			return Operation{}, e
+		}
+		if len(selection.ID) != 64 || selection.EngineID == "" {
+			return Operation{}, fault("invalid_request", "项目标识无效")
+		}
+		r.ResourceID = selection.ID
+	case "compose":
+		var selection ComposeSelection
+		if e := json.Unmarshal(r.Payload, &selection); e != nil {
+			return Operation{}, e
+		}
+		ref, e := n.registeredCompose(ctx, selection.ID)
+		if e != nil {
+			return Operation{}, fault("not_found", "项目尚未登记")
+		}
+		if ref.EngineID != selection.EngineID {
+			return Operation{}, fault("conflict", "Docker Engine 身份不同")
+		}
+		action := protocol.ComposeAction{Project: ref, Action: selection.Action}
+		if e = action.Validate(); e != nil {
+			return Operation{}, fault("invalid_request", e.Error())
+		}
+		r.Payload, _ = json.Marshal(action)
+		r.ResourceID = ref.ID
+
+	case "task_save":
+		var task ScheduledTask
+		if e := json.Unmarshal(r.Payload, &task); e != nil {
+			return Operation{}, e
+		}
+		if _, e := task.schedule(); e != nil {
+			return Operation{}, e
+		}
+		r.ResourceID = task.ID
+	case "task_run":
+		var action protocol.ShellAction
+		if e := json.Unmarshal(r.Payload, &action); e != nil {
+			return Operation{}, e
+		}
+		if e := action.Validate(); e != nil {
+			return Operation{}, fault("invalid_request", e.Error())
+		}
+		r.ResourceID = action.TaskID
+
 	case "database_step":
 		var a protocol.DatabaseAction
 		if e := json.Unmarshal(r.Payload, &a); e != nil {
@@ -303,6 +359,9 @@ func (n *Node) enqueue(ctx context.Context, origin string, r Request) (Operation
 		return Operation{}, e
 	}
 	op := Operation{Key: r.Key, OperationRecord: protocol.OperationRecord{ID: r.ID, State: protocol.Accepted, Revision: 1, Decision: "undecided", Steps: []protocol.OperationStep{}}, NodeID: n.ID, Subject: r.Kind, Actor: origin, CreatedAt: n.Now().UTC(), UpdatedAt: n.Now().UTC(), Executor: "node"}
+	if r.Kind == "compose_register" || r.Kind == "compose" || r.Kind == "task_save" || r.Kind == "task_run" {
+		op.ResourceID = r.ResourceID
+	}
 	if r.Kind == "database_step" {
 		op.ResourceID = r.ResourceID
 	}
@@ -316,8 +375,20 @@ func (n *Node) enqueue(ctx context.Context, origin string, r Request) (Operation
 		_ = json.Unmarshal(r.Payload, &p)
 		op.PlanID = p.ID
 	}
+	phase := "queued"
+	if r.Kind == "task_run" {
+		var count, total int
+		if e = tx.QueryRowContext(ctx, "SELECT count(*),COALESCE(sum(json_extract(body,'$.resource_id')=?),0) FROM queue WHERE kind='task_run' AND terminal=0", r.ResourceID).Scan(&total, &count); e != nil {
+			return op, e
+		}
+		if count > 0 || total >= 8 {
+			op.State = protocol.Rejected
+			op.Error = &protocol.Error{Code: "task_busy", Message: "任务正在执行或节点并发已满"}
+			phase = "finished"
+		}
+	}
 	b, _ := json.Marshal(op)
-	result, e := tx.ExecContext(ctx, "INSERT INTO queue(id,origin,kind,payload,request_key,request_digest,body) VALUES(?,?,?,?,?,?,?)", r.ID, origin, r.Kind, string(payload), r.Key, digest[:], string(b))
+	result, e := tx.ExecContext(ctx, "INSERT INTO queue(id,origin,kind,payload,request_key,request_digest,body,terminal,phase) VALUES(?,?,?,?,?,?,?,?,?)", r.ID, origin, r.Kind, string(payload), r.Key, digest[:], string(b), operations.Terminal(op.State), phase)
 	if e != nil {
 		return op, e
 	}
@@ -416,6 +487,13 @@ func (n *Node) saveOperation(ctx context.Context, op *Operation, phase string) e
 	}
 	if e = tx.Commit(); e == nil {
 		n.notifyChange(Change{Resource: "operations", NodeID: n.ID})
+		if op.Subject == "compose" {
+			n.invalidateContainers()
+			n.notifyChange(Change{Resource: "compose", NodeID: n.ID})
+		}
+		if op.Subject == "task_run" {
+			n.notifyChange(Change{Resource: "tasks", NodeID: n.ID})
+		}
 		if op.Subject == "container" {
 			n.invalidateContainers()
 		}
@@ -438,11 +516,12 @@ func (n *Node) queueLoop() {
 		}
 	}
 }
-func (n *Node) advance() {
+func (n *Node) advance() { n.advanceFiltered("kind<>'task_run'") }
+func (n *Node) advanceFiltered(filter string, args ...any) {
 	ctx, cancel := context.WithTimeout(n.ctx, 30*time.Second)
 	defer cancel()
 	var id, origin, kind, encrypted, phase string
-	e := n.DB.QueryRowContext(ctx, "SELECT id,origin,kind,payload,phase FROM queue WHERE terminal=0 ORDER BY seq LIMIT 1").Scan(&id, &origin, &kind, &encrypted, &phase)
+	e := n.DB.QueryRowContext(ctx, "SELECT id,origin,kind,payload,phase FROM queue WHERE terminal=0 AND "+filter+" ORDER BY seq LIMIT 1", args...).Scan(&id, &origin, &kind, &encrypted, &phase)
 	if e != nil {
 		return
 	}
@@ -489,7 +568,7 @@ func (n *Node) advance() {
 		n.advanceDatabase(ctx, &op, plain)
 		return
 	}
-	if kind != "firewall" && kind != "component" && kind != "firewall_config" && kind != "container" && kind != "database_step" {
+	if kind != "firewall" && kind != "component" && kind != "firewall_config" && kind != "container" && kind != "database_step" && kind != "task_run" && kind != "compose" {
 		e = n.applyLocal(ctx, kind, plain, &op)
 		if e != nil {
 			finish(protocol.Rejected, e)
@@ -503,7 +582,14 @@ func (n *Node) advance() {
 	if claimed {
 		// 先记下发送意图。进程中断后只查询/封存同一 ID，不重新发送未知结果的动作。
 		action := protocol.OperationAction{Kind: kind}
-		if kind == "database_step" {
+		if kind == "compose" {
+			action.Compose = &protocol.ComposeAction{}
+			e = json.Unmarshal(plain, action.Compose)
+		} else if kind == "task_run" {
+			action.Kind = "shell"
+			action.Shell = &protocol.ShellAction{}
+			e = json.Unmarshal(plain, action.Shell)
+		} else if kind == "database_step" {
 			action.Kind = "database"
 			action.Database = &protocol.DatabaseAction{}
 			e = json.Unmarshal(plain, action.Database)
@@ -557,6 +643,12 @@ func (n *Node) advance() {
 	_ = n.saveOperation(ctx, &op, "submitted")
 }
 func (n *Node) applyLocal(ctx context.Context, kind string, plain []byte, op *Operation) error {
+	if kind == "compose_register" {
+		return n.registerCompose(ctx, plain, op)
+	}
+	if kind == "task_save" {
+		return n.applyTask(ctx, plain, op)
+	}
 	c, e := n.Config(ctx)
 	if e != nil {
 		return e
@@ -818,6 +910,7 @@ func (n *Node) cancelQueued(ctx context.Context, id string) (Operation, error) {
 }
 
 type ListQuery struct {
+	ResourceID    string            `json:"resource_id,omitempty"`
 	Authorization *apiauth.Token    `json:"authorization,omitempty"`
 	Key           string            `json:"key,omitempty"`
 	Positions     map[string]uint64 `json:"positions,omitempty"`
@@ -867,6 +960,10 @@ func (n *Node) localOperations(ctx context.Context, q ListQuery) (OperationList,
 			return OperationList{Items: []Operation{}}, nil
 		}
 		query += " AND (" + strings.Join(parts, " OR ") + ")"
+	}
+	if q.ResourceID != "" {
+		query += " AND json_extract(body,'$.resource_id')=?"
+		args = append(args, q.ResourceID)
 	}
 	if q.Key != "" {
 		query += " AND request_key=?"

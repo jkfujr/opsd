@@ -91,6 +91,16 @@ func decodeJSON(data []byte, target any) error {
 func validatePayload(payload Payload) error {
 	var operationID string
 	switch body := payload.(type) {
+	case *OperationCancel:
+		if body.OperationID == "" || body.ExpectedRevision == 0 {
+			return fmt.Errorf("取消操作缺少标识或版本")
+		}
+	case *ExecutionLogsRead:
+		if body.OperationID == "" || body.Offset < 0 || body.Limit < 1 || body.Limit > 65536 {
+			return fmt.Errorf("日志范围无效")
+		}
+	case *TerminalFrame:
+		return body.Validate()
 	case *ContainerInspect:
 		return body.ContainerRef.Validate()
 	case *ContainerLogsRead:
@@ -202,6 +212,12 @@ func validatePayload(payload Payload) error {
 
 func (action OperationAction) validate() error {
 	count := 0
+	if action.Compose != nil {
+		count++
+	}
+	if action.Shell != nil {
+		count++
+	}
 	if action.Database != nil {
 		count++
 	}
@@ -224,6 +240,16 @@ func (action OperationAction) validate() error {
 		return fmt.Errorf("操作必须包含且只包含一种业务载荷")
 	}
 	switch action.Kind {
+	case "compose":
+		if action.Compose == nil {
+			return fmt.Errorf("Compose 操作缺少参数")
+		}
+		return action.Compose.Validate()
+	case "shell":
+		if action.Shell == nil {
+			return fmt.Errorf("任务缺少参数")
+		}
+		return action.Shell.Validate()
 	case "database":
 		if action.Database == nil {
 			return fmt.Errorf("数据库操作缺少参数")

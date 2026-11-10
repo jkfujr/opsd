@@ -89,7 +89,7 @@ func (s *Server) ListOperations(w http.ResponseWriter, r *http.Request, _ httpap
 	s.operationList(w, r, false)
 }
 func (s *Server) operationList(w http.ResponseWriter, r *http.Request, pending bool) {
-	q := cluster.ListQuery{Key: r.URL.Query().Get("idempotency_key"), Pending: pending, State: r.URL.Query().Get("state"), Limit: 50}
+	q := cluster.ListQuery{ResourceID: r.URL.Query().Get("resource_id"), Key: r.URL.Query().Get("idempotency_key"), Pending: pending, State: r.URL.Query().Get("state"), Limit: 50}
 	if a := access(r.Context()); a != nil {
 		q.Authorization = &a.Token
 	}

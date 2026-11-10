@@ -55,6 +55,17 @@ UFW 互信只改写 OPSD 所属链与带标记的引用，`INPUT` 首条引用�
 
 本批使用 GitHub Actions，流程见 [验收文档](../../../../docs/VALIDATION.md)。`npm run build` 包含接口生成、前端类型检查、构建与双架构程序编译；同提交成功产物直接用于发布。当前成功结果输入未变就复用。
 
-`scripts/check-ui.mjs` 在 CI 实际安装的生产程序上运行 Chromium，覆盖页面、主题、窄屏、浮层和未提交修改，截图写入 `artifacts/ui/`。防火墙顶部按筛选组、状态与操作组分别核对位置，包含 639／640px 换行边界、1000px 中等宽度和长名称、状态换行、加载、错误；模拟加载结束后定向移除所属处理器，并等待已进入的拦截请求完成，保留其他页面处理器。通过结果后下载该产物，检查中等宽度与换行边界的实际视觉；交互与人工视觉结果分别记录。人工浏览器缺少连接时，继续使用已授权 CI，保留其尚未覆盖的实机范围。
+本批停止旧前端开发，CI 使用 `OPSD_API_TEST=1 go test ./internal/control -run '^TestProductionBackendAPI$'` 在实际安装程序上检查 HTTP、终端 WebSocket、任务取消和日志、容器更新与 Compose。结果为 `api-check`；`frontend2` 由用户独立开发。以下旧界面流程仅在后续明确要求界面工作时使用。
+
+`scripts/check-ui.mjs` 在实际安装的生产程序上运行 Chromium，覆盖页面、主题、窄屏、浮层和未提交修改，截图写入 `artifacts/ui/`。防火墙顶部按筛选组、状态与操作组分别核对位置，包含 639／640px 换行边界、1000px 中等宽度和长名称、状态换行、加载、错误；模拟加载结束后定向移除所属处理器，并等待已进入的拦截请求完成，保留其他页面处理器。通过结果后下载该产物，检查中等宽度与换行边界的实际视觉；交互与人工视觉结果分别记录。人工浏览器缺少连接时，继续使用已授权 CI，保留其尚未覆盖的实机范围。
 
 界面检查失败时先读取工件中的 `failure-state.json`，核对防火墙配置、实际互信状态、待处理及最近操作，再处理 `failure.txt` 和截图；响应解析失败时保留原始响应正文。
+
+
+## 终端、任务和 Compose
+
+终端入口为 `control/terminal.go` → `cluster/terminal.go` → 执行器 Unix WebSocket → `internal/terminal`。业务 RPC 和终端通道分别管理；绑定会话的单次票据、Origin、CSRF 及断连释放保持在相应模块。
+
+`cluster/tasks.go` 保存和调度任务，保存完成通知调度器，未来计划使用稳定请求键；`operations/shell.go` 保存执行意图，CLI 按任务 ID 加锁，普通修改仍用原锁。取消持久登记后重启原 systemd 操作服务，释放整个进程组，未知脚本不补跑。执行日志限 16 MiB，HTTP 每批最多 64 KiB。
+
+`dockerengine` 负责实际 Compose 标签与目录核对、CLI 和镜像更新；执行和恢复状态留在 `operations`。更新先拉取再停止、保留原配置与卷；已发送步骤应答未知时只读回。Compose 配置编辑继续使用 SSH，不添加另一套编辑状态。

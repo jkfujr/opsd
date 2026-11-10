@@ -11,6 +11,7 @@ func ControlMethod(method string) bool {
 }
 
 type PeerHello struct {
+	Stream      string          `json:"stream,omitempty"`
 	Token       string          `json:"token,omitempty"`
 	Member      json.RawMessage `json:"member"`
 	Directory   json.RawMessage `json:"directory,omitempty"`

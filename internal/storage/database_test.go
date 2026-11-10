@@ -35,7 +35,7 @@ func TestOpenAndReopen(t *testing.T) {
 				}
 				expectedVersion := 6
 				if kind == Node {
-					expectedVersion = 2
+					expectedVersion = 3
 				}
 				if count != expectedVersion || version != expectedVersion || sync != 2 || foreign != 1 || mode != "wal" {
 					t.Fatalf("数据库配置或迁移错误：记录=%d 版本=%d 同步=%d 外键=%d 日志=%s", count, version, sync, foreign, mode)
@@ -61,7 +61,7 @@ func TestExistingNodeDatabaseKeepsAccountAndQueue(t *testing.T) {
 	if _, err = db.Exec(legacy); err != nil {
 		t.Fatal(err)
 	}
-	if _, err = db.Exec("INSERT INTO account VALUES(1,'existing','hash','/signin',7,'encrypted'); INSERT INTO queue(seq,id,origin,kind,payload,request_key,request_digest,phase,body,terminal) VALUES(9,'original','origin','firewall','encrypted','request',X'01','submitted','{}',0)"); err != nil {
+	if _, err = db.Exec(`INSERT INTO account VALUES(1,'existing','hash','/signin',7,'encrypted'); INSERT INTO queue(seq,id,origin,kind,payload,request_key,request_digest,phase,body,terminal) VALUES(9,'original','origin','firewall','encrypted','request',X'01','submitted','{}',0); INSERT INTO account_navigation VALUES(1,4,'["settings","nodes","overview","containers","databases","storage","firewall"]')`); err != nil {
 		t.Fatal(err)
 	}
 	db.Close()
@@ -80,6 +80,13 @@ func TestExistingNodeDatabaseKeepsAccountAndQueue(t *testing.T) {
 		}
 		if username != "existing" || revision != 7 || id != "original" || sequence != 9 || terminal != 0 {
 			t.Fatal("迁移改变了已有身份或受理记录")
+		}
+		var order string
+		if err = db.QueryRow("SELECT order_json,revision FROM account_navigation").Scan(&order, &revision); err != nil {
+			t.Fatal(err)
+		}
+		if order != `["tools","settings","nodes","overview","containers","databases","storage","firewall"]` || revision != 5 {
+			t.Fatal("菜单迁移改变了原顺序或重复插入工具", order, revision)
 		}
 		db.Close()
 	}

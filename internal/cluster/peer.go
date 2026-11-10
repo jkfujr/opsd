@@ -63,6 +63,9 @@ func (n *Node) accept(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	joining := hello.Token != ""
+	if hello.Stream != "" && (hello.Stream != "terminal" || joining || hello.ProbeFamily != "") {
+		return
+	}
 	if hello.ProbeFamily != "" {
 		if joining || !n.Active(r.Context(), m.ID) || m.Cluster != n.cluster {
 			n.sendFailure(r.Context(), channel, first.RequestID, fault("forbidden", "成员身份无效"))
@@ -104,6 +107,10 @@ func (n *Node) accept(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if joining {
+		return
+	}
+	if hello.Stream == "terminal" {
+		n.serveTerminal(r.Context(), m.ID, transport.TerminalChannel{Channel: channel})
 		return
 	}
 	p := &peer{channel: channel, calls: transport.NewCalls(), id: m.ID, resident: hello.Resident, done: make(chan struct{}), last: n.Now()}

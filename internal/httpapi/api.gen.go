@@ -31,6 +31,7 @@ const (
 	APIErrorCodeNotAccepted           APIErrorCode = "not_accepted"
 	APIErrorCodeNotFound              APIErrorCode = "not_found"
 	APIErrorCodeRateLimited           APIErrorCode = "rate_limited"
+	APIErrorCodeTaskBusy              APIErrorCode = "task_busy"
 	APIErrorCodeUnauthenticated       APIErrorCode = "unauthenticated"
 )
 
@@ -60,6 +61,8 @@ func (e APIErrorCode) Valid() bool {
 	case APIErrorCodeNotFound:
 		return true
 	case APIErrorCodeRateLimited:
+		return true
+	case APIErrorCodeTaskBusy:
 		return true
 	case APIErrorCodeUnauthenticated:
 		return true
@@ -209,6 +212,33 @@ func (e Backend) Valid() bool {
 	}
 }
 
+// Defines values for ComposeActionRequestAction.
+const (
+	ComposeActionRequestActionPull     ComposeActionRequestAction = "pull"
+	ComposeActionRequestActionRecreate ComposeActionRequestAction = "recreate"
+	ComposeActionRequestActionStart    ComposeActionRequestAction = "start"
+	ComposeActionRequestActionStop     ComposeActionRequestAction = "stop"
+	ComposeActionRequestActionUpdate   ComposeActionRequestAction = "update"
+)
+
+// Valid indicates whether the value is a known member of the ComposeActionRequestAction enum.
+func (e ComposeActionRequestAction) Valid() bool {
+	switch e {
+	case ComposeActionRequestActionPull:
+		return true
+	case ComposeActionRequestActionRecreate:
+		return true
+	case ComposeActionRequestActionStart:
+		return true
+	case ComposeActionRequestActionStop:
+		return true
+	case ComposeActionRequestActionUpdate:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for ConfigScope.
 const (
 	Both      ConfigScope = "both"
@@ -232,19 +262,22 @@ func (e ConfigScope) Valid() bool {
 
 // Defines values for ContainerActionRequestAction.
 const (
-	Restart ContainerActionRequestAction = "restart"
-	Start   ContainerActionRequestAction = "start"
-	Stop    ContainerActionRequestAction = "stop"
+	ContainerActionRequestActionRestart ContainerActionRequestAction = "restart"
+	ContainerActionRequestActionStart   ContainerActionRequestAction = "start"
+	ContainerActionRequestActionStop    ContainerActionRequestAction = "stop"
+	ContainerActionRequestActionUpdate  ContainerActionRequestAction = "update"
 )
 
 // Valid indicates whether the value is a known member of the ContainerActionRequestAction enum.
 func (e ContainerActionRequestAction) Valid() bool {
 	switch e {
-	case Restart:
+	case ContainerActionRequestActionRestart:
 		return true
-	case Start:
+	case ContainerActionRequestActionStart:
 		return true
-	case Stop:
+	case ContainerActionRequestActionStop:
+		return true
+	case ContainerActionRequestActionUpdate:
 		return true
 	default:
 		return false
@@ -668,6 +701,7 @@ const (
 	NavigationItemOverview   NavigationItem = "overview"
 	NavigationItemSettings   NavigationItem = "settings"
 	NavigationItemStorage    NavigationItem = "storage"
+	NavigationItemTools      NavigationItem = "tools"
 )
 
 // Valid indicates whether the value is a known member of the NavigationItem enum.
@@ -686,6 +720,8 @@ func (e NavigationItem) Valid() bool {
 	case NavigationItemSettings:
 		return true
 	case NavigationItemStorage:
+		return true
+	case NavigationItemTools:
 		return true
 	default:
 		return false
@@ -766,15 +802,19 @@ func (e OperationExecutor) Valid() bool {
 
 // Defines values for OperationSubject.
 const (
-	OperationSubjectAccount        OperationSubject = "account"
-	OperationSubjectComponent      OperationSubject = "component"
-	OperationSubjectConfig         OperationSubject = "config"
-	OperationSubjectContainer      OperationSubject = "container"
-	OperationSubjectDatabase       OperationSubject = "database"
-	OperationSubjectDatabaseStep   OperationSubject = "database_step"
-	OperationSubjectFirewall       OperationSubject = "firewall"
-	OperationSubjectFirewallConfig OperationSubject = "firewall_config"
-	OperationSubjectName           OperationSubject = "name"
+	OperationSubjectAccount         OperationSubject = "account"
+	OperationSubjectComponent       OperationSubject = "component"
+	OperationSubjectCompose         OperationSubject = "compose"
+	OperationSubjectComposeRegister OperationSubject = "compose_register"
+	OperationSubjectConfig          OperationSubject = "config"
+	OperationSubjectContainer       OperationSubject = "container"
+	OperationSubjectDatabase        OperationSubject = "database"
+	OperationSubjectDatabaseStep    OperationSubject = "database_step"
+	OperationSubjectFirewall        OperationSubject = "firewall"
+	OperationSubjectFirewallConfig  OperationSubject = "firewall_config"
+	OperationSubjectName            OperationSubject = "name"
+	OperationSubjectTaskRun         OperationSubject = "task_run"
+	OperationSubjectTaskSave        OperationSubject = "task_save"
 )
 
 // Valid indicates whether the value is a known member of the OperationSubject enum.
@@ -783,6 +823,10 @@ func (e OperationSubject) Valid() bool {
 	case OperationSubjectAccount:
 		return true
 	case OperationSubjectComponent:
+		return true
+	case OperationSubjectCompose:
+		return true
+	case OperationSubjectComposeRegister:
 		return true
 	case OperationSubjectConfig:
 		return true
@@ -798,6 +842,10 @@ func (e OperationSubject) Valid() bool {
 		return true
 	case OperationSubjectName:
 		return true
+	case OperationSubjectTaskRun:
+		return true
+	case OperationSubjectTaskSave:
+		return true
 	default:
 		return false
 	}
@@ -809,6 +857,7 @@ const (
 	OperationStateApplying             OperationState = "applying"
 	OperationStateAttentionRequired    OperationState = "attention_required"
 	OperationStateAwaitingConfirmation OperationState = "awaiting_confirmation"
+	OperationStateCancelled            OperationState = "cancelled"
 	OperationStateFailed               OperationState = "failed"
 	OperationStatePrepared             OperationState = "prepared"
 	OperationStateRejected             OperationState = "rejected"
@@ -828,6 +877,8 @@ func (e OperationState) Valid() bool {
 	case OperationStateAttentionRequired:
 		return true
 	case OperationStateAwaitingConfirmation:
+		return true
+	case OperationStateCancelled:
 		return true
 	case OperationStateFailed:
 		return true
@@ -1340,6 +1391,56 @@ type Capability struct {
 	Supported bool    `json:"supported"`
 }
 
+// ComposeActionRequest defines model for ComposeActionRequest.
+type ComposeActionRequest struct {
+	Action   ComposeActionRequestAction `json:"action"`
+	EngineId string                     `json:"engine_id"`
+}
+
+// ComposeActionRequestAction defines model for ComposeActionRequest.Action.
+type ComposeActionRequestAction string
+
+// ComposeProject defines model for ComposeProject.
+type ComposeProject struct {
+	CheckedAt        time.Time          `json:"checked_at"`
+	Directory        string             `json:"directory"`
+	EngineId         string             `json:"engine_id"`
+	EnvironmentFiles []string           `json:"environment_files"`
+	Files            []string           `json:"files"`
+	Id               string             `json:"id"`
+	Name             string             `json:"name"`
+	ReadOnlyReason   *string            `json:"read_only_reason,omitempty"`
+	Registered       bool               `json:"registered"`
+	Services         []ContainerSummary `json:"services"`
+}
+
+// ComposeProjectItem defines model for ComposeProjectItem.
+type ComposeProjectItem struct {
+	CheckedAt        time.Time          `json:"checked_at"`
+	Directory        string             `json:"directory"`
+	EngineId         string             `json:"engine_id"`
+	EnvironmentFiles []string           `json:"environment_files"`
+	Files            []string           `json:"files"`
+	Id               string             `json:"id"`
+	Name             string             `json:"name"`
+	NodeId           string             `json:"node_id"`
+	NodeName         string             `json:"node_name"`
+	ReadOnlyReason   *string            `json:"read_only_reason,omitempty"`
+	Registered       bool               `json:"registered"`
+	Services         []ContainerSummary `json:"services"`
+}
+
+// ComposeProjectList defines model for ComposeProjectList.
+type ComposeProjectList struct {
+	Items []ComposeProjectItem `json:"items"`
+	Nodes []ResourceNodeRead   `json:"nodes"`
+}
+
+// ComposeProjectSelection defines model for ComposeProjectSelection.
+type ComposeProjectSelection struct {
+	EngineId string `json:"engine_id"`
+}
+
 // ConfigScope defines model for ConfigScope.
 type ConfigScope string
 
@@ -1427,6 +1528,20 @@ type ContainerPort struct {
 	HostIp        string `json:"host_ip"`
 	HostPort      int    `json:"host_port"`
 	Protocol      string `json:"protocol"`
+}
+
+// ContainerSummary defines model for ContainerSummary.
+type ContainerSummary struct {
+	ContainerId    string          `json:"container_id"`
+	EngineId       string          `json:"engine_id"`
+	Health         string          `json:"health"`
+	Image          string          `json:"image"`
+	Name           string          `json:"name"`
+	Ports          []ContainerPort `json:"ports"`
+	Project        string          `json:"project"`
+	ReadOnlyReason *string         `json:"read_only_reason,omitempty"`
+	Service        string          `json:"service"`
+	State          string          `json:"state"`
 }
 
 // CurrentSession defines model for CurrentSession.
@@ -1676,6 +1791,15 @@ type EnrollmentTokenCreated struct {
 // EnrollmentTokenList defines model for EnrollmentTokenList.
 type EnrollmentTokenList struct {
 	Items []EnrollmentToken `json:"items"`
+}
+
+// ExecutionLogs defines model for ExecutionLogs.
+type ExecutionLogs struct {
+	Data       []byte `json:"data"`
+	HasMore    bool   `json:"has_more"`
+	NextOffset int64  `json:"next_offset"`
+	Offset     int64  `json:"offset"`
+	Truncated  bool   `json:"truncated"`
 }
 
 // FieldError defines model for FieldError.
@@ -2217,6 +2341,13 @@ type ResolveOperation struct {
 // ResolveOperationAcceptCurrent defines model for ResolveOperation.AcceptCurrent.
 type ResolveOperationAcceptCurrent bool
 
+// ResourceNodeRead defines model for ResourceNodeRead.
+type ResourceNodeRead struct {
+	NodeId   string     `json:"node_id"`
+	NodeName string     `json:"node_name"`
+	Read     ReadStatus `json:"read"`
+}
+
 // RuleSpec defines model for RuleSpec.
 type RuleSpec struct {
 	Action      RuleSpecAction   `json:"action"`
@@ -2233,6 +2364,46 @@ type RuleSpecAction string
 
 // RuleSpecProtocol defines model for RuleSpec.Protocol.
 type RuleSpecProtocol string
+
+// ScheduledTask defines model for ScheduledTask.
+type ScheduledTask struct {
+	Directory string     `json:"directory"`
+	Enabled   bool       `json:"enabled"`
+	Id        string     `json:"id"`
+	Name      string     `json:"name"`
+	NextAt    *time.Time `json:"next_at,omitempty"`
+	Revision  int64      `json:"revision"`
+	Schedule  string     `json:"schedule"`
+	Script    string     `json:"script"`
+	Timezone  string     `json:"timezone"`
+}
+
+// ScheduledTaskItem defines model for ScheduledTaskItem.
+type ScheduledTaskItem struct {
+	Directory string     `json:"directory"`
+	Enabled   bool       `json:"enabled"`
+	Id        string     `json:"id"`
+	Name      string     `json:"name"`
+	NextAt    *time.Time `json:"next_at,omitempty"`
+	NodeId    string     `json:"node_id"`
+	NodeName  string     `json:"node_name"`
+	Revision  int64      `json:"revision"`
+	Schedule  string     `json:"schedule"`
+	Script    string     `json:"script"`
+	Timezone  string     `json:"timezone"`
+}
+
+// ScheduledTaskList defines model for ScheduledTaskList.
+type ScheduledTaskList struct {
+	Items       []ScheduledTaskItem `json:"items"`
+	Nodes       []ResourceNodeRead  `json:"nodes"`
+	Unavailable []UnavailableNode   `json:"unavailable"`
+}
+
+// ScheduledTaskRuns defines model for ScheduledTaskRuns.
+type ScheduledTaskRuns struct {
+	Items []Operation `json:"items"`
+}
 
 // Session defines model for Session.
 type Session struct {
@@ -2269,6 +2440,12 @@ type StorageStatus struct {
 // StorageStatusState defines model for StorageStatus.State.
 type StorageStatusState string
 
+// TerminalTicket defines model for TerminalTicket.
+type TerminalTicket struct {
+	ExpiresAt time.Time `json:"expires_at"`
+	Url       string    `json:"url"`
+}
+
 // TokenRevision defines model for TokenRevision.
 type TokenRevision struct {
 	Revision int64 `json:"revision"`
@@ -2278,6 +2455,13 @@ type TokenRevision struct {
 type TrustMember struct {
 	Id   string `json:"id"`
 	Name string `json:"name"`
+}
+
+// UnavailableNode defines model for UnavailableNode.
+type UnavailableNode struct {
+	Message  string `json:"message"`
+	NodeId   string `json:"node_id"`
+	NodeName string `json:"node_name"`
 }
 
 // VersionInfo defines model for VersionInfo.
@@ -2341,6 +2525,11 @@ type LogoutParams struct {
 // RevokeSessionParams defines parameters for RevokeSession.
 type RevokeSessionParams struct {
 	XCSRFToken *string `json:"X-CSRF-Token,omitempty"`
+}
+
+// ListComposeProjectsParams defines parameters for ListComposeProjects.
+type ListComposeProjectsParams struct {
+	NodeId *string `form:"node_id,omitempty" json:"node_id,omitempty"`
 }
 
 // ListContainersParams defines parameters for ListContainers.
@@ -2407,6 +2596,18 @@ type RevealNodePasswordParams struct {
 	XCSRFToken *string `json:"X-CSRF-Token,omitempty"`
 }
 
+// ChangeComposeProjectParams defines parameters for ChangeComposeProject.
+type ChangeComposeProjectParams struct {
+	XCSRFToken     *string `json:"X-CSRF-Token,omitempty"`
+	IdempotencyKey string  `json:"Idempotency-Key"`
+}
+
+// RegisterComposeProjectParams defines parameters for RegisterComposeProject.
+type RegisterComposeProjectParams struct {
+	XCSRFToken     *string `json:"X-CSRF-Token,omitempty"`
+	IdempotencyKey string  `json:"Idempotency-Key"`
+}
+
 // GetContainerParams defines parameters for GetContainer.
 type GetContainerParams struct {
 	EngineId string `form:"engine_id" json:"engine_id"`
@@ -2422,6 +2623,12 @@ type ChangeContainerParams struct {
 type GetContainerLogsParams struct {
 	EngineId string `form:"engine_id" json:"engine_id"`
 	Tail     *int   `form:"tail,omitempty" json:"tail,omitempty"`
+}
+
+// ReadExecutionLogsParams defines parameters for ReadExecutionLogs.
+type ReadExecutionLogsParams struct {
+	Offset *int `form:"offset,omitempty" json:"offset,omitempty"`
+	Limit  *int `form:"limit,omitempty" json:"limit,omitempty"`
 }
 
 // ChangeFirewallConfigParams defines parameters for ChangeFirewallConfig.
@@ -2463,6 +2670,23 @@ type ChangeNodeSettingsParams struct {
 	IdempotencyKey string  `json:"Idempotency-Key"`
 }
 
+// SaveScheduledTaskParams defines parameters for SaveScheduledTask.
+type SaveScheduledTaskParams struct {
+	XCSRFToken     *string `json:"X-CSRF-Token,omitempty"`
+	IdempotencyKey string  `json:"Idempotency-Key"`
+}
+
+// ExecuteScheduledTaskParams defines parameters for ExecuteScheduledTask.
+type ExecuteScheduledTaskParams struct {
+	XCSRFToken     *string `json:"X-CSRF-Token,omitempty"`
+	IdempotencyKey string  `json:"Idempotency-Key"`
+}
+
+// CreateNodeTerminalParams defines parameters for CreateNodeTerminal.
+type CreateNodeTerminalParams struct {
+	XCSRFToken *string `json:"X-CSRF-Token,omitempty"`
+}
+
 // ListOperationsParams defines parameters for ListOperations.
 type ListOperationsParams struct {
 	Cursor         *string         `form:"cursor,omitempty" json:"cursor,omitempty"`
@@ -2471,6 +2695,7 @@ type ListOperationsParams struct {
 	State          *OperationState `form:"state,omitempty" json:"state,omitempty"`
 	PlanId         *string         `form:"plan_id,omitempty" json:"plan_id,omitempty"`
 	IdempotencyKey *string         `form:"idempotency_key,omitempty" json:"idempotency_key,omitempty"`
+	ResourceId     *string         `form:"resource_id,omitempty" json:"resource_id,omitempty"`
 }
 
 // ListPendingOperationsParams defines parameters for ListPendingOperations.
@@ -2514,6 +2739,11 @@ type UpdateNavigationParams struct {
 	XCSRFToken *string `json:"X-CSRF-Token,omitempty"`
 }
 
+// ListScheduledTasksParams defines parameters for ListScheduledTasks.
+type ListScheduledTasksParams struct {
+	NodeId *string `form:"node_id,omitempty" json:"node_id,omitempty"`
+}
+
 // CreateAPITokenJSONRequestBody defines body for CreateAPIToken for application/json ContentType.
 type CreateAPITokenJSONRequestBody = APITokenInput
 
@@ -2541,6 +2771,12 @@ type RenameNodeJSONRequestBody = NodePatch
 // ChangeNodeAccountJSONRequestBody defines body for ChangeNodeAccount for application/json ContentType.
 type ChangeNodeAccountJSONRequestBody = NodeAccountChange
 
+// ChangeComposeProjectJSONRequestBody defines body for ChangeComposeProject for application/json ContentType.
+type ChangeComposeProjectJSONRequestBody = ComposeActionRequest
+
+// RegisterComposeProjectJSONRequestBody defines body for RegisterComposeProject for application/json ContentType.
+type RegisterComposeProjectJSONRequestBody = ComposeProjectSelection
+
 // ChangeContainerJSONRequestBody defines body for ChangeContainer for application/json ContentType.
 type ChangeContainerJSONRequestBody = ContainerActionRequest
 
@@ -2561,6 +2797,9 @@ type ChangePublicAddressesJSONRequestBody = PublicAddressPatch
 
 // ChangeNodeSettingsJSONRequestBody defines body for ChangeNodeSettings for application/json ContentType.
 type ChangeNodeSettingsJSONRequestBody = NodeConfig
+
+// SaveScheduledTaskJSONRequestBody defines body for SaveScheduledTask for application/json ContentType.
+type SaveScheduledTaskJSONRequestBody = ScheduledTask
 
 // ConfirmOperationJSONRequestBody defines body for ConfirmOperation for application/json ContentType.
 type ConfirmOperationJSONRequestBody = OperationRevision
@@ -2615,6 +2854,9 @@ type ServerInterface interface {
 	// RevokeSession 撤销指定会话
 	// (DELETE /auth/sessions/{id})
 	RevokeSession(w http.ResponseWriter, r *http.Request, id string, params RevokeSessionParams)
+
+	// (GET /compose-projects)
+	ListComposeProjects(w http.ResponseWriter, r *http.Request, params ListComposeProjectsParams)
 	// ListContainers 读取各节点容器和 Docker 状态
 	// (GET /containers)
 	ListContainers(w http.ResponseWriter, r *http.Request, params ListContainersParams)
@@ -2669,6 +2911,12 @@ type ServerInterface interface {
 
 	// (POST /nodes/{id}/account/password)
 	RevealNodePassword(w http.ResponseWriter, r *http.Request, id string, params RevealNodePasswordParams)
+
+	// (POST /nodes/{id}/compose-projects/{project_id}/actions)
+	ChangeComposeProject(w http.ResponseWriter, r *http.Request, id string, projectId string, params ChangeComposeProjectParams)
+
+	// (POST /nodes/{id}/compose-projects/{project_id}/register)
+	RegisterComposeProject(w http.ResponseWriter, r *http.Request, id string, projectId string, params RegisterComposeProjectParams)
 	// GetContainer 读取容器详情
 	// (GET /nodes/{id}/containers/{container_id})
 	GetContainer(w http.ResponseWriter, r *http.Request, id string, containerId string, params GetContainerParams)
@@ -2684,6 +2932,9 @@ type ServerInterface interface {
 	// SaveDatabaseInstance 保存本机数据库连接
 	// (PUT /nodes/{id}/databases/instances/{instance_id})
 	SaveDatabaseInstance(w http.ResponseWriter, r *http.Request, id string, instanceId string)
+
+	// (GET /nodes/{id}/executions/{operation_id}/logs)
+	ReadExecutionLogs(w http.ResponseWriter, r *http.Request, id string, operationId string, params ReadExecutionLogsParams)
 	// ReadFirewall 读取 OPSD 防火墙配置及应用状态
 	// (GET /nodes/{id}/firewall)
 	ReadFirewall(w http.ResponseWriter, r *http.Request, id string)
@@ -2720,6 +2971,18 @@ type ServerInterface interface {
 
 	// (GET /nodes/{id}/storage)
 	GetStorageStatus(w http.ResponseWriter, r *http.Request, id string)
+
+	// (POST /nodes/{id}/tasks)
+	SaveScheduledTask(w http.ResponseWriter, r *http.Request, id string, params SaveScheduledTaskParams)
+
+	// (POST /nodes/{id}/tasks/{task_id}/run)
+	ExecuteScheduledTask(w http.ResponseWriter, r *http.Request, id string, taskId string, params ExecuteScheduledTaskParams)
+
+	// (GET /nodes/{id}/tasks/{task_id}/runs)
+	ListScheduledTaskRuns(w http.ResponseWriter, r *http.Request, id string, taskId string)
+
+	// (POST /nodes/{id}/terminal)
+	CreateNodeTerminal(w http.ResponseWriter, r *http.Request, id string, params CreateNodeTerminalParams)
 	// ListOperations 查询历史或定位原操作
 	// (GET /operations)
 	ListOperations(w http.ResponseWriter, r *http.Request, params ListOperationsParams)
@@ -2768,6 +3031,12 @@ type ServerInterface interface {
 	// GetVersion 读取版本
 	// (GET /settings/version)
 	GetVersion(w http.ResponseWriter, r *http.Request)
+
+	// (GET /tasks)
+	ListScheduledTasks(w http.ResponseWriter, r *http.Request, params ListScheduledTasksParams)
+
+	// (GET /terminals/{ticket})
+	AttachTerminal(w http.ResponseWriter, r *http.Request, ticket string)
 }
 
 // ServerInterfaceWrapper converts contexts to parameters.
@@ -3122,6 +3391,39 @@ func (siw *ServerInterfaceWrapper) RevokeSession(w http.ResponseWriter, r *http.
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.RevokeSession(w, r, id, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListComposeProjects operation middleware
+func (siw *ServerInterfaceWrapper) ListComposeProjects(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListComposeProjectsParams
+
+	// ------------- Optional query parameter "node_id" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "node_id", r.URL.Query(), &params.NodeId, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "node_id"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "node_id", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListComposeProjects(w, r, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -3841,6 +4143,170 @@ func (siw *ServerInterfaceWrapper) RevealNodePassword(w http.ResponseWriter, r *
 	handler.ServeHTTP(w, r)
 }
 
+// ChangeComposeProject operation middleware
+func (siw *ServerInterfaceWrapper) ChangeComposeProject(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "project_id" -------------
+	var projectId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "project_id", r.PathValue("project_id"), &projectId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "project_id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ChangeComposeProjectParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "X-CSRF-Token" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-CSRF-Token")]; found {
+		var XCSRFToken string
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "X-CSRF-Token", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "X-CSRF-Token", valueList[0], &XCSRFToken, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-CSRF-Token", Err: err})
+			return
+		}
+
+		params.XCSRFToken = &XCSRFToken
+
+	}
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey string
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ChangeComposeProject(w, r, id, projectId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// RegisterComposeProject operation middleware
+func (siw *ServerInterfaceWrapper) RegisterComposeProject(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "project_id" -------------
+	var projectId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "project_id", r.PathValue("project_id"), &projectId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "project_id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params RegisterComposeProjectParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "X-CSRF-Token" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-CSRF-Token")]; found {
+		var XCSRFToken string
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "X-CSRF-Token", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "X-CSRF-Token", valueList[0], &XCSRFToken, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-CSRF-Token", Err: err})
+			return
+		}
+
+		params.XCSRFToken = &XCSRFToken
+
+	}
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey string
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RegisterComposeProject(w, r, id, projectId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // GetContainer operation middleware
 func (siw *ServerInterfaceWrapper) GetContainer(w http.ResponseWriter, r *http.Request) {
 
@@ -4090,6 +4556,70 @@ func (siw *ServerInterfaceWrapper) SaveDatabaseInstance(w http.ResponseWriter, r
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.SaveDatabaseInstance(w, r, id, instanceId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ReadExecutionLogs operation middleware
+func (siw *ServerInterfaceWrapper) ReadExecutionLogs(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "operation_id" -------------
+	var operationId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "operation_id", r.PathValue("operation_id"), &operationId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "operation_id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ReadExecutionLogsParams
+
+	// ------------- Optional query parameter "offset" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "offset", r.URL.Query(), &params.Offset, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "offset"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "offset", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ReadExecutionLogs(w, r, id, operationId, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -4671,6 +5201,246 @@ func (siw *ServerInterfaceWrapper) GetStorageStatus(w http.ResponseWriter, r *ht
 	handler.ServeHTTP(w, r)
 }
 
+// SaveScheduledTask operation middleware
+func (siw *ServerInterfaceWrapper) SaveScheduledTask(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params SaveScheduledTaskParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "X-CSRF-Token" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-CSRF-Token")]; found {
+		var XCSRFToken string
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "X-CSRF-Token", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "X-CSRF-Token", valueList[0], &XCSRFToken, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-CSRF-Token", Err: err})
+			return
+		}
+
+		params.XCSRFToken = &XCSRFToken
+
+	}
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey string
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.SaveScheduledTask(w, r, id, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ExecuteScheduledTask operation middleware
+func (siw *ServerInterfaceWrapper) ExecuteScheduledTask(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "task_id" -------------
+	var taskId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "task_id", r.PathValue("task_id"), &taskId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "task_id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ExecuteScheduledTaskParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "X-CSRF-Token" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-CSRF-Token")]; found {
+		var XCSRFToken string
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "X-CSRF-Token", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "X-CSRF-Token", valueList[0], &XCSRFToken, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-CSRF-Token", Err: err})
+			return
+		}
+
+		params.XCSRFToken = &XCSRFToken
+
+	}
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey string
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ExecuteScheduledTask(w, r, id, taskId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListScheduledTaskRuns operation middleware
+func (siw *ServerInterfaceWrapper) ListScheduledTaskRuns(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "task_id" -------------
+	var taskId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "task_id", r.PathValue("task_id"), &taskId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "task_id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListScheduledTaskRuns(w, r, id, taskId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateNodeTerminal operation middleware
+func (siw *ServerInterfaceWrapper) CreateNodeTerminal(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params CreateNodeTerminalParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "X-CSRF-Token" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-CSRF-Token")]; found {
+		var XCSRFToken string
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "X-CSRF-Token", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "X-CSRF-Token", valueList[0], &XCSRFToken, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-CSRF-Token", Err: err})
+			return
+		}
+
+		params.XCSRFToken = &XCSRFToken
+
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateNodeTerminal(w, r, id, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // ListOperations operation middleware
 func (siw *ServerInterfaceWrapper) ListOperations(w http.ResponseWriter, r *http.Request) {
 
@@ -4754,6 +5524,19 @@ func (siw *ServerInterfaceWrapper) ListOperations(w http.ResponseWriter, r *http
 			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "idempotency_key"})
 		} else {
 			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "idempotency_key", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "resource_id" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "resource_id", r.URL.Query(), &params.ResourceId, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "resource_id"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "resource_id", Err: err})
 		}
 		return
 	}
@@ -5248,6 +6031,65 @@ func (siw *ServerInterfaceWrapper) GetVersion(w http.ResponseWriter, r *http.Req
 	handler.ServeHTTP(w, r)
 }
 
+// ListScheduledTasks operation middleware
+func (siw *ServerInterfaceWrapper) ListScheduledTasks(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListScheduledTasksParams
+
+	// ------------- Optional query parameter "node_id" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "node_id", r.URL.Query(), &params.NodeId, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "node_id"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "node_id", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListScheduledTasks(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// AttachTerminal operation middleware
+func (siw *ServerInterfaceWrapper) AttachTerminal(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "ticket" -------------
+	var ticket string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "ticket", r.PathValue("ticket"), &ticket, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "ticket", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.AttachTerminal(w, r, ticket)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 type UnescapedCookieParamError struct {
 	ParamName string
 	Err       error
@@ -5379,6 +6221,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/auth/session", wrapper.GetSession)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/auth/sessions", wrapper.ListSessions)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/auth/sessions/{id}", wrapper.RevokeSession)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/compose-projects", wrapper.ListComposeProjects)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/containers", wrapper.ListContainers)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/databases/clusters", wrapper.ListDatabaseClusters)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/databases/clusters", wrapper.CreateDatabaseCluster)
@@ -5397,11 +6240,14 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/nodes/{id}/account", wrapper.GetNodeAccount)
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/nodes/{id}/account", wrapper.ChangeNodeAccount)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/nodes/{id}/account/password", wrapper.RevealNodePassword)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/nodes/{id}/compose-projects/{project_id}/actions", wrapper.ChangeComposeProject)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/nodes/{id}/compose-projects/{project_id}/register", wrapper.RegisterComposeProject)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/nodes/{id}/containers/{container_id}", wrapper.GetContainer)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/nodes/{id}/containers/{container_id}/actions", wrapper.ChangeContainer)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/nodes/{id}/containers/{container_id}/logs", wrapper.GetContainerLogs)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/nodes/{id}/databases/discover", wrapper.DiscoverDatabases)
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/nodes/{id}/databases/instances/{instance_id}", wrapper.SaveDatabaseInstance)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/nodes/{id}/executions/{operation_id}/logs", wrapper.ReadExecutionLogs)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/nodes/{id}/firewall", wrapper.ReadFirewall)
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/nodes/{id}/firewall", wrapper.ChangeFirewallConfig)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/nodes/{id}/firewall/install", wrapper.InstallFirewall)
@@ -5414,6 +6260,10 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/nodes/{id}/settings", wrapper.GetNodeSettings)
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/nodes/{id}/settings", wrapper.ChangeNodeSettings)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/nodes/{id}/storage", wrapper.GetStorageStatus)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/nodes/{id}/tasks", wrapper.SaveScheduledTask)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/nodes/{id}/tasks/{task_id}/run", wrapper.ExecuteScheduledTask)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/nodes/{id}/tasks/{task_id}/runs", wrapper.ListScheduledTaskRuns)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/nodes/{id}/terminal", wrapper.CreateNodeTerminal)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/operations", wrapper.ListOperations)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/operations/pending", wrapper.ListPendingOperations)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/operations/{id}", wrapper.GetOperation)
@@ -5430,6 +6280,8 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/settings/navigation", wrapper.GetNavigation)
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/settings/navigation", wrapper.UpdateNavigation)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/settings/version", wrapper.GetVersion)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/tasks", wrapper.ListScheduledTasks)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/terminals/{ticket}", wrapper.AttachTerminal)
 
 	return m
 }
@@ -6596,6 +7448,28 @@ func (response RevokeSession503JSONResponse) VisitRevokeSessionResponse(w http.R
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(503)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListComposeProjectsRequestObject struct {
+	Params ListComposeProjectsParams
+}
+
+type ListComposeProjectsResponseObject interface {
+	VisitListComposeProjectsResponse(w http.ResponseWriter) error
+}
+
+type ListComposeProjects200JSONResponse ComposeProjectList
+
+func (response ListComposeProjects200JSONResponse) VisitListComposeProjectsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -8397,6 +9271,56 @@ func (response RevealNodePassword503JSONResponse) VisitRevealNodePasswordRespons
 	return err
 }
 
+type ChangeComposeProjectRequestObject struct {
+	Id        string `json:"id"`
+	ProjectId string `json:"project_id"`
+	Params    ChangeComposeProjectParams
+	Body      *ChangeComposeProjectJSONRequestBody
+}
+
+type ChangeComposeProjectResponseObject interface {
+	VisitChangeComposeProjectResponse(w http.ResponseWriter) error
+}
+
+type ChangeComposeProject202JSONResponse Operation
+
+func (response ChangeComposeProject202JSONResponse) VisitChangeComposeProjectResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(202)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RegisterComposeProjectRequestObject struct {
+	Id        string `json:"id"`
+	ProjectId string `json:"project_id"`
+	Params    RegisterComposeProjectParams
+	Body      *RegisterComposeProjectJSONRequestBody
+}
+
+type RegisterComposeProjectResponseObject interface {
+	VisitRegisterComposeProjectResponse(w http.ResponseWriter) error
+}
+
+type RegisterComposeProject202JSONResponse Operation
+
+func (response RegisterComposeProject202JSONResponse) VisitRegisterComposeProjectResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(202)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type GetContainerRequestObject struct {
 	Id          string `json:"id"`
 	ContainerId string `json:"container_id"`
@@ -8974,6 +9898,30 @@ func (response SaveDatabaseInstance503JSONResponse) VisitSaveDatabaseInstanceRes
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(503)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ReadExecutionLogsRequestObject struct {
+	Id          string `json:"id"`
+	OperationId string `json:"operation_id"`
+	Params      ReadExecutionLogsParams
+}
+
+type ReadExecutionLogsResponseObject interface {
+	VisitReadExecutionLogsResponse(w http.ResponseWriter) error
+}
+
+type ReadExecutionLogs200JSONResponse ExecutionLogs
+
+func (response ReadExecutionLogs200JSONResponse) VisitReadExecutionLogsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -10167,6 +11115,128 @@ func (response GetStorageStatus200JSONResponse) VisitGetStorageStatusResponse(w 
 type GetStorageStatus503JSONResponse APIError
 
 func (response GetStorageStatus503JSONResponse) VisitGetStorageStatusResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(503)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SaveScheduledTaskRequestObject struct {
+	Id     string `json:"id"`
+	Params SaveScheduledTaskParams
+	Body   *SaveScheduledTaskJSONRequestBody
+}
+
+type SaveScheduledTaskResponseObject interface {
+	VisitSaveScheduledTaskResponse(w http.ResponseWriter) error
+}
+
+type SaveScheduledTask202JSONResponse Operation
+
+func (response SaveScheduledTask202JSONResponse) VisitSaveScheduledTaskResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(202)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ExecuteScheduledTaskRequestObject struct {
+	Id     string `json:"id"`
+	TaskId string `json:"task_id"`
+	Params ExecuteScheduledTaskParams
+}
+
+type ExecuteScheduledTaskResponseObject interface {
+	VisitExecuteScheduledTaskResponse(w http.ResponseWriter) error
+}
+
+type ExecuteScheduledTask202JSONResponse Operation
+
+func (response ExecuteScheduledTask202JSONResponse) VisitExecuteScheduledTaskResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(202)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListScheduledTaskRunsRequestObject struct {
+	Id     string `json:"id"`
+	TaskId string `json:"task_id"`
+}
+
+type ListScheduledTaskRunsResponseObject interface {
+	VisitListScheduledTaskRunsResponse(w http.ResponseWriter) error
+}
+
+type ListScheduledTaskRuns200JSONResponse ScheduledTaskRuns
+
+func (response ListScheduledTaskRuns200JSONResponse) VisitListScheduledTaskRunsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateNodeTerminalRequestObject struct {
+	Id     string `json:"id"`
+	Params CreateNodeTerminalParams
+}
+
+type CreateNodeTerminalResponseObject interface {
+	VisitCreateNodeTerminalResponse(w http.ResponseWriter) error
+}
+
+type CreateNodeTerminal201JSONResponse TerminalTicket
+
+func (response CreateNodeTerminal201JSONResponse) VisitCreateNodeTerminalResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateNodeTerminal403JSONResponse struct{ ForbiddenJSONResponse }
+
+func (response CreateNodeTerminal403JSONResponse) VisitCreateNodeTerminalResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateNodeTerminal503JSONResponse APIError
+
+func (response CreateNodeTerminal503JSONResponse) VisitCreateNodeTerminalResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response); err != nil {
@@ -12018,6 +13088,58 @@ func (response GetVersion503JSONResponse) VisitGetVersionResponse(w http.Respons
 	return err
 }
 
+type ListScheduledTasksRequestObject struct {
+	Params ListScheduledTasksParams
+}
+
+type ListScheduledTasksResponseObject interface {
+	VisitListScheduledTasksResponse(w http.ResponseWriter) error
+}
+
+type ListScheduledTasks200JSONResponse ScheduledTaskList
+
+func (response ListScheduledTasks200JSONResponse) VisitListScheduledTasksResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AttachTerminalRequestObject struct {
+	Ticket string `json:"ticket"`
+}
+
+type AttachTerminalResponseObject interface {
+	VisitAttachTerminalResponse(w http.ResponseWriter) error
+}
+
+type AttachTerminal101Response struct {
+}
+
+func (response AttachTerminal101Response) VisitAttachTerminalResponse(w http.ResponseWriter) error {
+	w.WriteHeader(101)
+	return nil
+}
+
+type AttachTerminal403JSONResponse struct{ ForbiddenJSONResponse }
+
+func (response AttachTerminal403JSONResponse) VisitAttachTerminalResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 // StrictServerInterface represents all server handlers.
 type StrictServerInterface interface {
 	// ListAPITokens 列出 API 令牌
@@ -12053,6 +13175,9 @@ type StrictServerInterface interface {
 	// RevokeSession 撤销指定会话
 	// (DELETE /auth/sessions/{id})
 	RevokeSession(ctx context.Context, request RevokeSessionRequestObject) (RevokeSessionResponseObject, error)
+
+	// (GET /compose-projects)
+	ListComposeProjects(ctx context.Context, request ListComposeProjectsRequestObject) (ListComposeProjectsResponseObject, error)
 	// ListContainers 读取各节点容器和 Docker 状态
 	// (GET /containers)
 	ListContainers(ctx context.Context, request ListContainersRequestObject) (ListContainersResponseObject, error)
@@ -12107,6 +13232,12 @@ type StrictServerInterface interface {
 
 	// (POST /nodes/{id}/account/password)
 	RevealNodePassword(ctx context.Context, request RevealNodePasswordRequestObject) (RevealNodePasswordResponseObject, error)
+
+	// (POST /nodes/{id}/compose-projects/{project_id}/actions)
+	ChangeComposeProject(ctx context.Context, request ChangeComposeProjectRequestObject) (ChangeComposeProjectResponseObject, error)
+
+	// (POST /nodes/{id}/compose-projects/{project_id}/register)
+	RegisterComposeProject(ctx context.Context, request RegisterComposeProjectRequestObject) (RegisterComposeProjectResponseObject, error)
 	// GetContainer 读取容器详情
 	// (GET /nodes/{id}/containers/{container_id})
 	GetContainer(ctx context.Context, request GetContainerRequestObject) (GetContainerResponseObject, error)
@@ -12122,6 +13253,9 @@ type StrictServerInterface interface {
 	// SaveDatabaseInstance 保存本机数据库连接
 	// (PUT /nodes/{id}/databases/instances/{instance_id})
 	SaveDatabaseInstance(ctx context.Context, request SaveDatabaseInstanceRequestObject) (SaveDatabaseInstanceResponseObject, error)
+
+	// (GET /nodes/{id}/executions/{operation_id}/logs)
+	ReadExecutionLogs(ctx context.Context, request ReadExecutionLogsRequestObject) (ReadExecutionLogsResponseObject, error)
 	// ReadFirewall 读取 OPSD 防火墙配置及应用状态
 	// (GET /nodes/{id}/firewall)
 	ReadFirewall(ctx context.Context, request ReadFirewallRequestObject) (ReadFirewallResponseObject, error)
@@ -12158,6 +13292,18 @@ type StrictServerInterface interface {
 
 	// (GET /nodes/{id}/storage)
 	GetStorageStatus(ctx context.Context, request GetStorageStatusRequestObject) (GetStorageStatusResponseObject, error)
+
+	// (POST /nodes/{id}/tasks)
+	SaveScheduledTask(ctx context.Context, request SaveScheduledTaskRequestObject) (SaveScheduledTaskResponseObject, error)
+
+	// (POST /nodes/{id}/tasks/{task_id}/run)
+	ExecuteScheduledTask(ctx context.Context, request ExecuteScheduledTaskRequestObject) (ExecuteScheduledTaskResponseObject, error)
+
+	// (GET /nodes/{id}/tasks/{task_id}/runs)
+	ListScheduledTaskRuns(ctx context.Context, request ListScheduledTaskRunsRequestObject) (ListScheduledTaskRunsResponseObject, error)
+
+	// (POST /nodes/{id}/terminal)
+	CreateNodeTerminal(ctx context.Context, request CreateNodeTerminalRequestObject) (CreateNodeTerminalResponseObject, error)
 	// ListOperations 查询历史或定位原操作
 	// (GET /operations)
 	ListOperations(ctx context.Context, request ListOperationsRequestObject) (ListOperationsResponseObject, error)
@@ -12206,6 +13352,12 @@ type StrictServerInterface interface {
 	// GetVersion 读取版本
 	// (GET /settings/version)
 	GetVersion(ctx context.Context, request GetVersionRequestObject) (GetVersionResponseObject, error)
+
+	// (GET /tasks)
+	ListScheduledTasks(ctx context.Context, request ListScheduledTasksRequestObject) (ListScheduledTasksResponseObject, error)
+
+	// (GET /terminals/{ticket})
+	AttachTerminal(ctx context.Context, request AttachTerminalRequestObject) (AttachTerminalResponseObject, error)
 }
 
 type StrictHandlerFunc func(ctx context.Context, w http.ResponseWriter, r *http.Request, request any) (any, error)
@@ -12550,6 +13702,32 @@ func (sh *strictHandler) RevokeSession(w http.ResponseWriter, r *http.Request, i
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(RevokeSessionResponseObject); ok {
 		if err := validResponse.VisitRevokeSessionResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListComposeProjects operation middleware
+func (sh *strictHandler) ListComposeProjects(w http.ResponseWriter, r *http.Request, params ListComposeProjectsParams) {
+	var request ListComposeProjectsRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListComposeProjects(ctx, request.(ListComposeProjectsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListComposeProjects")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListComposeProjectsResponseObject); ok {
+		if err := validResponse.VisitListComposeProjectsResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -13058,6 +14236,76 @@ func (sh *strictHandler) RevealNodePassword(w http.ResponseWriter, r *http.Reque
 	}
 }
 
+// ChangeComposeProject operation middleware
+func (sh *strictHandler) ChangeComposeProject(w http.ResponseWriter, r *http.Request, id string, projectId string, params ChangeComposeProjectParams) {
+	var request ChangeComposeProjectRequestObject
+
+	request.Id = id
+	request.ProjectId = projectId
+	request.Params = params
+
+	var body ChangeComposeProjectJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ChangeComposeProject(ctx, request.(ChangeComposeProjectRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ChangeComposeProject")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ChangeComposeProjectResponseObject); ok {
+		if err := validResponse.VisitChangeComposeProjectResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// RegisterComposeProject operation middleware
+func (sh *strictHandler) RegisterComposeProject(w http.ResponseWriter, r *http.Request, id string, projectId string, params RegisterComposeProjectParams) {
+	var request RegisterComposeProjectRequestObject
+
+	request.Id = id
+	request.ProjectId = projectId
+	request.Params = params
+
+	var body RegisterComposeProjectJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.RegisterComposeProject(ctx, request.(RegisterComposeProjectRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "RegisterComposeProject")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(RegisterComposeProjectResponseObject); ok {
+		if err := validResponse.VisitRegisterComposeProjectResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // GetContainer operation middleware
 func (sh *strictHandler) GetContainer(w http.ResponseWriter, r *http.Request, id string, containerId string, params GetContainerParams) {
 	var request GetContainerRequestObject
@@ -13202,6 +14450,34 @@ func (sh *strictHandler) SaveDatabaseInstance(w http.ResponseWriter, r *http.Req
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(SaveDatabaseInstanceResponseObject); ok {
 		if err := validResponse.VisitSaveDatabaseInstanceResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ReadExecutionLogs operation middleware
+func (sh *strictHandler) ReadExecutionLogs(w http.ResponseWriter, r *http.Request, id string, operationId string, params ReadExecutionLogsParams) {
+	var request ReadExecutionLogsRequestObject
+
+	request.Id = id
+	request.OperationId = operationId
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ReadExecutionLogs(ctx, request.(ReadExecutionLogsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ReadExecutionLogs")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ReadExecutionLogsResponseObject); ok {
+		if err := validResponse.VisitReadExecutionLogsResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -13556,6 +14832,122 @@ func (sh *strictHandler) GetStorageStatus(w http.ResponseWriter, r *http.Request
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(GetStorageStatusResponseObject); ok {
 		if err := validResponse.VisitGetStorageStatusResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// SaveScheduledTask operation middleware
+func (sh *strictHandler) SaveScheduledTask(w http.ResponseWriter, r *http.Request, id string, params SaveScheduledTaskParams) {
+	var request SaveScheduledTaskRequestObject
+
+	request.Id = id
+	request.Params = params
+
+	var body SaveScheduledTaskJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.SaveScheduledTask(ctx, request.(SaveScheduledTaskRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "SaveScheduledTask")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(SaveScheduledTaskResponseObject); ok {
+		if err := validResponse.VisitSaveScheduledTaskResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ExecuteScheduledTask operation middleware
+func (sh *strictHandler) ExecuteScheduledTask(w http.ResponseWriter, r *http.Request, id string, taskId string, params ExecuteScheduledTaskParams) {
+	var request ExecuteScheduledTaskRequestObject
+
+	request.Id = id
+	request.TaskId = taskId
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ExecuteScheduledTask(ctx, request.(ExecuteScheduledTaskRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ExecuteScheduledTask")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ExecuteScheduledTaskResponseObject); ok {
+		if err := validResponse.VisitExecuteScheduledTaskResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListScheduledTaskRuns operation middleware
+func (sh *strictHandler) ListScheduledTaskRuns(w http.ResponseWriter, r *http.Request, id string, taskId string) {
+	var request ListScheduledTaskRunsRequestObject
+
+	request.Id = id
+	request.TaskId = taskId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListScheduledTaskRuns(ctx, request.(ListScheduledTaskRunsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListScheduledTaskRuns")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListScheduledTaskRunsResponseObject); ok {
+		if err := validResponse.VisitListScheduledTaskRunsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CreateNodeTerminal operation middleware
+func (sh *strictHandler) CreateNodeTerminal(w http.ResponseWriter, r *http.Request, id string, params CreateNodeTerminalParams) {
+	var request CreateNodeTerminalRequestObject
+
+	request.Id = id
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CreateNodeTerminal(ctx, request.(CreateNodeTerminalRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CreateNodeTerminal")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CreateNodeTerminalResponseObject); ok {
+		if err := validResponse.VisitCreateNodeTerminalResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -14006,6 +15398,58 @@ func (sh *strictHandler) GetVersion(w http.ResponseWriter, r *http.Request) {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(GetVersionResponseObject); ok {
 		if err := validResponse.VisitGetVersionResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListScheduledTasks operation middleware
+func (sh *strictHandler) ListScheduledTasks(w http.ResponseWriter, r *http.Request, params ListScheduledTasksParams) {
+	var request ListScheduledTasksRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListScheduledTasks(ctx, request.(ListScheduledTasksRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListScheduledTasks")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListScheduledTasksResponseObject); ok {
+		if err := validResponse.VisitListScheduledTasksResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// AttachTerminal operation middleware
+func (sh *strictHandler) AttachTerminal(w http.ResponseWriter, r *http.Request, ticket string) {
+	var request AttachTerminalRequestObject
+
+	request.Ticket = ticket
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.AttachTerminal(ctx, request.(AttachTerminalRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "AttachTerminal")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(AttachTerminalResponseObject); ok {
+		if err := validResponse.VisitAttachTerminalResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

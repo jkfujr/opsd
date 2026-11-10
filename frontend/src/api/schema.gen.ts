@@ -842,6 +842,166 @@ export interface paths {
         patch: operations["updateNavigation"];
         trace?: never;
     };
+    "/nodes/{id}/terminal": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["createNodeTerminal"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/terminals/{ticket}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["attachTerminal"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/tasks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listScheduledTasks"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/nodes/{id}/tasks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["saveScheduledTask"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/nodes/{id}/tasks/{task_id}/run": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["executeScheduledTask"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/nodes/{id}/tasks/{task_id}/runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listScheduledTaskRuns"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/nodes/{id}/executions/{operation_id}/logs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["readExecutionLogs"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/compose-projects": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listComposeProjects"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/nodes/{id}/compose-projects/{project_id}/register": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["registerComposeProject"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/nodes/{id}/compose-projects/{project_id}/actions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["changeComposeProject"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -923,7 +1083,7 @@ export interface components {
         /** @enum {string} */
         ConfigScope: "runtime" | "permanent" | "both";
         /** @enum {string} */
-        OperationState: "accepted" | "prepared" | "applying" | "awaiting_confirmation" | "reverting" | "attention_required" | "succeeded" | "rejected" | "failed" | "reverted" | "resolved_manually";
+        OperationState: "accepted" | "prepared" | "applying" | "awaiting_confirmation" | "reverting" | "attention_required" | "succeeded" | "rejected" | "failed" | "reverted" | "resolved_manually" | "cancelled";
         /** @enum {string} */
         Backend: "ufw" | "firewalld" | "nftables" | "iptables" | "none" | "conflict" | "unknown";
         FieldError: {
@@ -932,7 +1092,7 @@ export interface components {
         };
         APIError: {
             /** @enum {string} */
-            code: "invalid_request" | "unauthenticated" | "forbidden" | "csrf_rejected" | "conflict" | "node_busy" | "node_unavailable" | "dependency_unavailable" | "not_found" | "rate_limited" | "internal_error" | "cancelled" | "not_accepted";
+            code: "invalid_request" | "unauthenticated" | "forbidden" | "csrf_rejected" | "conflict" | "node_busy" | "node_unavailable" | "dependency_unavailable" | "not_found" | "rate_limited" | "internal_error" | "cancelled" | "not_accepted" | "task_busy";
             /** @description 简短中文错误信息 */
             message: string;
             request_id: string;
@@ -1374,7 +1534,7 @@ export interface components {
             /** @enum {string} */
             executor: "node";
             /** @enum {string} */
-            subject: "firewall" | "component" | "config" | "name" | "account" | "firewall_config" | "container" | "database" | "database_step";
+            subject: "firewall" | "component" | "config" | "name" | "account" | "firewall_config" | "container" | "database" | "database_step" | "task_save" | "task_run" | "compose" | "compose_register";
             state: components["schemas"]["OperationState"];
             /** Format: int64 */
             revision: number;
@@ -1730,7 +1890,7 @@ export interface components {
         ContainerActionRequest: {
             engine_id: string;
             /** @enum {string} */
-            action: "start" | "stop" | "restart";
+            action: "start" | "stop" | "restart" | "update";
         };
         ContainerLogs: {
             engine_id: string;
@@ -2025,7 +2185,7 @@ export interface components {
             checked_at: string;
         };
         /** @enum {string} */
-        NavigationItem: "overview" | "nodes" | "containers" | "databases" | "storage" | "firewall" | "settings";
+        NavigationItem: "overview" | "nodes" | "containers" | "databases" | "storage" | "firewall" | "tools" | "settings";
         NavigationPreferences: {
             order: components["schemas"]["NavigationItem"][];
             /** Format: int64 */
@@ -2039,6 +2199,94 @@ export interface components {
             /** Format: date-time */
             attempted_at?: string;
             error?: components["schemas"]["NetworkError"];
+        };
+        TerminalTicket: {
+            url: string;
+            /** Format: date-time */
+            expires_at: string;
+        };
+        TerminalFrame: {
+            /** @enum {string} */
+            type: "input" | "output" | "resize" | "exit";
+            /** Format: byte */
+            data?: string;
+            cols?: number;
+            rows?: number;
+            message?: string;
+        };
+        ScheduledTask: {
+            id: string;
+            /** Format: int64 */
+            revision: number;
+            name: string;
+            schedule: string;
+            timezone: string;
+            script: string;
+            directory: string;
+            enabled: boolean;
+            /** Format: date-time */
+            next_at?: string;
+        };
+        ScheduledTaskItem: components["schemas"]["ScheduledTask"] & {
+            node_id: string;
+            node_name: string;
+        };
+        ScheduledTaskList: {
+            items: components["schemas"]["ScheduledTaskItem"][];
+            unavailable: components["schemas"]["UnavailableNode"][];
+            nodes: components["schemas"]["ResourceNodeRead"][];
+        };
+        UnavailableNode: {
+            node_id: string;
+            node_name: string;
+            message: string;
+        };
+        ScheduledTaskRuns: {
+            items: components["schemas"]["Operation"][];
+        };
+        ExecutionLogs: {
+            /** Format: byte */
+            data: string;
+            /** Format: int64 */
+            offset: number;
+            /** Format: int64 */
+            next_offset: number;
+            has_more: boolean;
+            truncated: boolean;
+        };
+        ResourceNodeRead: {
+            node_id: string;
+            node_name: string;
+            read: components["schemas"]["ReadStatus"];
+        };
+        ComposeProject: {
+            id: string;
+            engine_id: string;
+            name: string;
+            directory: string;
+            files: string[];
+            environment_files: string[];
+            registered: boolean;
+            services: components["schemas"]["ContainerSummary"][];
+            read_only_reason?: string;
+            /** Format: date-time */
+            checked_at: string;
+        };
+        ComposeProjectItem: components["schemas"]["ComposeProject"] & {
+            node_id: string;
+            node_name: string;
+        };
+        ComposeProjectList: {
+            items: components["schemas"]["ComposeProjectItem"][];
+            nodes: components["schemas"]["ResourceNodeRead"][];
+        };
+        ComposeProjectSelection: {
+            engine_id: string;
+        };
+        ComposeActionRequest: {
+            engine_id: string;
+            /** @enum {string} */
+            action: "pull" | "start" | "stop" | "recreate" | "update";
         };
     };
     responses: {
@@ -2558,6 +2806,7 @@ export interface operations {
                 state?: components["schemas"]["OperationState"];
                 plan_id?: string;
                 idempotency_key?: string;
+                resource_id?: string;
             };
             header?: never;
             path?: never;
@@ -4099,6 +4348,269 @@ export interface operations {
             500: components["responses"]["InternalError"];
             /** @description 节点或数据库不可用 */
             503: components["responses"]["Unavailable"];
+        };
+    };
+    createNodeTerminal: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-CSRF-Token"?: string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 成功 */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TerminalTicket"];
+                };
+            };
+            403: components["responses"]["Forbidden"];
+            /** @description 成功 */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["APIError"];
+                };
+            };
+        };
+    };
+    attachTerminal: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ticket: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 终端 WebSocket，交换 TerminalFrame */
+            101: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    listScheduledTasks: {
+        parameters: {
+            query?: {
+                node_id?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 成功 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScheduledTaskList"];
+                };
+            };
+        };
+    };
+    saveScheduledTask: {
+        parameters: {
+            query?: never;
+            header: {
+                "X-CSRF-Token"?: string;
+                "Idempotency-Key": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ScheduledTask"];
+            };
+        };
+        responses: {
+            /** @description 成功 */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Operation"];
+                };
+            };
+        };
+    };
+    executeScheduledTask: {
+        parameters: {
+            query?: never;
+            header: {
+                "X-CSRF-Token"?: string;
+                "Idempotency-Key": string;
+            };
+            path: {
+                id: string;
+                task_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 成功 */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Operation"];
+                };
+            };
+        };
+    };
+    listScheduledTaskRuns: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                task_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 成功 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScheduledTaskRuns"];
+                };
+            };
+        };
+    };
+    readExecutionLogs: {
+        parameters: {
+            query?: {
+                offset?: number;
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                id: string;
+                operation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 成功 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExecutionLogs"];
+                };
+            };
+        };
+    };
+    listComposeProjects: {
+        parameters: {
+            query?: {
+                node_id?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 成功 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ComposeProjectList"];
+                };
+            };
+        };
+    };
+    registerComposeProject: {
+        parameters: {
+            query?: never;
+            header: {
+                "X-CSRF-Token"?: string;
+                "Idempotency-Key": string;
+            };
+            path: {
+                id: string;
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ComposeProjectSelection"];
+            };
+        };
+        responses: {
+            /** @description 成功 */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Operation"];
+                };
+            };
+        };
+    };
+    changeComposeProject: {
+        parameters: {
+            query?: never;
+            header: {
+                "X-CSRF-Token"?: string;
+                "Idempotency-Key": string;
+            };
+            path: {
+                id: string;
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ComposeActionRequest"];
+            };
+        };
+        responses: {
+            /** @description 成功 */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Operation"];
+                };
+            };
         };
     };
 }

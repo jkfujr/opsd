@@ -26,7 +26,7 @@ func TestNavigationAccountScopeSessionsAndConflicts(t *testing.T) {
 		t.Fatal("未登录请求状态错误", code)
 	}
 	var defaults cluster.NavigationPreferences
-	if code := call(client, "GET", "", nil, &defaults); code != 200 || defaults.Revision != 0 || !slices.Equal(defaults.Order, []string{"overview", "nodes", "containers", "databases", "storage", "firewall", "settings"}) {
+	if code := call(client, "GET", "", nil, &defaults); code != 200 || defaults.Revision != 0 || !slices.Equal(defaults.Order, []string{"overview", "nodes", "containers", "databases", "storage", "firewall", "tools", "settings"}) {
 		t.Fatal("默认菜单错误", code, defaults)
 	}
 	input := defaults

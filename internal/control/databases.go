@@ -117,6 +117,10 @@ func (s *Server) GetDatabaseCluster(w http.ResponseWriter, r *http.Request, id s
 	if params.View != nil {
 		scope = string(*params.View)
 	}
+	if scope != "health" && scope != "schemas" && scope != "users" && scope != "proxies" {
+		s.fail(w, r, 422, "invalid_request", "读取分类无效")
+		return
+	}
 	out, e := s.node.ManagedDatabaseStatus(r.Context(), c, scope)
 	s.resultError(w, r, 200, convertHTTP[httpapi.ManagedDatabaseStatus](out), e)
 }

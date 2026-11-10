@@ -34,7 +34,7 @@ type Manager struct{ Socket string }
 
 func New() *Manager { return &Manager{Socket: "/var/run/docker.sock"} }
 
-func (m *Manager) connect(ctx context.Context) (*client.Client, string, string, error) {
+func (m *Manager) connect(ctx context.Context, timeouts ...time.Duration) (*client.Client, string, string, error) {
 	if runtime.GOOS != "linux" {
 		return nil, "", "", failure("dependency_unavailable", "容器管理仅支持 Linux Docker", "unsupported")
 	}
@@ -47,7 +47,11 @@ func (m *Manager) connect(ctx context.Context) (*client.Client, string, string, 
 		}
 		return nil, "", "", failure("dependency_unavailable", "Docker Socket 不可用", "unavailable")
 	}
-	c, err := client.New(client.WithHost("unix://"+m.Socket), client.WithAPIVersionNegotiation(), client.WithTimeout(15*time.Second))
+	timeout := 15 * time.Second
+	if len(timeouts) > 0 {
+		timeout = timeouts[0]
+	}
+	c, err := client.New(client.WithHost("unix://"+m.Socket), client.WithAPIVersionNegotiation(), client.WithTimeout(timeout))
 	if err != nil {
 		return nil, "", "", failure("dependency_unavailable", "Docker 客户端初始化失败", "unavailable")
 	}
@@ -80,6 +84,9 @@ func (m *Manager) List(ctx context.Context) protocol.DockerState {
 		if err == nil {
 			for _, item := range result.Items {
 				summary := protocol.ContainerSummary{ContainerRef: protocol.ContainerRef{EngineID: id, ContainerID: item.ID}, Image: item.Image, State: string(item.State), Health: health(item.Status), Ports: []protocol.ContainerPort{}, Project: item.Labels["com.docker.compose.project"], Service: item.Labels["com.docker.compose.service"], ReadOnlyReason: readOnly(item.Labels)}
+				if image := item.Labels[sourceImageLabel]; image != "" {
+					summary.Image = image
+				}
 				if len(item.Names) > 0 {
 					summary.Name = strings.TrimPrefix(item.Names[0], "/")
 				}
@@ -127,11 +134,11 @@ func readOnly(labels map[string]string) string {
 	}
 	return ""
 }
-func (m *Manager) inspect(ctx context.Context, ref protocol.ContainerRef) (*client.Client, container.InspectResponse, error) {
+func (m *Manager) inspect(ctx context.Context, ref protocol.ContainerRef, timeouts ...time.Duration) (*client.Client, container.InspectResponse, error) {
 	if err := ref.Validate(); err != nil {
 		return nil, container.InspectResponse{}, failure("invalid_request", err.Error(), "")
 	}
-	c, id, _, err := m.connect(ctx)
+	c, id, _, err := m.connect(ctx, timeouts...)
 	if err != nil {
 		return nil, container.InspectResponse{}, err
 	}
@@ -181,6 +188,9 @@ func detail(ref protocol.ContainerRef, raw container.InspectResponse) protocol.C
 	}
 	if raw.Config != nil {
 		v.Image = raw.Config.Image
+		if image := raw.Config.Labels[sourceImageLabel]; image != "" {
+			v.Image = image
+		}
 		v.TTY = raw.Config.Tty
 		v.Project = raw.Config.Labels["com.docker.compose.project"]
 		v.Service = raw.Config.Labels["com.docker.compose.service"]

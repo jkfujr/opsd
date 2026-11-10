@@ -42,7 +42,7 @@ function NavIcon({ name }: { name: string }) {
 function Sidebar({ close, brand = true }: { close?: () => void; brand?: boolean }) {
   const { pathname } = useLocation();
   const preferences = useNavigation();
-  const items = preferences.data?.order.map((id) => navigation.find((item) => item.id === id)!) ?? navigation;
+  const items = preferences.data?.order.flatMap((id) => navigation.filter((item) => item.id === id)) ?? navigation;
   return <>{brand && <NavLink to="/" onClick={close} className="flex h-14 items-center border-b border-border px-6 text-xl font-semibold tracking-tight text-foreground-intense">OPSD</NavLink>}
     <nav aria-label="主导航" aria-busy={preferences.isPending} className="space-y-1 p-3">{items.map(({ path, label, id }) => <div key={path}>
       <NavLink to={path} end={path === '/'} onClick={close} className="sidebar-link"><NavIcon name={id} /><span>{label}</span></NavLink>

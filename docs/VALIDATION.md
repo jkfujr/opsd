@@ -11,9 +11,9 @@ npm run build
 OPSD_DOCKER_TEST=1 OPSD_DATABASE_TEST=1 npm test
 ```
 
-构建包含接口生成、前端类型检查与生产构建、Linux amd64／arm64 编译。CI 使用 busybox:1.37.0 验证真实容器启停、重启与 TTY／非 TTY 日志，校对生成文件、版本和安装脚本语法，在隔离网络空间执行原生互信规则的新连接验收，再安装生产程序，通过 Chromium 检查页面与交互；截图输出为 `ui-check` 工件。
+构建包含接口生成、前端类型检查与生产构建、Linux amd64／arm64 编译。CI 使用 busybox:1.37.0 验证真实容器启停、重启与 TTY／非 TTY 日志，校对生成文件、版本和安装脚本语法，在隔离网络空间执行原生互信规则的新连接验收，再安装生产程序，通过实际 HTTP／WebSocket API 检查任务执行和取消、日志分页、容器更新、Compose 操作及 root 终端释放；结果输出为 `api-check` 工件。
 
-数据库检查启动三成员 MariaDB Galera、两个 ProxySQL、Prometheus 与 Grafana，覆盖业务库、账号、代理实际登录、权限和部分恢复，结果输出为 `database-check` 工件。三逻辑 OPSD 节点在同一 CI 主机运行；生产页面覆盖 API、数据库六页签与操作反馈，数据库页面状态通过请求注入，后端执行使用真实集群。
+数据库检查启动三成员 MariaDB Galera、两个 ProxySQL、Prometheus 与 Grafana，覆盖业务库、账号、代理实际登录、权限和部分恢复，结果输出为 `database-check` 工件。三逻辑 OPSD 节点在同一 CI 主机运行；数据库读写与恢复使用真实集群；既有浏览器结果作为此前界面验收记录保留。
 
 ```bash
 go test -c -o artifacts/firewall-native.test ./internal/firewall
@@ -28,7 +28,9 @@ Release 复用同提交成功工件，通过公开地址下载，检查实际安
 
 已验证：C001、C052 已上传的本机重复防火墙记录整理到 17／5 条；C041、C091 继续按每批最多 200 条整理。C041 原生 iptables 双栈互信运行与永久结果均为 in_sync；旧 nftables 普通确认配置与当前只读后端的差异保持 failed，未覆盖外部规则。C001 无公网 IPv6 状态和互信正常汇总通过线上 Chromium 检查，1440／320px 页面无横向溢出，脚本错误为 0；四张截图及 API 读回保存在 `artifacts/optimization/batch1-browser.json` 和 PNG。
 
-第二批通信、共享读取、数据库分类和历史批量查询源码已更新，CI 与四节点升级尚未完成。
+第二批 `66a2a64` 已通过 [CI 42759277088](https://github.com/jkfujr/opsd/actions/runs/42759277088)，四节点均已使用同一成功工件更新。四节点 online、40 个容器可读；五轮概览响应为 149～1076 ms（含当前网络传输）。四个 Galera 健康摘要不附带库和账号，分类读取分别返回各 7 个库、13 个账号；两个 ProxySQL 均可读。历史返回 289 个五分钟点，无不可用来源。线上脚本错误为 0；账号版本、身份、原容器及外部规则内容与相对顺序保留，队列与执行器未结束操作均为 0。结果保存在 `artifacts/optimization/batch2-browser.json` 与 `batch2-preservation.json`。
+
+第三批专注后端，停止旧前端新功能开发，功能验收改走 API。终端、Shell 任务、容器更新及 Compose 接口源码已写入，尚待本批 CI 与实际部署。
 
 2026-11-08；提交：`da421e16ad333c7e56f25b21eac2ae83dd8d3344`；环境：GitHub Ubuntu 24.04、Go 1.26.2、Node.js 24.14.1、Chromium、Docker，以及 C001／C041／C052／C091 四台 amd64 宿主机；覆盖项：账号菜单排序、存储入口、现有 CI、四个节点安装更新、生产数据库集群登记及线上读取。CI 结果复用此前同提交成功结果。
 

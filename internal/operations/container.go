@@ -16,9 +16,11 @@ type ContainerRuntime interface {
 	Change(context.Context, protocol.ContainerAction) error
 }
 type containerState struct {
-	BeforeStartedAt *time.Time `json:"before_started_at,omitempty"`
-	Attempted       bool       `json:"attempted"`
-	Acknowledged    bool       `json:"acknowledged"`
+	Project         *composeState             `json:"project,omitempty"`
+	Update          *dockerengine.UpdateState `json:"update,omitempty"`
+	BeforeStartedAt *time.Time                `json:"before_started_at,omitempty"`
+	Attempted       bool                      `json:"attempted"`
+	Acknowledged    bool                      `json:"acknowledged"`
 }
 
 func operationCode(err error) string {
@@ -40,6 +42,9 @@ func containerGoal(a protocol.ContainerAction, current protocol.ContainerDetail,
 	return false
 }
 func (e *Engine) container(ctx context.Context, l *Local, boot string) error {
+	if l.Action.Container != nil && l.Action.Container.Action == "update" {
+		return e.updateContainer(ctx, l, boot)
+	}
 	attention := func(err error) error {
 		if len(l.Record.Steps) > 0 {
 			l.Record.Steps[0].State = "unknown"

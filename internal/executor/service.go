@@ -15,14 +15,17 @@ import (
 	"github.com/jkfujr/opsd/internal/monitoring"
 	"github.com/jkfujr/opsd/internal/operations"
 	"github.com/jkfujr/opsd/internal/protocol"
+	"github.com/jkfujr/opsd/internal/terminal"
 )
 
 type Services struct {
+	Terminals     terminal.Manager
 	Metrics       monitoring.Collector
 	Engine        *operations.Engine
 	Docker        *dockerengine.Manager
 	Start         func(context.Context, string) error
 	Restart       func(context.Context, string) error
+	TaskLock      func(string) (func(), error)
 	OperationLock func() (func(), error)
 	localMu       sync.Mutex
 	trustMu       sync.Mutex
@@ -56,6 +59,17 @@ func NewServices(db *sql.DB) *Services {
 }
 func (s *Services) Handle(ctx context.Context, payload protocol.Payload) (protocol.Payload, error) {
 	switch body := payload.(type) {
+	case *protocol.ComposeRead:
+		if s.Docker == nil {
+			return nil, fmt.Errorf("Docker 读取入口不可用")
+		}
+		projects, e := s.Docker.Projects(ctx)
+		return &protocol.ComposeReadResult{Projects: projects}, e
+	case *protocol.OperationCancel:
+		return s.request(ctx, body.OperationID, "cancel", body.ExpectedRevision)
+	case *protocol.ExecutionLogsRead:
+		logs, e := s.Engine.ExecutionLogs(ctx, *body)
+		return &protocol.ExecutionLogsResult{Logs: logs}, e
 	case *protocol.DatabaseDiscovery:
 		return s.discoverDatabases(ctx)
 	case *protocol.DatabaseRead:
@@ -123,7 +137,13 @@ func (s *Services) Handle(ctx context.Context, payload protocol.Payload) (protoc
 		p, e := s.Engine.Manager.Preview(ctx, body.Change)
 		return &protocol.FirewallPreviewResult{Plan: p}, e
 	case *protocol.OperationSubmit:
-		unlock, lockErr := s.lock()
+		var unlock func()
+		var lockErr error
+		if body.Action.Shell != nil && s.TaskLock != nil {
+			unlock, lockErr = s.TaskLock(body.Action.Shell.TaskID)
+		} else {
+			unlock, lockErr = s.lock()
+		}
 		if lockErr != nil {
 			return nil, lockErr
 		}

@@ -870,6 +870,13 @@
               "type": "string",
               "minLength": 1
             }
+          },
+          {
+            "name": "resource_id",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
           }
         ]
       }
@@ -3657,6 +3664,488 @@
           }
         }
       }
+    },
+    "/nodes/{id}/terminal": {
+      "post": {
+        "operationId": "createNodeTerminal",
+        "security": [
+          {
+            "SessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TerminalTicket"
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "503": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/terminals/{ticket}": {
+      "get": {
+        "operationId": "attachTerminal",
+        "security": [
+          {
+            "SessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "ticket",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "101": {
+            "description": "终端 WebSocket，交换 TerminalFrame"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/tasks": {
+      "get": {
+        "operationId": "listScheduledTasks",
+        "security": [
+          {
+            "SessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "node_id",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScheduledTaskList"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/nodes/{id}/tasks": {
+      "post": {
+        "operationId": "saveScheduledTask",
+        "security": [
+          {
+            "SessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Operation"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScheduledTask"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/nodes/{id}/tasks/{task_id}/run": {
+      "post": {
+        "operationId": "executeScheduledTask",
+        "security": [
+          {
+            "SessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "task_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Operation"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/nodes/{id}/tasks/{task_id}/runs": {
+      "get": {
+        "operationId": "listScheduledTaskRuns",
+        "security": [
+          {
+            "SessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "task_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScheduledTaskRuns"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/nodes/{id}/executions/{operation_id}/logs": {
+      "get": {
+        "operationId": "readExecutionLogs",
+        "security": [
+          {
+            "SessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "operation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExecutionLogs"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/compose-projects": {
+      "get": {
+        "operationId": "listComposeProjects",
+        "security": [
+          {
+            "SessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "node_id",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ComposeProjectList"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/nodes/{id}/compose-projects/{project_id}/register": {
+      "post": {
+        "operationId": "registerComposeProject",
+        "security": [
+          {
+            "SessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "project_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Operation"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ComposeProjectSelection"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/nodes/{id}/compose-projects/{project_id}/actions": {
+      "post": {
+        "operationId": "changeComposeProject",
+        "security": [
+          {
+            "SessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "project_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Operation"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ComposeActionRequest"
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -3984,7 +4473,8 @@
           "rejected",
           "failed",
           "reverted",
-          "resolved_manually"
+          "resolved_manually",
+          "cancelled"
         ]
       },
       "Backend": {
@@ -4034,7 +4524,8 @@
               "rate_limited",
               "internal_error",
               "cancelled",
-              "not_accepted"
+              "not_accepted",
+              "task_busy"
             ]
           },
           "message": {
@@ -5726,7 +6217,11 @@
               "firewall_config",
               "container",
               "database",
-              "database_step"
+              "database_step",
+              "task_save",
+              "task_run",
+              "compose",
+              "compose_register"
             ]
           },
           "state": {
@@ -7111,7 +7606,8 @@
             "enum": [
               "start",
               "stop",
-              "restart"
+              "restart",
+              "update"
             ]
           }
         },
@@ -8286,6 +8782,7 @@
           "databases",
           "storage",
           "firewall",
+          "tools",
           "settings"
         ]
       },
@@ -8295,8 +8792,8 @@
         "properties": {
           "order": {
             "type": "array",
-            "minItems": 7,
-            "maxItems": 7,
+            "minItems": 8,
+            "maxItems": 8,
             "uniqueItems": true,
             "items": {
               "$ref": "#/components/schemas/NavigationItem"
@@ -8344,6 +8841,378 @@
         "required": [
           "state"
         ]
+      },
+      "TerminalTicket": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "url",
+          "expires_at"
+        ],
+        "properties": {
+          "url": {
+            "type": "string"
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "TerminalFrame": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "type"
+        ],
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "input",
+              "output",
+              "resize",
+              "exit"
+            ]
+          },
+          "data": {
+            "type": "string",
+            "format": "byte"
+          },
+          "cols": {
+            "type": "integer",
+            "minimum": 2,
+            "maximum": 500
+          },
+          "rows": {
+            "type": "integer",
+            "minimum": 2,
+            "maximum": 300
+          },
+          "message": {
+            "type": "string"
+          }
+        }
+      },
+      "ScheduledTask": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "revision",
+          "name",
+          "schedule",
+          "timezone",
+          "script",
+          "directory",
+          "enabled"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]{1,128}$"
+          },
+          "revision": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255
+          },
+          "schedule": {
+            "type": "string"
+          },
+          "timezone": {
+            "type": "string"
+          },
+          "script": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 262144
+          },
+          "directory": {
+            "type": "string"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "next_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ScheduledTaskItem": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/ScheduledTask"
+          },
+          {
+            "type": "object",
+            "required": [
+              "node_id",
+              "node_name"
+            ],
+            "properties": {
+              "node_id": {
+                "type": "string"
+              },
+              "node_name": {
+                "type": "string"
+              }
+            }
+          }
+        ]
+      },
+      "ScheduledTaskList": {
+        "type": "object",
+        "required": [
+          "items",
+          "unavailable",
+          "nodes"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ScheduledTaskItem"
+            }
+          },
+          "unavailable": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UnavailableNode"
+            }
+          },
+          "nodes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ResourceNodeRead"
+            }
+          }
+        }
+      },
+      "UnavailableNode": {
+        "type": "object",
+        "required": [
+          "node_id",
+          "node_name",
+          "message"
+        ],
+        "properties": {
+          "node_id": {
+            "type": "string"
+          },
+          "node_name": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          }
+        }
+      },
+      "ScheduledTaskRuns": {
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Operation"
+            }
+          }
+        }
+      },
+      "ExecutionLogs": {
+        "type": "object",
+        "required": [
+          "data",
+          "offset",
+          "next_offset",
+          "has_more",
+          "truncated"
+        ],
+        "properties": {
+          "data": {
+            "type": "string",
+            "format": "byte"
+          },
+          "offset": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "next_offset": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "has_more": {
+            "type": "boolean"
+          },
+          "truncated": {
+            "type": "boolean"
+          }
+        }
+      },
+      "ResourceNodeRead": {
+        "type": "object",
+        "required": [
+          "node_id",
+          "node_name",
+          "read"
+        ],
+        "properties": {
+          "node_id": {
+            "type": "string"
+          },
+          "node_name": {
+            "type": "string"
+          },
+          "read": {
+            "$ref": "#/components/schemas/ReadStatus"
+          }
+        }
+      },
+      "ComposeProject": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "engine_id",
+          "name",
+          "directory",
+          "files",
+          "environment_files",
+          "registered",
+          "services",
+          "checked_at"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "engine_id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "directory": {
+            "type": "string"
+          },
+          "files": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "environment_files": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "registered": {
+            "type": "boolean"
+          },
+          "services": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ContainerSummary"
+            }
+          },
+          "read_only_reason": {
+            "type": "string"
+          },
+          "checked_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ComposeProjectItem": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/ComposeProject"
+          },
+          {
+            "type": "object",
+            "required": [
+              "node_id",
+              "node_name"
+            ],
+            "properties": {
+              "node_id": {
+                "type": "string"
+              },
+              "node_name": {
+                "type": "string"
+              }
+            }
+          }
+        ]
+      },
+      "ComposeProjectList": {
+        "type": "object",
+        "required": [
+          "items",
+          "nodes"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ComposeProjectItem"
+            }
+          },
+          "nodes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ResourceNodeRead"
+            }
+          }
+        }
+      },
+      "ComposeProjectSelection": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "engine_id"
+        ],
+        "properties": {
+          "engine_id": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      },
+      "ComposeActionRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "engine_id",
+          "action"
+        ],
+        "properties": {
+          "engine_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "pull",
+              "start",
+              "stop",
+              "recreate",
+              "update"
+            ]
+          }
+        }
       }
     },
     "responses": {

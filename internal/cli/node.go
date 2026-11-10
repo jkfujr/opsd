@@ -189,6 +189,14 @@ func serveExecutor(args []string) error {
 	}
 	defer db.Close()
 	service := executor.NewServices(db)
+	service.Engine.LogDirectory = filepath.Join(f.ExecutorDir, "logs")
+	defer service.Terminals.Close()
+	service.TaskLock = func(id string) (func(), error) {
+		if !operations.ValidID(id) {
+			return nil, fmt.Errorf("任务标识无效")
+		}
+		return localstate.Lock(filepath.Join(f.ExecutorDir, "task-"+id+".lock"))
+	}
 	service.OperationLock = func() (func(), error) { return localstate.Lock(filepath.Join(f.ExecutorDir, "operation.lock")) }
 	trustDone := make(chan struct{})
 	go func() { defer close(trustDone); service.MaintainTrust(ctx) }()
@@ -249,6 +257,7 @@ func operation(args []string, recoverAll bool) error {
 	}
 	defer db.Close()
 	service := executor.NewServices(db)
+	service.Engine.LogDirectory = filepath.Join(f.ExecutorDir, "logs")
 	ids := []string{*id}
 	if recoverAll {
 		ids, e = service.Engine.Store.Pending(ctx)
@@ -283,13 +292,22 @@ func operation(args []string, recoverAll bool) error {
 			}
 		}
 	}
-	unlock, e := localstate.Lock(filepath.Join(f.ExecutorDir, "operation.lock"))
-	if e != nil {
-		return e
-	}
-	defer unlock()
 	for _, value := range ids {
-		if e = service.Engine.Run(ctx, value); e != nil {
+		lockName := "operation.lock"
+		state, err := service.Engine.Store.Get(ctx, value)
+		if err != nil {
+			return err
+		}
+		if state.Action != nil && state.Action.Shell != nil {
+			lockName = "task-" + state.Action.Shell.TaskID + ".lock"
+		}
+		unlock, err := localstate.Lock(filepath.Join(f.ExecutorDir, lockName))
+		if err != nil {
+			return err
+		}
+		e = service.Engine.Run(ctx, value)
+		unlock()
+		if e != nil {
 			return e
 		}
 	}

@@ -35,15 +35,16 @@ type subscriber struct {
 	done    chan struct{}
 }
 type Server struct {
-	db            *sql.DB
-	node          *cluster.Node
-	options       Options
-	now           func() time.Time
-	mu            sync.Mutex
-	subscribers   map[*subscriber]struct{}
-	failures      map[string][]time.Time
-	inFlight      map[string]int
-	passwordSlots chan struct{}
+	db              *sql.DB
+	node            *cluster.Node
+	options         Options
+	now             func() time.Time
+	mu              sync.Mutex
+	subscribers     map[*subscriber]struct{}
+	failures        map[string][]time.Time
+	inFlight        map[string]int
+	passwordSlots   chan struct{}
+	terminalTickets map[string]terminalTicket
 }
 type sessionContext struct {
 	session  httpapi.Session
@@ -182,7 +183,7 @@ func (s *Server) body(w http.ResponseWriter, r *http.Request, value any) bool {
 		return false
 	}
 	limit := int64(16 * 1024)
-	if strings.HasPrefix(r.URL.Path, "/api/v1/api-tokens") || strings.HasPrefix(r.URL.Path, "/api/v1/databases/") || strings.Contains(r.URL.Path, "/databases/") {
+	if strings.HasPrefix(r.URL.Path, "/api/v1/api-tokens") || strings.HasPrefix(r.URL.Path, "/api/v1/databases/") || strings.Contains(r.URL.Path, "/databases/") || strings.HasSuffix(r.URL.Path, "/tasks") {
 		limit = 256 * 1024
 	}
 	reader := http.MaxBytesReader(w, r.Body, limit)

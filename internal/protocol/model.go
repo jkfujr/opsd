@@ -31,6 +31,7 @@ const (
 	Succeeded            OperationState = "succeeded"
 	Rejected             OperationState = "rejected"
 	Failed               OperationState = "failed"
+	Cancelled            OperationState = "cancelled"
 	Reverted             OperationState = "reverted"
 	ResolvedManually     OperationState = "resolved_manually"
 )
@@ -220,6 +221,8 @@ type OperationRecord struct {
 
 // OperationAction 的业务载荷互斥，编解码层拒绝不匹配组合。
 type OperationAction struct {
+	Compose        *ComposeAction    `json:"compose,omitempty"`
+	Shell          *ShellAction      `json:"shell,omitempty"`
 	Kind           string            `json:"kind"`
 	Firewall       *ChangePlan       `json:"firewall,omitempty"`
 	FirewallConfig *FirewallTarget   `json:"firewall_config,omitempty"`

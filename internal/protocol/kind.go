@@ -4,6 +4,18 @@ import "fmt"
 
 func newPayload(kind Kind) (Payload, error) {
 	switch kind {
+	case "compose.read":
+		return &ComposeRead{}, nil
+	case "compose.read.result":
+		return &ComposeReadResult{}, nil
+	case "operation.cancel":
+		return &OperationCancel{}, nil
+	case "execution.logs":
+		return &ExecutionLogsRead{}, nil
+	case "execution.logs.result":
+		return &ExecutionLogsResult{}, nil
+	case "terminal.frame":
+		return &TerminalFrame{}, nil
 	case "database.discover":
 		return &DatabaseDiscovery{}, nil
 	case "database.discovered":

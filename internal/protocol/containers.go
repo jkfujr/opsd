@@ -29,8 +29,8 @@ func (a ContainerAction) Validate() error {
 	if err := a.ContainerRef.Validate(); err != nil {
 		return err
 	}
-	if a.Action != "start" && a.Action != "stop" && a.Action != "restart" {
-		return fmt.Errorf("容器动作须为启动、停止或重启")
+	if a.Action != "start" && a.Action != "stop" && a.Action != "restart" && a.Action != "update" {
+		return fmt.Errorf("容器动作无效")
 	}
 	return nil
 }

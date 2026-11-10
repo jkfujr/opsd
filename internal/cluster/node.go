@@ -43,6 +43,7 @@ type Node struct {
 	cancel           context.CancelFunc
 	wg               sync.WaitGroup
 	wake             chan struct{}
+	taskWake         chan struct{}
 	changed          chan struct{}
 	collector        monitoring.Collector
 	liveMu           sync.Mutex
@@ -121,7 +122,7 @@ func Open(ctx context.Context, path string, o Options) (*Node, error) {
 	if e != nil {
 		return nil, e
 	}
-	n := &Node{DB: db, Executor: o.Executor, Now: o.Now, connections: map[string]*peer{}, dialing: map[string]chan struct{}{}, wake: make(chan struct{}, 1), changed: make(chan struct{}, 1), subscribers: map[chan Change]struct{}{}}
+	n := &Node{DB: db, Executor: o.Executor, Now: o.Now, connections: map[string]*peer{}, dialing: map[string]chan struct{}{}, wake: make(chan struct{}, 1), taskWake: make(chan struct{}, 1), changed: make(chan struct{}, 1), subscribers: map[chan Change]struct{}{}}
 	var private, public, signing []byte
 	var ageKey string
 	e = db.QueryRowContext(ctx, "SELECT cluster,private_key,public_key,signing_key,age_key FROM node_identity WHERE id=1").Scan(&n.cluster, &private, &public, &signing, &ageKey)
@@ -218,10 +219,12 @@ func (n *Node) Start() {
 		return
 	}
 	n.started = true
-	n.wg.Add(7)
+	n.wg.Add(9)
 	n.mu.Unlock()
 	go func() { defer n.wg.Done(); n.discovery() }()
 	go func() { defer n.wg.Done(); n.queueLoop() }()
+	go func() { defer n.wg.Done(); n.taskLoop() }()
+	go func() { defer n.wg.Done(); n.taskQueueLoop() }()
 	go func() { defer n.wg.Done(); n.storageLoop() }()
 	go func() { defer n.wg.Done(); n.sampleLoop() }()
 	go func() { defer n.wg.Done(); n.maintenanceLoop() }()

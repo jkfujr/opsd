@@ -82,7 +82,7 @@ function NavigationSettings() {
   return <Fieldset className="mt-8 border-t border-border pt-4"><FieldsetLegend className="section-title">菜单顺序</FieldsetLegend>
     <Failure error={query.error} retry={() => void query.refetch()} busy={query.isFetching} />
     <ol aria-label="菜单顺序" aria-busy={query.isPending} className="max-w-lg divide-y divide-border">{(value?.order ?? defaultNavigationOrder).map((id, index) => {
-      const label = navigation.find((item) => item.id === id)!.label;
+      const label = navigation.find((item) => item.id === id)?.label ?? (id === 'tools' ? '工具' : id);
       return <li key={id} className="flex min-h-14 items-center justify-between gap-3 py-2"><span>{label}</span><div className="flex gap-2"><Button size="sm" variant="outline" aria-label={`${label}上移`} disabled={!value || save.isPending || index === 0} onClick={() => move(index, -1)}>上移</Button><Button size="sm" variant="outline" aria-label={`${label}下移`} disabled={!value || save.isPending || index === defaultNavigationOrder.length - 1} onClick={() => move(index, 1)}>下移</Button></div></li>;
     })}</ol>
     <Failure error={save.error} />

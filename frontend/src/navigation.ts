@@ -13,7 +13,7 @@ export const navigation: { id: NavigationItem; path: string; label: string }[] =
   { id: 'firewall', path: '/firewall', label: '防火墙' },
   { id: 'settings', path: '/settings', label: '设置' },
 ];
-export const defaultNavigationOrder = navigation.map((item) => item.id);
+export const defaultNavigationOrder = navigation.flatMap((item) => item.id === 'settings' ? ['tools' as const, item.id] : [item.id]);
 
 export function useNavigation() {
   const session = useSession();

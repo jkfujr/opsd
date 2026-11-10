@@ -12,7 +12,7 @@ type NavigationPreferences struct {
 	Revision uint64   `json:"revision"`
 }
 
-var defaultNavigation = []string{"overview", "nodes", "containers", "databases", "storage", "firewall", "settings"}
+var defaultNavigation = []string{"overview", "nodes", "containers", "databases", "storage", "firewall", "tools", "settings"}
 
 func (n *Node) Navigation(ctx context.Context) (NavigationPreferences, error) {
 	value := NavigationPreferences{Order: slices.Clone(defaultNavigation)}

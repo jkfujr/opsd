@@ -11,8 +11,8 @@ import { BusyButton, ChoiceField, Confirm, date, Failure, StatusLabel } from './
 
 type Operation = components['schemas']['Operation'];
 type State = components['schemas']['OperationState'];
-export const operationStates: Record<State, string> = { accepted: '已受理', prepared: '准备执行', applying: '应用中', awaiting_confirmation: '待确认', reverting: '撤销中', attention_required: '需处理', succeeded: '已成功', rejected: '未执行', failed: '未完成且无残留', reverted: '已撤销', resolved_manually: '已人工处理' };
-export const terminal = (state: State) => ['succeeded', 'rejected', 'failed', 'reverted', 'resolved_manually'].includes(state);
+export const operationStates: Record<State, string> = { accepted: '已受理', prepared: '准备执行', applying: '应用中', awaiting_confirmation: '待确认', reverting: '撤销中', attention_required: '需处理', succeeded: '已成功', rejected: '未执行', failed: '未完成且无残留', cancelled: '已取消', reverted: '已撤销', resolved_manually: '已人工处理' };
+export const terminal = (state: State) => ['succeeded', 'cancelled', 'rejected', 'failed', 'reverted', 'resolved_manually'].includes(state);
 export const pendingQuery = { queryKey: ['operations', 'pending'], queryFn: async ({ signal }: { signal: AbortSignal }) => unwrap(await api.GET('/operations/pending', { signal })) };
 const OperationsContext = createContext<{ show: (id?: string) => void } | null>(null);
 export function useOperations() { return useContext(OperationsContext)!; }

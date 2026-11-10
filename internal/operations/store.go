@@ -40,7 +40,7 @@ type querier interface {
 
 func Terminal(state protocol.OperationState) bool {
 	switch state {
-	case protocol.Succeeded, protocol.Rejected, protocol.Failed, protocol.Reverted, protocol.ResolvedManually:
+	case protocol.Succeeded, protocol.Rejected, protocol.Failed, protocol.Cancelled, protocol.Reverted, protocol.ResolvedManually:
 		return true
 	}
 	return false
@@ -153,7 +153,7 @@ func (s Store) Receive(ctx context.Context, id string, version int, action proto
 	if _, e := protocol.Encode(protocol.Message{RequestID: "validation", Payload: &protocol.OperationSubmit{OperationID: id, ContractVersion: version, Action: action}}); e != nil {
 		return Local{}, false, e
 	}
-	if action.Kind != "firewall" && action.Kind != "firewall_config" && action.Kind != "container" && action.Kind != "database" && !(action.Kind == "component" && action.Component != nil && action.Component.Component == "firewall" && action.Component.Action == "install") {
+	if action.Kind != "compose" && action.Kind != "shell" && action.Kind != "firewall" && action.Kind != "firewall_config" && action.Kind != "container" && action.Kind != "database" && !(action.Kind == "component" && action.Component != nil && action.Component.Component == "firewall" && action.Component.Action == "install") {
 		return Local{}, false, firewall.Unsupported("当前版本不执行此类动作")
 	}
 	c, e := begin(ctx, s.DB)
@@ -176,7 +176,13 @@ func (s Store) Receive(ctx context.Context, id string, version int, action proto
 		return l, false, e
 	}
 	var n int
-	if e = c.QueryRowContext(ctx, "SELECT count(*) FROM operations WHERE terminal=0").Scan(&n); e != nil {
+	query := "SELECT count(*) FROM operations WHERE terminal=0 AND json_extract(action,'$.kind')<>'shell'"
+	var args []any
+	if action.Kind == "shell" {
+		query = "SELECT count(*) FROM operations WHERE terminal=0 AND json_extract(action,'$.kind')='shell' AND json_extract(action,'$.shell.task_id')=?"
+		args = []any{action.Shell.TaskID}
+	}
+	if e = c.QueryRowContext(ctx, query, args...).Scan(&n); e != nil {
 		return l, false, e
 	}
 	if n != 0 {
@@ -310,7 +316,10 @@ func (s Store) Request(ctx context.Context, id, kind string, revision uint64) (L
 	if Terminal(l.Record.State) {
 		return l, firewall.Conflict("操作已经结束")
 	}
-	if kind != "confirm" && kind != "recover" && kind != "resolve" {
+	if kind == "cancel" && (l.Action == nil || l.Action.Kind != "shell") {
+		return l, firewall.Unsupported("此操作不能取消")
+	}
+	if kind != "confirm" && kind != "recover" && kind != "resolve" && kind != "cancel" {
 		return l, fmt.Errorf("未知操作处理请求")
 	}
 	if _, e = c.ExecContext(ctx, "UPDATE operations SET request=?,request_revision=? WHERE id=?", kind, revision, id); e != nil {

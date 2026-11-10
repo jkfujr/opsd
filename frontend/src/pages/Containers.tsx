@@ -17,7 +17,7 @@ import { nodesQuery } from './Nodes';
 
 type Container = components['schemas']['ContainerListItem'];
 type Detail = components['schemas']['ContainerDetail'];
-type Action = components['schemas']['ContainerActionRequest']['action'];
+type Action = Exclude<components['schemas']['ContainerActionRequest']['action'], 'update'>;
 const actions: Record<Action, string> = { start: '启动', stop: '停止', restart: '重启' };
 const states: Record<string, string> = { running: '运行中', exited: '已停止', created: '未启动', paused: '已暂停', restarting: '重启中', removing: '移除中', dead: '异常' };
 const health: Record<string, string> = { healthy: '健康', unhealthy: '不健康', starting: '检查中' };

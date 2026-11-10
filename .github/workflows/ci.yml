@@ -45,7 +45,7 @@ jobs:
           sudo apt-get -o Acquire::Retries=1 -o Acquire::http::Timeout=20 -o Acquire::https::Timeout=20 install -y -q nftables iptables firewalld ufw fonts-noto-cjk
           go test -c -o artifacts/firewall-native.test ./internal/firewall
           sudo env OPSD_NATIVE_TRUST=1 artifacts/firewall-native.test -test.run '^TestPeerTrustNativeNetwork$' -test.v
-      - name: 安装生产程序并检查控制台
+      - name: 安装生产程序并准备 API 验收
         run: |
           chmod +x artifacts/opsd-linux-amd64
           sudo sh scripts/check-installer.sh
@@ -55,8 +55,8 @@ jobs:
           sudo ufw --force enable > /dev/null
           password=$(openssl rand -hex 24)
           echo "::add-mask::$password"
-          echo "OPSD_UI_PASSWORD=$password" >> "$GITHUB_ENV"
-          sudo env OPSD_PASSWORD="$password" artifacts/opsd-linux-amd64 install --non-interactive --address http://127.0.0.1:8444 -n ui-check --username ui-check --entrance /signin > artifacts/install-check.log
+          echo "OPSD_API_PASSWORD=$password" >> "$GITHUB_ENV"
+          sudo env OPSD_PASSWORD="$password" artifacts/opsd-linux-amd64 install --non-interactive --address http://127.0.0.1:8444 -n api-check --username api-check --entrance /signin > artifacts/install-check.log
           if sudo /opt/opsd/bin/opsd network --listen 127.0.0.1:8444 > artifacts/network-running.log 2>&1; then exit 1; fi
           grep -q '请先停止 opsd.service' artifacts/network-running.log
           sudo systemctl stop opsd.service opsd-executor.service
@@ -65,20 +65,17 @@ jobs:
           sudo /opt/opsd/bin/opsd install -n '重复安装保留账号' --address http://127.0.0.1:1
           sudo /opt/opsd/bin/opsd console --enabled=true
           sudo /opt/opsd/bin/opsd api --enabled=true
-          docker run -d --name opsd-ui-container --label com.docker.compose.project=ui-demo --label com.docker.compose.service=web busybox:1.37.0 sh -c 'trap "exit 0" TERM INT; while :; do echo "界面验收容器输出"; echo "界面验收错误输出" >&2; sleep 1; done'
-          npx playwright install --with-deps chromium
-      - name: 生产界面与交互
-        run: node scripts/check-ui.mjs
+      - name: 生产 API 与 root 执行器
+        run: OPSD_API_TEST=1 go test ./internal/control -run '^TestProductionBackendAPI$' -v -count=1 -timeout=8m
       - name: 停止验收服务
         if: always()
         run: |
           sudo systemctl stop opsd.service opsd-executor.service || true
-          docker rm -f opsd-ui-container || true
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: ui-check
-          path: artifacts/ui
+          name: api-check
+          path: artifacts/api
           if-no-files-found: ignore
       - uses: actions/upload-artifact@v4
         if: always()

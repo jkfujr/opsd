@@ -12,12 +12,13 @@ import (
 )
 
 type Engine struct {
-	Store      Store
-	Manager    *firewall.Manager
-	Clock      func() (string, int64, error)
-	Install    func(context.Context, *Local, func() error) error
-	Containers ContainerRuntime
-	Databases  DatabaseRuntime
+	LogDirectory string
+	Store        Store
+	Manager      *firewall.Manager
+	Clock        func() (string, int64, error)
+	Install      func(context.Context, *Local, func() error) error
+	Containers   ContainerRuntime
+	Databases    DatabaseRuntime
 }
 
 func (e *Engine) clock() (string, int64, error) {
@@ -87,6 +88,12 @@ func (e *Engine) Run(ctx context.Context, id string) error {
 	}
 	if l.Action.Kind == "component" {
 		return e.install(ctx, &l, boot)
+	}
+	if l.Action.Kind == "shell" {
+		return e.shell(ctx, &l, boot)
+	}
+	if l.Action.Kind == "compose" {
+		return e.compose(ctx, &l, boot)
 	}
 	if l.Action.Kind == "container" {
 		return e.container(ctx, &l, boot)

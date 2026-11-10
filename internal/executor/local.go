@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/coder/websocket"
 	"io"
 	"net"
 	"net/http"
@@ -19,9 +20,13 @@ import (
 	"github.com/jkfujr/opsd/internal/firewall"
 	"github.com/jkfujr/opsd/internal/identity"
 	"github.com/jkfujr/opsd/internal/protocol"
+	"github.com/jkfujr/opsd/internal/transport"
 )
 
-type Client struct{ HTTP, Control *http.Client }
+type Client struct {
+	HTTP, Control *http.Client
+	Socket        string
+}
 
 func NewClient(socket string) *Client {
 	create := func(limit int) *http.Client {
@@ -29,7 +34,19 @@ func NewClient(socket string) *Client {
 			return (&net.Dialer{}).DialContext(ctx, "unix", socket)
 		}, MaxConnsPerHost: limit, MaxIdleConnsPerHost: limit, IdleConnTimeout: time.Minute}, Timeout: 35 * time.Second}
 	}
-	return &Client{HTTP: create(6), Control: create(2)}
+	return &Client{HTTP: create(6), Control: create(2), Socket: socket}
+}
+
+func (c *Client) Terminal(ctx context.Context) (protocol.TerminalStream, error) {
+	client := &http.Client{Transport: &http.Transport{DialContext: func(ctx context.Context, _, _ string) (net.Conn, error) {
+		return (&net.Dialer{}).DialContext(ctx, "unix", c.Socket)
+	}}}
+	socket, _, err := websocket.Dial(ctx, "ws://executor/terminal", &websocket.DialOptions{HTTPClient: client})
+	if err != nil {
+		return nil, err
+	}
+	socket.SetReadLimit(65536)
+	return transport.TerminalSocket{Socket: socket}, nil
 }
 func (c *Client) request(ctx context.Context, path string, b []byte, control ...bool) ([]byte, error) {
 	r, e := http.NewRequestWithContext(ctx, "POST", "http://executor"+path, bytes.NewReader(b))
@@ -65,7 +82,7 @@ func (c *Client) Call(ctx context.Context, p protocol.Payload) (protocol.Payload
 	}
 	control := false
 	switch p.(type) {
-	case *protocol.OperationQuery, *protocol.OperationConfirm, *protocol.OperationRecover, *protocol.OperationResolve:
+	case *protocol.OperationCancel, *protocol.OperationQuery, *protocol.OperationConfirm, *protocol.OperationRecover, *protocol.OperationResolve:
 		control = true
 	}
 	reply, e := c.request(ctx, "/rpc", b, control)
@@ -112,6 +129,18 @@ type Server struct {
 
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
+	mux.HandleFunc("GET /terminal", func(w http.ResponseWriter, r *http.Request) {
+		socket, err := websocket.Accept(w, r, &websocket.AcceptOptions{InsecureSkipVerify: true})
+		if err != nil {
+			return
+		}
+		socket.SetReadLimit(65536)
+		stream := transport.TerminalSocket{Socket: socket}
+		if err = s.Services.Terminals.Serve(r.Context(), stream); err != nil {
+			_ = stream.Send(r.Context(), protocol.TerminalFrame{Type: "exit", Message: err.Error()})
+			stream.Close()
+		}
+	})
 	mux.HandleFunc("POST /rpc", func(w http.ResponseWriter, r *http.Request) {
 		b, e := io.ReadAll(http.MaxBytesReader(w, r.Body, protocol.MaxMessageBytes))
 		if e != nil {
