@@ -98,8 +98,12 @@ func prepareUpdate(ref protocol.ContainerRef, raw container.InspectResponse, id 
 		if string(m.Type) == "volume" && !covered[m.Destination] {
 			bind := m.Name + ":" + m.Destination
 			mode := m.Mode
-			if mode == "" && !m.RW {
-				mode = "ro"
+			if mode == "" {
+				// Docker 会给无模式的具名卷补 z，显式保留原匿名卷的读写设置。
+				mode = "rw"
+				if !m.RW {
+					mode = "ro"
+				}
 			}
 			if mode != "" {
 				bind += ":" + mode
