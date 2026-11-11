@@ -172,6 +172,32 @@ func TestOperationPagesFollowCreatedTimeAcrossNodes(t *testing.T) {
 	}
 }
 
+func TestAPIV2RequestReceiptsAcrossNodes(t *testing.T) {
+	a, _ := openTestNode(t)
+	b, _ := openTestNode(t)
+	joinTest(t, b, a)
+	request := requeststate.Write{Actor: "account:" + a.ID + ":1", Key: "cross-entry", Digest: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}
+	for _, entry := range []*Node{a, b} {
+		if _, err := entry.RequestReceipt(t.Context(), a.ID, request); !missingRequest(err) {
+			t.Fatal("未找到回执被当成节点故障", err)
+		}
+	}
+	op, err := b.Submit(t.Context(), a.ID, Request{Actor: request.Actor, Kind: "name", Key: request.Key, Payload: payload("跨入口"), InputDigest: request.Digest})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, entry := range []*Node{a, b} {
+		receipt, err := entry.RequestReceipt(t.Context(), a.ID, request)
+		if err != nil || receipt.OperationID != op.ID || receipt.Operation == nil {
+			t.Fatal("原回执跨入口不可读", receipt, err)
+		}
+	}
+	request.Digest = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+	if _, err := b.RequestReceipt(t.Context(), a.ID, request); err == nil || missingRequest(err) {
+		t.Fatal("同键异参没有保留冲突", err)
+	}
+}
+
 func TestAPIV2ReceiptsSurviveNodeReopen(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "receipt.db")
 	n, err := Open(t.Context(), path, Options{Password: "test-password"})

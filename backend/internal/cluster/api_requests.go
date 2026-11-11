@@ -53,6 +53,9 @@ func (n *Node) requestReceipt(ctx context.Context, request requeststate.Write) (
 		return out, e
 	}
 	r, e := requeststate.Lookup(ctx, n.DB, request)
+	if errors.Is(e, sql.ErrNoRows) {
+		return out, fault("not_found", "尚未找到原请求")
+	}
 	if errors.Is(e, requeststate.ErrConflict) {
 		return out, fault("conflict", e.Error())
 	}
