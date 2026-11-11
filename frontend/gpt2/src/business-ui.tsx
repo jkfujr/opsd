@@ -21,7 +21,7 @@ import { Badge } from '@appica/ui-react/badge';
 
 export function TextField({ label, loading, ...props }: ComponentProps<typeof Input> & { label: string; loading?: boolean }) {
   const id = useId();
-  return <Field className="min-w-0 space-y-2"><FieldLabel htmlFor={props.id ?? id}>{label}</FieldLabel>{loading ? <Skeleton className="h-10 w-full" /> : <Input id={id} {...props} className={`ui-input ${props.className ?? ""}`} />}</Field>;
+  return <Field className="business-field"><FieldLabel htmlFor={props.id ?? id}>{label}</FieldLabel>{loading ? <Skeleton className="h-11 w-full" /> : <Input id={id} {...props} className={`ui-input ${props.className ?? ""}`} />}</Field>;
 }
 
 export function Failure({ error, retry, busy }: { error: unknown; retry?: () => void; busy?: boolean }) {
@@ -85,11 +85,11 @@ export function Confirm({ open, title, description, busy, error, onCancel, onCon
   </AlertDialog>;
 }
 
-export function ChoiceField({ label, value, options, onChange, disabled, placeholder = '请选择' }: { label: string; value: string; options: readonly (readonly [string, string])[]; onChange: (value: string) => void; disabled?: boolean; placeholder?: string }) {
+export function ChoiceField({ label, value, options, onChange, disabled, placeholder = '请选择', resource = false }: { label: string; value: string; options: readonly (readonly [string, string])[]; onChange: (value: string) => void; disabled?: boolean; placeholder?: string; resource?: boolean }) {
   const id = useId();
-  return <Field className="min-w-0 space-y-2"><FieldLabel htmlFor={id}>{label}</FieldLabel><Select value={value || null} onValueChange={(next) => onChange(String(next ?? ''))} disabled={disabled}>
+  return <Field className="business-field"><FieldLabel htmlFor={id}>{label}</FieldLabel><Select value={value || null} onValueChange={(next) => onChange(String(next ?? ''))} disabled={disabled} alignItemWithTrigger={false}>
     <SelectTrigger id={id} className="ui-select w-full min-w-0"><SelectValue>{options.find(([key]) => key === value)?.[1] ?? placeholder}</SelectValue></SelectTrigger>
-    <SelectContent>{options.map(([key, title]) => <SelectItem key={key} value={key}>{title}</SelectItem>)}</SelectContent>
+    <SelectContent className={`ui-select-popup ${resource ? 'resource-select' : ''}`}>{options.map(([key, title]) => <SelectItem key={key} value={key}>{title}</SelectItem>)}</SelectContent>
   </Select></Field>;
 }
 

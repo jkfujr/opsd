@@ -8,7 +8,8 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview --host 127.0.0.1 --port 5182 --strictPort",
     "package": "npm run build && node scripts/package-theme.mjs",
-    "check:ui": "node scripts/check-ui.mjs"
+    "check:ui": "node scripts/check-ui.mjs",
+    "check:presentation": "node scripts/check-presentation.mjs"
   },
   "dependencies": {
     "@appica/ui-react": "1.3.0",

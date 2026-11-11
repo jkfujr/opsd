@@ -69,8 +69,8 @@ export function FirewallSettings() {
   const verify = async () => { const result = await policy.refetch(); if (result.data) { setUncertain(false); setChange(null); save.reset(); invalidateNetwork(); } };
   const names = new Map(nodes.data?.items.map((n) => [n.id, n.name]));
   const count = nodes.data?.items.filter((n) => !n.revoked_at).length ?? 0;
-  return <section className="panel">
-    <PageTitle>防火墙设置</PageTitle>
+  return <div className="page-stack">
+    <PageTitle>防火墙设置</PageTitle><section className="panel panel-padded content-stack">
     <PageToolbar><Link to={`/firewall${search.size ? `?${search}` : ''}`} className={buttonVariants({ variant: 'outline' })}>返回规则</Link></PageToolbar>
     <Failure error={policy.error} retry={() => void policy.refetch()} busy={policy.isFetching} />
     <div className="flex max-w-lg items-center justify-between gap-4 border-y border-border py-4"><label htmlFor="cluster-peer-trust" className="font-medium">集群互信</label>{policy.isPending ? <Skeleton className="h-5 w-10" /> : <Switch id="cluster-peer-trust" checked={policy.data?.enabled ?? false} disabled={!policy.data || policy.isError || save.isPending || uncertain} onCheckedChange={(enabled) => { save.reset(); setChange({ enabled, previous: policy.data! }); }} />}</div>
@@ -82,7 +82,7 @@ export function FirewallSettings() {
       {status.data?.nodes.length === 0 && !status.isError && <TableRow><TableCell colSpan={6} className="py-8 text-center text-foreground-muted">暂无节点</TableCell></TableRow>}
     </TableBody></Table></div>
     <Confirm open={change !== null} title={change?.enabled ? '开启集群互信？' : '关闭集群互信？'} description={change?.enabled ? `为 ${count} 个节点优先放行全部成员公网 IP 的所有主机入站端口，包含本机和数据库端口。已有相同的全协议 IP 放行规则将转交互信管理。共享公网 IP 的其他来源也在放行范围内。` : `撤除 ${count} 个节点的 OPSD 互信规则，包含已从普通 IP 规则转交的条目。离线节点恢复连接后继续撤除。`} confirmLabel={change?.enabled ? '开启互信' : '关闭互信'} dangerous={false} busy={save.isPending} error={save.error} onCancel={() => { if (!uncertain) setChange(null); }} onConfirm={() => { if (!uncertain) save.mutate(); }} />
-  </section>;
+  </section></div>;
 }
 
 export function TrustRulesTable({ data, family, loading, error }: { data?: Trust; family: string; loading: boolean; error: unknown }) {
@@ -111,7 +111,7 @@ export function TrustRulesTable({ data, family, loading, error }: { data?: Trust
 const publicQuery = (id: string) => ({ queryKey: ['public-addresses', id], retry: false, queryFn: async ({ signal }: { signal: AbortSignal }) => unwrap(await api.GET('/nodes/{node_id}/public-addresses', { signal, params: { path: { node_id: id } } })) });
 export function NodePublicAddresses({ id }: { id: string }) {
   const query = useQuery(publicQuery(id));
-  return <section id="public-addresses" className="panel"><h2 className="section-title">公网地址</h2><Failure error={query.error} retry={() => void query.refetch()} busy={query.isFetching} />{query.data ? <PublicForm key={id} id={id} value={query.data} readOnly={query.isError} /> : <div className="form-grid">{['IPv4', 'IPv6'].map((family) => <div key={family}><h3 className="mb-4 font-medium">{family}</h3>{query.isPending && <Skeleton className="h-24 w-full" />}</div>)}</div>}</section>;
+  return <section id="public-addresses" className="panel panel-padded content-stack"><h2 className="section-title">公网地址</h2><Failure error={query.error} retry={() => void query.refetch()} busy={query.isFetching} />{query.data ? <PublicForm key={id} id={id} value={query.data} readOnly={query.isError} /> : <div className="form-grid">{['IPv4', 'IPv6'].map((family) => <div key={family}><h3 className="mb-4 font-medium">{family}</h3>{query.isPending && <Skeleton className="h-24 w-full" />}</div>)}</div>}</section>;
 }
 function PublicForm({ id, value, readOnly }: { id: string; value: Public; readOnly: boolean }) {
   const base = useRef(value);
@@ -131,7 +131,7 @@ function PublicForm({ id, value, readOnly }: { id: string; value: Public; readOn
   const locked = readOnly || offline || value.cached || save.isPending || uncertain;
   const verify = async () => { setVerifyError(null); try { const v = await queryClient.fetchQuery(publicQuery(id)); if (v.cached) throw new Error('节点离线，恢复连接后核对'); queryClient.setQueryData(['public-addresses', id], v); setUncertain(false); setConfirm(false); setDirty(false); save.reset(); } catch (error) { setVerifyError(error); } };
   const firstID = useId();
-  return <form className="space-y-4" onSubmit={(event) => { event.preventDefault(); setConfirm(true); }}>
+  return <form className="editor-form" onSubmit={(event) => { event.preventDefault(); setConfirm(true); }}>
     <fieldset disabled={locked} className="form-grid">{(['ipv4', 'ipv6'] as const).map((family) => <div key={family} className="min-w-0 space-y-4"><h3 className="font-medium">{family === 'ipv4' ? 'IPv4' : 'IPv6'}</h3><ChoiceField label="发现模式" value={draft[family].mode} options={[[ 'auto', '自动' ], ['manual', '手工' ]]} disabled={locked} onChange={(mode) => { setDraft({ ...draft, [family]: { ...draft[family], mode: mode as 'auto' | 'manual' } }); setDirty(true); }} />{draft[family].mode === 'manual' && <Field className="space-y-2"><FieldLabel htmlFor={`${firstID}-${family}`}>公网 IP（每行一个）</FieldLabel><Textarea id={`${firstID}-${family}`} value={text[family]} rows={3} onChange={(e) => { setText({ ...text, [family]: e.target.value }); setDirty(true); }} /></Field>}<div className="flex flex-wrap items-center gap-2"><StatusLabel state={value[family].state}>{value[family].state === 'pending' ? '待发现' : networkStates[value[family].state]}</StatusLabel><span className="text-xs text-foreground-muted">{date(value[family].updated_at)}</span></div><div className="space-y-1 break-all font-mono text-xs">{value[family].addresses.length ? value[family].addresses.map((ip) => <p key={ip}>{ip}</p>) : '—'}</div>{value[family].error && <p className="text-sm text-error-intense">{value[family].error}</p>}{value[family].observations.length > 0 && <dl className="space-y-2 text-xs">{value[family].observations.map((o) => <div key={o.source} className="flex flex-wrap gap-x-3 gap-y-1"><dt className="text-foreground-muted">{({ peer: '成员观测', ipify: '公共回显', local: '本机检测' })[o.source]}</dt><dd className="break-all">{o.address || o.error?.message || '—'}</dd></div>)}</dl>}</div>)}</fieldset>
     {value.cached && <StatusLabel state="offline">已保存数据</StatusLabel>}
     <Failure error={verifyError ?? save.error ?? refresh.error} />
