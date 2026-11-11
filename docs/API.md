@@ -83,7 +83,7 @@ GET 保持只读，可采集当前状态。配置与运行状态使用独立资�
 | 429 | 已有容量或频率限制；遵守适用的 `Retry-After` |
 | 500／503／504 | 内部错误、节点或依赖不可用、处理结果未知或上游超时 |
 
-失败操作本身仍是可读取资源，查询返回 200，其 `error` 为领域故障。所有响应携带 `X-Request-ID`，与 Problem 和 HTTP 日志关联。日志记录方法、路由模板、身份、目标、状态和耗时，不记录秘密、正文、原始脚本或终端票据 URL。
+失败操作本身仍是可读取资源，查询返回 200，其 `error` 为领域故障；故障代码由执行模块定义，`request_id` 可省略。HTTP 错误使用 Problem 中的请求 ID。所有响应携带 `X-Request-ID`，与 Problem 和 HTTP 日志关联。日志记录方法、路由模板、身份、目标、状态和耗时，不记录秘密、正文、原始脚本或终端票据 URL。
 
 ### 条件更新
 
@@ -139,7 +139,7 @@ curl -fsS "$OPSD_API_URL/operations/原操作ID" -H "Authorization: Bearer $OPSD
 
 错误可包含 `operation_id` 和 `outcome: not_accepted|unknown`。网络中断、超时或 `unknown` 时先查询原请求、原操作或目标现状。暂时 404 不能证明原请求永远不会受理；保持原键，不自动换键再执行。离线目标不排队等待未来上线；已经受理的操作在入口退出、令牌撤销或共享数据库不可用时继续。
 
-待处理操作使用 `GET /operations?pending=true`，详情与日志位于 `/operations/{id}`、`/operations/{id}/logs`。确认、重新处理、接受现状、取消统一为：
+待处理操作使用 `GET /operations?pending=true`，详情与日志位于 `/operations/{id}`、`/operations/{id}/logs`。步骤状态 `intent` 表示已保存发送意图，实际结果继续读取原步骤。确认、重新处理、接受现状、取消统一为：
 
 ```bash
 curl -fsS -X POST "$OPSD_API_URL/operations/原操作ID/actions" \

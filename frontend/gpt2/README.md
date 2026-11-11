@@ -70,7 +70,7 @@ npm run check:ui -- --recovery --replace
 
 检查仅接受本机地址。`OPSD_GPT2_URL`、`OPSD_GPT2_ENTRANCE`、`OPSD_GPT2_PASSWORD` 和 `OPSD_GPT2_BROWSER` 可以调整验收连接；`--resume` 仅用于复用输入未变的已通过场景，受影响场景加 `--rerun=场景名称片段` 强制重跑；主题包更新后加 `--replace`，替换本地同版本安装再检查。三种模式的报告和截图分别位于根目录 `artifacts/frontend/gpt2/integration/`、`integration-builtin/` 和 `integration-recovery/`。
 
-真实本地 HTTP 场景覆盖登录、主题安装与启用、菜单持久化与跨会话冲突、接入码、API 令牌和原键恢复。资源页面通过 Playwright 注入 API 状态，终端通过 WebSocket 路由检查帧和字节；这些交互结果与 Linux 实际容器、数据库、防火墙、任务及 PTY 执行分开记录。生产部署不属于本轮范围。
+真实本地 HTTP 场景覆盖登录、主题安装与启用、菜单持久化与跨会话冲突、接入码、API 令牌和原键恢复。资源页面通过 Playwright 注入 API 状态，终端通过 WebSocket 路由检查帧和字节；这些交互结果与 Linux 实际容器、数据库、防火墙、任务及 PTY 执行分开记录。
 
 字体来源和许可证见 `RESEARCH.md` 与 `public/fonts/`。
 
@@ -82,4 +82,4 @@ npm run check:ui -- --recovery --replace
 
 `TestConsoleThemeBrowser` 使用最终内置资源通过，覆盖 React／Vue、连续主题切换、双登录模式、自定义安全入口、账号修改、恢复页深层刷新和终端参数、会话失效、损坏主题恢复及刷新后进入所选主题。结果见根目录 `artifacts/theme-ui/result.json` 和 `artifacts/frontend/gpt2/` 下的构建日志、交互报告与截图。
 
-已验证：上述本地构建、真实身份与主题 HTTP 交互、资源状态注入和终端 WebSocket 路由检查。未验证：云端 CI、Linux 实机系统执行和生产环境。未执行提交、推送、发布或部署。
+已验证：上述本地构建、真实身份与主题 HTTP 交互、资源状态注入和终端 WebSocket 路由检查。本批云端 CI、Linux 系统执行与生产部署结果统一记录在[项目验收](../../docs/VALIDATION.md)。
