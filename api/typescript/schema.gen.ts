@@ -1751,7 +1751,7 @@ export interface components {
         OperationStep: {
             name: string;
             /** @enum {string} */
-            state: "pending" | "applying" | "applied" | "reverting" | "reverted" | "completed" | "failed" | "unknown";
+            state: "pending" | "intent" | "applying" | "applied" | "reverting" | "reverted" | "completed" | "failed" | "unknown";
             message?: string;
             /** Format: date-time */
             observed_at?: string;

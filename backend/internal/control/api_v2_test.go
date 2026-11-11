@@ -143,11 +143,12 @@ func TestAPIV2ValidationConditionsAndReceipts(t *testing.T) {
 func TestAPIV2OperationDomainFault(t *testing.T) {
 	n := openAPINode(t, "领域错误", "东京", 1, 1)
 	client, _ := apiAdmin(t, n)
-	op, err := n.node.Submit(t.Context(), n.node.ID, cluster.Request{Kind: "name", Payload: json.RawMessage(`"等待执行"`)})
+	op, err := n.node.Submit(t.Context(), n.node.ID, cluster.Request{Kind: "name", Key: "domain-fault", Payload: json.RawMessage(`"等待执行"`)})
 	if err != nil {
 		t.Fatal(err)
 	}
 	op.State = protocol.AttentionRequired
+	op.Steps = []protocol.OperationStep{{Name: "发送到执行器", State: "intent"}}
 	op.Error = &protocol.Error{Code: "executor_reply_lost", Message: "执行结果未知，请查询原操作"}
 	body, err := json.Marshal(op)
 	if err != nil {

@@ -1342,6 +1342,7 @@ const (
 	OperationStepStateApplying  OperationStepState = "applying"
 	OperationStepStateCompleted OperationStepState = "completed"
 	OperationStepStateFailed    OperationStepState = "failed"
+	OperationStepStateIntent    OperationStepState = "intent"
 	OperationStepStatePending   OperationStepState = "pending"
 	OperationStepStateReverted  OperationStepState = "reverted"
 	OperationStepStateReverting OperationStepState = "reverting"
@@ -1358,6 +1359,8 @@ func (e OperationStepState) Valid() bool {
 	case OperationStepStateCompleted:
 		return true
 	case OperationStepStateFailed:
+		return true
+	case OperationStepStateIntent:
 		return true
 	case OperationStepStatePending:
 		return true

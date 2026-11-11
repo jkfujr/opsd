@@ -12209,6 +12209,7 @@
             "type": "string",
             "enum": [
               "pending",
+              "intent",
               "applying",
               "applied",
               "reverting",
