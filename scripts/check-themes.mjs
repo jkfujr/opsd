@@ -279,7 +279,7 @@ async function checkThemes() {
     await page.reload(); await page.getByRole('heading', { name: '节点设置', exact: true }).waitFor();
     assert.equal(new URL(page.url()).hash, '#node-settings');
     await page.getByRole('navigation', { name: '主导航', exact: true }).getByRole('link', { name: '工具', exact: true }).click();
-    assert(new URL(page.url()).pathname.startsWith(builtin + 'tools/'));
+    await page.waitForURL(url => url.pathname.startsWith(builtin + 'tools/'));
     await page.goto(base + builtin + `terminal?node=${current.local_node_id}&keep=1#terminal-end`);
     await page.waitForURL(url => url.pathname === builtin + 'tools/terminal' && url.searchParams.has('session'));
     assert.equal(new URL(page.url()).searchParams.get('keep'), '1');
