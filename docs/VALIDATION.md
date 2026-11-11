@@ -34,7 +34,17 @@ go -C backend test ./internal/control -run '^TestConsoleThemeBrowser$' -v -count
 
 ## 最近结果
 
-2026-11-12：gpt2 全界面布局、导航与信息展示优化，未提交。共享页头、页签、面板、筛选、菜单和编辑器采用明确的间距容器；二级导航取消竖线，分类、子页面与终端会话使用不同反馈，长会话关闭区保持 44px。数据库区分健康、读取与上次结果，健康与分类查询独立，已有列表及详情健康缓存按成员身份和时间更新；操作记录显示中文业务摘要，完整标识与请求键保留在技术详情。HTTP API、OpenAPI、后端业务、协议和持久数据未改。
+2026-11-12：登录布局及后续共享布局、导航、数据库展示和操作摘要已提交推送，最终程序源码为 `e39bbdde72749024e73cb7cbd3518ca9d1958541`；[CI 43106255224](https://github.com/jkfujr/opsd/actions/runs/43106255224) 完整通过，C091 已使用同次成功的 amd64 工件原位更新。版本保持 `0.1.0-dev`。本次只有前端与文档变更；其余三节点网页关闭，继续使用此前程序。
+
+已验证：本次 CI 的生成一致性、前端类型与生产构建、Linux 双架构编译、完整后端与真实 Docker／Galera／ProxySQL、原生互信新连接、整套主题与内置恢复、实际安装与重复安装，以及生产 API 与 root 执行器检查均通过。此前本地三模式各 29 项及登录布局结果在输入未变范围内复用，详见下方本地记录。
+
+C091 实际运行程序与成功工件一致，节点和执行器均为 active、`NRestarts=0`，数据库版本为 node 5／executor 7，未结束操作均为 0。更新前后 15 项比较全部通过：实例路径、节点身份、账号、入口、菜单、配置、任务、令牌、数据库登记、Compose 登记及旧操作保留；10 个容器的 ID、状态、启动时间与双栈 filter 规则内容、顺序保持一致。
+
+线上 Chromium 检查通过：普通与恢复登录在 1440／320px 下的字段 20px、标题与按钮 24px 间距、44px 高度和等宽均符合实际样式；四节点在线且监控数据可读取。节点编辑弹窗在定义加载完成、按钮可用后核对 1440／320px 单行 Footer、44px 操作区及透明红字撤销，随后取消。数据库六页签均为 48px，概览、采集时间、成员、库及代理读取正常，四个 Galera 成员 Primary／Ready／Synced、成员数 4，两个 ProxySQL 为 ready。中文操作摘要、设置与工具二级导航、恢复页深层刷新通过；40 个容器、3 个 Compose 项目与 1 项定时任务均完成四节点 ready 读取。15 张线上截图已保存并查看代表页面，无整体横向溢出，脚本错误为 0。编辑弹窗首次截图处于读取中，仅定向补查加载完成状态，其余成功场景复用。
+
+结果位于 `artifacts/deploy-ui-layout/43106255224/` 的成功工件、CI 及更新／运行记录，以及 `artifacts/deploy-ui-layout/` 的 `preservation-C091.json`、`browser-result.json` 和 PNG。未验证：arm64 实机与整机重启；生产业务写入未执行，相关系统执行由本次 CI 验证。本批未公开发布安装包；[后端交接](UI.md#后端交接数据库读取与操作摘要)四项未实施。后续文档提交复用上述源码和工件结果。
+
+2026-11-12：gpt2 全界面布局、导航与信息展示优化，本地记录；后续提交与部署见本节最新结果。共享页头、页签、面板、筛选、菜单和编辑器采用明确的间距容器；二级导航取消竖线，分类、子页面与终端会话使用不同反馈，长会话关闭区保持 44px。数据库区分健康、读取与上次结果，健康与分类查询独立，已有列表及详情健康缓存按成员身份和时间更新；操作记录显示中文业务摘要，完整标识与请求键保留在技术详情。HTTP API、OpenAPI、后端业务、协议和持久数据未改。
 
 已验证：最终源码的类型检查、内置生产构建和独立 ZIP 打包通过；六组 Node.js 展示检查通过。Edge 的默认内置、独立主题及内置恢复各 29 项检查全部通过，未预期脚本错误均为 0。受影响的布局与交互重新运行，未受影响及同批输入未变的成功结果复用；HTTP 读取失败提示仅定向复核健康和列表错误。三模式各保留 196 张业务页面与浮层截图，覆盖深浅色 320／768／1440px、数据库六页签、节点配置与公网地址、节点及任务编辑、Compose 登记、容器详情及日志；代表截图已查看。另核对 639／640、900／901、1279／1280px、200% 等效视口、24／20／16／8px 实际间距、48px 页签、资源菜单、长名称、IPv6、公钥、键盘焦点和正文滚动。布局扫描无发现。
 
@@ -44,11 +54,11 @@ go -C backend test ./internal/control -run '^TestConsoleThemeBrowser$' -v -count
 
 主题切换与登录流程复用此前内置资源的 `TestConsoleThemeBrowser` 成功结果，覆盖实际主题安装、连续切换、普通与恢复登录、自定义入口、账号修改、深层刷新、会话失效、丢失应答及损坏主题恢复。登录布局复用此前三种模式的 24 张深浅色尺寸截图、实际间距、等宽按钮、错误、等待、键盘、短窗口和真实跳转结果，错误为 0。身份、导航、令牌、请求回执和主题安装使用真实本地 HTTP；容器、数据库、防火墙和任务状态由浏览器注入，终端字节由 WebSocket 路由提供。
 
-结果位于 `artifacts/frontend/gpt2/integration/`、`integration-builtin/` 和 `integration-recovery/` 的 `result.json`、截图及 `layout-*-final.log`、`layout-*-http-error.log`；构建、打包、展示检查、主题恢复与登录结果分别为 `layout-builtin-build.log`、`layout-theme-build.log`、`layout-package.log`、`layout-presentation-check.log`、`layout-theme-browser.log`、`layout-login-check.log` 和 `login-layout/result.json`。节点编辑末次构建、打包和三模式定向检查为 `node-editor-*-build.log`、`node-editor-package.log` 与 `node-editor-*-check.log`。后端交接见 [UI 规范](UI.md#后端交接数据库读取与操作摘要)。本地验收服务检查后已停止。未验证：本批云端 CI、Linux 实际系统执行及生产环境；未执行提交、推送、发布或部署。
+结果位于 `artifacts/frontend/gpt2/integration/`、`integration-builtin/` 和 `integration-recovery/` 的 `result.json`、截图及 `layout-*-final.log`、`layout-*-http-error.log`；构建、打包、展示检查、主题恢复与登录结果分别为 `layout-builtin-build.log`、`layout-theme-build.log`、`layout-package.log`、`layout-presentation-check.log`、`layout-theme-browser.log`、`layout-login-check.log` 和 `login-layout/result.json`。节点编辑末次构建、打包和三模式定向检查为 `node-editor-*-build.log`、`node-editor-package.log` 与 `node-editor-*-check.log`。后端交接见 [UI 规范](UI.md#后端交接数据库读取与操作摘要)。本地验收服务检查后已停止；本批 CI、Linux 系统执行及生产部署见本节最新结果。
 
-2026-11-12：登录页布局调整，未提交。登录表单使用专用 `auth-form`，字段间距 20px、密码框到等宽按钮 24px、标题到表单 24px；输入框和按钮保持 44px。卡片最大宽度 448px、桌面内距 32px，639px 以下内距 24px、页面两侧留白 16px；错误提示按内容展开，无错误时不留空位。
+2026-11-12：登录页布局调整，本地记录；已随 `0303087` 提交，后续提交与部署见本节最新结果。登录表单使用专用 `auth-form`，字段间距 20px、密码框到等宽按钮 24px、标题到表单 24px；输入框和按钮保持 44px。卡片最大宽度 448px、桌面内距 32px，639px 以下内距 24px、页面两侧留白 16px；错误提示按内容展开，无错误时不留空位。
 
-已验证：类型检查、内置生产构建及独立 ZIP 打包通过。既有三模式检查重新运行真实主题安装与登录，未受影响的业务检查复用此前结果。定向 Edge 检查在默认内置、独立主题及恢复模式下核对上述实际间距、等宽、自动填充属性、Tab 顺序、短窗口滚动、错误、提交中、429 等待和真实登录跳转，脚本错误为 0；24 张深浅色 320／768／1440px 与 200% 等效视口截图及三张错误截图已保存，代表截图已查看。布局扫描无发现。结果位于 `artifacts/frontend/gpt2/login-layout/result.json`、同目录 PNG、`login-*-check.log`、`login-builtin-build.log` 和 `login-package.log`。未验证：本次登录布局改动的云端 CI 和生产环境；未执行提交、推送、发布或部署。
+已验证：类型检查、内置生产构建及独立 ZIP 打包通过。既有三模式检查重新运行真实主题安装与登录，未受影响的业务检查复用此前结果。定向 Edge 检查在默认内置、独立主题及恢复模式下核对上述实际间距、等宽、自动填充属性、Tab 顺序、短窗口滚动、错误、提交中、429 等待和真实登录跳转，脚本错误为 0；24 张深浅色 320／768／1440px 与 200% 等效视口截图及三张错误截图已保存，代表截图已查看。布局扫描无发现。结果位于 `artifacts/frontend/gpt2/login-layout/result.json`、同目录 PNG、`login-*-check.log`、`login-builtin-build.log` 和 `login-package.log`。本批 CI 与生产部署见本节最新结果。
 
 2026-11-12：API v2、主题管理、前后端目录整理及 gpt2 默认／内置恢复接入已提交推送。程序源码为 `f2a8171242f40893dcf76c851cb19dcd671f8791`，[CI 43064890948](https://github.com/jkfujr/opsd/actions/runs/43064890948) 完整通过，C001／C041／C052／C091 已使用该次成功的 amd64 工件原位更新；程序与界面版本保持 `0.1.0-dev`，API 契约为 `2.0.0`。
 
