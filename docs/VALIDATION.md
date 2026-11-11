@@ -6,23 +6,59 @@
 
 ```bash
 npm ci
-npm --prefix frontend ci
+npm --prefix frontend/gpt2 ci
 npm run build
 OPSD_DOCKER_TEST=1 OPSD_DATABASE_TEST=1 npm test
 ```
 
-构建包含接口生成、前端类型检查与生产构建、Linux amd64／arm64 编译。CI 使用 busybox:1.37.0 验证真实容器启停、重启与 TTY／非 TTY 日志，校对生成文件、版本和安装脚本语法，在隔离网络空间执行原生互信规则的新连接验收，再安装生产程序，通过实际 HTTP／WebSocket API 检查任务执行和取消、日志分页、容器更新、Compose 操作及 root 终端释放；结果输出为 `api-check` 工件。
+构建包含接口生成、前端类型检查与生产构建、Linux amd64／arm64 编译。CI 使用 busybox:1.37.0 验证真实容器启停、重启与 TTY／非 TTY 日志，校对生成类型、严格适配、授权与能力定义、版本和安装脚本语法，在隔离网络空间执行原生互信规则的新连接验收，再安装生产程序，通过 v2 HTTP／WebSocket API 检查任务及 Compose 的 Bearer 授权、任务执行和取消、日志分页、容器更新、Compose 操作及 root 终端释放；结果输出为 `api-check` 工件。
 
 数据库检查启动三成员 MariaDB Galera、两个 ProxySQL、Prometheus 与 Grafana，覆盖业务库、账号、代理实际登录、权限和部分恢复，结果输出为 `database-check` 工件。三逻辑 OPSD 节点在同一 CI 主机运行；数据库读写与恢复使用真实集群；既有浏览器结果作为此前界面验收记录保留。
 
 ```bash
-go test -c -o artifacts/firewall-native.test ./internal/firewall
+go -C backend test -c -o ../artifacts/firewall-native.test ./internal/firewall
 sudo env OPSD_NATIVE_TRUST=1 artifacts/firewall-native.test -test.run '^TestPeerTrustNativeNetwork$' -test.v
 ```
 
 Release 复用同提交成功工件，通过公开地址下载，检查实际安装、两个 systemd 服务、版本与重复安装保留配置。
 
+主题检查沿用 Go 测试和 Playwright，CI 的“整套主题与内置恢复界面”步骤构建 React、Vue 成品包，在内置生产资源上检查安装、连续条件切换、双登录模式、深层路由、未知应答后的读取和损坏主题恢复，同时验证 Swagger 会话／Bearer、CSRF、条件写入、原键查询与根路径指标。结果为 `theme-check` 工件。本地从仓库根目录运行：
+
+```powershell
+npm install --prefix artifacts/theme-ui/vue-runtime --no-save --package-lock=false vue@3.5.45
+# 使用已安装的 Edge；CI 使用 Playwright Chromium。
+$env:OPSD_THEME_UI='1'
+$env:OPSD_THEME_BROWSER='msedge'
+go -C backend test ./internal/control -run '^TestConsoleThemeBrowser$' -v -count=1 -timeout=4m
+```
+
 ## 最近结果
+
+2026-11-11：gpt2 完成 API v2 调用差异、默认内置与内置恢复适配，未提交。恢复路由保留业务基址，登录、退出、账号修改和会话失效使用实际安全入口；主题选择以选择资源 ETag 为准，“刷新界面”进入所选主题的普通根路径。未知写入按原目标与原键查询，分页中断保留内容和游标，已打开弹窗随节点状态禁止写入，防火墙版本冲突保留草稿并显式重新读取。
+
+已验证：`npm run build:frontend` 的类型检查与生产构建、独立主题 ZIP 打包及 `npm run build:backend` 的 Linux amd64／arm64 编译通过。Windows Edge 的独立主题、默认内置、内置恢复三种模式各 22 项交互检查通过，未预期脚本错误均为 0；三种模式各有 80 张深浅色、320／768／1440px 和 200% 等效视口截图，代表页面已查看。复用此前输入未变的成功结果，受防火墙最后改动影响的场景在独立主题和默认内置模式重新运行；恢复模式的终端菜单检查增加前一菜单关闭等待后，重跑终端及后续场景通过。
+
+身份、菜单、接入码、令牌、主题和请求回执使用真实本地 HTTP；容器、数据库、防火墙、任务和终端字节通过浏览器注入 API 状态及 WebSocket 路由检查。覆盖原游标继续读取、弹窗内断连、SSE 所属节点过滤、跨节点未知结果及暂时 404、秘密值丢失恢复、Problem 字段与请求 ID、429 等待、防火墙冲突草稿，以及终端输入、多会话、重连和退出释放。
+
+`TestConsoleThemeBrowser` 使用最终 gpt2 内置资源通过，覆盖 React／Vue、连续主题切换、双登录、自定义安全入口、账号修改、恢复页深层刷新和终端参数、会话失效、上传应答丢失、损坏主题恢复及刷新后进入所选主题。结果位于 `artifacts/frontend/gpt2/integration/`、`integration-builtin/`、`integration-recovery/` 的 `result.json` 和截图，以及 `artifacts/theme-ui/result.json`；构建与主题检查日志位于 `artifacts/frontend/gpt2/`。本次隔离本地服务检查后已停止。
+
+未验证：本批云端 CI、Linux 实机的容器／数据库／防火墙／任务／PTY 系统执行和生产环境。构建保留既有主包体积提示；未执行提交、推送、发布或部署。
+
+2026-11-11：前后端目录整理，未提交。Go 模块迁入 `backend/`，默认前端改为 `frontend/gpt2`；原内置前端保留在 `frontend/legacy`，其余方案保留在 `frontend/variants`。模块名、HTTP API、节点协议、SQLite 结构和根版本值保持不变。共享 TypeScript 类型生成到 `api/typescript/schema.gen.ts`。
+
+已验证：本地完整 `npm run build` 的接口生成、gpt2 类型检查和生产构建、Linux amd64／arm64 编译通过；完整 `npm test` 通过，新增实际内置资源检查覆盖页面认证、工具深层路径、HTML 引用资源读取、缺失资源 404、HEAD 及控制台关闭／重新启用。legacy 的共享类型引用及 frontend-gpt 的版本引用通过各自类型检查。本地 HTTP 辅助程序已实际启动并完成登录、五个深层页面和四项入口资源读取，随后停止。独立主题 ZIP 打包通过，保留相对资源地址和四份字体许可证。原有三个 Vite 服务已按 5173／5290／5292 端口恢复并读回页面。迁移后 255 个原跟踪文件的对应路径均存在，十个脚本语法检查及受影响文档链接核对通过。结果位于 `artifacts/layout/` 的 `build.log`、`tests.log`、`local-console-result.json`、`theme-package-result.json` 和 `vite-restored.json`。
+
+目录整理时尚未验证 gpt2 内置恢复的完整浏览器交互；后续接入方式见 [默认前端接入](../frontend/README.md#默认前端接入)，交互结果见本节最新记录。该次构建保留了原有主包体积提示，未执行提交、推送、发布或部署。
+
+2026-11-11：API v2 工作区实施，未提交。契约为 `2.0.0`、87 个操作；v1 返回 JSON 404，普通 JSON 接口使用生成的严格适配，授权和节点能力由同一 OpenAPI 生成。内置调用方、实际 API 测试、主题包和验证脚本已迁移，演示前端保持原工作区内容。
+
+已验证：本地完整 `npm test`，后续受影响的 control 测试，以及 `npm run build` 的接口生成、前端类型／生产构建、Linux amd64／arm64 编译通过；Linux 生产 API 测试已跨编译。HTTP 用例覆盖错误媒体与字段、超限正文、428／412、并发同键创建、同键异参、跨入口复用、秘密值丢应答、重新登录及重启查询、受理后版本冲突、任务读取不泄露脚本、目标 Compose 登记条件、权限变化后的游标拒绝、创建时间分页、离线位置保留和离线成员撤销。迁移用例从原节点版本升级后核对身份配置、账号、原令牌授权、任务、未结束操作、请求键及旧主题选择保留。
+
+Windows Edge 的 Playwright 已使用最终生产资源验证 Swagger 会话／Bearer、CSRF 写入、节点条件更新、原键查询、权限拒绝、根路径 `/metrics` 与令牌不写入浏览器存储；React／Vue ZIP 的安装、切换、连续切换、双登录、深层路由、未知应答后读取、内置恢复和删除通过，深浅色 320／768／1440px 无整体横向溢出，未预期脚本错误为零。旧 API v1 主题保留选择并停止加载由管理模块用例验证。`scripts/check-ui.mjs` 完成 v2 调用迁移及语法检查，既有整套旧业务页面流程未重跑。
+
+结果位于 `artifacts/api-v2-tests.log`、`api-v2-control-final.log`、`api-v2-build.log`、`api-v2-theme.log` 与 `artifacts/theme-ui/result.json`。未验证：本批云端 CI、真实 Docker／Galera／ProxySQL／原生防火墙与实际安装程序的 v2 运行、公开主题 Release 和生产部署；本机没有 Docker，未执行提交、推送、发布或部署，历史 CI 与线上结果不计为本批验收。
+
+2026-11-10；整套前端主题工作区改动，未提交。已验证：本地 `npm test`、OpenAPI 生成、前端类型与生产构建、Linux amd64／arm64 编译；GitHub Release 下载由本机 HTTP 测试服务覆盖默认正式版与指定标签，异常 ZIP、兼容版本、重复安装、并发冲突、中断清理、数据库重新打开后的选择保留与文件缺失处理通过。Windows Edge 的 Playwright 检查使用实际构建的 React、Vue ZIP，覆盖安装、切换、内置与主题登录、深层路由刷新、资源隔离、未知应答后只读回、脚本错误恢复及删除；深浅色 320／768／1440px 页面无整体横向溢出，截图已查看，未预期脚本错误为零。结果位于 `artifacts/theme-ui/result.json` 和 `screenshots/`。未验证：本批云端 CI、实际公网 GitHub 主题 Release 安装及生产部署；既有业务容器、数据库与原生防火墙的实机结果不计为本批验证。
 
 2026-11-10：第一批 `e4602af` 已通过 [CI 42709280364](https://github.com/jkfujr/opsd/actions/runs/42709280364)，包括生成一致、双架构构建、真实容器和数据库、原生互信新连接、实际安装及生产界面。四台 C001／C041／C052／C091 已使用同一成功工件原位更新，`node.db` 版本为 2，服务 active，未结束队列与操作均为 0。
 

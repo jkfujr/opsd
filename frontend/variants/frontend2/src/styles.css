@@ -1,0 +1,256 @@
+@import '@appica/ui-react/styles.css';
+@source '../node_modules/@appica/ui-react/dist';
+
+@theme {
+  --font-sans: 'Inter', 'PingFang SC', 'HarmonyOS Sans SC', 'Microsoft YaHei UI', system-ui, sans-serif;
+  --color-surface: var(--surface);
+  --color-surface-subtle: var(--surface-subtle);
+}
+
+:root {
+  color-scheme: light;
+  --background: #F8FAFC;
+  --background-muted: #F1F5F9;
+  --surface: #FFFFFF;
+  --surface-subtle: #F8FAFC;
+  --foreground: #0F172A;
+  --foreground-intense: #020617;
+  --foreground-muted: #475569;
+  --foreground-subtle: #64748B;
+  --border: #E2E8F0;
+  --border-subtle: #F1F5F9;
+  --border-intense: #CBD5E1;
+  --primary: #2563EB;
+  --primary-intense: #1D4ED8;
+  --primary-foreground: #FFFFFF;
+  --primary-subtle: #EFF6FF;
+  --secondary: #F1F5F9;
+  --secondary-intense: #E2E8F0;
+  --secondary-foreground: #0F172A;
+  --secondary-subtle: #F8FAFC;
+  --success: #059669;
+  --success-intense: #047857;
+  --success-foreground: #FFFFFF;
+  --success-subtle: #ECFDF5;
+  --warning: #D97706;
+  --warning-intense: #B45309;
+  --warning-foreground: #FFFFFF;
+  --warning-subtle: #FFFBEB;
+  --error: #DC2626;
+  --error-intense: #B91C1C;
+  --error-foreground: #FFFFFF;
+  --error-subtle: #FEF2F2;
+  --info: #0284C7;
+  --info-intense: #0369A1;
+  --info-foreground: #FFFFFF;
+  --info-subtle: #F0F9FF;
+  --focus-ring: #2563EB;
+  --overlay: rgb(15 23 42 / 0.45);
+}
+
+.dark {
+  color-scheme: dark;
+  --background: #090D16;
+  --background-muted: #0F172A;
+  --surface: #111827;
+  --surface-subtle: #161F33;
+  --foreground: #F8FAFC;
+  --foreground-intense: #FFFFFF;
+  --foreground-muted: #94A3B8;
+  --foreground-subtle: #64748B;
+  --border: #1F2937;
+  --border-subtle: #161F33;
+  --border-intense: #334155;
+  --primary: #3B82F6;
+  --primary-intense: #2563EB;
+  --primary-foreground: #FFFFFF;
+  --primary-subtle: #172554;
+  --secondary: #1E293B;
+  --secondary-intense: #334155;
+  --secondary-foreground: #F8FAFC;
+  --secondary-subtle: #0F172A;
+  --success: #10B981;
+  --success-intense: #34D399;
+  --success-foreground: #052E16;
+  --success-subtle: #064E3B;
+  --warning: #F59E0B;
+  --warning-intense: #FBBF24;
+  --warning-foreground: #451A03;
+  --warning-subtle: #451A03;
+  --error: #EF4444;
+  --error-intense: #F87171;
+  --error-foreground: #FFFFFF;
+  --error-subtle: #450A0A;
+  --info: #38BDF8;
+  --info-intense: #7DD3FC;
+  --info-foreground: #082F49;
+  --info-subtle: #0C4A6E;
+  --focus-ring: #3B82F6;
+  --overlay: rgb(2 6 23 / 0.72);
+}
+
+html {
+  min-width: 320px;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--background);
+  color: var(--foreground);
+  font-size: 0.875rem;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+code,
+pre,
+.font-mono {
+  font-family:
+    'JetBrains Mono',
+    'Cascadia Code',
+    'SFMono-Regular',
+    Consolas,
+    'Liberation Mono',
+    monospace;
+}
+
+@layer components {
+  [data-slot='dialog-header'],
+  [data-slot='drawer-header'],
+  [data-slot='alert-dialog-header'] {
+    min-width: 0;
+  }
+  [data-slot='dialog-title'],
+  [data-slot='drawer-title'],
+  [data-slot='alert-dialog-title'],
+  [data-slot='alert-dialog-description'] {
+    overflow-wrap: anywhere;
+  }
+  [data-slot='dialog-title'],
+  [data-slot='drawer-title'] {
+    padding-inline-end: 2rem;
+  }
+  [data-slot='dialog-footer'],
+  [data-slot='drawer-footer'],
+  [data-slot='alert-dialog-footer'] {
+    flex-shrink: 0;
+    flex-wrap: wrap;
+  }
+  [data-slot='dialog-footer'] button,
+  [data-slot='drawer-footer'] button,
+  [data-slot='alert-dialog-footer'] button {
+    white-space: normal;
+    height: auto;
+    min-height: 2.5rem;
+    overflow-wrap: anywhere;
+  }
+  .surface,
+  .panel {
+    @apply rounded-xl border border-border bg-surface shadow-xs;
+  }
+  .panel {
+    @apply min-w-0 p-4 sm:p-5;
+  }
+  .panel-header {
+    @apply mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-border/70 pb-3.5;
+  }
+  .page-toolbar {
+    @apply mb-4 flex min-w-0 flex-wrap items-end gap-3;
+  }
+  .toolbar-actions {
+    @apply ml-auto flex shrink-0 flex-wrap items-center gap-2;
+  }
+  .firewall-filters {
+    @apply grid max-w-[37rem] grid-cols-1 gap-4 sm:grid-cols-[minmax(0,2fr)_minmax(0,1fr)];
+  }
+  .firewall-status-row {
+    @apply mb-4 grid min-w-0 grid-cols-1 items-center gap-3 border-b border-border pb-3 sm:grid-cols-[minmax(0,1fr)_auto];
+  }
+  .firewall-status-row .toolbar-actions {
+    @apply ml-0 justify-start sm:justify-end;
+  }
+  .form-section {
+    @apply min-w-0 border-t border-border pt-4;
+  }
+  .section-title {
+    @apply mb-4 text-base font-semibold tracking-tight text-foreground-intense;
+  }
+  .metric-card {
+    @apply flex flex-col justify-between rounded-xl border border-border bg-surface p-4 shadow-xs transition-colors;
+  }
+  .form-grid {
+    @apply grid min-w-0 gap-4 sm:grid-cols-2;
+  }
+  .error-message {
+    @apply my-3 flex min-w-0 flex-wrap items-center gap-3;
+  }
+  .sidebar-link {
+    @apply flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-foreground-muted transition-colors hover:bg-background-muted hover:text-foreground-intense;
+  }
+  .sidebar-link[aria-current='page'] {
+    @apply bg-primary/10 font-semibold text-primary;
+  }
+  .settings-link {
+    @apply flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium text-foreground-muted transition-colors hover:bg-background-muted hover:text-foreground-intense;
+  }
+  .settings-link[aria-current='page'] {
+    @apply bg-primary/10 font-semibold text-primary;
+  }
+  .table-shell {
+    @apply max-w-full overflow-x-auto rounded-lg border border-border bg-surface;
+  }
+}
+
+.firewall-filters [data-slot='field'],
+.container-filters [data-slot='field'] {
+  display: grid;
+  gap: 0.375rem;
+}
+
+.firewall-filters [data-slot='field'] {
+  max-width: 24rem;
+}
+
+.firewall-filters [data-slot='field']:last-child {
+  max-width: 12rem;
+}
+
+.firewall-filters [data-slot='field'] > *,
+.container-filters [data-slot='field'] > * {
+  margin-block: 0;
+}
+
+[data-slot='table-head'] {
+  padding: 0.6875rem 0.875rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--foreground-muted);
+  background-color: color-mix(in srgb, var(--background-muted) 65%, transparent);
+}
+
+[data-slot='table-cell'] {
+  padding: 0.75rem 0.875rem;
+  vertical-align: middle;
+  font-size: 0.875rem;
+}
+
+[data-slot='table-cell'] [data-slot='button'] {
+  white-space: nowrap;
+}
+
+[data-slot='table-container'] {
+  max-width: 100%;
+}
+
+:where(a, button):focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}

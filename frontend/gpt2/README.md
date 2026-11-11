@@ -1,0 +1,85 @@
+# OPSD Mosona 控制台主题
+
+`frontend/gpt2`（原 `frontend-gpt2`）是调用同源 `/api/v2` 的默认内置前端，也可独立打包为主题。沿用 Mosona 中性色阶、16px 正文、44px 操作区域和始终纯黑的多会话终端。
+
+## 页面
+
+| 一级菜单 | 功能 |
+|---|---|
+| 概览 | 实时资源汇总、地域与节点筛选、历史、排行、异常和待处理操作 |
+| 节点 | 列表与监控、接入码和安装命令、改名和撤销；详情中管理配置、公网地址、账号和 OPSD 数据 |
+| 容器 | 容器详情与最近日志、启停重启及镜像更新；Compose 配置、登记、拉取、启停、重建和更新 |
+| 数据库 | 发现与登记；概览、成员、库、账号、代理、备份六页签，以及后端支持的管理操作 |
+| 存储 | 显示“未接入” |
+| 防火墙 | 节点和地址族筛选、端口/IP/互信规则、排序、默认策略、安装、应用状态与互信设置 |
+| 工具 | 真实终端；定时任务定义、启停、立即执行、执行记录、取消及分页日志 |
+| 设置 | 账号、登录会话、API、外观与版本；外观含菜单排序和主题管理 |
+
+导航、路由和排序共用 `src/navigation.ts`，账号已保存的顺序优先。`/terminal` 跳转到 `/tools/terminal` 并保留查询参数和片段。账号菜单可访问内置界面。
+
+节点系统信息只读；容器不提供直接创建或任意修改镜像标签。Compose 登记采用服务端发现的路径，文件编辑继续使用 SSH。任务在编辑定义中启停，不提供删除；数据库保护账号和备份保持只读。
+
+## 构建和安装
+
+在当前目录执行，依赖要求沿用根项目的 Node.js 版本：
+
+```powershell
+npm ci
+npm run package
+```
+
+版本只取根 `package.json`。ZIP 写入根目录 `artifacts/frontend/gpt2/opsd-frontend-gpt2-<根版本>.zip`，包含 `theme.json` 和 `dist/`，使用 `format_version: 1`、`api_version: 2`、`login: theme`。在 OPSD“设置 → 外观 → 前端主题”上传 ZIP 并启用。
+
+独立 ZIP 的字体、图标和脚本使用相对资源路径，业务路由基址为 `/`。根 `npm run build:frontend` 使用绝对资源基址，直接生成后端嵌入资源。已登录恢复入口为 `/__opsd/builtin/settings/appearance`，登录页恢复使用原安全入口加 `?builtin=1`。普通导航保留当前模式，切换主题后的“刷新界面”进入普通根路径并加载所选主题。
+
+## 开发
+
+本地服务复用已构建的 `backend/internal/webassets/artifacts/`。从仓库根目录启动隔离服务，数据写入被忽略的 `artifacts/frontend/gpt2/`：
+
+```powershell
+npm run build:frontend
+npm run dev:backend
+```
+
+在另一个终端从仓库根目录执行：
+
+```powershell
+$env:OPSD_GPT2_API_URL='http://127.0.0.1:5183'
+npm run dev
+```
+
+访问 `http://127.0.0.1:5182/signin`，本地验收账号为 `admin`，密码为 `test-password`。开发服务器代理 API 与内置恢复路径。隔离服务提供真实身份、数据库、API 和主题管理，不启动 Linux 执行器；容器、数据库和终端的系统执行需要实际节点。
+
+## 请求和终端
+
+使用根项目 OpenAPI 生成类型。读取由 TanStack Query 管理，ETag 对象保留原引用；概览三秒刷新，历史采用返回的采集间隔，SSE 按资源与所属节点刷新。分页合并各页数据和读取状态；后续页失败保留有效内容与原游标，通过“继续读取”再次查询。Problem 保留字段错误与请求 ID，429 显示服务端等待时间。后台读取保留已有内容和未保存表单。
+
+写入关闭自动重试。未知应答的请求键、目标和路径保存在当前浏览器会话，操作抽屉可以查询原回执或原操作；版本冲突保留草稿并提供重新读取。密码、完整令牌和终端票据不写入浏览器持久存储；退出或失效清理查询缓存、临时请求引用并释放终端。
+
+终端每次连接申请一次性票据，使用 JSON 的 `input/output/resize/exit` 帧和 Base64 字节。每个会话保留独立 xterm.js 实例、5000 行滚动缓冲、输出和滚动位置。跨页面保留会话；重连申请新票据，旧输出保留，输入不重放。字体和字号位于“更多 → 终端设置”，与外观页共用偏好；搜索支持 `Ctrl+Shift+F`、Enter 和 Escape。
+
+## 本地交互检查
+
+复用仓库已安装的 Playwright 与 Edge。先运行本地验收服务并构建主题包，再执行：
+
+```powershell
+npm run check:ui -- --replace
+npm run check:ui -- --builtin --replace
+npm run check:ui -- --recovery --replace
+```
+
+检查仅接受本机地址。`OPSD_GPT2_URL`、`OPSD_GPT2_ENTRANCE`、`OPSD_GPT2_PASSWORD` 和 `OPSD_GPT2_BROWSER` 可以调整验收连接；`--resume` 仅用于复用输入未变的已通过场景，受影响场景加 `--rerun=场景名称片段` 强制重跑；主题包更新后加 `--replace`，替换本地同版本安装再检查。三种模式的报告和截图分别位于根目录 `artifacts/frontend/gpt2/integration/`、`integration-builtin/` 和 `integration-recovery/`。
+
+真实本地 HTTP 场景覆盖登录、主题安装与启用、菜单持久化与跨会话冲突、接入码、API 令牌和原键恢复。资源页面通过 Playwright 注入 API 状态，终端通过 WebSocket 路由检查帧和字节；这些交互结果与 Linux 实际容器、数据库、防火墙、任务及 PTY 执行分开记录。生产部署不属于本轮范围。
+
+字体来源和许可证见 `RESEARCH.md` 与 `public/fonts/`。
+
+## 本轮结果
+
+2026-11-11：类型检查、默认内置生产构建、独立 ZIP 和 Linux amd64／arm64 编译通过。独立主题、默认内置和内置恢复各 22 项交互检查通过，未预期脚本错误均为 0；三种模式各保留 80 张深浅色、320／768／1440px 和 200% 等效视口截图，已查看代表页面。输入未变的成功场景复用此前结果，最终防火墙改动在独立主题与默认内置模式重新检查。
+
+覆盖部分分页失败后从原游标继续、弹窗内断连、SSE 所属节点过滤、跨节点未知应答按原目标与原键查询、秘密值丢失后的显式恢复，以及防火墙冲突后保留草稿并重新读取。终端覆盖中文组合输入、ANSI、多会话、跨页保留、重连不重放、票据过期、429、退出帧和退出登录释放；菜单检查等待前一菜单关闭后再打开下一菜单。
+
+`TestConsoleThemeBrowser` 使用最终内置资源通过，覆盖 React／Vue、连续主题切换、双登录模式、自定义安全入口、账号修改、恢复页深层刷新和终端参数、会话失效、损坏主题恢复及刷新后进入所选主题。结果见根目录 `artifacts/theme-ui/result.json` 和 `artifacts/frontend/gpt2/` 下的构建日志、交互报告与截图。
+
+已验证：上述本地构建、真实身份与主题 HTTP 交互、资源状态注入和终端 WebSocket 路由检查。未验证：云端 CI、Linux 实机系统执行和生产环境。未执行提交、推送、发布或部署。

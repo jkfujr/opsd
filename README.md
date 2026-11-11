@@ -4,7 +4,9 @@
 
 当前为开发预发布的对等架构，不兼容旧 Hub／Agent 协议和数据库。
 
-控制台默认按概览、节点、容器、数据库、存储、防火墙、设置排列。“设置 → 外观”可调整菜单顺序，保存到当前节点管理员账号，各设备共用；“存储”当前显示未接入，后续接入 Silo。
+默认内置控制台采用 `frontend/gpt2`，主菜单包含概览、节点、容器、数据库、存储、防火墙、工具和设置。“设置 → 外观”可调整菜单顺序，保存到当前节点管理员账号，各设备共用；“存储”当前显示未接入，后续接入 Silo。
+
+“设置 → 外观”支持从公开 GitHub Release 或 ZIP 安装整套前端主题，按当前控制台节点切换；打包格式与内置恢复入口见 [控制台主题](docs/THEMES.md)。
 
 ## 开发
 
@@ -12,13 +14,17 @@
 
 ```powershell
 npm ci
-npm --prefix frontend ci
-go mod download
+npm --prefix frontend/gpt2 ci
+go -C backend mod download
 npm run build
 npm test
 ```
 
-`api/openapi.json` 是 HTTP 类型来源，`npm run generate` 生成 Go 和 TypeScript 接口。前端资源嵌入程序，生产环境无需 Node.js。构建产物位于 `artifacts/`，包含 `install.sh` 与 `opsd-linux-amd64`、`opsd-linux-arm64`。
+`backend/` 保存 Go 模块、程序入口、内部包和后端开发工具；`frontend/` 保存默认 gpt2、旧前端 `legacy/` 及其他方案 `variants/`。OpenAPI 和共享 TypeScript 类型位于 `api/`，构建入口位于 `scripts/`。
+
+`api/openapi.json` 是 HTTP 契约来源，`npm run generate` 生成后端类型、严格接口、授权定义及 `api/typescript/schema.gen.ts`，并复制内置文档资源。`npm run build:frontend` 直接将 gpt2 构建到 `backend/internal/webassets/artifacts/`；`npm run build:backend` 复用该资源编译双架构程序。完整构建使用 `npm run build`。外部主题按节点保存，生产环境无需 Node.js。交付产物位于根 `artifacts/`，包含 `install.sh` 与 `opsd-linux-amd64`、`opsd-linux-arm64`。
+
+`npm run dev` 启动 gpt2；`npm run dev:backend` 启动隔离的本地 HTTP 服务。各前端命令及待调整清单见 [前端开发](frontend/README.md)。
 
 ## 安装与运行
 
@@ -65,6 +71,8 @@ sudo systemctl start opsd-recover.service
 ```
 
 ## API 与看板
+
+业务入口为 `/api/v2`，在线文档为 `/api/v2/docs`；完整规范和接口使用管理员会话或 Bearer 认证。条件更新、持久操作、分页和未知结果处理见 [API v2 接入](docs/API.md)。v1 路由已移除，主题 API 版本为 2。
 
 在“设置 → API”开启 API，选择监控看板、全部只读、容器管理、数据库管理或自定义模板，设置资源范围后生成令牌。完整令牌仅显示一次；同一窗口提供地址、验证命令及 Prometheus 配置。令牌支持编辑权限、停用、重新生成和删除。节点、地域与数据库集群范围直接附着在令牌上。
 
@@ -116,6 +124,7 @@ sudo /opt/opsd/bin/opsd api --enabled=true
 - [架构](docs/ARCHITECTURE.md)
 - [API 接入](docs/API.md)
 - [UI 规范](docs/UI.md)
+- [控制台主题](docs/THEMES.md)
 - [验收命令与最近结果](docs/VALIDATION.md)
 - [发布](docs/RELEASING.md)
 - [变更记录](CHANGELOG.md)

@@ -1,0 +1,26 @@
+{
+  "name": "@opsd/frontend-ds",
+  "private": true,
+  "type": "module",
+  "version": "0.1.0-dev",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1 --port 5290",
+    "typecheck": "tsc --noEmit",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview --port 5291"
+  },
+  "dependencies": {
+    "@tanstack/react-query": "5.105.0",
+    "openapi-fetch": "0.17.0",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
+    "react-router": "8.5.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "6.1.2",
+    "typescript": "5.9.3",
+    "vite": "8.3.5"
+  }
+}

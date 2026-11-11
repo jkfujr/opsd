@@ -2,11 +2,11 @@
 
 ## 准备与读取
 
-先确认用户已授权本次目标实例更新。`npm run build` 依次生成接口、构建前端、写入 `frontend/dist/version.txt`、将资源嵌入 Go，并产生 `artifacts/opsd-linux-amd64` 和 `artifacts/opsd-linux-arm64`；使用目标架构的完整工件，不修改二进制中的资源字符串。无需在服务器安装 Node.js 或编译。
+先确认用户已授权本次目标实例更新。`npm run build` 依次生成接口、构建 `frontend/gpt2`、写入 `backend/internal/webassets/artifacts/version.txt`、将资源嵌入 Go，并产生 `artifacts/opsd-linux-amd64` 和 `artifacts/opsd-linux-arm64`；使用目标架构的完整工件，不修改二进制中的资源字符串。无需在服务器安装 Node.js 或编译。
 
 从实际实例配置读取 `binary`、`data_dir`、`executor_dir` 等路径，不把默认路径当成现场事实。检查节点队列和 root 操作中 `terminal=0` 的记录；有未结束操作时停止更新。普通用户与 root 服务使用同一程序，停止和恢复两者，不触碰 CouchDB 或其他服务。
 
-前端已有成功构建且输入未变化时，复用 `frontend/dist`，从根 `package.json` 写入 `frontend/dist/version.txt` 后只编译目标架构。产物写入被忽略的 `artifacts/`，使用 `-ldflags='-s -w'` 去掉调试符号可缩小传输文件；完整程序可先用 XZ 压缩，远端解压到独立候选路径再执行 update。普通 SFTP 已出现持续卡顿时，复用该连接结果启用小包方式。传输中断后先读取远端文件状态，续传同一工件。
+前端已有成功构建且输入未变化时，复用 `backend/internal/webassets/artifacts`，运行 `npm run build:backend` 编译双架构。只编译目标架构时从根目录使用 `go -C backend build`，输出位置按根目录产物路径指定。前端或根版本变化后先运行 `npm run build:frontend`。产物写入被忽略的 `artifacts/`，使用 `-ldflags='-s -w'` 去掉调试符号可缩小传输文件；完整程序可先用 XZ 压缩，远端解压到独立候选路径再执行 update。普通 SFTP 已出现持续卡顿时，复用该连接结果启用小包方式。传输中断后先读取远端文件状态，续传同一工件。
 
 `scripts/opsd_remote.py` 使用本机 OpenSSH 和远端 Python 3。相对路径均从项目根目录解释；实例配置通过 `--config` 指定。默认动作为只读 inspect：
 

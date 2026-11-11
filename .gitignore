@@ -1,10 +1,10 @@
 /.data/
 /AGENTS.md
+/backend/internal/httpapi/static/
+/backend/internal/webassets/artifacts/
 /.agents/skills/
-/node_modules/
-/frontend/node_modules/
-/frontend/dist/
-/dist/
+**/node_modules/
+**/dist/
 /artifacts/
 *.tsbuildinfo
 .env

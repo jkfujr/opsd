@@ -1,0 +1,42 @@
+@font-face { font-family: Inter; src: url('../public/fonts/InterVariable.woff2') format('woff2'); font-weight: 100 900; font-style: normal; font-display: swap; }
+@font-face { font-family: 'Source Han Sans SC'; src: url('../public/fonts/SourceHanSansCN-VF.woff2') format('woff2'); font-weight: 250 900; font-style: normal; font-display: swap; }
+@font-face { font-family: 'JetBrains Mono'; src: url('../public/fonts/JetBrainsMono-Regular.woff2') format('woff2'); font-weight: 400; font-style: normal; font-display: swap; }
+@font-face { font-family: 'JetBrains Mono'; src: url('../public/fonts/JetBrainsMono-Bold.woff2') format('woff2'); font-weight: 700; font-style: normal; font-display: swap; }
+@font-face { font-family: 'Sarasa Fixed SC'; src: url('../public/fonts/SarasaFixedSC-Regular.woff2') format('woff2'); font-weight: 400; font-style: normal; font-display: swap; }
+@font-face { font-family: 'Sarasa Fixed SC'; src: url('../public/fonts/SarasaFixedSC-Bold.woff2') format('woff2'); font-weight: 700; font-style: normal; font-display: swap; }
+
+@theme { --font-sans: Inter, 'Source Han Sans SC', 'Microsoft YaHei UI', system-ui, sans-serif; --font-mono: 'JetBrains Mono', 'Sarasa Fixed SC', monospace; }
+
+:root {
+  --font-sans: Inter, 'Source Han Sans SC', 'Microsoft YaHei UI', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Sarasa Fixed SC', monospace;
+  --workspace: rgb(247 247 248); --rail: rgb(255 255 255);
+  --background: rgb(255 255 255); --background-subtle: rgb(250 250 250); --background-muted: rgb(243 243 244); --background-strong: rgb(232 232 234); --background-overlay: rgb(255 255 255); --background-selected: rgb(237 237 239); --background-inverse: rgb(27 27 30);
+  --foreground: rgb(42 42 46); --foreground-subtle: rgb(86 86 92); --foreground-muted: rgb(86 86 92); --foreground-strong: rgb(27 27 30); --foreground-emphasis: rgb(27 27 30); --foreground-intense: rgb(27 27 30); --foreground-inverse: rgb(250 250 250);
+  --border: rgb(221 221 224); --border-muted: rgb(234 234 236); --border-strong: rgb(189 189 195); --border-emphasis: rgb(144 144 153); --border-intense: rgb(96 96 105); --border-overlay: var(--border-strong);
+  --primary: rgb(27 27 30); --primary-foreground: rgb(255 255 255); --primary-subtle: rgb(243 243 244); --primary-soft: rgb(232 232 234); --primary-muted: rgb(221 221 224); --primary-strong: rgb(52 52 56); --primary-emphasis: rgb(70 70 75);
+  --secondary: var(--background-muted); --secondary-subtle: var(--background-subtle); --secondary-soft: var(--background-muted); --secondary-muted: var(--background-strong); --secondary-strong: var(--border); --secondary-emphasis: var(--border-strong); --secondary-intense: var(--border-emphasis); --secondary-foreground: var(--foreground-intense);
+  --success: rgb(22 112 83); --success-subtle: rgb(234 247 240); --success-soft: rgb(212 238 225); --success-foreground: rgb(255 255 255);
+  --warning: rgb(146 87 12); --warning-subtle: rgb(255 245 225); --warning-soft: rgb(250 233 198); --warning-foreground: rgb(255 255 255);
+  --error: rgb(186 50 56); --error-subtle: rgb(255 239 239); --error-soft: rgb(251 214 216); --error-strong: rgb(156 40 45); --error-foreground: rgb(255 255 255);
+  --info: rgb(52 99 178); --info-subtle: rgb(238 243 255); --info-foreground: rgb(255 255 255);
+  --chart-network: rgb(28 128 99); --chart-cpu: rgb(66 113 207); --chart-memory: rgb(145 94 194); --chart-grid: rgb(233 233 236);
+  --brand: rgb(22 112 83); --focus-ring: rgb(52 99 178); --ring: var(--focus-ring); --overlay: rgb(10 10 12 / .45);
+  --terminal: rgb(0 0 0); --terminal-overlay: rgb(24 24 24); --terminal-hover: rgb(38 38 38); --terminal-border: rgb(255 255 255 / .1); --terminal-text: rgb(245 245 245); --terminal-black: rgb(38 38 38); --terminal-muted: rgb(163 163 163); --terminal-selection: rgb(80 103 143 / .65); --terminal-red: rgb(244 126 136); --terminal-green: rgb(104 209 163); --terminal-yellow: rgb(235 194 112); --terminal-blue: rgb(139 176 244); --terminal-magenta: rgb(202 155 233); --terminal-cyan: rgb(113 207 217);
+  --radius: .5rem; --radius-xs: .25rem; --radius-sm: .375rem; --radius-md: .5rem; --radius-lg: .75rem;
+  --motion-fast: 140ms; --motion-standard: 220ms; --ease-ui: cubic-bezier(.2, .8, .2, 1); --shadow-overlay: 0 16px 48px rgb(0 0 0 / .16);
+}
+.dark {
+  --workspace: rgb(10 10 10); --rail: rgb(10 10 10);
+  --background: rgb(18 18 18); --background-subtle: rgb(20 20 20); --background-muted: rgb(30 30 30); --background-strong: rgb(38 38 38); --background-overlay: rgb(24 24 24); --background-selected: rgb(38 38 38); --background-inverse: rgb(245 245 245);
+  --foreground: rgb(245 245 245); --foreground-subtle: rgb(163 163 163); --foreground-muted: rgb(163 163 163); --foreground-strong: rgb(245 245 245); --foreground-emphasis: rgb(245 245 245); --foreground-intense: rgb(245 245 245); --foreground-inverse: rgb(18 18 18);
+  --border: rgb(255 255 255 / .1); --border-muted: rgb(255 255 255 / .06); --border-strong: rgb(255 255 255 / .15); --border-emphasis: rgb(255 255 255 / .3); --border-intense: rgb(255 255 255 / .5);
+  --primary: rgb(245 245 245); --primary-foreground: rgb(18 18 18); --primary-subtle: rgb(30 30 30); --primary-soft: rgb(38 38 38); --primary-muted: rgb(64 64 64); --primary-strong: rgb(220 220 220); --primary-emphasis: rgb(200 200 200);
+  --success: rgb(90 211 163); --success-subtle: rgb(23 48 38); --success-soft: rgb(29 66 49);
+  --warning: rgb(238 188 92); --warning-subtle: rgb(53 42 24); --warning-soft: rgb(77 57 28);
+  --error: rgb(248 129 136); --error-subtle: rgb(54 29 33); --error-soft: rgb(78 36 41); --error-strong: rgb(249 163 166);
+  --info: rgb(143 181 249); --info-subtle: rgb(30 41 62);
+  --chart-network: rgb(77 206 164); --chart-cpu: rgb(123 163 241); --chart-memory: rgb(194 148 237); --chart-grid: rgb(255 255 255 / .08);
+  --brand: rgb(95 218 176); --focus-ring: rgb(143 181 249); --overlay: rgb(0 0 0 / .62);
+  --shadow-overlay: 0 16px 48px rgb(0 0 0 / .4);
+}

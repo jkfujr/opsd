@@ -1,0 +1,300 @@
+/* ------------------------------------------------------------------
+   OPSD 工作台 · 基础层
+   世界：冷光控制室。冷白画布、深蓝墨色、瑞士网格、克制的单一强调色。
+   与「三联单」版的纸面/印章系统完全无关：这里是产品化的浅色工作台。
+   ------------------------------------------------------------------ */
+
+@font-face {
+  font-family: 'Plex Sans';
+  src: url('../assets/fonts/plexsans-400.woff2') format('woff2');
+  font-weight: 400;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Plex Sans';
+  src: url('../assets/fonts/plexsans-500.woff2') format('woff2');
+  font-weight: 500;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Plex Sans';
+  src: url('../assets/fonts/plexsans-600.woff2') format('woff2');
+  font-weight: 600;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'JetBrains Mono';
+  src: url('../assets/fonts/jbmono-400.woff2') format('woff2');
+  font-weight: 400;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'JetBrains Mono';
+  src: url('../assets/fonts/jbmono-500.woff2') format('woff2');
+  font-weight: 500;
+  font-display: swap;
+}
+
+:root {
+  --f-sans: 'Plex Sans', 'Microsoft YaHei UI', 'PingFang SC', 'Hiragino Sans GB', system-ui, sans-serif;
+  --f-mono: 'JetBrains Mono', 'Cascadia Mono', Consolas, ui-monospace, monospace;
+
+  --canvas: #f4f6fa;
+  --surface: #ffffff;
+  --surface-2: #f8fafc;
+  --surface-3: #eef2f8;
+  --ink: #111b2b;
+  --ink-2: #44536a;
+  --ink-3: #71809a;
+  --line: #e2e8f1;
+  --line-2: #d3dce8;
+  --line-strong: #b9c6d8;
+
+  --brand: #16325c;
+  --brand-ink: #ffffff;
+  --accent: #2563eb;
+  --accent-wash: rgba(37, 99, 235, 0.09);
+  --ok: #0b7a52;
+  --ok-wash: rgba(11, 122, 82, 0.1);
+  --warn: #9a5b06;
+  --warn-wash: rgba(154, 91, 6, 0.1);
+  --danger: #c0362c;
+  --danger-wash: rgba(192, 54, 44, 0.09);
+  --info: #2b5f8a;
+  --info-wash: rgba(43, 95, 138, 0.09);
+  --carbon: #2b5f8a;
+
+  --r-card: 12px;
+  --r-ctl: 8px;
+  --r-pill: 999px;
+
+  --topbar-h: 64px;
+  --gap: 20px;
+  --pad: 28px;
+
+  --shadow-card: 0 1px 2px rgba(16, 27, 45, 0.04), 0 10px 28px -22px rgba(16, 27, 45, 0.3);
+  --shadow-pop: 0 12px 40px -12px rgba(16, 27, 45, 0.28), 0 2px 6px rgba(16, 27, 45, 0.06);
+
+  --ease: cubic-bezier(0.2, 0.7, 0.3, 1);
+  color-scheme: light;
+}
+
+:root[data-theme='dark'] {
+  --canvas: #0b1220;
+  --surface: #121b2b;
+  --surface-2: #162033;
+  --surface-3: #1b2740;
+  --ink: #e7eef8;
+  --ink-2: #b7c4d6;
+  --ink-3: #8b9bb2;
+  --line: #223049;
+  --line-2: #2a3a56;
+  --line-strong: #3a4c6b;
+
+  --brand: #dbe7f8;
+  --brand-ink: #0b1220;
+  --accent: #7fa7ff;
+  --accent-wash: rgba(127, 167, 255, 0.14);
+  --ok: #4ec49a;
+  --ok-wash: rgba(78, 196, 154, 0.13);
+  --warn: #e2b25c;
+  --warn-wash: rgba(226, 178, 92, 0.13);
+  --danger: #f07066;
+  --danger-wash: rgba(240, 112, 102, 0.13);
+  --info: #8fb9e2;
+  --info-wash: rgba(143, 185, 226, 0.12);
+  --carbon: #8fb9e2;
+
+  --shadow-card: 0 1px 0 rgba(0, 0, 0, 0.35), 0 18px 40px -28px rgba(0, 0, 0, 0.9);
+  --shadow-pop: 0 20px 60px -16px rgba(0, 0, 0, 0.75);
+  color-scheme: dark;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  min-width: 320px;
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  min-height: 100dvh;
+  background: var(--canvas);
+  color: var(--ink);
+  font-family: var(--f-sans);
+  font-size: 14px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+h1,
+h2,
+h3,
+h4,
+p,
+figure,
+ol,
+ul {
+  margin: 0;
+  padding: 0;
+}
+
+ol,
+ul {
+  list-style: none;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+button {
+  cursor: pointer;
+  background: none;
+  border: 0;
+  padding: 0;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+::selection {
+  background: var(--accent-wash);
+}
+
+svg {
+  display: block;
+}
+
+.mono {
+  font-family: var(--f-mono);
+  font-variant-ligatures: none;
+  font-feature-settings: 'zero' 1;
+}
+
+.num {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+
+.muted {
+  color: var(--ink-3);
+}
+
+.soft {
+  color: var(--ink-2);
+}
+
+.nowrap {
+  white-space: nowrap;
+}
+
+.truncate {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  border: 0;
+}
+
+.kicker {
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+.stack {
+  display: flex;
+  flex-direction: column;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+}
+
+.spread {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.wrap {
+  flex-wrap: wrap;
+}
+
+.gap-2 { gap: 2px; }
+.gap-4 { gap: 4px; }
+.gap-6 { gap: 6px; }
+.gap-8 { gap: 8px; }
+.gap-10 { gap: 10px; }
+.gap-12 { gap: 12px; }
+.gap-14 { gap: 14px; }
+.gap-16 { gap: 16px; }
+.gap-20 { gap: 20px; }
+.gap-24 { gap: 24px; }
+
+.grow { flex: 1 1 auto; min-width: 0; }
+.shrink-0 { flex-shrink: 0; }
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+
+
+/* 兼容层：页面内联样式仍在用第一版的语义变量名 */
+:root {
+  --ink-soft: var(--ink-2);
+  --ink-mute: var(--ink-3);
+  --rule: var(--line);
+  --rule-soft: var(--line);
+  --rule-hard: var(--line-2);
+  --sheet: var(--surface);
+  --sheet-2: var(--surface-2);
+  --field: var(--canvas);
+  --seal: var(--ok);
+  --stamp: var(--danger);
+  --amber: var(--warn);
+  --tint: rgba(17, 27, 43, 0.04);
+  --tint-strong: rgba(17, 27, 43, 0.07);
+}
+
+:root[data-theme='dark'] {
+  --tint: rgba(231, 238, 248, 0.05);
+  --tint-strong: rgba(231, 238, 248, 0.08);
+}

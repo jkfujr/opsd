@@ -83,14 +83,23 @@ try {
   await page.getByLabel('账号', { exact: true }).fill('ui-check');
   await page.getByLabel('密码', { exact: true }).fill(password);
   await submitLogin(page);
-  const nodes = await (await context.request.get(`${base}/api/v1/nodes`)).json();
+  const nodes = await (await context.request.get(`${base}/api/v2/nodes`)).json();
   assert.equal(nodes.items[0].name, 'ui-check', '网络修改或重复安装改变了节点名称');
   const id = nodes.items[0].id;
-  const session = await (await context.request.get(`${base}/api/v1/auth/session`)).json();
+  const session = await (await context.request.get(`${base}/api/v2/auth/sessions/current`)).json();
+  const tags = new Map();
   const api = async (path, method = 'GET', data) => {
-    const response = await context.request.fetch(`${base}/api/v1${path}`, { method, data, headers: { Origin: base, 'X-CSRF-Token': session.csrf_token, 'Idempotency-Key': crypto.randomUUID() } });
-    const body = await response.json();
-    assert(response.ok(), `${path}：${response.status()} ${body.message ?? ''}`);
+    const headers = { Origin: base, 'X-CSRF-Token': session.csrf_token };
+    if (method !== 'GET') headers['Idempotency-Key'] = crypto.randomUUID();
+    if (method === 'PATCH' || method === 'DELETE') {
+      assert(tags.has(path), `请先读取 ${path} 的 ETag`);
+      headers['If-Match'] = tags.get(path);
+    }
+    if (method === 'PATCH') headers['Content-Type'] = 'application/merge-patch+json';
+    const response = await context.request.fetch(`${base}/api/v2${path}`, { method, data, headers });
+    const body = response.status() === 204 ? null : await response.json();
+    assert(response.ok(), `${path}：${response.status()} ${body?.detail ?? ''}`);
+    if (method === 'GET' && response.headers().etag) tags.set(path, response.headers().etag);
     return body;
   };
   const waitFor = async (read, check, message) => {
@@ -116,10 +125,10 @@ try {
     await otherPage.goto(`${base}/signin`);
     await otherPage.getByLabel('账号', { exact: true }).fill('ui-check');
     await otherPage.getByLabel('密码', { exact: true }).fill(password);
-    const otherEvents = otherPage.waitForResponse((response) => response.url().endsWith('/api/v1/events'));
+    const otherEvents = otherPage.waitForResponse((response) => response.url().endsWith('/api/v2/events'));
     await submitLogin(otherPage);
     await otherEvents;
-    const otherAppearanceEvents = otherPage.waitForResponse((response) => response.url().endsWith('/api/v1/events'));
+    const otherAppearanceEvents = otherPage.waitForResponse((response) => response.url().endsWith('/api/v2/events'));
     await otherPage.goto(`${base}/settings/appearance`);
     await otherAppearanceEvents;
     await waitFor(() => otherPage.getByRole('button', { name: '存储上移', exact: true }).isEnabled(), Boolean, '另一会话未读取菜单偏好');
@@ -130,21 +139,21 @@ try {
     await page.getByRole('button', { name: '保存', exact: true }).click();
     await page.getByRole('status').filter({ hasText: '已保存' }).waitFor();
     await waitFor(() => menuLabels(otherPage), (items) => JSON.stringify(items) === JSON.stringify(customLabels), '跨会话菜单未通过 SSE 更新');
-    const reloadedEvents = page.waitForResponse((response) => response.url().endsWith('/api/v1/events'));
+    const reloadedEvents = page.waitForResponse((response) => response.url().endsWith('/api/v2/events'));
     await page.reload();
     await reloadedEvents;
     await waitFor(() => menuLabels(page), (items) => JSON.stringify(items) === JSON.stringify(customLabels), '刷新丢失菜单顺序');
     await otherPage.getByRole('button', { name: '节点下移', exact: true }).click();
     const dirtyLabels = ['概览', '容器', '节点', '存储', '数据库', '防火墙', '设置'];
-    const updated = otherPage.waitForResponse((response) => response.url().endsWith('/api/v1/settings/navigation') && response.request().method() === 'GET');
+    const updated = otherPage.waitForResponse((response) => response.url().endsWith('/api/v2/settings/navigation') && response.request().method() === 'GET');
     await page.getByRole('button', { name: '设置上移', exact: true }).click();
     await page.getByRole('button', { name: '保存', exact: true }).click();
     await updated;
     await page.getByRole('status').filter({ hasText: '已保存' }).waitFor();
     assert.deepEqual(await listLabels(otherPage), dirtyLabels, 'SSE 覆盖了未提交顺序');
-    const conflict = otherPage.waitForResponse((response) => response.url().endsWith('/api/v1/settings/navigation') && response.request().method() === 'PATCH');
+    const conflict = otherPage.waitForResponse((response) => response.url().endsWith('/api/v2/settings/navigation') && response.request().method() === 'PUT');
     await otherPage.getByRole('button', { name: '保存', exact: true }).click();
-    assert.equal((await conflict).status(), 409);
+    assert.equal((await conflict).status(), 412);
     await otherPage.getByRole('button', { name: '重新读取', exact: true }).click();
     assert.deepEqual(await listLabels(otherPage), dirtyLabels);
     await waitFor(() => otherPage.getByRole('button', { name: '保存', exact: true }).isEnabled(), Boolean, '读取后未恢复保存');
@@ -171,19 +180,20 @@ try {
     await submitLogin(otherPage);
     await waitFor(() => menuLabels(otherPage), (items) => JSON.stringify(items) === JSON.stringify(navigationLabels), '重新登录丢失菜单偏好');
   } finally { await otherContext.close(); }
-  const firewallPath = `/nodes/${id}/firewall`;
+  const firewallBase = `/nodes/${id}/firewall`;
+  const firewallPath = `${firewallBase}/status`;
   const addRule = async (rule) => {
     const current = await api(firewallPath);
-    const saved = await api(firewallPath, 'PATCH', { expected_revision: current.revision, change: { kind: 'add_rule', rule } });
+    const saved = await api(`${firewallBase}/changes`, 'POST', { expected_revision: current.revision, change: { kind: 'add_rule', rule } });
     await waitFor(async () => {
-      const operation = await api(`/operations/${saved.operation_id}`);
-      if (operation.state === 'awaiting_confirmation') await api(`/operations/${operation.id}/confirm`, 'POST', { expected_revision: operation.revision });
+      const operation = await api(`/operations/${saved.id}`);
+      if (operation.state === 'awaiting_confirmation') await api(`/operations/${operation.id}/actions`, 'POST', { action: 'confirm', expected_revision: operation.revision });
       return api(firewallPath);
     }, (value) => value.state === 'in_sync', '测试规则未完成应用');
   };
   await waitFor(() => api(firewallPath), (value) => value.backend === 'ufw' && value.state === 'in_sync', '防火墙未完成初始导入');
   const publicValue = await api(`/nodes/${id}/public-addresses`);
-  await api(`/nodes/${id}/public-addresses`, 'PATCH', { expected_revision: publicValue.revision, ipv4: { mode: 'manual', addresses: ['8.8.8.8'] }, ipv6: { mode: 'manual', addresses: ['2606:4700:4700::1111'] } });
+  await api(`/nodes/${id}/public-addresses`, 'PATCH', { ipv4: { mode: 'manual', addresses: ['8.8.8.8'] }, ipv6: { mode: 'manual', addresses: ['2606:4700:4700::1111'] } });
   await addRule({ family: 'ipv4', source: '8.8.8.8/32', protocol: 'any', action: 'allow' });
   await addRule({ family: 'ipv4', source: '100.64.0.0/10', protocol: 'any', action: 'allow' });
   await addRule({ family: 'ipv4', source: '0.0.0.0/0', protocol: 'tcp', port: '22', action: 'allow' });
@@ -196,12 +206,12 @@ try {
   const databaseState = { read: { state: 'ready', data_at: checked, attempted_at: checked }, state: 'ready', version: '11.8.9-MariaDB', cluster_id: 'ui-cluster', cluster_name: '业务集群', configured_members: 'gcomm://10.0.0.1,10.0.0.2', actual_members: '10.0.0.1:3306,10.0.0.2:3306', member_address: '10.0.0.1:3306', cluster_size: 2, primary: true, ready: true, synced: true, read_only: false, connections: 12, receive_queue: 0, send_queue: 0, flow_control: 0.01, checked_at: checked, databases: [{ name: 'mysql', charset: 'utf8mb4', collation: 'utf8mb4_general_ci', bytes: 4096, protected: true }, { name: 'business', charset: 'utf8mb4', collation: 'utf8mb4_unicode_ci', bytes: 1048576, protected: false }], users: [{ name: 'root', host: 'localhost', protected: true, grants: [] }, { name: 'business', host: '%', protected: false, grants: [{ database: 'business', privileges: ['SELECT', 'INSERT'] }] }], servers: [], pools: [], proxy_users: [], pending_changes: false };
   const definition = { id: databaseID, name: '业务 Galera', coordinator: id, cluster_id: 'ui-cluster', revision: 1, members: [member], proxies: [proxy], workbench_url: 'https://example.com/sql' };
   const databaseValue = { cluster: definition, checked_at: checked, members: [{ ...member, status: databaseState }], proxies: [{ ...proxy, status: { ...databaseState, version: '3.0.3', servers: [{ hostgroup: 10, host: '10.0.0.1', port: 3306, state: 'ONLINE' }], pools: [{ hostgroup: 10, host: '10.0.0.1', port: 3306, used: 3, free: 7, errors: 0 }], proxy_users: [{ name: 'business', active: true, hostgroup: 10, state: 'in_sync', protected: false }] } }] };
-  const databasePath = `/databases/clusters/${databaseID}`;
-  const databaseURL = (url) => url.pathname === `/api/v1${databasePath}`;
+  const databasePath = `/database-clusters/${databaseID}`;
+  const databaseURL = (url) => url.pathname === `/api/v2${databasePath}/status`;
   const databaseListRoute = (route) => route.request().method() === 'GET' ? route.fulfill({ json: { items: [databaseValue] } }) : route.continue();
-  await page.route('**/api/v1/databases/clusters', databaseListRoute);
+  await page.route('**/api/v2/database-clusters', databaseListRoute);
   await page.route(databaseURL, (route) => route.fulfill({ json: databaseValue }));
-  await page.route(`**/api/v1${databasePath}/backups`, (route) => route.fulfill({ json: { items: [{ node_id: id, instance_id: 'galera', items: [{ name: 'daily', schedule: '*-*-* 03:00:00', state: 'failed', last_run: checked, last_success: checked, artifacts: ['/backup/daily/business.sql.zst'], error: '备份目录空间不足' }] }] } }));
+  await page.route(`**/api/v2${databasePath}/backups`, (route) => route.fulfill({ json: { items: [{ node_id: id, instance_id: 'galera', items: [{ name: 'daily', schedule: '*-*-* 03:00:00', state: 'failed', last_run: checked, last_success: checked, artifacts: ['/backup/daily/business.sql.zst'], error: '备份目录空间不足' }] }] } }));
   const pages = [['overview', '/'], ['nodes', '/nodes'], ['detail', `/nodes/${id}`], ['containers', '/containers'], ['firewall', `/firewall?node=${id}`], ['firewall-settings', '/firewall/settings'], ['databases', '/databases'], ['database-detail', `/databases/${databaseID}`], ['storage', '/storage'], ['api', '/settings/api'], ['account', '/settings/account'], ['sessions', '/settings/sessions'], ['appearance', '/settings/appearance'], ['version', '/settings/version']];
   for (const theme of ['light', 'dark']) {
     await page.goto(`${base}/settings/appearance`);
@@ -227,15 +237,15 @@ try {
     assert.equal(await page.getByText('已启用', { exact: true }).count(), 0);
 
     const longName = 'C091-GreenCloud-JP-TYO-长节点名称-'.repeat(3);
-    await page.route('**/api/v1/nodes', (route) => route.fulfill({ json: { ...nodes, items: nodes.items.map((node) => node.id === id ? { ...node, name: longName } : node) } }));
+    await page.route('**/api/v2/nodes', (route) => route.fulfill({ json: { ...nodes, items: nodes.items.map((node) => node.id === id ? { ...node, name: longName } : node) } }));
     await page.setViewportSize({ width: 1000, height: 1000 });
     await page.reload();
     await page.getByLabel('目标节点', { exact: true }).getByText(longName, { exact: true }).waitFor();
     await checkFirewallHeader();
     await capture(`${theme}-1000-firewall-long-name`);
-    await page.unroute('**/api/v1/nodes');
+    await page.unroute('**/api/v2/nodes');
 
-    await page.route(`**/api/v1${firewallPath}`, (route) => route.fulfill({ json: { ...firewall, service_active: false } }));
+    await page.route(`**/api/v2${firewallPath}`, (route) => route.fulfill({ json: { ...firewall, service_active: false } }));
     await page.setViewportSize({ width: 320, height: 1000 });
     await page.reload();
     await page.getByText('已保存', { exact: true }).waitFor();
@@ -243,7 +253,7 @@ try {
     assert(backend && checked && checked.y >= backend.y + backend.height, '窄屏长状态未换行');
     await checkFirewallHeader();
     await capture(`${theme}-320-firewall-status-wrap`);
-    await page.unroute(`**/api/v1${firewallPath}`);
+    await page.unroute(`**/api/v2${firewallPath}`);
 
     let release;
     const pending = new Promise((resolve) => { release = resolve; });
@@ -253,17 +263,17 @@ try {
       loadingRequests.push(request);
       return request;
     };
-    await page.route(`**/api/v1${firewallPath}`, loadingRoute);
+    await page.route(`**/api/v2${firewallPath}`, loadingRoute);
     await page.setViewportSize({ width: 1000, height: 1000 });
     try {
       await page.reload({ waitUntil: 'domcontentloaded' });
       await page.locator('.firewall-status [data-slot="skeleton"]').waitFor();
       await checkFirewallHeader();
       await capture(`${theme}-1000-firewall-loading`);
-    } finally { release(); await page.unroute(`**/api/v1${firewallPath}`, loadingRoute); await Promise.all(loadingRequests); }
+    } finally { release(); await page.unroute(`**/api/v2${firewallPath}`, loadingRoute); await Promise.all(loadingRequests); }
     await page.locator('.firewall-status').getByText('UFW', { exact: true }).waitFor();
 
-    await page.route(`**/api/v1${firewallPath}`, (route) => route.fulfill({ status: 503, json: { code: 'dependency_unavailable', message: '防火墙读取失败' } }));
+    await page.route(`**/api/v2${firewallPath}`, (route) => route.fulfill({ status: 503, json: { code: 'dependency_unavailable', message: '防火墙读取失败' } }));
     await page.reload();
     const alert = page.getByRole('alert').filter({ hasText: '防火墙读取失败' });
     await alert.waitFor();
@@ -271,7 +281,7 @@ try {
     const [row, failure] = await Promise.all([page.locator('.firewall-status-row'), alert].map((locator) => locator.boundingBox()));
     assert(row && failure && failure.y >= row.y + row.height, '错误提示未独立占行');
     await capture(`${theme}-1000-firewall-error`);
-    await page.unroute(`**/api/v1${firewallPath}`);
+    await page.unroute(`**/api/v2${firewallPath}`);
     await page.reload();
     await page.getByRole('button', { name: '更多', exact: true }).first().waitFor();
   }
@@ -315,7 +325,7 @@ try {
   const nativeContainer = containerList.items.find((item) => item.name === 'opsd-ui-container');
   assert(nativeContainer, '实际 Docker 容器未显示');
   assert.deepEqual(await page.getByRole('columnheader').allTextContents(), ['容器', '状态', '节点', '镜像', '端口', '操作']);
-  const containerPath = `/nodes/${nativeContainer.node_id}/containers/${nativeContainer.container_id}`;
+  const containerPath = `/nodes/${nativeContainer.node_id}/engines/${nativeContainer.engine_id}/containers/${nativeContainer.container_id}`;
   const containerRow = page.getByRole('row').filter({ has: page.getByText('opsd-ui-container', { exact: true }) });
   await containerRow.getByRole('button', { name: '查看', exact: true }).click();
   await page.getByRole('heading', { name: '容器详情', exact: true }).waitFor();
@@ -334,7 +344,7 @@ try {
   await waitFor(() => api('/containers'), (value) => value.items.some((item) => item.container_id === nativeContainer.container_id && item.state === 'running'), '容器启动未读回');
   await page.getByRole('button', { name: '关闭操作', exact: true }).click();
   let restartRequests = 0;
-  const actionPattern = '**/api/v1/nodes/*/containers/*/actions';
+  const actionPattern = '**/api/v2/nodes/*/engines/*/containers/*/actions';
   await page.route(actionPattern, async (route) => { restartRequests++; const response = await route.fetch(); assert.equal(response.status(), 202); await route.abort('failed'); });
   await containerRow.getByRole('button', { name: '更多', exact: true }).click();
   await page.getByRole('menuitem', { name: '重启', exact: true }).click();
@@ -346,7 +356,7 @@ try {
   assert.equal(restartRequests, 1, '应答丢失后重新发送了容器动作');
   await page.unroute(actionPattern);
   await page.getByRole('button', { name: '关闭操作', exact: true }).click();
-  const nativeDetail = await api(`${containerPath}?engine_id=${encodeURIComponent(nativeContainer.engine_id)}`);
+  const nativeDetail = await api(containerPath);
   assert.equal(nativeDetail.state, 'running');
   let logRequests = 0;
   const countLogs = (request) => { if (request.url().includes(`${containerPath}/logs`)) logRequests++; };
@@ -374,7 +384,7 @@ try {
   let containerScenario = 'empty';
   let releaseContainerLoad;
   let containerLoadGate;
-  const containerPattern = '**/api/v1/containers*';
+  const containerPattern = '**/api/v2/containers*';
   await page.route(containerPattern, async (route) => {
     const scenario = containerScenario;
     if (scenario === 'loading') await containerLoadGate;
@@ -481,7 +491,7 @@ try {
   }
   const trustError = { code: 'conflict', message: '测试互信运行规则读取失败' };
   const partialTrust = { ...trust, state: 'failed', rules: trust.rules.map((rule) => rule.family === 'ipv4' ? { ...rule, state: 'failed', error: trustError.message } : rule), results: trust.results.map((result) => result.family === 'ipv4' && result.scope === 'runtime' ? { ...result, state: 'failed', error: trustError } : result) };
-  await page.route(`**/api/v1${trustPath}`, (route) => route.fulfill({ json: partialTrust }));
+  await page.route(`**/api/v2${trustPath}`, (route) => route.fulfill({ json: partialTrust }));
   await page.reload();
   await page.getByText('部分生效', { exact: true }).first().waitFor();
   assert.equal(await page.getByText(trustError.message, { exact: true }).count(), 0, '互信列表重复展开了错误详情');
@@ -497,33 +507,33 @@ try {
   await page.getByRole('columnheader', { name: 'IPv6', exact: true }).waitFor({ state: 'hidden' });
   assert.deepEqual(await page.getByRole('columnheader').allTextContents(), ['来源节点', 'IPv4', '操作']);
   await capture('trust-partial-ipv4');
-  await page.unroute(`**/api/v1${trustPath}`);
+  await page.unroute(`**/api/v2${trustPath}`);
   const activePolicy = await api('/peer-trust');
-  await page.route('**/api/v1/peer-trust/status', (route) => route.fulfill({ json: { policy: activePolicy, nodes: [partialTrust] } }));
+  await page.route('**/api/v2/peer-trust/status', (route) => route.fulfill({ json: { policy: activePolicy, nodes: [partialTrust] } }));
   await page.goto(`${base}/firewall/settings`);
   await page.getByText('部分生效', { exact: true }).waitFor();
   assert.deepEqual(await page.getByRole('columnheader').allTextContents(), ['目标节点', 'IPv4', 'IPv6', '互信状态', '检查时间', '操作']);
   await capture('trust-partial-settings');
-  await page.unroute('**/api/v1/peer-trust/status');
+  await page.unroute('**/api/v2/peer-trust/status');
   const sharedTrust = { ...trust, rules: trust.rules.map((rule) => ({ ...rule, members: [...rule.members, { id: 'shared-node', name: '共享公网地址节点' }] })).concat([{ family: 'ipv4', members: [{ id: 'discovering-node', name: '待发现节点' }], state: 'pending' }, { family: 'ipv4', address: '9.9.9.9', members: [], state: 'removing' }]) };
-  await page.route(`**/api/v1${trustPath}`, (route) => route.fulfill({ json: sharedTrust }));
+  await page.route(`**/api/v2${trustPath}`, (route) => route.fulfill({ json: sharedTrust }));
   await page.goto(`${base}/firewall?node=${id}&type=trust`);
   await page.getByRole('link', { name: '共享公网地址节点', exact: true }).waitFor();
   assert.equal(await page.locator('main tbody tr').count(), 4, '共享地址、待发现与已移除节点的分组不符');
   await page.getByText('待发现', { exact: true }).waitFor();
   await page.getByText('已移除节点', { exact: true }).waitFor();
   await capture('trust-shared-discovery-removal');
-  await page.unroute(`**/api/v1${trustPath}`);
+  await page.unroute(`**/api/v2${trustPath}`);
   await page.reload();
   await page.setViewportSize({ width: 1440, height: 1000 });
   for (const state of ['pending', 'failed']) {
-    await page.route(`**/api/v1${trustPath}`, (route) => route.fulfill({ json: { ...trust, migration: { state, operation_id: migrated.migration.operation_id, ...(state === 'failed' ? { error: { code: 'conflict', message: '测试迁移失败' } } : {}) } } }));
+    await page.route(`**/api/v2${trustPath}`, (route) => route.fulfill({ json: { ...trust, migration: { state, operation_id: migrated.migration.operation_id, ...(state === 'failed' ? { error: { code: 'conflict', message: '测试迁移失败' } } : {}) } } }));
     await page.reload();
     await page.getByText(state === 'failed' ? '迁移失败' : '迁移中', { exact: true }).waitFor();
     assert.equal(await page.getByRole('button', { name: '查看操作', exact: true }).count(), 1);
     if (state === 'failed') await page.getByRole('button', { name: '重试', exact: true }).waitFor();
     await capture(`trust-migration-${state}`);
-    await page.unroute(`**/api/v1${trustPath}`);
+    await page.unroute(`**/api/v2${trustPath}`);
   }
   await page.goto(`${base}/firewall/settings`);
   await page.getByRole('switch', { name: '集群互信' }).click();
@@ -575,24 +585,25 @@ try {
   await page.getByRole('button', { name: '生成令牌', exact: true }).click();
   const tokenValue = await page.getByLabel('令牌（仅显示一次）', { exact: true }).inputValue();
   const authorization = { Authorization: `Bearer ${tokenValue}` };
-  const verify = await context.request.get(`${base}/api/v1/api-tokens/verify`, { headers: authorization });
+  const verify = await context.request.get(`${base}/api/v2/`, { headers: authorization });
   assert.equal(verify.status(), 200);
-  const createdToken = await verify.json();
-  const current = await context.request.get(`${base}/api/v1/monitoring/current`, { headers: authorization });
+  const identity = await verify.json();
+  const createdToken = await api(`/nodes/${id}/api-tokens/${identity.principal.id.split(':').at(-1)}`);
+  const current = await context.request.get(`${base}/api/v2/monitoring/current`, { headers: authorization });
   assert.equal(current.status(), 200);
   assert.equal((await current.json()).items[0].node_id, id);
   const metrics = await context.request.get(`${base}/metrics`, { headers: authorization });
   assert.equal(metrics.status(), 200);
   assert.match(await metrics.text(), /opsd_node_up\{/);
-  assert.match(await page.getByLabel('验证命令', { exact: true }).inputValue(), /api-tokens\/verify/);
+  assert.match(await page.getByLabel('验证命令', { exact: true }).inputValue(), /api\/v2\//);
   assert.match(await page.getByLabel('Prometheus 配置', { exact: true }).inputValue(), /scrape_interval: 15s/);
   await capture('api-connection-result');
   await page.getByRole('button', { name: '完成', exact: true }).click();
 
   let databaseOperation = { ...(await api('/operations?limit=1')).items[0], id: 'ui-database-operation', node_id: id, subject: 'database', resource_id: databaseID, state: 'attention_required', revision: 1, result_pending_sync: false, error: { code: 'dependency_unavailable', message: 'ProxySQL 目标暂不可达' }, steps: [{ name: 'Galera：创建业务库', state: 'completed' }, { name: 'ProxySQL：同步账号', state: 'unknown' }] };
-  await page.route(`**/api/v1${databasePath}/changes`, (route) => route.fulfill({ status: 202, json: databaseOperation }));
-  await page.route('**/api/v1/operations/ui-database-operation', (route) => route.fulfill({ json: databaseOperation }));
-  await page.route('**/api/v1/operations/ui-database-operation/recover', (route) => { databaseOperation = { ...databaseOperation, revision: 2, state: 'succeeded', error: undefined, steps: databaseOperation.steps.map((step) => ({ ...step, state: 'completed' })) }; return route.fulfill({ json: databaseOperation }); });
+  await page.route(`**/api/v2${databasePath}/changes`, (route) => route.fulfill({ status: 202, json: databaseOperation }));
+  await page.route('**/api/v2/operations/ui-database-operation', (route) => route.fulfill({ json: databaseOperation }));
+  await page.route('**/api/v2/operations/ui-database-operation/actions', (route) => { databaseOperation = { ...databaseOperation, revision: 2, state: 'succeeded', error: undefined, steps: databaseOperation.steps.map((step) => ({ ...step, state: 'completed' })) }; return route.fulfill({ json: databaseOperation }); });
   await page.goto(`${base}/databases/${databaseID}`);
   await page.getByRole('tab', { name: '库', exact: true }).click();
   await page.getByRole('button', { name: '创建库', exact: true }).click();
@@ -604,33 +615,32 @@ try {
   await page.getByRole('button', { name: '重新处理', exact: true }).waitFor({ state: 'hidden' });
   await capture('database-operation-recovered');
   await page.getByRole('button', { name: '关闭操作', exact: true }).click();
-  await page.unroute(`**/api/v1${databasePath}/changes`);
-  await page.unroute('**/api/v1/operations/ui-database-operation');
-  await page.unroute('**/api/v1/operations/ui-database-operation/recover');
+  await page.unroute(`**/api/v2${databasePath}/changes`);
+  await page.unroute('**/api/v2/operations/ui-database-operation');
+  await page.unroute('**/api/v2/operations/ui-database-operation/actions');
   await page.route(databaseURL, (route) => route.fulfill({ status: 503, json: { code: 'dependency_unavailable', message: '数据库协调节点暂不可达' } }));
   await page.reload();
   await page.getByRole('alert').filter({ hasText: '数据库协调节点暂不可达' }).waitFor();
   await capture('database-read-error');
   await page.unroute(databaseURL);
-  await page.unroute('**/api/v1/databases/clusters');
-  await page.unroute(`**/api/v1${databasePath}/backups`);
+  await page.unroute('**/api/v2/database-clusters');
+  await page.unroute(`**/api/v2${databasePath}/backups`);
 
   const cli = (kind, enabled) => execFileSync('sudo', ['/opt/opsd/bin/opsd', kind, `--enabled=${enabled}`]);
   try {
     cli('console', false);
     await waitFor(() => context.request.get(`${base}/signin`), (r) => r.status() === 404, '控制台未关闭');
-    assert.equal((await context.request.get(`${base}/api/v1/api-tokens/verify`, { headers: authorization })).status(), 200);
+    assert.equal((await context.request.get(`${base}/api/v2/`, { headers: authorization })).status(), 200);
     cli('console', true);
     cli('api', false);
-    await waitFor(() => context.request.get(`${base}/api/v1/api-tokens/verify`, { headers: authorization }), (r) => r.status() === 503, 'API 未独立关闭');
+    await waitFor(() => context.request.get(`${base}/api/v2/`, { headers: authorization }), (r) => r.status() === 503, 'API 未独立关闭');
     assert.equal((await context.request.get(`${base}/signin`)).status(), 200);
     cli('console', false);
     await new Promise((resolve, reject) => { const listener = createServer(); listener.on('error', reject); listener.listen(Number(new URL(base).port), '127.0.0.1', () => listener.close(resolve)); });
   } finally { cli('console', true); cli('api', true); }
-  await waitFor(() => api('/auth/session').catch(() => null), Boolean, 'Web 恢复后会话未保留');
-  const deletedToken = await context.request.delete(`${base}/api/v1/api-tokens/${createdToken.id}?revision=${createdToken.revision}`, { headers: { Origin: base, 'X-CSRF-Token': session.csrf_token } });
-  assert.equal(deletedToken.status(), 204);
-  assert.equal((await context.request.get(`${base}/api/v1/api-tokens/verify`, { headers: authorization })).status(), 401);
+  await waitFor(() => api('/auth/sessions/current').catch(() => null), Boolean, 'Web 恢复后会话未保留');
+  await api(`/nodes/${id}/api-tokens/${createdToken.id}`, 'DELETE');
+  assert.equal((await context.request.get(`${base}/api/v2/`, { headers: authorization })).status(), 401);
   await page.goto(`${base}/settings/account`);
   await page.getByLabel('账号', { exact: true }).fill('changed');
   await page.getByRole('navigation', { name: '主导航' }).getByRole('link', { name: '节点', exact: true }).click();
@@ -655,13 +665,13 @@ try {
   console.log(`界面验收通过：${pages.length} 页面、深浅主题、API 令牌接入与独立启停、数据库页面与操作恢复、容器、防火墙及互信。`);
 } catch (error) {
   try {
-    const response = await context.request.get(`${base}/api/v1/nodes`);
+    const response = await context.request.get(`${base}/api/v2/nodes`);
     const nodes = await response.json();
     const id = nodes.items.find((node) => node.local)?.id;
     if (id) {
-      const paths = [`/nodes/${id}/firewall`, `/nodes/${id}/firewall/peer-trust`, '/operations/pending', `/operations?node_id=${id}&limit=20`];
+      const paths = [`/nodes/${id}/firewall/status`, `/nodes/${id}/firewall/peer-trust`, '/operations?pending=true', `/operations?node_id=${id}&limit=20`];
       const states = {};
-      for (const path of paths) { const result = await context.request.get(`${base}/api/v1${path}`); const text = await result.text(); let body; try { body = JSON.parse(text); } catch { body = text; } states[path] = { status: result.status(), body }; }
+      for (const path of paths) { const result = await context.request.get(`${base}/api/v2${path}`); const text = await result.text(); let body; try { body = JSON.parse(text); } catch { body = text; } states[path] = { status: result.status(), body }; }
       writeFileSync(`${output}/failure-state.json`, JSON.stringify(states, null, 2));
     }
   } catch { /* 保留原始失败及页面截图。 */ }
