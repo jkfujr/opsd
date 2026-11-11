@@ -19,60 +19,6 @@ import (
 	"github.com/oapi-codegen/runtime"
 )
 
-// Defines values for APIErrorCode.
-const (
-	APIErrorCodeCancelled             APIErrorCode = "cancelled"
-	APIErrorCodeConflict              APIErrorCode = "conflict"
-	APIErrorCodeCsrfRejected          APIErrorCode = "csrf_rejected"
-	APIErrorCodeDependencyUnavailable APIErrorCode = "dependency_unavailable"
-	APIErrorCodeForbidden             APIErrorCode = "forbidden"
-	APIErrorCodeInternalError         APIErrorCode = "internal_error"
-	APIErrorCodeInvalidRequest        APIErrorCode = "invalid_request"
-	APIErrorCodeNodeBusy              APIErrorCode = "node_busy"
-	APIErrorCodeNodeUnavailable       APIErrorCode = "node_unavailable"
-	APIErrorCodeNotAccepted           APIErrorCode = "not_accepted"
-	APIErrorCodeNotFound              APIErrorCode = "not_found"
-	APIErrorCodeRateLimited           APIErrorCode = "rate_limited"
-	APIErrorCodeTaskBusy              APIErrorCode = "task_busy"
-	APIErrorCodeUnauthenticated       APIErrorCode = "unauthenticated"
-)
-
-// Valid indicates whether the value is a known member of the APIErrorCode enum.
-func (e APIErrorCode) Valid() bool {
-	switch e {
-	case APIErrorCodeCancelled:
-		return true
-	case APIErrorCodeConflict:
-		return true
-	case APIErrorCodeCsrfRejected:
-		return true
-	case APIErrorCodeDependencyUnavailable:
-		return true
-	case APIErrorCodeForbidden:
-		return true
-	case APIErrorCodeInternalError:
-		return true
-	case APIErrorCodeInvalidRequest:
-		return true
-	case APIErrorCodeNodeBusy:
-		return true
-	case APIErrorCodeNodeUnavailable:
-		return true
-	case APIErrorCodeNotAccepted:
-		return true
-	case APIErrorCodeNotFound:
-		return true
-	case APIErrorCodeRateLimited:
-		return true
-	case APIErrorCodeTaskBusy:
-		return true
-	case APIErrorCodeUnauthenticated:
-		return true
-	default:
-		return false
-	}
-}
-
 // Defines values for APIGrantLevel.
 const (
 	Manage APIGrantLevel = "manage"
@@ -2095,18 +2041,15 @@ func (e ListOperationsParamsModule) Valid() bool {
 	}
 }
 
-// APIError defines model for APIError.
+// APIError 持久操作内部的领域故障；HTTP 错误使用 Problem，领域故障不要求 HTTP 请求 ID。
 type APIError struct {
-	Code   APIErrorCode  `json:"code"`
+	Code   string        `json:"code"`
 	Fields *[]FieldError `json:"fields,omitempty"`
 
 	// Message 简短中文错误信息
-	Message   string `json:"message"`
-	RequestId string `json:"request_id"`
+	Message   string  `json:"message"`
+	RequestId *string `json:"request_id,omitempty"`
 }
-
-// APIErrorCode defines model for APIError.Code.
-type APIErrorCode string
 
 // APIGrant defines model for APIGrant.
 type APIGrant struct {
@@ -3387,21 +3330,23 @@ type Operation struct {
 	ConfirmationRemainingSeconds *int64            `json:"confirmation_remaining_seconds,omitempty"`
 	CreatedAt                    time.Time         `json:"created_at"`
 	Decision                     OperationDecision `json:"decision"`
-	Error                        *APIError         `json:"error,omitempty"`
-	Executor                     OperationExecutor `json:"executor"`
-	Id                           string            `json:"id"`
-	IdempotencyKey               *string           `json:"idempotency_key,omitempty"`
-	LastObservedAt               *time.Time        `json:"last_observed_at,omitempty"`
-	NodeId                       string            `json:"node_id"`
-	PlanId                       *string           `json:"plan_id,omitempty"`
-	QueueSequence                *int64            `json:"queue_sequence,omitempty"`
-	ResourceId                   *string           `json:"resource_id,omitempty"`
-	ResultPendingSync            bool              `json:"result_pending_sync"`
-	Revision                     int64             `json:"revision"`
-	State                        OperationState    `json:"state"`
-	Steps                        []OperationStep   `json:"steps"`
-	Subject                      OperationSubject  `json:"subject"`
-	UpdatedAt                    time.Time         `json:"updated_at"`
+
+	// Error 持久操作内部的领域故障；HTTP 错误使用 Problem，领域故障不要求 HTTP 请求 ID。
+	Error             *APIError         `json:"error,omitempty"`
+	Executor          OperationExecutor `json:"executor"`
+	Id                string            `json:"id"`
+	IdempotencyKey    *string           `json:"idempotency_key,omitempty"`
+	LastObservedAt    *time.Time        `json:"last_observed_at,omitempty"`
+	NodeId            string            `json:"node_id"`
+	PlanId            *string           `json:"plan_id,omitempty"`
+	QueueSequence     *int64            `json:"queue_sequence,omitempty"`
+	ResourceId        *string           `json:"resource_id,omitempty"`
+	ResultPendingSync bool              `json:"result_pending_sync"`
+	Revision          int64             `json:"revision"`
+	State             OperationState    `json:"state"`
+	Steps             []OperationStep   `json:"steps"`
+	Subject           OperationSubject  `json:"subject"`
+	UpdatedAt         time.Time         `json:"updated_at"`
 }
 
 // OperationDecision defines model for Operation.Decision.

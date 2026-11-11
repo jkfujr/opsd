@@ -140,6 +140,28 @@ func TestAPIV2ValidationConditionsAndReceipts(t *testing.T) {
 	}
 }
 
+func TestAPIV2OperationDomainFault(t *testing.T) {
+	n := openAPINode(t, "领域错误", "东京", 1, 1)
+	client, _ := apiAdmin(t, n)
+	op, err := n.node.Submit(t.Context(), n.node.ID, cluster.Request{Kind: "name", Payload: json.RawMessage(`"等待执行"`)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	op.State = protocol.AttentionRequired
+	op.Error = &protocol.Error{Code: "executor_reply_lost", Message: "执行结果未知，请查询原操作"}
+	body, err := json.Marshal(op)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = n.node.DB.ExecContext(t.Context(), "UPDATE queue SET body=? WHERE id=?", string(body), op.ID); err != nil {
+		t.Fatal(err)
+	}
+	var result httpapi.Operation
+	if code := apiCall(t, client, n.web.URL, "GET", "/api/v2/operations/"+op.ID, "", "", "", nil, &result); code != 200 || result.Error == nil || result.Error.Code != "executor_reply_lost" {
+		t.Fatal("领域故障不能要求 HTTP 请求 ID 或替换错误码", code, result.Error)
+	}
+}
+
 func TestAPIV2ComposeRegistrationChecksTargetRevision(t *testing.T) {
 	a := openAPINode(t, "入口", "东京", 1, 1)
 	b := openAPINode(t, "目标", "东京", 1, 1)

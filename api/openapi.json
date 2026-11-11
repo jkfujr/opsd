@@ -10581,22 +10581,7 @@
         "properties": {
           "code": {
             "type": "string",
-            "enum": [
-              "invalid_request",
-              "unauthenticated",
-              "forbidden",
-              "csrf_rejected",
-              "conflict",
-              "node_busy",
-              "node_unavailable",
-              "dependency_unavailable",
-              "not_found",
-              "rate_limited",
-              "internal_error",
-              "cancelled",
-              "not_accepted",
-              "task_busy"
-            ]
+            "minLength": 1
           },
           "message": {
             "type": "string",
@@ -10615,9 +10600,9 @@
         },
         "required": [
           "code",
-          "message",
-          "request_id"
-        ]
+          "message"
+        ],
+        "description": "持久操作内部的领域故障；HTTP 错误使用 Problem，领域故障不要求 HTTP 请求 ID。"
       },
       "Capability": {
         "type": "object",

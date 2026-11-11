@@ -2,6 +2,7 @@ package cluster
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"math/rand/v2"
@@ -219,6 +220,9 @@ func (n *Node) servePeer(ctx context.Context, p *peer) {
 	}
 }
 func wireError(e error) *protocol.Error {
+	if errors.Is(e, sql.ErrNoRows) {
+		return &protocol.Error{Code: "not_found", Message: "尚未找到请求的记录"}
+	}
 	var f *Fault
 	if errors.As(e, &f) {
 		return &protocol.Error{Code: f.Code, Message: f.Message}
