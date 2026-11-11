@@ -43,7 +43,7 @@ func TestProductionBackendAPI(t *testing.T) {
 	csrf := ""
 	bearer := ""
 	activeTest := t
-	call := func(method, path, key string, body, out any) int {
+	call := func(method, path, key string, body, out any, contexts ...context.Context) int {
 		t := activeTest
 		t.Helper()
 		var reader io.Reader
@@ -54,7 +54,11 @@ func TestProductionBackendAPI(t *testing.T) {
 			}
 			reader = bytes.NewReader(data)
 		}
-		r, err := http.NewRequestWithContext(t.Context(), method, base+"/api/v2"+path, reader)
+		requestContext := t.Context()
+		if len(contexts) > 0 {
+			requestContext = contexts[0]
+		}
+		r, err := http.NewRequestWithContext(requestContext, method, base+"/api/v2"+path, reader)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -110,7 +114,8 @@ func TestProductionBackendAPI(t *testing.T) {
 	t.Cleanup(func() {
 		activeTest = t
 		bearer = ""
-		call("DELETE", "/nodes/"+id+"/api-tokens/"+automationToken.Token.Id, "", map[string]any{"revision": automationToken.Token.Revision}, nil)
+		// 测试上下文在清理前取消；HTTP 客户端仍限制每次请求的耗时。
+		call("DELETE", "/nodes/"+id+"/api-tokens/"+automationToken.Token.Id, "", map[string]any{"revision": automationToken.Token.Revision}, nil, context.WithoutCancel(t.Context()))
 	})
 	waitOperation := func(operation string, check func(protocol.OperationState) bool) cluster.Operation {
 		t := activeTest
