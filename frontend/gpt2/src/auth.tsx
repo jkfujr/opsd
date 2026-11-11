@@ -71,7 +71,7 @@ function Entry({ children }: { children: ReactNode }) { return <main className="
 function Login({ entrance }: { entrance: string }) {
   const mutation = useMutation({ gcTime: 0, mutationFn: async (form: FormData) => unwrap(await api.POST('/auth/sessions', { body: { entrance, username: String(form.get('username')), password: String(form.get('password')) } })), onSuccess: data => { queryClient.setQueryData(['session'], data); window.location.replace(loginDestination()); } });
   const cooldown = useRetryAfter(mutation.error);
-  return <Entry><Heading title="登录"/><form className="editor-form" onSubmit={event => { event.preventDefault(); mutation.mutate(new FormData(event.currentTarget)); }}>
+  return <Entry><Heading title="登录"/><form className="auth-form" onSubmit={event => { event.preventDefault(); mutation.mutate(new FormData(event.currentTarget)); }}>
     <Field label="账号" name="username" required maxLength={128} autoComplete="username"/><Field label="密码" name="password" type="password" required maxLength={1024} autoComplete="current-password"/>
     <Failure error={mutation.error}/><Btn variant="primary" type="submit" disabled={mutation.isPending || cooldown > 0} aria-busy={mutation.isPending}>{mutation.isPending ? '正在登录…' : '登录'}</Btn>
   </form></Entry>;

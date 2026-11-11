@@ -295,7 +295,11 @@ code, pre { font-family: var(--font-mono); }
 .auth-entry { display: grid; min-height: 100dvh; place-items: center; padding: 1.5rem; }
 .auth-entry > .panel { width: min(100%, 28rem); }
 .auth-content { padding: 2rem; }
-.auth-content .page-heading { margin-bottom: 2rem; }
+.auth-content .page-heading { margin-bottom: 1.5rem; }
+.auth-form { display: grid; gap: 1.25rem; }
+.auth-form > .ui-button { width: 100%; margin-top: .25rem; }
+.auth-form > .error-message { margin-block: 0; }
+@media(max-width:639px) { .auth-entry { padding: 1rem; } .auth-content { padding: 1.5rem; } }
 .switch-field { display: flex; align-items: center; gap: .75rem; min-height: 2.75rem; }
 .script-input { min-height: 16rem; font-family: var(--font-mono); }
 .operation-row { display: grid; gap: .5rem; text-align: left; padding: 1rem 0; border-bottom: 1px solid var(--border); width: 100%; overflow-wrap: anywhere; }
