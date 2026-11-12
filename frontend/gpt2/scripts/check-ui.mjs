@@ -188,7 +188,7 @@ try {
     } finally { await limited.close(); }
   });
   config = (await api(`/nodes/${id}/configuration`)).body;
-  const realNodes = (await api('/nodes')).body; nodeList = { ...realNodes, items: [{ ...realNodes.items[0], name: '本地验收节点', connected: true, writable: true }, { ...realNodes.items[0], id: 'offline-node', name: '远端离线', region: '其他', connected: false, writable: false }] };
+  const realNodes = (await api('/nodes')).body; nodeList = { ...realNodes, items: [{ ...realNodes.items[0], name: '本地验收节点', region: '本地', connected: true, writable: true }, { ...realNodes.items[0], id: 'offline-node', name: '远端离线', region: '其他', connected: false, writable: false }] };
   const metrics = { collected_at: checked, cpu_cores: 4, cpu_usage: 32.4, memory_used: 2 * 1073741824, memory_total: 4 * 1073741824, disk_used: 20 * 1073741824, disk_total: 80 * 1073741824, network_rx: 1048576, network_tx: 524288, errors: [] };
   overview = { updated_at: checked, nodes: [{ node: nodeList.items[0], reading: { node_id: id, state: 'ready', metrics, firewall: 'enabled', read: ready } }, { node: nodeList.items[1], reading: { node_id: 'offline-node', state: 'offline', firewall: 'unknown', read: { state: 'offline' } } }], summary: { metrics, valid_nodes: { cpu: 1, memory: 1, disk: 1, network: 1 } }, pending_operations: [], unavailable: [] };
   container = { node_id: id, node_name: nodeList.items[0].name, engine_id: 'docker', container_id: containerID, name: 'web', image: 'nginx:stable', state: 'running', health: 'healthy', ports: [], project: 'web', service: 'web', revision: rev };
