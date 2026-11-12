@@ -344,9 +344,14 @@ try {
       await go(source); await page.getByRole('button',{name:/^操作记录/}).click(); await page.getByLabel('操作节点',{exact:true}).click(); await page.getByRole('option',{name:'本地验收节点',exact:true}).click(); await page.locator('.operation-row[data-operation-id="'+execution.id+'"]').click(); await page.getByRole('button',{name:'查看执行日志',exact:true}).click();
       await page.getByRole('alert').filter({hasText:'日志读取失败'}).waitFor(); assert((await page.locator('.page-meta').innerText()).includes('已成功')); assert.equal(await page.getByRole('heading',{name:'暂无日志',exact:true}).count(),0);
       await page.locator('.log-failure summary').click(); await page.getByText('请求 ID：log-read-test',{exact:true}).waitFor();
-      fail=false; await page.getByRole('button',{name:'重试',exact:true}).click(); await page.getByRole('button',{name:'加载更多',exact:true}).click();
-      await wait(()=>page.evaluate(()=>{const button=document.querySelector('.log-footer button');return !button||!button.disabled;}),'日志分页请求未结束');
-      while(await page.locator('.log-footer button').count()){await page.locator('.log-footer button').click();await wait(()=>page.evaluate(()=>{const button=document.querySelector('.log-footer button');return !button||!button.disabled;}),'日志分页请求未结束');}
+      fail=false; await page.getByRole('button',{name:'重试',exact:true}).click();
+      for (let offset=4;;) {
+        const response=page.waitForResponse(value=>{const url=new URL(value.url());return url.pathname.endsWith('/operations/'+execution.id+'/logs')&&url.searchParams.get('offset')===String(offset);});
+        await page.getByRole('button',{name:'加载更多',exact:true}).click();
+        const chunk=await (await response).json();
+        if(!chunk.has_more)break;
+        offset=chunk.next_offset;
+      }
       await wait(async()=>(await page.locator('.log-document').innerText()).includes('第 599 行'),'字节分页没有读完');
       const text=await page.locator('.log-document pre').innerText();assert(!text.includes('�')&&!text.includes('\x1b')); assert(text.includes('服务启动'));
       await page.getByRole('button',{name:'自动刷新',exact:true}).click();
