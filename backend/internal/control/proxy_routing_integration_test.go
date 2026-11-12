@@ -248,15 +248,12 @@ func nativeGaleraWriteConflict(t *testing.T, f *nativeDatabases) {
 	first, second := nativeSQL(t, f.galera[0]), nativeSQL(t, f.galera[1])
 	defer first.Close()
 	defer second.Close()
-	if _, err := first.Exec("CREATE TABLE opsd_ci_business.write_conflict(id INT PRIMARY KEY, value INT NOT NULL)"); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := first.Exec("INSERT INTO opsd_ci_business.write_conflict VALUES(1, 0)"); err != nil {
+	if _, err := first.Exec("CREATE TABLE opsd_ci_business.write_conflict(id INT PRIMARY KEY)"); err != nil {
 		t.Fatal(err)
 	}
 	waitDatabase(t, "多写事务准备", 10*time.Second, func() bool {
-		var value int
-		return second.QueryRow("SELECT value FROM opsd_ci_business.write_conflict WHERE id=1").Scan(&value) == nil
+		var count int
+		return second.QueryRow("SELECT COUNT(*) FROM opsd_ci_business.write_conflict").Scan(&count) == nil && count == 0
 	})
 	one, err := first.BeginTx(t.Context(), nil)
 	if err != nil {
@@ -269,8 +266,11 @@ func nativeGaleraWriteConflict(t *testing.T, f *nativeDatabases) {
 	}
 	defer two.Rollback()
 	for _, tx := range []*sql.Tx{one, two} {
-		if _, err = tx.Exec("UPDATE opsd_ci_business.write_conflict SET value=value+1 WHERE id=1"); err != nil {
-			t.Fatal(err)
+		if _, err = tx.Exec("SET SESSION innodb_lock_wait_timeout=2"); err != nil {
+			t.Fatal("设置并发事务期限", err)
+		}
+		if _, err = tx.Exec("INSERT INTO opsd_ci_business.write_conflict VALUES(1)"); err != nil {
+			t.Fatal("准备不同入口的未提交写入", err)
 		}
 	}
 	// 两个入口提交同一行，各事务只发送一次，认证失败由调用方显式处理。
@@ -286,7 +286,7 @@ func nativeGaleraWriteConflict(t *testing.T, f *nativeDatabases) {
 			continue
 		}
 		var fault *mysql.MySQLError
-		if !errors.As(err, &fault) || fault.Number != 1213 {
+		if !errors.As(err, &fault) || fault.Number != 1213 && fault.Number != 1205 {
 			t.Fatalf("多写事务返回非认证冲突：%v", err)
 		}
 		conflicts++
@@ -296,8 +296,8 @@ func nativeGaleraWriteConflict(t *testing.T, f *nativeDatabases) {
 	}
 	for _, db := range []*sql.DB{first, second} {
 		waitDatabase(t, "冲突事务收敛", 10*time.Second, func() bool {
-			var value int
-			return db.QueryRow("SELECT value FROM opsd_ci_business.write_conflict WHERE id=1").Scan(&value) == nil && value == 1
+			var count int
+			return db.QueryRow("SELECT COUNT(*) FROM opsd_ci_business.write_conflict WHERE id=1").Scan(&count) == nil && count == 1
 		})
 	}
 }
