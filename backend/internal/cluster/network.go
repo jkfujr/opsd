@@ -807,10 +807,10 @@ func (n *Node) syncTrust(ctx context.Context) {
 	}
 	data, _ := json.Marshal(status)
 	var previous string
-	var old protocol.PeerTrustUpdated
+	var previousStatus protocol.PeerTrustUpdated
 	_ = n.DB.QueryRowContext(ctx, "SELECT body FROM peer_trust_status WHERE id=1").Scan(&previous)
-	_ = json.Unmarshal([]byte(previous), &old)
-	before, after := old, *status
+	_ = json.Unmarshal([]byte(previous), &previousStatus)
+	before, after := previousStatus, *status
 	before.CheckedAt, after.CheckedAt = nil, nil
 	if _, e = n.DB.ExecContext(ctx, "INSERT INTO peer_trust_status(id,body) VALUES(1,?) ON CONFLICT(id) DO UPDATE SET body=excluded.body", string(data)); e == nil {
 		if previous == "" || !reflect.DeepEqual(before, after) {
