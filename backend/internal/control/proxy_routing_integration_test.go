@@ -22,6 +22,7 @@ import (
 // nativeProxyRouting 复用同批 Galera 和代理，覆盖无数据库实例的代理所属节点。
 func nativeProxyRouting(t *testing.T, f *nativeDatabases, nodes []*apiNode, raw, password string, registered cluster.ManagedDatabaseCluster) cluster.ManagedDatabaseCluster {
 	t.Helper()
+	nativeGaleraWriteConflict(t, f)
 	standalone := openAPINode(t, "仅代理节点", "日本", 1, 20)
 	joinAPINodes(t, nodes[0], standalone)
 	service := newDatabaseServices(t)
@@ -145,7 +146,13 @@ func nativeProxyRouting(t *testing.T, f *nativeDatabases, nodes []*apiNode, raw,
 		t.Fatal("权重切换中断或迁移了活动事务", before, after, err)
 	}
 	if _, err = session.ExecContext(t.Context(), "COMMIT"); err != nil {
-		t.Fatal(err)
+		t.Fatal("提交跨权重切换的原事务", err)
+	}
+	if err = session.Close(); err != nil {
+		t.Fatal("释放事务会话", err)
+	}
+	if err = client.Close(); err != nil {
+		t.Fatal("释放事务连接", err)
 	}
 	var duplicate cluster.Operation
 	if code := apiCall(t, http.DefaultClient, nodes[0].web.URL, "POST", path+"/actions", raw, "apply-native-routing", "", preview, &duplicate); code != 202 || duplicate.ID != operation.ID {
@@ -204,8 +211,6 @@ func nativeProxyRouting(t *testing.T, f *nativeDatabases, nodes []*apiNode, raw,
 			return err == nil && state.Ready && state.Synced && state.ClusterSize == 3
 		})
 	}
-	nativeGaleraWriteConflict(t, f)
-
 	// 保存后的代理配置经实际进程重启读回。
 	for i, connection := range f.proxies {
 		f.docker(t, "restart", f.names[len(f.galera)+i])
@@ -249,7 +254,7 @@ func nativeGaleraWriteConflict(t *testing.T, f *nativeDatabases) {
 	defer first.Close()
 	defer second.Close()
 	if _, err := first.Exec("CREATE TABLE opsd_ci_business.write_conflict(id INT PRIMARY KEY)"); err != nil {
-		t.Fatal(err)
+		t.Fatal("创建多写冲突用表", err)
 	}
 	waitDatabase(t, "多写事务准备", 10*time.Second, func() bool {
 		var count int
@@ -257,12 +262,12 @@ func nativeGaleraWriteConflict(t *testing.T, f *nativeDatabases) {
 	})
 	one, err := first.BeginTx(t.Context(), nil)
 	if err != nil {
-		t.Fatal(err)
+		t.Fatal("开启第一个写入口事务", err)
 	}
 	defer one.Rollback()
 	two, err := second.BeginTx(t.Context(), nil)
 	if err != nil {
-		t.Fatal(err)
+		t.Fatal("开启第二个写入口事务", err)
 	}
 	defer two.Rollback()
 	for _, tx := range []*sql.Tx{one, two} {
