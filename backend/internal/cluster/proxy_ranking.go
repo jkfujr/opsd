@@ -375,7 +375,7 @@ func (n *Node) reconcileProxyRouting(ctx context.Context, c ManagedDatabaseClust
 		return
 	}
 	payload, _ := json.Marshal(protocol.DatabaseAction{Connection: connection, Kind: "proxy_route", Routing: &action})
-	sum := sha256.Sum256([]byte(c.ID + "/" + ref.InstanceID + "/" + action.PolicyVersion + "/" + fmt.Sprint(order) + "/" + observation.Fingerprint))
+	sum := sha256.Sum256([]byte(c.ID + "/" + ref.InstanceID + "/" + state.OperationID + "/" + action.PolicyVersion + "/" + fmt.Sprint(order) + "/" + observation.Fingerprint))
 	key := "proxy-routing-" + hex.EncodeToString(sum[:])
 	op, err := n.enqueue(ctx, n.ID, Request{Key: key, Kind: "database_step", ResourceID: c.ID, Payload: payload})
 	if err != nil {

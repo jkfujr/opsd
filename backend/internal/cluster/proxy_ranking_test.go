@@ -1,8 +1,10 @@
 package cluster
 
 import (
+	"context"
 	"fmt"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -22,6 +24,80 @@ func rankingInput(now time.Time, latencies ...int64) (protocol.ProxyRoutingPolic
 		}
 	}
 	return policy, observation, order
+}
+
+type routingObservationExecutor struct {
+	lostExecutor
+	observation protocol.ProxyRoutingObservation
+}
+
+func (e *routingObservationExecutor) Call(ctx context.Context, value protocol.Payload) (protocol.Payload, error) {
+	if _, ok := value.(*protocol.ProxyRoutingRead); ok {
+		return &protocol.ProxyRoutingReadResult{Routing: e.observation}, nil
+	}
+	return e.lostExecutor.Call(ctx, value)
+}
+
+func TestAutomaticProxyRankingCreatesNewOperationsWhenOrderCycles(t *testing.T) {
+	n, _ := openTestNode(t)
+	now := time.Now().UTC()
+	n.Now = func() time.Time { return now }
+	password := "test-password"
+	instance, err := n.saveDatabaseInstance(t.Context(), DatabaseInstanceInput{DatabaseInstance: DatabaseInstance{ID: "proxy", Name: "代理", Kind: "proxysql", Address: "127.0.0.1:6032", Username: "admin"}, Password: &password})
+	if err != nil {
+		t.Fatal(err)
+	}
+	policy, observation, order := rankingInput(now, 100, 80000, 50000)
+	observation.Fingerprint, observation.UnmanagedFingerprint = strings.Repeat("a", 64), strings.Repeat("f", 64)
+	runtime := &routingObservationExecutor{observation: observation}
+	n.Executor = runtime
+	ref := DatabaseRef{NodeID: n.ID, InstanceID: instance.ID, InstanceRevision: instance.Revision}
+	c := ManagedDatabaseCluster{ID: NewOperationID(n.ID), Coordinator: n.ID, ProxyRouting: &policy, Proxies: []DatabaseRef{ref}}
+	for _, backend := range policy.Backends {
+		c.Members = append(c.Members, DatabaseRef{NodeID: backend.NodeID, InstanceID: backend.InstanceID})
+	}
+	state := ProxyRoutingState{NodeID: n.ID, InstanceID: ref.InstanceID, State: "ready", PolicyVersion: routingVersion(policy), ConfigFingerprint: observation.Fingerprint, Order: order, Entries: []ProxyRankEntry{}}
+	if err = n.saveProxyRoutingState(t.Context(), c.ID, state); err != nil {
+		t.Fatal(err)
+	}
+	seen := map[string]bool{}
+	for cycle := range 3 {
+		latencies := []int64{100, 80000, 50000}
+		if cycle == 1 {
+			latencies = []int64{100, 50000, 80000}
+		}
+		_, samples, _ := rankingInput(now, latencies...)
+		runtime.observation.Samples, runtime.observation.CheckedAt = samples.Samples, now
+		for range 3 {
+			n.reconcileProxyRouting(t.Context(), c, ref)
+		}
+		state, err = n.proxyRoutingState(t.Context(), c.ID, ref.InstanceID)
+		if err != nil || state.PendingAction == nil || state.OperationID == "" || seen[state.OperationID] {
+			t.Fatal("排序循环复用了已完成操作", cycle, state, err)
+		}
+		seen[state.OperationID] = true
+		op, err := n.operation(t.Context(), state.OperationID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		op.State, op.Revision = protocol.Succeeded, op.Revision+1
+		if err = n.saveOperation(t.Context(), &op, "finished"); err != nil {
+			t.Fatal(err)
+		}
+		runtime.observation.Fingerprint = strings.Repeat("b", 64)
+		if cycle == 1 {
+			runtime.observation.Fingerprint = strings.Repeat("a", 64)
+		}
+		setProxyApplied(&state, runtime.observation, *state.PendingAction, op.ID, now)
+		if err = n.saveProxyRoutingState(t.Context(), c.ID, state); err != nil {
+			t.Fatal(err)
+		}
+		now = now.Add(10 * time.Minute)
+	}
+	var count int
+	if err = n.DB.QueryRowContext(t.Context(), "SELECT count(*) FROM queue WHERE kind='database_step'").Scan(&count); err != nil || count != 3 {
+		t.Fatal("排序操作数量不同", count, err)
+	}
 }
 
 func TestProxyRankingKeepsLocalAndRequiresStableImprovement(t *testing.T) {
