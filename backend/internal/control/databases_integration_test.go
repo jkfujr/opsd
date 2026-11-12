@@ -167,7 +167,7 @@ func startNativeDatabases(t *testing.T) *nativeDatabases {
 		if e := os.WriteFile(file, []byte(config), 0644); e != nil {
 			t.Fatal(e)
 		}
-		f.docker(t, "run", "-d", "--name", name, "--network", f.network, "-p", fmt.Sprintf("127.0.0.1:%d:6032", adminPort), "-p", fmt.Sprintf("127.0.0.1:%d:6033", dataPort), "-v", file+":/etc/proxysql.cnf:ro", "--entrypoint", "/usr/bin/proxysql", "proxysql/proxysql:3.0.3", "-f", "--initial", "-c", "/etc/proxysql.cnf")
+		f.docker(t, "run", "-d", "--name", name, "--network", f.network, "-p", fmt.Sprintf("127.0.0.1:%d:6032", adminPort), "-p", fmt.Sprintf("127.0.0.1:%d:6033", dataPort), "-v", file+":/etc/proxysql.cnf:ro", "--entrypoint", "/usr/bin/proxysql", "proxysql/proxysql:3.0.3", "-f", "-c", "/etc/proxysql.cnf")
 		c := protocol.DatabaseConnection{Kind: "proxysql", Address: fmt.Sprintf("127.0.0.1:%d", adminPort), Username: "opsd_admin", Password: password}
 		f.proxies = append(f.proxies, c)
 		f.proxyPorts = append(f.proxyPorts, dataPort)

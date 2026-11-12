@@ -211,7 +211,7 @@ func nativeProxyRouting(t *testing.T, f *nativeDatabases, nodes []*apiNode, raw,
 		f.docker(t, "restart", f.names[len(f.galera)+i])
 		waitDatabase(t, "代理重启持久配置", 20*time.Second, func() bool {
 			observation, err := manager.ReadProxyRouting(t.Context(), connection, &preview.Policy.Hostgroups)
-			return err == nil && !observation.PendingChanges && !slices.ContainsFunc(observation.Servers, func(server protocol.ProxyRouteServer) bool { return server.Host == "172.30.91.71" })
+			return err == nil && databaseengine.ProxyRouteActionSatisfied(observation, preview.Targets[i].Action)
 		})
 	}
 	var state cluster.ProxyRoutingState

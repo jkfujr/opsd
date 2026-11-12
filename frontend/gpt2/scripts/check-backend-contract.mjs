@@ -23,7 +23,7 @@ export async function checkBackendContract({ page, go, step, capture, closeDrawe
       await page.getByRole('button', { name: '配置路由', exact: true }).click();
       const dialog = page.getByRole('dialog');
       await dialog.getByText('移除路由', { exact: true }).first().waitFor();
-      await dialog.getByLabel('SQL 主机地址', { exact: true }).fill('100.100.201.1');
+      await dialog.getByLabel('SQL 主机地址', { exact: true }).fill('100.100.201.2');
       assert(await dialog.getByRole('button', { name: '应用配置', exact: true }).isDisabled());
       await dialog.getByRole('button', { name: '重新预览', exact: true }).click();
       await dialog.getByText('移除路由', { exact: true }).first().waitFor();
