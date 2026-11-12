@@ -67,12 +67,18 @@ type DatabaseUser struct {
 	Grants    []DatabaseGrant `json:"grants"`
 }
 type DatabaseProxyServer struct {
-	Hostgroup int    `json:"hostgroup"`
-	Host      string `json:"host"`
-	Port      int    `json:"port"`
-	State     string `json:"state"`
+	Weight         int    `json:"weight"`
+	MaxConnections int    `json:"max_connections"`
+	Hostgroup      int    `json:"hostgroup"`
+	Host           string `json:"host"`
+	Port           int    `json:"port"`
+	State          string `json:"state"`
 }
 type DatabaseProxyPool struct {
+	State     string `json:"state"`
+	PeakUsed  int64  `json:"peak_used"`
+	Queries   int64  `json:"queries"`
+	LatencyUS int64  `json:"latency_us"`
 	Hostgroup int    `json:"hostgroup"`
 	Host      string `json:"host"`
 	Port      int    `json:"port"`
@@ -88,6 +94,8 @@ type DatabaseProxyUser struct {
 	Protected bool   `json:"protected"`
 }
 type DatabaseState struct {
+	ProxyHostgroups   *ProxyHostgroups      `json:"proxy_hostgroups,omitempty"`
+	MaxConnections    int64                 `json:"max_connections,omitempty"`
 	Read              ReadStatus            `json:"read"`
 	State             string                `json:"state"`
 	Version           string                `json:"version"`
@@ -157,6 +165,7 @@ func (*DatabaseReadResult) Kind() Kind { return "database.read.result" }
 func (*DatabaseReadResult) isPayload() {}
 
 type DatabaseAction struct {
+	Routing      *ProxyRouteAction  `json:"routing,omitempty"`
 	Connection   DatabaseConnection `json:"connection"`
 	ClusterID    string             `json:"cluster_id"`
 	Kind         string             `json:"kind"`
@@ -205,6 +214,10 @@ func (a DatabaseAction) Validate() error {
 		}
 	}
 	switch a.Kind {
+	case "proxy_route":
+		if a.Connection.Kind == "proxysql" && a.Routing != nil {
+			return a.Routing.Validate()
+		}
 	case "create_database":
 		if a.Database != "" && slices.Contains([]string{"utf8mb4", "utf8mb3", "latin1", "ascii"}, a.Charset) {
 			return nil

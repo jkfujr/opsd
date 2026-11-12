@@ -23,17 +23,19 @@ type DatabaseProxySelection struct {
 	Hostgroup  int    `json:"hostgroup"`
 }
 type DatabaseChange struct {
-	Cluster          string                   `json:"cluster_id"`
-	ExpectedRevision uint64                   `json:"expected_revision"`
-	Kind             string                   `json:"kind"`
-	Database         string                   `json:"database,omitempty"`
-	Charset          string                   `json:"charset,omitempty"`
-	User             string                   `json:"user,omitempty"`
-	Host             string                   `json:"host,omitempty"`
-	Password         string                   `json:"password,omitempty"`
-	Privileges       []string                 `json:"privileges,omitempty"`
-	Grants           []protocol.DatabaseGrant `json:"grants,omitempty"`
-	Proxies          []DatabaseProxySelection `json:"proxies"`
+	Routing          *protocol.ProxyRoutingPolicy `json:"routing,omitempty"`
+	RoutingTargets   []ProxyRoutePreview          `json:"routing_targets,omitempty"`
+	Cluster          string                       `json:"cluster_id"`
+	ExpectedRevision uint64                       `json:"expected_revision"`
+	Kind             string                       `json:"kind"`
+	Database         string                       `json:"database,omitempty"`
+	Charset          string                       `json:"charset,omitempty"`
+	User             string                       `json:"user,omitempty"`
+	Host             string                       `json:"host,omitempty"`
+	Password         string                       `json:"password,omitempty"`
+	Privileges       []string                     `json:"privileges,omitempty"`
+	Grants           []protocol.DatabaseGrant     `json:"grants,omitempty"`
+	Proxies          []DatabaseProxySelection     `json:"proxies"`
 }
 type DatabaseSubmission struct {
 	Change  DatabaseChange         `json:"change"`
@@ -56,6 +58,9 @@ type databaseWorkflow struct {
 
 func validateDatabaseSubmission(input DatabaseSubmission) error {
 	c, d := input.Cluster, input.Change
+	if d.Kind == "configure_proxy_routes" {
+		return validateRoutingSubmission(input)
+	}
 	if c.ID == "" || c.Deleted || d.Cluster != c.ID || d.ExpectedRevision != c.Revision || !slices.Contains([]string{"create_database", "delete_database", "create_user", "password", "delete_user", "grant", "revoke", "sync_user"}, d.Kind) || len(d.Password) > 1024 || len(d.Grants) > 100 || len(d.Proxies) > 100 {
 		return fault("invalid_request", "数据库操作参数无效")
 	}
@@ -67,6 +72,9 @@ func validateDatabaseSubmission(input DatabaseSubmission) error {
 	for _, p := range d.Proxies {
 		if p.Hostgroup < 0 || !slices.ContainsFunc(c.Proxies, func(ref DatabaseRef) bool { return ref.NodeID == p.NodeID && ref.InstanceID == p.InstanceID }) {
 			return fault("invalid_request", "代理超出数据库集群范围")
+		}
+		if c.ProxyRouting != nil && c.ProxyRouting.Enabled && d.Kind != "delete_user" && p.Hostgroup != c.ProxyRouting.Hostgroups.Writer {
+			return fault("invalid_request", "受管代理账号须使用写入主机组")
 		}
 	}
 	if d.Kind == "sync_user" {
@@ -115,6 +123,11 @@ func (n *Node) SubmitDatabaseChange(ctx context.Context, change DatabaseChange, 
 	}
 	if c.Revision != change.ExpectedRevision {
 		return Operation{}, fault("conflict", "数据库集群配置已经变化")
+	}
+	if change.Kind == "configure_proxy_routes" && c.ProxyRouting == nil {
+		if e = n.requireProxyRoutingSupport(ctx); e != nil {
+			return Operation{}, e
+		}
 	}
 	var pins sync.WaitGroup
 	for groupIndex, group := range [][]DatabaseRef{c.Members, c.Proxies} {
@@ -172,6 +185,19 @@ func (n *Node) buildDatabaseWorkflow(ctx context.Context, id string, input Datab
 	add := func(ref DatabaseRef, a protocol.DatabaseAction) {
 		sum := sha256.Sum256([]byte(fmt.Sprintf("%s/%d", id, len(out.Steps))))
 		out.Steps = append(out.Steps, databaseWorkflowStep{Ref: ref, Action: a, ID: ref.NodeID + "_" + hex.EncodeToString(sum[:]), State: "pending"})
+	}
+	if d.Kind == "configure_proxy_routes" {
+		for _, preview := range d.RoutingTargets {
+			for _, ref := range c.Proxies {
+				if ref.NodeID == preview.NodeID && ref.InstanceID == preview.InstanceID {
+					ref.InstanceRevision = preview.InstanceRevision
+					action := preview.Action
+					add(ref, protocol.DatabaseAction{Kind: "proxy_route", Routing: &action})
+				}
+			}
+		}
+		out.Built = true
+		return out, nil
 	}
 	proxy := func(kind string) {
 		for _, p := range d.Proxies {
@@ -244,6 +270,11 @@ func (n *Node) persistDatabaseWorkflow(ctx context.Context, op *Operation, flow 
 	if e = n.appendTx(ctx, tx, "operation", op.ID, op, n.Now()); e != nil {
 		return e
 	}
+	if op.State == protocol.Succeeded && op.Action == "configure_proxy_routes" {
+		if e = n.finishProxyRoutingPolicy(ctx, tx, op.ID); e != nil {
+			return e
+		}
+	}
 	if e = tx.Commit(); e == nil {
 		n.notifyChange(Change{Resource: "operations", NodeID: n.ID})
 		n.notifyChange(Change{Resource: "databases"})
@@ -251,7 +282,7 @@ func (n *Node) persistDatabaseWorkflow(ctx context.Context, op *Operation, flow 
 	return e
 }
 func databaseActionName(kind string) string {
-	return map[string]string{"create_database": "创建库", "delete_database": "删除库", "create_user": "创建账号", "password": "修改密码", "delete_user": "删除账号", "grant": "授权", "revoke": "撤权", "proxy_upsert": "同步代理账号", "proxy_disable": "停用代理账号", "proxy_delete": "删除代理账号"}[kind]
+	return map[string]string{"create_database": "创建库", "delete_database": "删除库", "create_user": "创建账号", "password": "修改密码", "delete_user": "删除账号", "grant": "授权", "revoke": "撤权", "proxy_upsert": "同步代理账号", "proxy_disable": "停用代理账号", "proxy_delete": "删除代理账号", "proxy_route": "应用代理路由"}[kind]
 }
 func (n *Node) advanceDatabase(ctx context.Context, op *Operation, plain []byte) {
 	flow, e := n.loadDatabaseWorkflow(ctx, op.ID)
@@ -297,7 +328,12 @@ func (n *Node) advanceDatabase(ctx context.Context, op *Operation, plain []byte)
 	if flow.Index >= len(flow.Steps) {
 		op.State = protocol.Succeeded
 		op.Error = nil
-		_ = n.persistDatabaseWorkflow(ctx, op, flow)
+		if err := n.persistDatabaseWorkflow(ctx, op, flow); err != nil {
+			if current, readErr := n.operation(ctx, op.ID); readErr == nil {
+				*op = current
+				attention(err)
+			}
+		}
 		return
 	}
 	step := &flow.Steps[flow.Index]
@@ -358,6 +394,12 @@ func (n *Node) advanceDatabase(ctx context.Context, op *Operation, plain []byte)
 		return
 	}
 	if record.State == protocol.Succeeded {
+		if step.Action.Kind == "proxy_route" {
+			if e = n.Call(ctx, step.Ref.NodeID, "database.proxy_routing.applied", request, nil); e != nil {
+				attention(e)
+				return
+			}
+		}
 		step.State = "completed"
 		flow.Index++
 		flow.Request = ""

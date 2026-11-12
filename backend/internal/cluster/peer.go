@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/coder/websocket"
+	"github.com/jkfujr/opsd/internal/firewall"
 	"github.com/jkfujr/opsd/internal/identity"
 	"github.com/jkfujr/opsd/internal/protocol"
 	"github.com/jkfujr/opsd/internal/transport"
@@ -226,6 +227,10 @@ func wireError(e error) *protocol.Error {
 	var f *Fault
 	if errors.As(e, &f) {
 		return &protocol.Error{Code: f.Code, Message: f.Message}
+	}
+	var native *firewall.Fault
+	if errors.As(e, &native) {
+		return &protocol.Error{Code: native.Code, Message: native.Message}
 	}
 	return &protocol.Error{Code: "dependency_unavailable", Message: "节点操作未完成，请查询原操作"}
 }

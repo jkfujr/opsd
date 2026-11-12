@@ -18,6 +18,7 @@ import (
 )
 
 type FirewallWrite struct {
+	AdoptFingerprint string                   `json:"adopt_fingerprint,omitempty"`
 	InputDigest      string                   `json:"input_digest,omitempty"`
 	Actor            string                   `json:"actor,omitempty"`
 	ExpectedRevision uint64                   `json:"expected_revision"`
@@ -29,6 +30,35 @@ type FirewallWrite struct {
 type FirewallSaved struct {
 	Configuration protocol.ManagedFirewallState `json:"configuration"`
 	OperationID   string                        `json:"operation_id"`
+}
+
+type FirewallAdoption struct {
+	ExpectedRevision uint64                      `json:"expected_revision"`
+	Fingerprint      string                      `json:"fingerprint"`
+	Configuration    protocol.FirewallDefinition `json:"configuration"`
+	CheckedAt        time.Time                   `json:"checked_at"`
+}
+
+func (n *Node) previewFirewallAdoption(ctx context.Context) (FirewallAdoption, error) {
+	reply, err := n.executeRead(ctx, &protocol.FirewallInspect{PreviewCurrent: true})
+	if err != nil {
+		return FirewallAdoption{}, err
+	}
+	inspection, ok := reply.(*protocol.FirewallInspected)
+	if !ok || inspection.Current == nil || inspection.Fingerprint == "" {
+		return FirewallAdoption{}, fault("dependency_unavailable", "当前防火墙配置读取失败")
+	}
+	return FirewallAdoption{Fingerprint: inspection.Fingerprint, Configuration: *inspection.Current, CheckedAt: inspection.CheckedAt}, nil
+}
+
+func (n *Node) PreviewFirewallAdoption(ctx context.Context) (FirewallAdoption, error) {
+	preview, err := n.previewFirewallAdoption(ctx)
+	if err != nil {
+		return preview, err
+	}
+	state, err := n.FirewallConfig(ctx)
+	preview.ExpectedRevision = state.Revision
+	return preview, err
 }
 
 type firewallQuerier interface {
@@ -127,7 +157,21 @@ func (n *Node) writeFirewall(ctx context.Context, origin string, request Firewal
 		return out, fault("node_busy", "防火墙仍有未结束操作")
 	}
 	target := protocol.FirewallTarget{Revision: state.Revision, Configuration: state.FirewallDefinition}
-	if maintenance {
+	if request.AdoptFingerprint != "" {
+		if maintenance || request.Change != nil {
+			return out, fault("invalid_request", "接纳配置不能与规则修改同时执行")
+		}
+		preview, err := n.previewFirewallAdoption(ctx)
+		if err != nil {
+			return out, err
+		}
+		if preview.Fingerprint != request.AdoptFingerprint {
+			return out, fault("conflict", "实际防火墙配置已经变化，请重新预览")
+		}
+		target = protocol.FirewallTarget{Revision: state.Revision + 1, Configuration: preview.Configuration, AdoptFingerprint: preview.Fingerprint}
+		state.FirewallDefinition, state.Revision = target.Configuration, target.Revision
+		state.Error = nil
+	} else if maintenance {
 		target = protocol.FirewallTarget{Revision: state.ConfirmedRevision, Configuration: confirmed, Automatic: true}
 	} else if request.migration || request.Change == nil && state.Migration != nil && state.Migration.State == "failed" {
 		target, e = n.trustMigrationTarget(ctx, tx, state, confirmed)
@@ -164,6 +208,21 @@ func (n *Node) writeFirewall(ctx context.Context, origin string, request Firewal
 	idSum := sha256.Sum256([]byte(origin + "\x00" + request.Key))
 	id := n.ID + "_" + hex.EncodeToString(idSum[:])
 	op := Operation{Key: request.Key, OperationRecord: protocol.OperationRecord{ID: id, State: protocol.Accepted, Revision: 1, Decision: "undecided", Steps: []protocol.OperationStep{}}, NodeID: n.ID, Subject: "firewall_config", Actor: origin, CreatedAt: n.Now().UTC(), UpdatedAt: n.Now().UTC(), Executor: "node"}
+	logs := false
+	op.Action, op.SupportsLogs = "sync", &logs
+	if request.AdoptFingerprint != "" {
+		op.Action = "adopt_current"
+	}
+	op.Resource = &OperationResource{Kind: "component", NodeID: n.ID, ID: "firewall"}
+	var nodeConfig string
+	if e = tx.QueryRowContext(ctx, "SELECT config FROM node_identity WHERE id=1").Scan(&nodeConfig); e != nil {
+		return out, e
+	}
+	var config Config
+	if e = json.Unmarshal([]byte(nodeConfig), &config); e != nil {
+		return out, e
+	}
+	op.TargetName = config.Name
 	opBody, _ := json.Marshal(op)
 	r, e := tx.ExecContext(ctx, "INSERT INTO queue(id,origin,kind,payload,request_key,request_digest,body) VALUES(?,?,'firewall_config',?,?,?,?)", id, origin, string(payload), request.Key, digest[:], string(opBody))
 	if e != nil {

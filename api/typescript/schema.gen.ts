@@ -1235,6 +1235,77 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/nodes/{node_id}/firewall/adoption": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 预览当前防火墙配置 */
+        get: operations["previewFirewallAdoption"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/database-clusters/{id}/proxy-routing": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 读取代理策略及本机排序 */
+        get: operations["getProxyRouting"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/database-clusters/{id}/proxy-routing/previews": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 预览代理受管配置及排序 */
+        post: operations["previewProxyRouting"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/database-clusters/{id}/proxy-routing/actions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * 应用预览的代理配置
+         * @description Idempotency-Key 作用于稳定调用身份和所属目标；未知结果先查询原请求，禁止自动换键重做。
+         */
+        post: operations["applyProxyRouting"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1420,7 +1491,7 @@ export interface components {
         };
         AddressObservation: {
             /** @enum {string} */
-            source: "peer" | "ipify" | "local";
+            source: "peer" | "ipify" | "local" | "icanhazip";
             address?: string;
             /** Format: date-time */
             observed_at: string;
@@ -1433,7 +1504,10 @@ export interface components {
             /** @enum {string} */
             state: "pending" | "confirmed" | "failed" | "conflict" | "unavailable";
             observations: components["schemas"]["AddressObservation"][];
-            /** Format: date-time */
+            /**
+             * Format: date-time
+             * @description 最近一次确认地址或确认该地址族不可用的时间；失败观测保留该时间。
+             */
             updated_at?: string;
             error?: string;
         };
@@ -1787,6 +1861,12 @@ export interface components {
             actor?: string;
             idempotency_key?: string;
             resource_id?: string;
+            /** @description 受理时保存的具体动作；历史缺值保持未知。 */
+            action?: string;
+            /** @description 受理时的目标名称。 */
+            target_name?: string;
+            resource?: components["schemas"]["OperationResource"];
+            supports_logs?: boolean;
         };
         OperationList: {
             items: components["schemas"]["Operation"][];
@@ -1908,6 +1988,7 @@ export interface components {
             /** @enum {string} */
             address_mode?: "auto" | "manual";
             api?: boolean;
+            network_error?: components["schemas"]["NetworkError"];
         };
         NodeAccount: {
             username: string;
@@ -2218,6 +2299,8 @@ export interface components {
             host: string;
             port: number;
             state: string;
+            weight?: number;
+            max_connections?: number;
         };
         DatabaseProxyPool: {
             hostgroup: number;
@@ -2229,6 +2312,13 @@ export interface components {
             free: number;
             /** Format: double */
             errors: number;
+            state?: string;
+            /** Format: int64 */
+            peak_used?: number;
+            /** Format: int64 */
+            queries?: number;
+            /** Format: int64 */
+            latency_us?: number;
         };
         DatabaseProxyUser: {
             name: string;
@@ -2238,8 +2328,11 @@ export interface components {
             protected: boolean;
         };
         DatabaseStatus: {
-            /** @enum {string} */
-            state: "ready" | "unavailable" | "mismatch" | "queued" | "reading" | "stale" | "timeout" | "error" | "offline";
+            /**
+             * @description 最近成功读取的服务健康；读取过程和故障由 read 独立表达。
+             * @enum {string}
+             */
+            state: "ready" | "unavailable" | "mismatch" | "queued" | "reading" | "stale" | "timeout" | "error" | "offline" | "unknown";
             version?: string;
             cluster_id?: string;
             cluster_name?: string;
@@ -2265,10 +2358,16 @@ export interface components {
             pools?: components["schemas"]["DatabaseProxyPool"][];
             proxy_users?: components["schemas"]["DatabaseProxyUser"][];
             pending_changes?: boolean;
-            /** Format: date-time */
+            /**
+             * Format: date-time
+             * @description 来源实例实际采集时间。
+             */
             checked_at: string;
             error?: components["schemas"]["NetworkError"];
             read: components["schemas"]["ReadStatus"];
+            /** Format: int64 */
+            max_connections?: number;
+            proxy_hostgroups?: components["schemas"]["ProxyHostgroups"];
         };
         DatabaseInstance: {
             id: string;
@@ -2343,6 +2442,7 @@ export interface components {
             deleted: boolean;
             /** Format: date-time */
             updated_at: string;
+            proxy_routing?: components["schemas"]["ProxyRoutingPolicy"];
         };
         DatabaseClusterInput: {
             name: string;
@@ -2363,7 +2463,10 @@ export interface components {
             cluster: components["schemas"]["ManagedDatabaseCluster"];
             members: components["schemas"]["ManagedDatabaseMember"][];
             proxies: components["schemas"]["ManagedDatabaseMember"][];
-            /** Format: date-time */
+            /**
+             * Format: date-time
+             * @description 本次响应生成时间。
+             */
             checked_at: string;
         };
         ManagedDatabaseList: {
@@ -2423,9 +2526,15 @@ export interface components {
         ReadStatus: {
             /** @enum {string} */
             state: "queued" | "reading" | "ready" | "stale" | "timeout" | "error" | "offline";
-            /** Format: date-time */
+            /**
+             * Format: date-time
+             * @description 当前保留结果的来源采集时间；重复返回缓存不会更新。
+             */
             data_at?: string;
-            /** Format: date-time */
+            /**
+             * Format: date-time
+             * @description 最近一次取得名额并开始读取的时间。
+             */
             attempted_at?: string;
             error?: components["schemas"]["NetworkError"];
         };
@@ -2683,10 +2792,11 @@ export interface components {
         };
         FirewallAction: {
             /** @enum {string} */
-            action: "install" | "sync";
+            action: "install" | "sync" | "adopt_current";
             backend?: components["schemas"]["Backend"];
             /** Format: int64 */
             expected_revision: number;
+            fingerprint?: string;
         };
         OperationAction: {
             /** @enum {string} */
@@ -2799,6 +2909,135 @@ export interface components {
             directory: string;
             files: string[];
             environment_files: string[];
+        };
+        OperationResource: {
+            /** @enum {string} */
+            kind: "node" | "container" | "compose" | "task" | "database" | "component";
+            node_id: string;
+            id: string;
+            engine_id?: string;
+        };
+        FirewallAdoption: {
+            /** Format: int64 */
+            expected_revision: number;
+            fingerprint: string;
+            configuration: components["schemas"]["FirewallDefinition"];
+            /** Format: date-time */
+            checked_at: string;
+        };
+        FirewallDefinition: {
+            backend: components["schemas"]["Backend"];
+            rules: components["schemas"]["ManagedRule"][];
+            default_policies: components["schemas"]["ManagedPolicy"][];
+        };
+        ProxyEndpoint: {
+            host: string;
+            port: number;
+        };
+        ProxyHostgroups: {
+            writer: number;
+            backup_writer: number;
+            reader: number;
+            offline: number;
+        };
+        ProxyBackend: {
+            host: string;
+            port: number;
+            node_id: string;
+            instance_id: string;
+        };
+        ProxyAccountBinding: {
+            name: string;
+            node_id: string;
+            instance_id: string;
+        };
+        ProxyRoutingPolicy: {
+            enabled: boolean;
+            automatic: boolean;
+            hostgroups: components["schemas"]["ProxyHostgroups"];
+            backends: components["schemas"]["ProxyBackend"][];
+            retired: components["schemas"]["ProxyEndpoint"][];
+            accounts: components["schemas"]["ProxyAccountBinding"][];
+        };
+        ProxyRouteServer: {
+            host: string;
+            port: number;
+            hostgroup: number;
+            state: string;
+            weight: number;
+            max_connections: number;
+            use_ssl: boolean;
+        };
+        ProxyRouteAction: {
+            hostgroups: components["schemas"]["ProxyHostgroups"];
+            servers: components["schemas"]["ProxyRouteServer"][];
+            remove: components["schemas"]["ProxyEndpoint"][];
+            max_transactions_behind: number;
+            expected_fingerprint: string;
+            unmanaged_fingerprint: string;
+            policy_version: string;
+        };
+        ProxyRouteDiff: {
+            /** @enum {string} */
+            kind: "add" | "remove" | "weight" | "hostgroups";
+            host: string;
+            port: number;
+            before_weight: number;
+            after_weight: number;
+        };
+        ProxyRoutePreview: {
+            node_id: string;
+            instance_id: string;
+            /** Format: int64 */
+            instance_revision: number;
+            action: components["schemas"]["ProxyRouteAction"];
+            changes: components["schemas"]["ProxyRouteDiff"][];
+        };
+        ProxyRoutingPreview: {
+            /** Format: int64 */
+            expected_revision: number;
+            policy: components["schemas"]["ProxyRoutingPolicy"];
+            targets: components["schemas"]["ProxyRoutePreview"][];
+        };
+        ProxyRoutingPreviewInput: {
+            /** Format: int64 */
+            expected_revision: number;
+            enabled: boolean;
+            automatic: boolean;
+            backends?: components["schemas"]["ProxyBackend"][];
+        };
+        ProxyRankEntry: {
+            host: string;
+            port: number;
+            node_id: string;
+            instance_id: string;
+            rank: number;
+            local: boolean;
+            /** Format: int64 */
+            latency_us?: number;
+            samples: number;
+            /** Format: date-time */
+            sampled_at?: string;
+        };
+        ProxyRoutingState: {
+            node_id: string;
+            instance_id: string;
+            /** @enum {string} */
+            state: "unmanaged" | "ready" | "paused" | "pending" | "applying" | "conflict" | "error" | "offline";
+            policy_version: string;
+            order: string[];
+            entries: components["schemas"]["ProxyRankEntry"][];
+            current_writer?: components["schemas"]["ProxyEndpoint"];
+            /** Format: date-time */
+            checked_at?: string;
+            /** Format: date-time */
+            changed_at?: string;
+            operation_id?: string;
+            error?: components["schemas"]["NetworkError"];
+        };
+        ProxyRoutingStatus: {
+            policy?: components["schemas"]["ProxyRoutingPolicy"];
+            proxies: components["schemas"]["ProxyRoutingState"][];
         };
     };
     responses: {
@@ -6641,6 +6880,176 @@ export interface operations {
                 };
                 content: {
                     "text/html": string;
+                };
+            };
+            400: components["responses"]["Error400"];
+            401: components["responses"]["Error401"];
+            403: components["responses"]["Error403"];
+            404: components["responses"]["Error404"];
+            405: components["responses"]["Error405"];
+            406: components["responses"]["Error406"];
+            409: components["responses"]["Error409"];
+            412: components["responses"]["Error412"];
+            413: components["responses"]["Error413"];
+            415: components["responses"]["Error415"];
+            422: components["responses"]["Error422"];
+            428: components["responses"]["Error428"];
+            429: components["responses"]["Error429"];
+            500: components["responses"]["Error500"];
+            503: components["responses"]["Error503"];
+            504: components["responses"]["Error504"];
+        };
+    };
+    previewFirewallAdoption: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                node_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 请求成功 */
+            200: {
+                headers: {
+                    "X-Request-ID": string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FirewallAdoption"];
+                };
+            };
+            400: components["responses"]["Error400"];
+            401: components["responses"]["Error401"];
+            403: components["responses"]["Error403"];
+            404: components["responses"]["Error404"];
+            405: components["responses"]["Error405"];
+            406: components["responses"]["Error406"];
+            409: components["responses"]["Error409"];
+            412: components["responses"]["Error412"];
+            413: components["responses"]["Error413"];
+            415: components["responses"]["Error415"];
+            422: components["responses"]["Error422"];
+            428: components["responses"]["Error428"];
+            429: components["responses"]["Error429"];
+            500: components["responses"]["Error500"];
+            503: components["responses"]["Error503"];
+            504: components["responses"]["Error504"];
+        };
+    };
+    getProxyRouting: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 请求成功 */
+            200: {
+                headers: {
+                    "X-Request-ID": string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProxyRoutingStatus"];
+                };
+            };
+            400: components["responses"]["Error400"];
+            401: components["responses"]["Error401"];
+            403: components["responses"]["Error403"];
+            404: components["responses"]["Error404"];
+            405: components["responses"]["Error405"];
+            406: components["responses"]["Error406"];
+            409: components["responses"]["Error409"];
+            412: components["responses"]["Error412"];
+            413: components["responses"]["Error413"];
+            415: components["responses"]["Error415"];
+            422: components["responses"]["Error422"];
+            428: components["responses"]["Error428"];
+            429: components["responses"]["Error429"];
+            500: components["responses"]["Error500"];
+            503: components["responses"]["Error503"];
+            504: components["responses"]["Error504"];
+        };
+    };
+    previewProxyRouting: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-CSRF-Token"?: string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProxyRoutingPreviewInput"];
+            };
+        };
+        responses: {
+            /** @description 请求成功 */
+            200: {
+                headers: {
+                    "X-Request-ID": string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProxyRoutingPreview"];
+                };
+            };
+            400: components["responses"]["Error400"];
+            401: components["responses"]["Error401"];
+            403: components["responses"]["Error403"];
+            404: components["responses"]["Error404"];
+            405: components["responses"]["Error405"];
+            406: components["responses"]["Error406"];
+            409: components["responses"]["Error409"];
+            412: components["responses"]["Error412"];
+            413: components["responses"]["Error413"];
+            415: components["responses"]["Error415"];
+            422: components["responses"]["Error422"];
+            428: components["responses"]["Error428"];
+            429: components["responses"]["Error429"];
+            500: components["responses"]["Error500"];
+            503: components["responses"]["Error503"];
+            504: components["responses"]["Error504"];
+        };
+    };
+    applyProxyRouting: {
+        parameters: {
+            query?: never;
+            header: {
+                "X-CSRF-Token"?: string;
+                "Idempotency-Key": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProxyRoutingPreview"];
+            };
+        };
+        responses: {
+            /** @description 请求成功 */
+            202: {
+                headers: {
+                    "X-Request-ID": string;
+                    Location: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Operation"];
                 };
             };
             400: components["responses"]["Error400"];

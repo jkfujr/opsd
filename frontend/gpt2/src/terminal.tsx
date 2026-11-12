@@ -15,8 +15,27 @@ import { terminalFonts } from './theme';
 import { Btn, Choice, Empty, Field, IconButton, Status } from './ui';
 import '@xterm/xterm/css/xterm.css';
 
-type Session = { id: string; nodeId: string; name: string; ordinal: number; state: 'connecting' | 'connected' | 'disconnected'; message?: string };
+type Session = { id: string; nodeId: string; name: string; ordinal: number; state: 'loading' | 'load_error' | 'connecting' | 'connected' | 'disconnected'; attempt: number; message?: string; reloadPage?: boolean };
 type Runtime = { term: Terminal; fit: FitAddon; search: SearchAddon; transport: TerminalTransport; dispose: () => void };
+function reloadFailedTerminalFonts() {
+  const failed = new Set<string>();
+  document.fonts.forEach(face => { if (face.status === 'error') failed.add(face.family.replaceAll(/["']/g, '')); });
+  const reload = (sheet: CSSStyleSheet | CSSGroupingRule, base: string) => {
+    for (let index = 0; index < sheet.cssRules.length; index++) {
+      const rule = sheet.cssRules[index];
+      if (rule instanceof CSSGroupingRule) reload(rule, base);
+      if (!(rule instanceof CSSFontFaceRule)) continue;
+      const family = rule.style.getPropertyValue('font-family').replaceAll(/["']/g, '').trim();
+      if (!failed.has(family) || !['JetBrains Mono', 'Sarasa Fixed SC'].includes(family)) continue;
+      // CSS 字体失败会缓存错误；重新创建字体规则，才会发起新的资源读取。
+      const css = rule.cssText.replace(/url\((['"]?)(.*?)\1\)/g, (_, _quote, path: string) => {
+        const url = new URL(path, base); url.searchParams.set('opsd_font_retry', String(Date.now())); return `url("${url.href}")`;
+      });
+      sheet.deleteRule(index); sheet.insertRule(css, index);
+    }
+  };
+  for (const sheet of document.styleSheets) if (!sheet.href || new URL(sheet.href).origin === location.origin) reload(sheet, sheet.href ?? location.href);
+}
 function terminalAddress(id: string | undefined, search: string, hash: string) {
   const params = new URLSearchParams(search);
   params.delete('node');
@@ -34,7 +53,7 @@ function useSessions() {
     const id = `session-${++sequence.current}`;
     const ordinal = (nodeSequence.current.get(nodeId) ?? 0) + 1;
     nodeSequence.current.set(nodeId, ordinal);
-    setSessions(old => [...old, { id, nodeId, name, ordinal, state: 'connecting' }]);
+    setSessions(old => [...old, { id, nodeId, name, ordinal, state: 'loading', attempt: 0 }]);
     setActiveId(id);
     return id;
   }
@@ -50,13 +69,21 @@ function useSessions() {
       if (location.pathname === '/tools/terminal') navigate(terminalAddress(replacement?.id, location.search, location.hash), { replace: true });
     }
   }
-  function state(id: string, value: Session['state'], message?: string) { setSessions(old => old.map(session => session.id === id ? { ...session, state: value, message } : session)); }
+  function state(id: string, value: Session['state'], message?: string, reloadPage = false) { setSessions(old => old.map(session => session.id === id ? { ...session, state: value, message, reloadPage } : session)); }
   useEffect(() => {
     const release = () => { runtimes.current.forEach(runtime => runtime.dispose()); runtimes.current.clear(); };
     window.addEventListener('opsd:session-clearing', release);
     return () => { window.removeEventListener('opsd:session-clearing', release); release(); };
   }, []);
-  return { sessions, runtimes, create, close, state, activeId, setActiveId };
+  const reload = (id: string) => {
+    const session = sessions.find(value => value.id === id);
+    if (session?.reloadPage) {
+      // 浏览器会缓存失败的模块导入；重新打开当前节点入口后再创建会话。
+      const url = new URL(window.location.href); url.searchParams.delete('session'); url.searchParams.set('node', session.nodeId); window.location.assign(url.href); return;
+    }
+    reloadFailedTerminalFonts(); setSessions(old => old.map(session => session.id === id ? { ...session, state: 'loading', message: undefined, attempt: session.attempt + 1 } : session));
+  };
+  return { sessions, runtimes, create, close, state, activeId, setActiveId, reload };
 }
 const TerminalContext = createContext<ReturnType<typeof useSessions> | null>(null);
 export function TerminalProvider({ children }: { children: ReactNode }) { return <TerminalContext value={useSessions()}>{children}</TerminalContext>; }
@@ -116,9 +143,11 @@ function TerminalSurface({ session, visible, onSearch }: { session: Session; vis
   current.current = { preferences, visible, onSearch };
   useEffect(() => {
     const host = element.current!;
-    let cancelled = false, runtime: Runtime | undefined;
+    delete host.dataset.ready;
+    let cancelled = false, moduleFailure = false, runtime: Runtime | undefined;
     const fonts = Promise.all([document.fonts.load('400 16px "JetBrains Mono"'), document.fonts.load('700 16px "JetBrains Mono"'), document.fonts.load('400 16px "Sarasa Fixed SC"', '中文'), document.fonts.load('700 16px "Sarasa Fixed SC"', '中文')]);
-    const resources = Promise.all([fonts, import('@xterm/xterm'), import('@xterm/addon-fit'), import('@xterm/addon-search')]);
+    const moduleError = (error: unknown): never => { moduleFailure = true; throw error; };
+    const resources = Promise.all([fonts, import('@xterm/xterm').catch(moduleError), import('@xterm/addon-fit').catch(moduleError), import('@xterm/addon-search').catch(moduleError)]);
     void resources.then(([, { Terminal }, { FitAddon }, { SearchAddon }]) => {
       if (cancelled) return;
       const { preferences } = current.current;
@@ -136,9 +165,9 @@ function TerminalSurface({ session, visible, onSearch }: { session: Session; vis
       runtime = { term, fit, search, transport, dispose: () => { if (disposed) return; disposed = true; cancelAnimationFrame(frame); observer.disconnect(); data.dispose(); resize.dispose(); transport.dispose(); term.dispose(); } };
       runtimes.current.set(session.id, runtime); host.dataset.ready = 'true';
       if (current.current.visible) term.focus();
-    }).catch(() => { if (!cancelled) { host.dataset.fontError = 'true'; state(session.id, 'disconnected'); } });
+    }).catch(() => { if (!cancelled) { state(session.id, 'load_error', '终端资源载入失败', moduleFailure); } });
     return () => { cancelled = true; if (runtimes.current.get(session.id) === runtime) runtimes.current.delete(session.id); runtime?.dispose(); };
-  }, [session.id]);
+  }, [session.id, session.attempt]);
   useEffect(() => {
     const runtime = runtimes.current.get(session.id);
     if (!runtime) return;
@@ -150,7 +179,7 @@ function TerminalSurface({ session, visible, onSearch }: { session: Session; vis
     });
     return () => cancelAnimationFrame(frame);
   }, [preferences, resolvedTheme, visible, session.id, runtimes]);
-  return <div className="terminal-surface" hidden={!visible} data-session-id={session.id} ref={element}><span className="terminal-loading" data-error="终端资源载入失败，请刷新页面重试">正在载入终端…</span></div>;
+  return <div className="terminal-surface" hidden={!visible} data-session-id={session.id} ref={element}></div>;
 }
 
 function sessionName(session: Session, sessions: Session[]) {
@@ -212,13 +241,13 @@ export function TerminalWorkspace({ active }: { active: boolean }) {
     void navigator.clipboard.writeText(text).then(() => setToast('已复制')).catch(() => setToast('复制失败，请使用 Ctrl+Shift+C'));
   }
   function paste() { void navigator.clipboard.readText().then(text => { runtime()?.term.paste(text); runtime()?.term.focus(); }).catch(() => setToast('请在终端中按 Ctrl+Shift+V 粘贴')); }
-  const stateLabel = { connecting: '连接中', connected: '已连接', disconnected: '已断开' };
+  const stateLabel = { loading: '加载中', load_error: '载入失败', connecting: '连接中', connected: '已连接', disconnected: '已断开' };
   return <div className="terminal-workspace" ref={workspace} hidden={!active}>
-    <header className="terminal-toolbar"><div className="terminal-identity">{selected ? <><h1><span className="terminal-session-name" title={sessionName(selected, model.sessions)}>{sessionName(selected, model.sessions)}</span><DropdownMenu><DropdownMenuTrigger className="terminal-session-switch" aria-label="切换终端会话"><span>{sessionName(selected, model.sessions)}</span><ChevronDown size={16} aria-hidden/></DropdownMenuTrigger><DropdownMenuContent className="action-menu terminal-popup session-picker" align="start" container={workspace}>{model.sessions.map(session => <DropdownMenuItem key={session.id} onClick={() => activate(session.id)}><span>{sessionName(session, model.sessions)}</span>{selected.id === session.id && <Check size={16} aria-hidden/>}</DropdownMenuItem>)}</DropdownMenuContent></DropdownMenu></h1><span className="terminal-os">{nodes.find(node => node.id === selected.nodeId)?.region}</span><Status tone={selected.state === 'connected' ? 'success' : selected.state === 'connecting' ? 'warning' : 'neutral'}>{stateLabel[selected.state]}</Status></> : <h1>终端</h1>}</div><div className="terminal-actions"><NewSessionMenu onCreate={create} container={workspace}/><IconButton icon={Search} label="搜索终端 Ctrl+Shift+F" disabled={!selected} aria-pressed={searchOpen} onClick={() => setSearchOpen(value => !value)}/><IconButton icon={Maximize} label={fullscreen ? '退出终端全屏' : '终端全屏'} onClick={() => { void (document.fullscreenElement ? document.exitFullscreen() : workspace.current?.requestFullscreen())?.catch(() => setToast('浏览器未允许全屏')); }}/><Popover open={settingsOpen} onOpenChange={setSettingsOpen}><DropdownMenu><DropdownMenuTrigger render={<IconButton ref={moreButton} icon={Ellipsis} label="终端更多操作"/>}/><DropdownMenuContent className="action-menu terminal-popup" align="end" container={workspace} finalFocus={settingsOpen ? false : moreButton}><DropdownMenuItem disabled={!selected} onClick={copy}><Copy size={18} aria-hidden/>复制选中内容</DropdownMenuItem><DropdownMenuItem disabled={selected?.state !== 'connected'} onClick={paste}><Clipboard size={18} aria-hidden/>粘贴</DropdownMenuItem><DropdownMenuItem disabled={!selected} onClick={() => { runtime()?.term.clear(); runtime()?.term.focus(); }}><Eraser size={18} aria-hidden/>清屏</DropdownMenuItem><DropdownMenuSeparator/><DropdownMenuItem onClick={() => setSettingsOpen(true)}><Settings2 size={18} aria-hidden/>终端设置</DropdownMenuItem><DropdownMenuSeparator/><DropdownMenuItem disabled={selected?.state !== 'connected'} onClick={() => runtime()?.transport.disconnect()}><Unplug size={18} aria-hidden/>断开会话</DropdownMenuItem>{selected && <DropdownMenuItem onClick={() => model.close(selected.id)}><X size={18} aria-hidden/>关闭会话</DropdownMenuItem>}</DropdownMenuContent></DropdownMenu><PopoverContent arrow={false} className="terminal-popup terminal-settings" anchor={moreButton} align="end" container={workspace} finalFocus={moreButton} aria-label="终端设置"><div className="terminal-settings-heading"><PopoverTitle>终端设置</PopoverTitle><IconButton icon={X} label="关闭终端设置" onClick={() => setSettingsOpen(false)}/></div><TerminalPreferences container={workspace} terminal/></PopoverContent></Popover></div></header>
+    <header className="terminal-toolbar"><div className="terminal-identity">{selected ? <><h1><span className="terminal-session-name" title={sessionName(selected, model.sessions)}>{sessionName(selected, model.sessions)}</span><DropdownMenu><DropdownMenuTrigger className="terminal-session-switch" aria-label="切换终端会话"><span>{sessionName(selected, model.sessions)}</span><ChevronDown size={16} aria-hidden/></DropdownMenuTrigger><DropdownMenuContent className="action-menu terminal-popup session-picker" align="start" container={workspace}>{model.sessions.map(session => <DropdownMenuItem key={session.id} onClick={() => activate(session.id)}><span>{sessionName(session, model.sessions)}</span>{selected.id === session.id && <Check size={16} aria-hidden/>}</DropdownMenuItem>)}</DropdownMenuContent></DropdownMenu></h1><span className="terminal-os">{nodes.find(node => node.id === selected.nodeId)?.region}</span><Status tone={selected.state === 'connected' ? 'success' : selected.state === 'load_error' ? 'error' : 'neutral'}>{stateLabel[selected.state]}</Status></> : <h1>终端</h1>}</div><div className="terminal-actions"><NewSessionMenu onCreate={create} container={workspace}/><IconButton icon={Search} label="搜索终端 Ctrl+Shift+F" disabled={!selected} aria-pressed={searchOpen} onClick={() => setSearchOpen(value => !value)}/><IconButton icon={Maximize} label={fullscreen ? '退出终端全屏' : '终端全屏'} onClick={() => { void (document.fullscreenElement ? document.exitFullscreen() : workspace.current?.requestFullscreen())?.catch(() => setToast('浏览器未允许全屏')); }}/><Popover open={settingsOpen} onOpenChange={setSettingsOpen}><DropdownMenu><DropdownMenuTrigger render={<IconButton ref={moreButton} icon={Ellipsis} label="终端更多操作"/>}/><DropdownMenuContent className="action-menu terminal-popup" align="end" container={workspace} finalFocus={settingsOpen ? false : moreButton}><DropdownMenuItem disabled={!selected} onClick={copy}><Copy size={18} aria-hidden/>复制选中内容</DropdownMenuItem><DropdownMenuItem disabled={selected?.state !== 'connected'} onClick={paste}><Clipboard size={18} aria-hidden/>粘贴</DropdownMenuItem><DropdownMenuItem disabled={!selected} onClick={() => { runtime()?.term.clear(); runtime()?.term.focus(); }}><Eraser size={18} aria-hidden/>清屏</DropdownMenuItem><DropdownMenuSeparator/><DropdownMenuItem onClick={() => setSettingsOpen(true)}><Settings2 size={18} aria-hidden/>终端设置</DropdownMenuItem><DropdownMenuSeparator/><DropdownMenuItem disabled={selected?.state !== 'connected'} onClick={() => runtime()?.transport.disconnect()}><Unplug size={18} aria-hidden/>断开会话</DropdownMenuItem>{selected && <DropdownMenuItem onClick={() => model.close(selected.id)}><X size={18} aria-hidden/>关闭会话</DropdownMenuItem>}</DropdownMenuContent></DropdownMenu><PopoverContent arrow={false} className="terminal-popup terminal-settings" anchor={moreButton} align="end" container={workspace} finalFocus={moreButton} aria-label="终端设置"><div className="terminal-settings-heading"><PopoverTitle>终端设置</PopoverTitle><IconButton icon={X} label="关闭终端设置" onClick={() => setSettingsOpen(false)}/></div><TerminalPreferences container={workspace} terminal/></PopoverContent></Popover></div></header>
     {selected ? <>
       {searchOpen && <form className="terminal-search" onSubmit={event => { event.preventDefault(); find(); }} onKeyDown={event => { if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); setSearchOpen(false); runtime()?.term.focus(); } }}><Field ref={searchInput} label="查找内容" value={query} onChange={event => { setQuery(event.target.value); setFound(null); }} placeholder="搜索当前会话…"/><IconButton icon={ArrowUp} label="上一个匹配" onClick={() => find(true)}/><IconButton icon={ArrowDown} label="下一个匹配" type="submit"/><span className="meta" role="status">{found === false ? '未找到' : found === true ? '已选中匹配内容' : ''}</span><IconButton icon={X} label="关闭搜索" onClick={() => { setSearchOpen(false); runtime()?.term.focus(); }}/></form>}
       <div className="terminal-viewport">{model.sessions.map(session => <div className="terminal-panel" key={session.id} role="region" aria-label={`${sessionName(session, model.sessions)} 终端输出`} hidden={!active || session.id !== selected.id}><TerminalSurface session={session} visible={active && session.id === selected.id} onSearch={() => setSearchOpen(true)}/></div>)}</div>
-      {selected.state === 'disconnected' && <div className="terminal-disconnected"><span role="status">{selected.message || '连接已断开'}</span><Btn icon={Plus} onClick={() => runtime()?.transport.reconnect()}>重新连接</Btn></div>}
+      {['disconnected', 'load_error'].includes(selected.state) && <div className="terminal-disconnected"><span role="status">{selected.message || '连接已断开'}</span><Btn icon={Plus} onClick={() => selected.state === 'load_error' ? model.reload(selected.id) : runtime()?.transport.reconnect()}>{selected.state === 'load_error' ? '重新加载' : '重新连接'}</Btn></div>}
     </> : <div className="terminal-welcome"><Empty icon={SquareTerminal} title="选择节点开始会话" action={<NewSessionMenu onCreate={create} container={workspace} empty/>}/></div>}
   </div>;
 }

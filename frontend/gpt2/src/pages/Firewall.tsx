@@ -1,3 +1,4 @@
+import { FirewallAdoption } from '../firewall-adoption';
 import { useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { Link, useSearchParams } from 'react-router';
@@ -88,7 +89,7 @@ function FirewallContent({ nodeID }: { nodeID: string }) {
     {node?.revoked_at && <p role="alert" className="mb-3"><StatusLabel state="offline">节点已撤销</StatusLabel></p>}
     {node?.connected === false && <p role="status" className="mb-3"><StatusLabel state="offline">节点离线</StatusLabel></p>}
     {read?.error && <p role="alert" className="mb-3 text-sm text-error-intense">{read.error.message}</p>}
-    <Failure error={retry.error ?? locateRetry.error} />
+    <Failure error={retry.error ?? locateRetry.error} />{read?.error && read.state === 'failed' && <FirewallAdoption key={nodeID} node={nodeID} disabled={disabled || retryUncertain}/>}
     {read && <InstallFirewall key={nodeID} nodeID={nodeID} revision={read.revision} available={read.backend === 'none' && read.capabilities.install.supported} disabled={node?.writable === false || state.isError} />}
     <Tabs variant="line" className="tab-set tabs-panel" value={category} onValueChange={(value) => update('type', String(value))}>
       <div className="tab-bar">

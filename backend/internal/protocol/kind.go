@@ -24,6 +24,10 @@ func newPayload(kind Kind) (Payload, error) {
 		return &DatabaseRead{}, nil
 	case "database.read.result":
 		return &DatabaseReadResult{}, nil
+	case "database.proxy_routing.read":
+		return &ProxyRoutingRead{}, nil
+	case "database.proxy_routing.result":
+		return &ProxyRoutingReadResult{}, nil
 	case "docker.read":
 		return &DockerRead{}, nil
 	case "docker.read.result":

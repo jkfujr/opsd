@@ -11,11 +11,11 @@ import (
 	"fmt"
 	"net"
 	"net/http"
-	"net/netip"
 	"net/url"
 	"reflect"
 	"slices"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 
@@ -268,8 +268,10 @@ func (n *Node) PatchPublic(ctx context.Context, request PublicAddressesPatch) (P
 		}
 		item.value.Mode = p.Mode
 		item.value.Error = ""
-		now := n.Now().UTC()
-		item.value.UpdatedAt = &now
+		if p.Mode == "manual" {
+			now := n.Now().UTC()
+			item.value.UpdatedAt = &now
+		}
 	}
 	if e = n.savePublicTx(ctx, tx, v); e == nil {
 		e = n.advertisePublicTx(ctx, tx, v.PublicAddresses)
@@ -289,7 +291,6 @@ func reconcileObservation(current PublicFamily, observations []protocol.AddressO
 		return current
 	}
 	current.Observations = observations
-	current.UpdatedAt = &now
 	current.Error = ""
 	values := []string{}
 	for _, o := range observations {
@@ -302,6 +303,7 @@ func reconcileObservation(current PublicFamily, observations []protocol.AddressO
 		if len(observations) == 1 && observations[0].Source == "local" && observations[0].Error != nil && observations[0].Error.Code == "address_unavailable" {
 			current.State = "unavailable"
 			current.Addresses = []string{}
+			current.UpdatedAt = &now
 			break
 		}
 		current.State = "failed"
@@ -309,6 +311,7 @@ func reconcileObservation(current PublicFamily, observations []protocol.AddressO
 	case 1:
 		current.Addresses = values
 		current.State = "confirmed"
+		current.UpdatedAt = &now
 	default:
 		current.State = "conflict"
 		current.Error = "公网地址来源不一致"
@@ -394,9 +397,9 @@ func (n *Node) advertisePublicTx(ctx context.Context, tx *sql.Tx, v PublicAddres
 		return nil
 	}
 	address := ""
-	if len(v.IPv4.Addresses) > 0 {
+	if v.IPv4.State == "confirmed" && len(v.IPv4.Addresses) > 0 {
 		address = v.IPv4.Addresses[0]
-	} else if len(v.IPv6.Addresses) > 0 {
+	} else if v.IPv6.State == "confirmed" && len(v.IPv6.Addresses) > 0 {
 		address = v.IPv6.Addresses[0]
 	}
 	if address == "" {
@@ -414,6 +417,12 @@ func (n *Node) advertisePublicTx(ctx context.Context, tx *sql.Tx, v PublicAddres
 		port = "8444"
 	}
 	u.Host = net.JoinHostPort(address, port)
+	next := c
+	next.Address = u.String()
+	if networkConfigurationError(next) != nil {
+		// 地址发现不修改监听；本机网络命令完成切换后才公布新地址。
+		return nil
+	}
 	if c.Address == u.String() {
 		return nil
 	}
@@ -429,7 +438,8 @@ func (n *Node) observePublic(ctx context.Context, family protocol.AddressFamily)
 	if n.ObservePublic != nil {
 		return n.ObservePublic(ctx, family)
 	}
-	result := []protocol.AddressObservation{}
+	ctx, cancel := context.WithTimeout(ctx, 8*time.Second)
+	defer cancel()
 	now := n.Now().UTC()
 	if family == protocol.IPv6 {
 		available, err := publicaddress.HasIPv6()
@@ -437,97 +447,152 @@ func (n *Node) observePublic(ctx context.Context, family protocol.AddressFamily)
 			return []protocol.AddressObservation{{Source: "local", ObservedAt: now, Error: &protocol.Error{Code: "address_unavailable", Message: "无公网 IPv6"}}}
 		}
 	}
-	if address, e := n.probePublic(ctx, family); e == nil {
-		result = append(result, protocol.AddressObservation{Source: "peer", Address: address, ObservedAt: now})
-	} else {
-		result = append(result, protocol.AddressObservation{Source: "peer", ObservedAt: now, Error: &protocol.Error{Code: "dependency_unavailable", Message: e.Error()}})
+	var peer protocol.AddressObservation
+	var public []publicaddress.Observation
+	var wg sync.WaitGroup
+	wg.Add(2)
+	go func() {
+		defer wg.Done()
+		address, err := n.probePublic(ctx, family)
+		peer = protocol.AddressObservation{Source: "peer", Address: address, ObservedAt: n.Now().UTC()}
+		if err != nil {
+			peer.Error = &protocol.Error{Code: "dependency_unavailable", Message: err.Error()}
+		}
+	}()
+	go func() { defer wg.Done(); public = publicaddress.Observe(ctx, string(family)) }()
+	wg.Wait()
+	result := []protocol.AddressObservation{peer}
+	for _, observation := range public {
+		o := protocol.AddressObservation{Source: observation.Source, Address: observation.Address, ObservedAt: n.Now().UTC()}
+		if observation.Error != nil {
+			o.Error = &protocol.Error{Code: "dependency_unavailable", Message: observation.Error.Error()}
+		}
+		result = append(result, o)
 	}
-	address, e := publicaddress.Echo(ctx, string(family))
-	o := protocol.AddressObservation{Source: "ipify", Address: address, ObservedAt: now}
-	if e != nil {
-		o.Error = &protocol.Error{Code: "dependency_unavailable", Message: e.Error()}
-	}
-	return append(result, o)
+	return result
 }
 func (n *Node) probePublic(ctx context.Context, family protocol.AddressFamily) (string, error) {
 	d, e := n.Directory(ctx)
 	if e != nil {
 		return "", e
 	}
+	return probePublicCandidates(ctx, family, n.ID, d, n.probePublicMember)
+}
+
+func probePublicCandidates(ctx context.Context, family protocol.AddressFamily, self string, d Directory, probe func(context.Context, Member, string, protocol.AddressFamily) (string, error)) (string, error) {
+	attempts := 0
+	failures := []string{}
+	revoked := map[string]bool{}
+	for _, revocation := range d.Revocations {
+		revoked[revocation.ID] = true
+	}
 	for _, m := range d.Members {
-		if m.ID == n.ID || n.Revoked(ctx, m.ID) {
+		if m.ID == self || revoked[m.ID] {
 			continue
 		}
-		u, e := url.Parse(m.Address)
-		if e != nil {
+		endpoint := publicEchoEndpoint(m, d.Addresses, family)
+		if endpoint == "" {
 			continue
 		}
-		if a, err := netip.ParseAddr(u.Hostname()); err == nil && a.Is6() != (family == protocol.IPv6) {
-			found := false
-			for _, record := range d.Addresses {
-				if record.NodeID == m.ID {
-					f := record.IPv4
-					if family == protocol.IPv6 {
-						f = record.IPv6
-					}
-					if len(f.Addresses) > 0 {
-						port := u.Port()
-						if port == "" {
-							port = "8444"
-						}
-						u.Host = net.JoinHostPort(f.Addresses[0], port)
-						found = true
-					}
-					break
-				}
-			}
-			if !found {
-				continue
-			}
+		attempt, cancel := context.WithTimeout(ctx, 2*time.Second)
+		address, err := probe(attempt, m, endpoint, family)
+		cancel()
+		if err == nil {
+			return address, nil
 		}
-		ctx, cancel := context.WithTimeout(ctx, 6*time.Second)
-		defer cancel()
-		client := publicaddress.Client(string(family))
-		defer client.CloseIdleConnections()
-		socket, _, e := websocket.Dial(ctx, u.String()+"/peer", &websocket.DialOptions{HTTPClient: client})
-		if e != nil {
-			return "", fmt.Errorf("成员回显不可达")
+		failures = append(failures, m.Name+"："+err.Error())
+		attempts++
+		if attempts == 3 || ctx.Err() != nil {
+			break
 		}
-		key, e := identity.Decode(m.Public)
-		if e != nil {
-			socket.CloseNow()
-			return "", e
-		}
-		channel, e := transport.Handshake(ctx, socket, n.Key, key, true)
-		if e != nil {
-			socket.CloseNow()
-			return "", e
-		}
-		defer channel.Close()
-		self, e := n.Self(ctx)
-		if e != nil {
-			return "", e
-		}
-		b, _ := json.Marshal(self)
-		id := identity.Random()
-		if e = channel.Send(ctx, protocol.Message{RequestID: id, Payload: &protocol.PeerHello{Member: b, ProbeFamily: family}}); e != nil {
-			return "", e
-		}
-		reply, e := channel.Receive(ctx)
-		if e != nil {
-			return "", e
-		}
-		echo, ok := reply.Payload.(*protocol.AddressEcho)
-		if !ok || reply.ReplyTo != id {
-			return "", fmt.Errorf("成员回显应答无效")
-		}
-		a, e := publicaddress.Parse(echo.Address)
-		if e != nil || a.Is6() != (family == protocol.IPv6) {
-			return "", fmt.Errorf("成员回显未取得公网地址")
-		}
-		return a.String(), nil
+	}
+	if len(failures) > 0 {
+		return "", fmt.Errorf("%s", strings.Join(failures, "；"))
 	}
 	return "", fmt.Errorf("没有可用的成员回显")
+}
+
+func publicEchoEndpoint(m Member, records []AddressRecord, family protocol.AddressFamily) string {
+	u, err := url.Parse(m.Address)
+	if err != nil {
+		return ""
+	}
+	if a, err := publicaddress.Parse(u.Hostname()); err == nil && a.Is6() == (family == protocol.IPv6) {
+		return u.String()
+	}
+	for _, record := range records {
+		if record.NodeID != m.ID {
+			continue
+		}
+		f := record.IPv4
+		if family == protocol.IPv6 {
+			f = record.IPv6
+		}
+		for _, value := range f.Addresses {
+			a, err := publicaddress.Parse(value)
+			if err != nil || a.Is6() != (family == protocol.IPv6) {
+				continue
+			}
+			port := u.Port()
+			if port == "" {
+				port = "8444"
+			}
+			u.Host = net.JoinHostPort(a.String(), port)
+			return u.String()
+		}
+	}
+	return ""
+}
+
+func (n *Node) probePublicMember(ctx context.Context, m Member, endpoint string, family protocol.AddressFamily) (string, error) {
+	client := publicaddress.Client(string(family))
+	defer client.CloseIdleConnections()
+	socket, _, err := websocket.Dial(ctx, endpoint+"/peer", &websocket.DialOptions{HTTPClient: client})
+	if err != nil {
+		if ctx.Err() == context.DeadlineExceeded {
+			return "", fmt.Errorf("成员回显连接超时")
+		}
+		return "", fmt.Errorf("成员回显不可达")
+	}
+	key, err := identity.Decode(m.Public)
+	if err != nil {
+		socket.CloseNow()
+		return "", err
+	}
+	channel, err := transport.Handshake(ctx, socket, n.Key, key, true)
+	if err != nil {
+		socket.CloseNow()
+		return "", err
+	}
+	defer channel.Close()
+	self, err := n.Self(ctx)
+	if err != nil {
+		return "", err
+	}
+	b, _ := json.Marshal(self)
+	id := identity.Random()
+	if err = channel.Send(ctx, protocol.Message{RequestID: id, Payload: &protocol.PeerHello{Member: b, ProbeFamily: family}}); err != nil {
+		return "", err
+	}
+	reply, err := channel.Receive(ctx)
+	if err != nil {
+		return "", err
+	}
+	if reply.ReplyTo != id {
+		return "", fmt.Errorf("成员回显应答无效")
+	}
+	if failure, ok := reply.Payload.(*protocol.PeerReply); ok && failure.Error != nil {
+		return "", fault(failure.Error.Code, failure.Error.Message)
+	}
+	echo, ok := reply.Payload.(*protocol.AddressEcho)
+	if !ok {
+		return "", fmt.Errorf("成员回显应答无效")
+	}
+	a, err := publicaddress.Parse(echo.Address)
+	if err != nil || a.Is6() != (family == protocol.IPv6) {
+		return "", fmt.Errorf("成员回显未取得公网地址")
+	}
+	return a.String(), nil
 }
 
 func (n *Node) networkDirectory(ctx context.Context, d *Directory) error {
@@ -741,8 +806,16 @@ func (n *Node) syncTrust(ctx context.Context) {
 		return
 	}
 	data, _ := json.Marshal(status)
+	var previous string
+	var old protocol.PeerTrustUpdated
+	_ = n.DB.QueryRowContext(ctx, "SELECT body FROM peer_trust_status WHERE id=1").Scan(&previous)
+	_ = json.Unmarshal([]byte(previous), &old)
+	before, after := old, *status
+	before.CheckedAt, after.CheckedAt = nil, nil
 	if _, e = n.DB.ExecContext(ctx, "INSERT INTO peer_trust_status(id,body) VALUES(1,?) ON CONFLICT(id) DO UPDATE SET body=excluded.body", string(data)); e == nil {
-		n.notifyChange(Change{Resource: "peer_trust", NodeID: n.ID})
+		if previous == "" || !reflect.DeepEqual(before, after) {
+			n.notifyChange(Change{Resource: "peer_trust", NodeID: n.ID})
+		}
 	}
 }
 func (n *Node) LocalTrustRules(ctx context.Context) (TrustRules, error) {

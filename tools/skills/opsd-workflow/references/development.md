@@ -21,6 +21,8 @@
 
 `current_reads.go` 在入口共享当前资源，立即返回已有状态，目标独立刷新并从取得名额起计算期限；无页面请求后停止。`read.state` 区分排队、读取、已有数据、过期、超时、失败与离线。`database_reads.go` 按健康和页签分类，`databaseengine` 只负责本机 SQL 与有界连接池，写入前检查不复用展示缓存。`history.go` 复用请求内选库和公钥，批量分页后归并图表时间桶。采集、上传及 CouchDB 维护分别运行；承载节点采用双向环复制。
 
+服务结果、读取故障与来源时间分别保存；操作元信息由 `operation_description.go` 在受理事务写入，历史缺值保持未知。`proxy_routing.go` 管理策略预览与持久工作流，`proxy_ranking.go` 在代理所属节点后台维护本机排序；节点迁移 `006_proxy_routing.sql` 只增加本机状态表。CouchDB 维护复用节点 HTTP Transport、变化唤醒及有上限退避，互信五秒维护保留、事件按实际变化发送。
+
 ## HTTP 与前端
 
 只修改 `api/openapi.json`，执行 `npm run generate` 生成 backend 内的 HTTP Go 类型、`api/typescript/schema.gen.ts` 共享类型、严格接口、授权和节点／主题 API 能力版本，不手改生成文件或另写 DTO。`/api/v2/docs` 使用同份规范及内置 Swagger 资源；通用调用规则只维护在 [API](../../../../docs/API.md)。`frontend/gpt2/src/api/client.ts` 统一附加 CSRF、记录 GET 的 ETag、遍历集合分页并处理 Problem；写入禁止自动重试，未知结果查询原请求键。
@@ -53,7 +55,7 @@ UFW 互信只改写 OPSD 所属链与带标记的引用，`INPUT` 首条引用�
 
 ## 按任务选择验收
 
-后端 CI 设置 `OPSD_DATABASE_TEST=1` 启用三成员 Galera、两个 ProxySQL 和实际 Prometheus／Grafana，结果位于 `artifacts/database-result.json`。三逻辑 OPSD 节点和真实数据库容器运行在同一 CI 主机。生产页面检查创建令牌后的实际 JSON／指标请求与 Web/API 独立启停；数据库界面注入状态数据，数据库变更由后端真实集群检查。截图和结果分别保存在 `ui-check`、`database-check` 工件。
+后端 CI 设置 `OPSD_DATABASE_TEST=1` 启用三成员 Galera、两个 ProxySQL 和实际 Prometheus／Grafana，结果位于 `artifacts/database-result.json`。四逻辑 OPSD 节点和真实数据库容器运行在同一 CI 主机，其中一台仅管理代理；受管配置、应答丢失、事务保持、故障切换、代理重启与多写冲突复用该环境。生产页面检查创建令牌后的实际 JSON／指标请求与 Web/API 独立启停；数据库界面注入状态数据，数据库变更由后端真实集群检查。三模式受影响界面结果随 `theme-check` 保存，数据库结果位于 `database-check`。
 
 本批使用 GitHub Actions，流程见 [验收文档](../../../../docs/VALIDATION.md)。`npm run build` 包含接口生成、前端类型检查、构建与双架构程序编译；同提交成功产物直接用于发布。当前成功结果输入未变就复用。
 

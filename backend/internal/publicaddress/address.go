@@ -52,19 +52,53 @@ func Client(family string) *http.Client {
 	}}, Timeout: 6 * time.Second}
 }
 
-func Echo(ctx context.Context, family string) (string, error) {
+type Observation struct {
+	Source  string
+	Address string
+	Error   error
+}
+
+// Observe 保留主源失败的原因，备用成功后仍可查看这次发现过程。
+func Observe(ctx context.Context, family string) []Observation {
 	endpoint := "https://api.ipify.org"
+	backup := "https://ipv4.icanhazip.com"
 	if family == "ipv6" {
 		endpoint = "https://api6.ipify.org"
+		backup = "https://ipv6.icanhazip.com"
 	}
+	client := Client(family)
+	defer client.CloseIdleConnections()
+	return observe(ctx, family, []string{endpoint, backup}, client)
+}
+
+func observe(ctx context.Context, family string, endpoints []string, client *http.Client) []Observation {
+	result := []Observation{}
+	for i, endpoint := range endpoints {
+		attempt, cancel := context.WithTimeout(ctx, 4*time.Second)
+		address, err := echo(attempt, family, endpoint, client)
+		cancel()
+		source := "ipify"
+		if i > 0 {
+			source = "icanhazip"
+		}
+		result = append(result, Observation{Source: source, Address: address, Error: err})
+		if err == nil || ctx.Err() != nil {
+			break
+		}
+	}
+	return result
+}
+
+func echo(ctx context.Context, family, endpoint string, client *http.Client) (string, error) {
 	request, err := http.NewRequestWithContext(ctx, "GET", endpoint, nil)
 	if err != nil {
 		return "", err
 	}
-	client := Client(family)
-	defer client.CloseIdleConnections()
 	response, err := client.Do(request)
 	if err != nil {
+		if ctx.Err() == context.DeadlineExceeded {
+			return "", fmt.Errorf("公共回显连接超时")
+		}
 		return "", fmt.Errorf("公共回显不可达")
 	}
 	defer response.Body.Close()
@@ -80,6 +114,19 @@ func Echo(ctx context.Context, family string) (string, error) {
 		return "", fmt.Errorf("公共回显地址无效")
 	}
 	return a.String(), nil
+}
+
+func Echo(ctx context.Context, family string) (string, error) {
+	ctx, cancel := context.WithTimeout(ctx, 8*time.Second)
+	defer cancel()
+	var last error
+	for _, observation := range Observe(ctx, family) {
+		if observation.Error == nil {
+			return observation.Address, nil
+		}
+		last = observation.Error
+	}
+	return "", last
 }
 
 func Discover(ctx context.Context) (string, error) {

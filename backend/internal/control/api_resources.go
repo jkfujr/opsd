@@ -45,7 +45,19 @@ func (s *Server) FirewallAction(w http.ResponseWriter, r *http.Request, id strin
 			return
 		}
 		s.writeFirewallConfig(w, r, id, cluster.FirewallWrite{ExpectedRevision: uint64(input.ExpectedRevision), Key: r.Header.Get("Idempotency-Key")})
+	case "adopt_current":
+		if input.Fingerprint == nil || len(*input.Fingerprint) != 64 || input.ExpectedRevision < 1 {
+			s.fail(w, r, 422, "invalid_request", "请先读取当前防火墙配置")
+			return
+		}
+		s.writeFirewallConfig(w, r, id, cluster.FirewallWrite{ExpectedRevision: uint64(input.ExpectedRevision), AdoptFingerprint: *input.Fingerprint, Key: r.Header.Get("Idempotency-Key")})
 	}
+}
+
+func (s *Server) PreviewFirewallAdoption(w http.ResponseWriter, r *http.Request, id string) {
+	var preview cluster.FirewallAdoption
+	err := s.node.Call(r.Context(), id, "firewall.config.preview_adoption", nil, &preview)
+	s.resultError(w, r, 200, convertHTTP[httpapi.FirewallAdoption](preview), err)
 }
 func (s *Server) DecideOperation(w http.ResponseWriter, r *http.Request, id string, _ httpapi.DecideOperationParams) {
 	var input httpapi.OperationAction

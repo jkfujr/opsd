@@ -44,7 +44,7 @@ func (n *Node) CurrentRead(ctx context.Context, target, method string, body, out
 	}
 	entry.used = n.Now()
 	status, value := entry.status, entry.value
-	if status.DataAt != nil && n.Now().Sub(*status.DataAt) > interval*2 {
+	if status.State == "ready" && status.DataAt != nil && n.Now().Sub(*status.DataAt) > interval*2 {
 		status.State = "stale"
 	}
 	if !entry.running && !n.closed && n.ctx.Err() == nil {
@@ -83,7 +83,7 @@ func (n *Node) refreshCurrent(entry *currentRead, target, method string, body js
 		<-n.readSlots
 		n.mu.Lock()
 		if err == nil {
-			completed := n.Now().UTC()
+			completed := currentDataTime(result, n.Now().UTC())
 			entry.value = result
 			entry.status = ReadStatus{State: "ready", DataAt: &completed, AttemptedAt: &at}
 		} else {
@@ -111,6 +111,29 @@ func (n *Node) refreshCurrent(entry *currentRead, target, method string, body js
 			return
 		}
 	}
+}
+
+// currentDataTime 使用来源采集时间，重复传输缓存不产生新的采集记录。
+func currentDataTime(value json.RawMessage, fallback time.Time) time.Time {
+	var data struct {
+		CheckedAt *time.Time      `json:"checked_at"`
+		State     json.RawMessage `json:"state"`
+		Metrics   struct {
+			CollectedAt *time.Time `json:"collected_at"`
+		} `json:"metrics"`
+	}
+	if json.Unmarshal(value, &data) == nil {
+		var state struct {
+			CheckedAt *time.Time `json:"checked_at"`
+		}
+		_ = json.Unmarshal(data.State, &state)
+		for _, at := range []*time.Time{data.CheckedAt, state.CheckedAt, data.Metrics.CollectedAt} {
+			if at != nil && !at.IsZero() {
+				return at.UTC()
+			}
+		}
+	}
+	return fallback
 }
 
 func (n *Node) connectedLocked(id string) bool {

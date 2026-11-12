@@ -27,6 +27,7 @@ type FirewallDefinition struct {
 }
 
 type FirewallTarget struct {
+	AdoptFingerprint   string              `json:"adopt_fingerprint,omitempty"`
 	Revision           uint64              `json:"revision"`
 	Configuration      FirewallDefinition  `json:"configuration"`
 	Automatic          bool                `json:"automatic,omitempty"`
@@ -64,20 +65,23 @@ type FirewallConfigPatch struct {
 
 // FirewallInspect 只供后台使用。首次导入的配置由执行器从主机读取。
 type FirewallInspect struct {
-	Import bool `json:"import,omitempty"`
+	Import         bool `json:"import,omitempty"`
+	PreviewCurrent bool `json:"preview_current,omitempty"`
 }
 
 func (*FirewallInspect) Kind() Kind { return "firewall.inspect" }
 func (*FirewallInspect) isPayload() {}
 
 type FirewallInspected struct {
-	Target        *FirewallTarget `json:"target,omitempty"`
-	Backend       Backend         `json:"backend"`
-	ServiceActive *bool           `json:"service_active,omitempty"`
-	Capabilities  Capabilities    `json:"capabilities"`
-	CheckedAt     time.Time       `json:"checked_at"`
-	InSync        bool            `json:"in_sync"`
-	Error         *Error          `json:"error,omitempty"`
+	Current       *FirewallDefinition `json:"current,omitempty"`
+	Fingerprint   string              `json:"fingerprint,omitempty"`
+	Target        *FirewallTarget     `json:"target,omitempty"`
+	Backend       Backend             `json:"backend"`
+	ServiceActive *bool               `json:"service_active,omitempty"`
+	Capabilities  Capabilities        `json:"capabilities"`
+	CheckedAt     time.Time           `json:"checked_at"`
+	InSync        bool                `json:"in_sync"`
+	Error         *Error              `json:"error,omitempty"`
 }
 
 func (*FirewallInspected) Kind() Kind { return "firewall.inspected" }

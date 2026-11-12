@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"github.com/jkfujr/opsd/internal/firewall"
 	"github.com/jkfujr/opsd/internal/operations"
 	"github.com/jkfujr/opsd/internal/protocol"
 	"github.com/jkfujr/opsd/internal/requeststate"
@@ -137,9 +138,26 @@ func (n *Node) taskDispatch(ctx context.Context, origin, method string, body jso
 		if operationOwner(input.OperationID) != n.ID {
 			return nil, fault("forbidden", "日志不属于本机")
 		}
+		op, err := n.operation(ctx, input.OperationID)
+		if err != nil {
+			return nil, err
+		}
+		supported := op.Subject == "task_run" || op.Subject == "container" || op.Subject == "compose"
+		if op.SupportsLogs != nil {
+			supported = *op.SupportsLogs
+		}
+		if !supported {
+			return nil, fault("logs_unsupported", "此操作不支持执行日志")
+		}
+		if op.Executor == "node" && op.State == protocol.Accepted {
+			return protocol.ExecutionLogs{Data: []byte{}, Offset: input.Offset, NextOffset: input.Offset}, nil
+		}
 		result, e := n.executeRead(ctx, &input)
 		if e != nil {
-			return nil, e
+			if firewall.Code(e) == "logs_unsupported" {
+				return nil, fault("logs_unsupported", "此操作不支持执行日志")
+			}
+			return nil, fault("logs_read_failed", "执行日志读取失败")
 		}
 		if p, ok := result.(*protocol.ExecutionLogsResult); ok {
 			return p.Logs, nil

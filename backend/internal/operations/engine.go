@@ -101,6 +101,9 @@ func (e *Engine) Run(ctx context.Context, id string) error {
 	if l.Action.Kind == "database" {
 		return e.database(ctx, &l)
 	}
+	if l.Action.FirewallConfig != nil && l.Action.FirewallConfig.AdoptFingerprint != "" {
+		return e.adoptFirewall(ctx, &l)
+	}
 	p := l.Action.Firewall
 	if target := l.Action.FirewallConfig; target != nil {
 		p = &protocol.ChangePlan{Backend: target.Configuration.Backend, RequiresConfirmation: managedConfirmation(target, l.Recipe), Executable: true}

@@ -39,6 +39,41 @@ func TestConsoleThemeBrowser(t *testing.T) {
 	c := openThemeConsole(t, webassets.Assets())
 	c.node.Start()
 	run("check", "OPSD_THEME_URL="+c.web.URL)
+	command := func(arguments []string, environment ...string) {
+		t.Helper()
+		cmd := exec.CommandContext(t.Context(), "node", arguments...)
+		cmd.Dir = root
+		cmd.Env = append(os.Environ(), environment...)
+		output, err := cmd.CombinedOutput()
+		if err != nil {
+			t.Fatalf("界面契约检查失败：%v\n%s", err, output)
+		}
+		t.Log(string(output))
+	}
+	command([]string{"frontend/gpt2/node_modules/vite/bin/vite.js", "build", "frontend/gpt2"})
+	command([]string{"frontend/gpt2/scripts/package-theme.mjs"})
+	browser := os.Getenv("OPSD_THEME_BROWSER")
+	if browser == "" {
+		browser = "chromium"
+	}
+	for _, mode := range []string{"theme", "builtin", "recovery"} {
+		t.Run(mode, func(t *testing.T) {
+			instance := openThemeConsole(t, webassets.Assets())
+			instance.node.Start()
+			arguments := []string{"frontend/gpt2/scripts/check-ui.mjs", "--backend-contract"}
+			if mode != "theme" {
+				arguments = append(arguments, "--"+mode)
+			}
+			cmd := exec.CommandContext(t.Context(), "node", arguments...)
+			cmd.Dir = root
+			cmd.Env = append(os.Environ(), "OPSD_GPT2_URL="+instance.web.URL, "OPSD_GPT2_BROWSER="+browser)
+			if output, err := cmd.CombinedOutput(); err != nil {
+				t.Fatalf("%s 界面契约检查失败：%v\n%s", mode, err, output)
+			} else {
+				t.Log(string(output))
+			}
+		})
+	}
 }
 
 func packageThemeDirectory(t *testing.T, directory, destination string) {

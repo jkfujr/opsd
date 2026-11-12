@@ -3,6 +3,7 @@ package operations
 import (
 	"context"
 	"fmt"
+	"github.com/jkfujr/opsd/internal/firewall"
 	"github.com/jkfujr/opsd/internal/protocol"
 	"io"
 	"os"
@@ -101,7 +102,7 @@ func (e *Engine) ExecutionLogs(ctx context.Context, p protocol.ExecutionLogsRead
 		return result, err
 	}
 	if !ValidID(p.OperationID) || l.Action == nil || (l.Action.Kind != "shell" && l.Action.Kind != "compose" && l.Action.Kind != "container") {
-		return result, fmt.Errorf("操作没有执行日志")
+		return result, &firewall.Fault{Code: "logs_unsupported", Message: "此操作不支持执行日志"}
 	}
 	file, err := os.Open(filepath.Join(e.LogDirectory, p.OperationID+".log"))
 	if os.IsNotExist(err) {

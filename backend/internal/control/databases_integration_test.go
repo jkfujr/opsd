@@ -455,6 +455,11 @@ func TestDatabaseNativeClusterAPIAndDashboard(t *testing.T) {
 		t.Fatal("受理了系统账号变更", code)
 	}
 	t.Run("真实看板", func(t *testing.T) { nativeDashboard(t, f, a) })
+	registered = nativeProxyRouting(t, f, nodes, raw, newPassword, registered)
+	proxies = nil
+	for _, proxy := range registered.Proxies {
+		proxies = append(proxies, cluster.DatabaseProxySelection{NodeID: proxy.NodeID, InstanceID: proxy.InstanceID, Hostgroup: 10})
+	}
 	remove := map[string]any{"expected_revision": registered.Revision, "kind": "delete_user", "user": "opsd_business", "host": "%", "proxies": proxies}
 	op = nativeSubmit(t, c, raw, registered.ID, "delete-user", remove)
 	nativeOperation(t, b, raw, op.ID, protocol.Succeeded)
@@ -469,7 +474,7 @@ func TestDatabaseNativeClusterAPIAndDashboard(t *testing.T) {
 	nativeOperation(t, b, raw, op.ID, protocol.Succeeded)
 	output := filepath.Join("..", "..", "..", "artifacts")
 	_ = os.MkdirAll(output, 0755)
-	report, _ := json.MarshalIndent(map[string]any{"galera_members": 3, "proxysql": 2, "api_nodes": 3, "idempotency": true, "partial_recovery": true, "grants": true, "proxy_login": true, "dashboard": true}, "", "  ")
+	report, _ := json.MarshalIndent(map[string]any{"galera_members": 3, "proxysql": 2, "api_nodes": 4, "idempotency": true, "partial_recovery": true, "grants": true, "proxy_login": true, "dashboard": true, "proxy_routing": true, "proxy_only_node": true, "active_transaction": true, "proxy_failover": true, "proxy_restart": true, "multiwriter_conflict": true}, "", "  ")
 	if e = os.WriteFile(filepath.Join(output, "database-result.json"), report, 0644); e != nil {
 		t.Fatal(e)
 	}

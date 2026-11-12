@@ -10216,6 +10216,472 @@
         "parameters": [],
         "x-opsd-stream": true
       }
+    },
+    "/nodes/{node_id}/firewall/adoption": {
+      "get": {
+        "operationId": "previewFirewallAdoption",
+        "summary": "预览当前防火墙配置",
+        "tags": [
+          "nodes"
+        ],
+        "responses": {
+          "200": {
+            "description": "请求成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FirewallAdoption"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-ID": {
+                "schema": {
+                  "type": "string"
+                },
+                "required": true
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "405": {
+            "$ref": "#/components/responses/Error405"
+          },
+          "406": {
+            "$ref": "#/components/responses/Error406"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "412": {
+            "$ref": "#/components/responses/Error412"
+          },
+          "413": {
+            "$ref": "#/components/responses/Error413"
+          },
+          "415": {
+            "$ref": "#/components/responses/Error415"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error422"
+          },
+          "428": {
+            "$ref": "#/components/responses/Error428"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          },
+          "504": {
+            "$ref": "#/components/responses/Error504"
+          }
+        },
+        "parameters": [
+          {
+            "name": "node_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        ],
+        "x-opsd-access": {
+          "level": "read",
+          "mode": "either",
+          "module": "firewall",
+          "scope": "node",
+          "resource": "node_id"
+        },
+        "security": [
+          {
+            "SessionCookie": []
+          },
+          {
+            "BearerToken": []
+          }
+        ]
+      }
+    },
+    "/database-clusters/{id}/proxy-routing": {
+      "get": {
+        "operationId": "getProxyRouting",
+        "summary": "读取代理策略及本机排序",
+        "responses": {
+          "200": {
+            "description": "请求成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProxyRoutingStatus"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-ID": {
+                "schema": {
+                  "type": "string"
+                },
+                "required": true
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "405": {
+            "$ref": "#/components/responses/Error405"
+          },
+          "406": {
+            "$ref": "#/components/responses/Error406"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "412": {
+            "$ref": "#/components/responses/Error412"
+          },
+          "413": {
+            "$ref": "#/components/responses/Error413"
+          },
+          "415": {
+            "$ref": "#/components/responses/Error415"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error422"
+          },
+          "428": {
+            "$ref": "#/components/responses/Error428"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          },
+          "504": {
+            "$ref": "#/components/responses/Error504"
+          }
+        },
+        "x-opsd-access": {
+          "level": "read",
+          "mode": "either",
+          "module": "databases",
+          "scope": "cluster",
+          "resource": "id"
+        },
+        "security": [
+          {
+            "SessionCookie": []
+          },
+          {
+            "BearerToken": []
+          }
+        ],
+        "tags": [
+          "system"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        ]
+      }
+    },
+    "/database-clusters/{id}/proxy-routing/previews": {
+      "post": {
+        "operationId": "previewProxyRouting",
+        "summary": "预览代理受管配置及排序",
+        "tags": [
+          "databases"
+        ],
+        "responses": {
+          "200": {
+            "description": "请求成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProxyRoutingPreview"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-ID": {
+                "schema": {
+                  "type": "string"
+                },
+                "required": true
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "405": {
+            "$ref": "#/components/responses/Error405"
+          },
+          "406": {
+            "$ref": "#/components/responses/Error406"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "412": {
+            "$ref": "#/components/responses/Error412"
+          },
+          "413": {
+            "$ref": "#/components/responses/Error413"
+          },
+          "415": {
+            "$ref": "#/components/responses/Error415"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error422"
+          },
+          "428": {
+            "$ref": "#/components/responses/Error428"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          },
+          "504": {
+            "$ref": "#/components/responses/Error504"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProxyRoutingPreviewInput"
+              }
+            }
+          }
+        },
+        "x-opsd-access": {
+          "level": "manage",
+          "mode": "either",
+          "module": "databases",
+          "scope": "cluster",
+          "resource": "id"
+        },
+        "security": [
+          {
+            "SessionCookie": []
+          },
+          {
+            "BearerToken": []
+          }
+        ]
+      }
+    },
+    "/database-clusters/{id}/proxy-routing/actions": {
+      "post": {
+        "operationId": "applyProxyRouting",
+        "summary": "应用预览的代理配置",
+        "tags": [
+          "databases"
+        ],
+        "responses": {
+          "202": {
+            "description": "请求成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Operation"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-ID": {
+                "schema": {
+                  "type": "string"
+                },
+                "required": true
+              },
+              "Location": {
+                "schema": {
+                  "type": "string"
+                },
+                "required": true
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "405": {
+            "$ref": "#/components/responses/Error405"
+          },
+          "406": {
+            "$ref": "#/components/responses/Error406"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "412": {
+            "$ref": "#/components/responses/Error412"
+          },
+          "413": {
+            "$ref": "#/components/responses/Error413"
+          },
+          "415": {
+            "$ref": "#/components/responses/Error415"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error422"
+          },
+          "428": {
+            "$ref": "#/components/responses/Error428"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          },
+          "504": {
+            "$ref": "#/components/responses/Error504"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProxyRoutingPreview"
+              }
+            }
+          }
+        },
+        "x-opsd-access": {
+          "level": "manage",
+          "mode": "either",
+          "module": "databases",
+          "scope": "cluster",
+          "resource": "id"
+        },
+        "security": [
+          {
+            "SessionCookie": []
+          },
+          {
+            "BearerToken": []
+          }
+        ],
+        "x-opsd-idempotent": true,
+        "description": " Idempotency-Key 作用于稳定调用身份和所属目标；未知结果先查询原请求，禁止自动换键重做。",
+        "x-opsd-max-body": 4194304
+      }
     }
   },
   "components": {
@@ -10943,7 +11409,8 @@
             "enum": [
               "peer",
               "ipify",
-              "local"
+              "local",
+              "icanhazip"
             ]
           },
           "address": {
@@ -10997,7 +11464,8 @@
           },
           "updated_at": {
             "type": "string",
-            "format": "date-time"
+            "format": "date-time",
+            "description": "最近一次确认地址或确认该地址族不可用的时间；失败观测保留该时间。"
           },
           "error": {
             "type": "string"
@@ -12334,6 +12802,20 @@
           },
           "resource_id": {
             "type": "string"
+          },
+          "action": {
+            "type": "string",
+            "description": "受理时保存的具体动作；历史缺值保持未知。"
+          },
+          "target_name": {
+            "type": "string",
+            "description": "受理时的目标名称。"
+          },
+          "resource": {
+            "$ref": "#/components/schemas/OperationResource"
+          },
+          "supports_logs": {
+            "type": "boolean"
           }
         },
         "required": [
@@ -12797,6 +13279,9 @@
           },
           "api": {
             "type": "boolean"
+          },
+          "network_error": {
+            "$ref": "#/components/schemas/NetworkError"
           }
         },
         "required": [
@@ -14066,6 +14551,12 @@
           },
           "state": {
             "type": "string"
+          },
+          "weight": {
+            "type": "integer"
+          },
+          "max_connections": {
+            "type": "integer"
           }
         },
         "required": [
@@ -14099,6 +14590,21 @@
           "errors": {
             "type": "number",
             "format": "double"
+          },
+          "state": {
+            "type": "string"
+          },
+          "peak_used": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "queries": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "latency_us": {
+            "type": "integer",
+            "format": "int64"
           }
         },
         "required": [
@@ -14153,8 +14659,10 @@
               "stale",
               "timeout",
               "error",
-              "offline"
-            ]
+              "offline",
+              "unknown"
+            ],
+            "description": "最近成功读取的服务健康；读取过程和故障由 read 独立表达。"
           },
           "version": {
             "type": "string"
@@ -14240,13 +14748,21 @@
           },
           "checked_at": {
             "type": "string",
-            "format": "date-time"
+            "format": "date-time",
+            "description": "来源实例实际采集时间。"
           },
           "error": {
             "$ref": "#/components/schemas/NetworkError"
           },
           "read": {
             "$ref": "#/components/schemas/ReadStatus"
+          },
+          "max_connections": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "proxy_hostgroups": {
+            "$ref": "#/components/schemas/ProxyHostgroups"
           }
         },
         "required": [
@@ -14528,6 +15044,9 @@
           "updated_at": {
             "type": "string",
             "format": "date-time"
+          },
+          "proxy_routing": {
+            "$ref": "#/components/schemas/ProxyRoutingPolicy"
           }
         },
         "required": [
@@ -14634,7 +15153,8 @@
           },
           "checked_at": {
             "type": "string",
-            "format": "date-time"
+            "format": "date-time",
+            "description": "本次响应生成时间。"
           }
         },
         "required": [
@@ -14892,11 +15412,13 @@
           },
           "data_at": {
             "type": "string",
-            "format": "date-time"
+            "format": "date-time",
+            "description": "当前保留结果的来源采集时间；重复返回缓存不会更新。"
           },
           "attempted_at": {
             "type": "string",
-            "format": "date-time"
+            "format": "date-time",
+            "description": "最近一次取得名额并开始读取的时间。"
           },
           "error": {
             "$ref": "#/components/schemas/NetworkError"
@@ -15867,7 +16389,8 @@
             "type": "string",
             "enum": [
               "install",
-              "sync"
+              "sync",
+              "adopt_current"
             ]
           },
           "backend": {
@@ -15877,6 +16400,11 @@
             "type": "integer",
             "format": "int64",
             "minimum": 0
+          },
+          "fingerprint": {
+            "type": "string",
+            "minLength": 64,
+            "maxLength": 64
           }
         },
         "required": [
@@ -16330,6 +16858,536 @@
             }
           }
         }
+      },
+      "OperationResource": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "node",
+              "container",
+              "compose",
+              "task",
+              "database",
+              "component"
+            ]
+          },
+          "node_id": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "engine_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "node_id",
+          "id"
+        ]
+      },
+      "FirewallAdoption": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "expected_revision": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "fingerprint": {
+            "type": "string"
+          },
+          "configuration": {
+            "$ref": "#/components/schemas/FirewallDefinition"
+          },
+          "checked_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "expected_revision",
+          "fingerprint",
+          "configuration",
+          "checked_at"
+        ]
+      },
+      "FirewallDefinition": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "backend": {
+            "$ref": "#/components/schemas/Backend"
+          },
+          "rules": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ManagedRule"
+            }
+          },
+          "default_policies": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ManagedPolicy"
+            }
+          }
+        },
+        "required": [
+          "backend",
+          "rules",
+          "default_policies"
+        ]
+      },
+      "ProxyEndpoint": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "host": {
+            "type": "string"
+          },
+          "port": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "host",
+          "port"
+        ]
+      },
+      "ProxyHostgroups": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "writer": {
+            "type": "integer"
+          },
+          "backup_writer": {
+            "type": "integer"
+          },
+          "reader": {
+            "type": "integer"
+          },
+          "offline": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "writer",
+          "backup_writer",
+          "reader",
+          "offline"
+        ]
+      },
+      "ProxyBackend": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "host": {
+            "type": "string"
+          },
+          "port": {
+            "type": "integer"
+          },
+          "node_id": {
+            "type": "string"
+          },
+          "instance_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "host",
+          "port",
+          "node_id",
+          "instance_id"
+        ]
+      },
+      "ProxyAccountBinding": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "node_id": {
+            "type": "string"
+          },
+          "instance_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "node_id",
+          "instance_id"
+        ]
+      },
+      "ProxyRoutingPolicy": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "automatic": {
+            "type": "boolean"
+          },
+          "hostgroups": {
+            "$ref": "#/components/schemas/ProxyHostgroups"
+          },
+          "backends": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProxyBackend"
+            }
+          },
+          "retired": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProxyEndpoint"
+            }
+          },
+          "accounts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProxyAccountBinding"
+            }
+          }
+        },
+        "required": [
+          "enabled",
+          "automatic",
+          "hostgroups",
+          "backends",
+          "retired",
+          "accounts"
+        ]
+      },
+      "ProxyRouteServer": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "host": {
+            "type": "string"
+          },
+          "port": {
+            "type": "integer"
+          },
+          "hostgroup": {
+            "type": "integer"
+          },
+          "state": {
+            "type": "string"
+          },
+          "weight": {
+            "type": "integer"
+          },
+          "max_connections": {
+            "type": "integer"
+          },
+          "use_ssl": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "host",
+          "port",
+          "hostgroup",
+          "state",
+          "weight",
+          "max_connections",
+          "use_ssl"
+        ]
+      },
+      "ProxyRouteAction": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "hostgroups": {
+            "$ref": "#/components/schemas/ProxyHostgroups"
+          },
+          "servers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProxyRouteServer"
+            }
+          },
+          "remove": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProxyEndpoint"
+            }
+          },
+          "max_transactions_behind": {
+            "type": "integer"
+          },
+          "expected_fingerprint": {
+            "type": "string"
+          },
+          "unmanaged_fingerprint": {
+            "type": "string"
+          },
+          "policy_version": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "hostgroups",
+          "servers",
+          "remove",
+          "max_transactions_behind",
+          "expected_fingerprint",
+          "unmanaged_fingerprint",
+          "policy_version"
+        ]
+      },
+      "ProxyRouteDiff": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "add",
+              "remove",
+              "weight",
+              "hostgroups"
+            ]
+          },
+          "host": {
+            "type": "string"
+          },
+          "port": {
+            "type": "integer"
+          },
+          "before_weight": {
+            "type": "integer"
+          },
+          "after_weight": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "kind",
+          "host",
+          "port",
+          "before_weight",
+          "after_weight"
+        ]
+      },
+      "ProxyRoutePreview": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "node_id": {
+            "type": "string"
+          },
+          "instance_id": {
+            "type": "string"
+          },
+          "instance_revision": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "action": {
+            "$ref": "#/components/schemas/ProxyRouteAction"
+          },
+          "changes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProxyRouteDiff"
+            }
+          }
+        },
+        "required": [
+          "node_id",
+          "instance_id",
+          "instance_revision",
+          "action",
+          "changes"
+        ]
+      },
+      "ProxyRoutingPreview": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "expected_revision": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "policy": {
+            "$ref": "#/components/schemas/ProxyRoutingPolicy"
+          },
+          "targets": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProxyRoutePreview"
+            }
+          }
+        },
+        "required": [
+          "expected_revision",
+          "policy",
+          "targets"
+        ]
+      },
+      "ProxyRoutingPreviewInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "expected_revision": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "automatic": {
+            "type": "boolean"
+          },
+          "backends": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProxyBackend"
+            }
+          }
+        },
+        "required": [
+          "expected_revision",
+          "enabled",
+          "automatic"
+        ]
+      },
+      "ProxyRankEntry": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "host": {
+            "type": "string"
+          },
+          "port": {
+            "type": "integer"
+          },
+          "node_id": {
+            "type": "string"
+          },
+          "instance_id": {
+            "type": "string"
+          },
+          "rank": {
+            "type": "integer"
+          },
+          "local": {
+            "type": "boolean"
+          },
+          "latency_us": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "samples": {
+            "type": "integer"
+          },
+          "sampled_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "host",
+          "port",
+          "node_id",
+          "instance_id",
+          "rank",
+          "local",
+          "samples"
+        ]
+      },
+      "ProxyRoutingState": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "node_id": {
+            "type": "string"
+          },
+          "instance_id": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "unmanaged",
+              "ready",
+              "paused",
+              "pending",
+              "applying",
+              "conflict",
+              "error",
+              "offline"
+            ]
+          },
+          "policy_version": {
+            "type": "string"
+          },
+          "order": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "entries": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProxyRankEntry"
+            }
+          },
+          "current_writer": {
+            "$ref": "#/components/schemas/ProxyEndpoint"
+          },
+          "checked_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "changed_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "operation_id": {
+            "type": "string"
+          },
+          "error": {
+            "$ref": "#/components/schemas/NetworkError"
+          }
+        },
+        "required": [
+          "node_id",
+          "instance_id",
+          "state",
+          "policy_version",
+          "order",
+          "entries"
+        ]
+      },
+      "ProxyRoutingStatus": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "policy": {
+            "$ref": "#/components/schemas/ProxyRoutingPolicy"
+          },
+          "proxies": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProxyRoutingState"
+            }
+          }
+        },
+        "required": [
+          "proxies"
+        ]
       }
     },
     "responses": {

@@ -6,6 +6,8 @@
 
 从实际实例配置读取 `binary`、`data_dir`、`executor_dir` 等路径，不把默认路径当成现场事实。检查节点队列和 root 操作中 `terminal=0` 的记录；有未结束操作时停止更新。普通用户与 root 服务使用同一程序，停止和恢复两者，不触碰 CouchDB 或其他服务。
 
+受管代理策略会进入签名目录。逐台更新全部有效成员后，再通过能力接口确认 `proxy_routing_version=1`，最后逐台预览并接管代理。节点程序更新与实际监听修复、防火墙接纳、代理策略应用分别读取结果；C041 使用既有停服 `network` 流程，C071 只从已预览的受管代理路由移除，服务器与数据库保持原值。
+
 前端已有成功构建且输入未变化时，复用 `backend/internal/webassets/artifacts`，运行 `npm run build:backend` 编译双架构。只编译目标架构时从根目录使用 `go -C backend build`，输出位置按根目录产物路径指定。前端或根版本变化后先运行 `npm run build:frontend`。产物写入被忽略的 `artifacts/`，使用 `-ldflags='-s -w'` 去掉调试符号可缩小传输文件；完整程序可先用 XZ 压缩，远端解压到独立候选路径再执行 update。普通 SFTP 已出现持续卡顿时，复用该连接结果启用小包方式。传输中断后先读取远端文件状态，续传同一工件。
 
 `scripts/opsd_remote.py` 使用本机 OpenSSH 和远端 Python 3。相对路径均从项目根目录解释；实例配置通过 `--config` 指定。默认动作为只读 inspect：

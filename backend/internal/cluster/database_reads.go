@@ -102,10 +102,10 @@ func (n *Node) readManagedDatabaseGroup(ctx context.Context, c ManagedDatabaseCl
 		}
 		read := n.CurrentRead(ctx, ref.NodeID, "database.read", DatabaseRPC{InstanceID: ref.InstanceID, Scope: selectedScope}, &result, interval)
 		result.State.Read = read
-		if read.State != "ready" {
-			result.State.State = read.State
-			result.State.Error = read.Error
-		} else if i < len(c.Members) && result.State.ClusterID != c.ClusterID {
+		if read.DataAt == nil {
+			result.State.State = "unknown"
+			result.State.Error = nil
+		} else if i < len(c.Members) && result.State.ClusterID != "" && result.State.ClusterID != c.ClusterID {
 			result.State.State = "mismatch"
 			result.State.Error = &protocol.Error{Code: "conflict", Message: "配置关联与实际 Galera 集群身份不同"}
 		}

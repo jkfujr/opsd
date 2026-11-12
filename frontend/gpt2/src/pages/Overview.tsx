@@ -2,7 +2,7 @@ import { useMemo, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link, useSearchParams } from 'react-router';
 import { ArrowUpRight, Cpu, MemoryStick, Network, Plus, Server, ServerOff, HardDrive, Clock3 } from 'lucide-react';
-import { aggregate, bytes, nodeMetrics, overviewQuery, percent, ratio, speed, type OverviewNode } from '../monitoring';
+import { aggregate, bytes, collectedAt, readingError, nodeMetrics, overviewQuery, percent, ratio, speed, type OverviewNode } from '../monitoring';
 import { Btn, Cell, Choice, DataTable, Empty, Heading, IconLink, LoadingRows, Meter, Panel, Refresh, Row, SearchBox, Skeleton, Status, TabSet } from '../ui';
 import { Failure, date } from '../business-ui';
 import { TrendChart } from '../charts';
@@ -12,6 +12,7 @@ export function Overview() {
   const query = useQuery(overviewQuery), [params, setParams] = useSearchParams(), [add, setAdd] = useState<'add' | 'tokens' | null>(null), trigger = useRef<HTMLButtonElement>(null);
   const region = params.get('region') ?? 'all', nodeID = params.get('node') ?? 'all', range = params.get('range') === '7d' ? '7d' : '24h';
   const nodes = query.data?.nodes ?? [], scoped = nodes.filter(({ node }) => (region === 'all' || (node.region ?? '') === region) && (nodeID === 'all' || node.id === nodeID));
+  const failures = scoped.flatMap(item => { const error = readingError(item); return error ? [`${item.node.name}：${error}`] : []; });
   const summary = aggregate(scoped), online = scoped.filter(n => n.node.connected).length;
   const setParam = (key: string, value: string) => setParams(old => { const next = new URLSearchParams(old); if (value === 'all' || value === '24h') next.delete(key); else next.set(key, value); return next; });
   const cards = [
@@ -20,8 +21,8 @@ export function Overview() {
     { name: '内存使用', Icon: MemoryStick, value: percent(ratio(summary.memory_used, summary.memory_total)), note: `${bytes(summary.memory_used)} / ${bytes(summary.memory_total)}` },
     { name: '网络流量', Icon: Network, value: speed(summary.network_rx), note: `发送 ${speed(summary.network_tx)}` },
   ];
-  return <div className="page-stack"><Heading title="概览" meta={<><span>{online} / {scoped.length} 个节点在线</span><span className="meta-divider"/><span>采集于 {date(query.data?.updated_at)}</span></>}><Choice label="地域" value={region} onChange={v => { setParam('region', v); }} options={[["all", "全部地域"], ...Array.from(new Set(nodes.map(n => n.node.region).filter((v): v is string => !!v))).map(v => [v, v] as const)]}/><Choice resource label="监控节点" value={nodeID} onChange={v => setParam('node', v)} options={[["all", "全部节点"], ...nodes.map(n => [n.node.id, n.node.name] as const)]}/><Refresh/><Btn ref={trigger} variant="primary" icon={Plus} onClick={() => setAdd('add')}>添加节点</Btn></Heading>
-  <Failure error={query.error} retry={() => void query.refetch()}/>{!!query.data?.unavailable?.length && <div className="notice" role="status">部分节点数据不可用：{query.data.unavailable.join('、')}</div>}
+  return <div className="page-stack"><Heading title="概览" meta={<><span>{online} / {scoped.length} 个节点在线</span><span className="meta-divider"/><span>采集于 {date(collectedAt(scoped))}</span></>}><Choice label="地域" value={region} onChange={v => { setParam('region', v); }} options={[["all", "全部地域"], ...Array.from(new Set(nodes.map(n => n.node.region).filter((v): v is string => !!v))).map(v => [v, v] as const)]}/><Choice resource label="监控节点" value={nodeID} onChange={v => setParam('node', v)} options={[["all", "全部节点"], ...nodes.map(n => [n.node.id, n.node.name] as const)]}/><Refresh/><Btn ref={trigger} variant="primary" icon={Plus} onClick={() => setAdd('add')}>添加节点</Btn></Heading>
+  <Failure error={query.error} retry={() => void query.refetch()}/>{failures.length > 0 && <div className="notice" role="alert">{failures.join('；')}</div>}
   <section className="metrics-grid" aria-label="资源汇总">{cards.map(({ name, Icon, value, unit, note }) => <Panel key={name} className="metric-card"><div className="metric-label"><Icon size={18} aria-hidden/>{name}</div>{query.isPending ? <Skeleton className="metric-skeleton"/> : <div className="metric-value">{value}<span className="metric-unit">{unit}</span></div>}<div className="metric-note">{note}</div></Panel>)}</section>
   <section className="overview-main-grid"><Panel title="网络流量" className="network-panel" actions={<Choice label="趋势时间范围" value={range} onChange={v => setParam('range', v)} options={[["24h", "24 小时"], ["7d", "7 天"]]}/>}><div className="network-readings"><span>接收 <strong>{speed(summary.network_rx)}</strong></span><span>发送 <strong>{speed(summary.network_tx)}</strong></span></div><TrendChart nodes={scoped.map(n => n.node)} range={range}/></Panel><ResourceRanking nodes={scoped}/></section>
   <section className="overview-secondary-grid"><Panel title="资源趋势" className="resource-panel"><TrendChart nodes={scoped.map(n => n.node)} range={range} metric="resources" compact/></Panel><Panel title="需关注" className="attention-panel"><Attention nodes={scoped}/></Panel></section>

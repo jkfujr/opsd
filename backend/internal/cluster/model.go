@@ -45,21 +45,22 @@ type Directory struct {
 	Trust       *TrustPolicy             `json:"trust,omitempty"`
 }
 type Config struct {
-	Cached           bool          `json:"cached,omitempty"`
-	LastSyncedAt     *time.Time    `json:"last_synced_at,omitempty"`
-	Revision         uint64        `json:"revision"`
-	Name             string        `json:"name"`
-	Address          string        `json:"address"`
-	AddressMode      string        `json:"address_mode,omitempty"`
-	Region           string        `json:"region"`
-	Listen           string        `json:"listen"`
-	Console          bool          `json:"console"`
-	API              bool          `json:"api"`
-	ConsoleListen    string        `json:"console_listen"`
-	PreferredStorage string        `json:"preferred_storage"`
-	IntervalMinutes  int           `json:"interval_minutes"`
-	RetentionDays    int           `json:"retention_days"`
-	Storage          StorageConfig `json:"storage"`
+	NetworkError     *protocol.Error `json:"network_error,omitempty"`
+	Cached           bool            `json:"cached,omitempty"`
+	LastSyncedAt     *time.Time      `json:"last_synced_at,omitempty"`
+	Revision         uint64          `json:"revision"`
+	Name             string          `json:"name"`
+	Address          string          `json:"address"`
+	AddressMode      string          `json:"address_mode,omitempty"`
+	Region           string          `json:"region"`
+	Listen           string          `json:"listen"`
+	Console          bool            `json:"console"`
+	API              bool            `json:"api"`
+	ConsoleListen    string          `json:"console_listen"`
+	PreferredStorage string          `json:"preferred_storage"`
+	IntervalMinutes  int             `json:"interval_minutes"`
+	RetentionDays    int             `json:"retention_days"`
+	Storage          StorageConfig   `json:"storage"`
 }
 type StorageConfig struct {
 	NativeCluster bool   `json:"native_cluster"`
@@ -113,8 +114,12 @@ type Request struct {
 	Key              string          `json:"key,omitempty"`
 }
 type Operation struct {
-	ResourceID string `json:"resource_id,omitempty"`
-	Key        string `json:"idempotency_key,omitempty"`
+	ResourceID   string             `json:"resource_id,omitempty"`
+	Action       string             `json:"action,omitempty"`
+	TargetName   string             `json:"target_name,omitempty"`
+	Resource     *OperationResource `json:"resource,omitempty"`
+	SupportsLogs *bool              `json:"supports_logs,omitempty"`
+	Key          string             `json:"idempotency_key,omitempty"`
 	protocol.OperationRecord
 	NodeID            string    `json:"node_id"`
 	Sequence          uint64    `json:"queue_sequence"`
@@ -125,6 +130,13 @@ type Operation struct {
 	PlanID            string    `json:"plan_id,omitempty"`
 	Executor          string    `json:"executor"`
 	ResultPendingSync bool      `json:"result_pending_sync"`
+}
+
+type OperationResource struct {
+	Kind     string `json:"kind"`
+	NodeID   string `json:"node_id"`
+	ID       string `json:"id"`
+	EngineID string `json:"engine_id,omitempty"`
 }
 type Executor interface {
 	Call(context.Context, protocol.Payload) (protocol.Payload, error)

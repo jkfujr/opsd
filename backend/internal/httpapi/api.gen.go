@@ -162,14 +162,17 @@ func (e AddressFamily) Valid() bool {
 
 // Defines values for AddressObservationSource.
 const (
-	Ipify AddressObservationSource = "ipify"
-	Local AddressObservationSource = "local"
-	Peer  AddressObservationSource = "peer"
+	Icanhazip AddressObservationSource = "icanhazip"
+	Ipify     AddressObservationSource = "ipify"
+	Local     AddressObservationSource = "local"
+	Peer      AddressObservationSource = "peer"
 )
 
 // Valid indicates whether the value is a known member of the AddressObservationSource enum.
 func (e AddressObservationSource) Valid() bool {
 	switch e {
+	case Icanhazip:
+		return true
 	case Ipify:
 		return true
 	case Local:
@@ -519,6 +522,7 @@ const (
 	DatabaseStatusStateStale       DatabaseStatusState = "stale"
 	DatabaseStatusStateTimeout     DatabaseStatusState = "timeout"
 	DatabaseStatusStateUnavailable DatabaseStatusState = "unavailable"
+	DatabaseStatusStateUnknown     DatabaseStatusState = "unknown"
 )
 
 // Valid indicates whether the value is a known member of the DatabaseStatusState enum.
@@ -541,6 +545,8 @@ func (e DatabaseStatusState) Valid() bool {
 	case DatabaseStatusStateTimeout:
 		return true
 	case DatabaseStatusStateUnavailable:
+		return true
+	case DatabaseStatusStateUnknown:
 		return true
 	default:
 		return false
@@ -777,13 +783,16 @@ func (e EntranceChangeKind) Valid() bool {
 
 // Defines values for FirewallActionAction.
 const (
-	Install FirewallActionAction = "install"
-	Sync    FirewallActionAction = "sync"
+	AdoptCurrent FirewallActionAction = "adopt_current"
+	Install      FirewallActionAction = "install"
+	Sync         FirewallActionAction = "sync"
 )
 
 // Valid indicates whether the value is a known member of the FirewallActionAction enum.
 func (e FirewallActionAction) Valid() bool {
 	switch e {
+	case AdoptCurrent:
+		return true
 	case Install:
 		return true
 	case Sync:
@@ -1288,6 +1297,36 @@ func (e OperationActionAction) Valid() bool {
 	}
 }
 
+// Defines values for OperationResourceKind.
+const (
+	OperationResourceKindComponent OperationResourceKind = "component"
+	OperationResourceKindCompose   OperationResourceKind = "compose"
+	OperationResourceKindContainer OperationResourceKind = "container"
+	OperationResourceKindDatabase  OperationResourceKind = "database"
+	OperationResourceKindNode      OperationResourceKind = "node"
+	OperationResourceKindTask      OperationResourceKind = "task"
+)
+
+// Valid indicates whether the value is a known member of the OperationResourceKind enum.
+func (e OperationResourceKind) Valid() bool {
+	switch e {
+	case OperationResourceKindComponent:
+		return true
+	case OperationResourceKindCompose:
+		return true
+	case OperationResourceKindContainer:
+		return true
+	case OperationResourceKindDatabase:
+		return true
+	case OperationResourceKindNode:
+		return true
+	case OperationResourceKindTask:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for OperationState.
 const (
 	OperationStateAccepted             OperationState = "accepted"
@@ -1558,6 +1597,66 @@ func (e ProblemFieldLocation) Valid() bool {
 	case Path:
 		return true
 	case Query:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ProxyRouteDiffKind.
+const (
+	ProxyRouteDiffKindAdd        ProxyRouteDiffKind = "add"
+	ProxyRouteDiffKindHostgroups ProxyRouteDiffKind = "hostgroups"
+	ProxyRouteDiffKindRemove     ProxyRouteDiffKind = "remove"
+	ProxyRouteDiffKindWeight     ProxyRouteDiffKind = "weight"
+)
+
+// Valid indicates whether the value is a known member of the ProxyRouteDiffKind enum.
+func (e ProxyRouteDiffKind) Valid() bool {
+	switch e {
+	case ProxyRouteDiffKindAdd:
+		return true
+	case ProxyRouteDiffKindHostgroups:
+		return true
+	case ProxyRouteDiffKindRemove:
+		return true
+	case ProxyRouteDiffKindWeight:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ProxyRoutingStateState.
+const (
+	ProxyRoutingStateStateApplying  ProxyRoutingStateState = "applying"
+	ProxyRoutingStateStateConflict  ProxyRoutingStateState = "conflict"
+	ProxyRoutingStateStateError     ProxyRoutingStateState = "error"
+	ProxyRoutingStateStateOffline   ProxyRoutingStateState = "offline"
+	ProxyRoutingStateStatePaused    ProxyRoutingStateState = "paused"
+	ProxyRoutingStateStatePending   ProxyRoutingStateState = "pending"
+	ProxyRoutingStateStateReady     ProxyRoutingStateState = "ready"
+	ProxyRoutingStateStateUnmanaged ProxyRoutingStateState = "unmanaged"
+)
+
+// Valid indicates whether the value is a known member of the ProxyRoutingStateState enum.
+func (e ProxyRoutingStateState) Valid() bool {
+	switch e {
+	case ProxyRoutingStateStateApplying:
+		return true
+	case ProxyRoutingStateStateConflict:
+		return true
+	case ProxyRoutingStateStateError:
+		return true
+	case ProxyRoutingStateStateOffline:
+		return true
+	case ProxyRoutingStateStatePaused:
+		return true
+	case ProxyRoutingStateStatePending:
+		return true
+	case ProxyRoutingStateStateReady:
+		return true
+	case ProxyRoutingStateStateUnmanaged:
 		return true
 	default:
 		return false
@@ -2601,7 +2700,11 @@ type DatabaseProxyPool struct {
 	Free      float64 `json:"free"`
 	Host      string  `json:"host"`
 	Hostgroup int     `json:"hostgroup"`
+	LatencyUs *int64  `json:"latency_us,omitempty"`
+	PeakUsed  *int64  `json:"peak_used,omitempty"`
 	Port      int     `json:"port"`
+	Queries   *int64  `json:"queries,omitempty"`
+	State     *string `json:"state,omitempty"`
 	Used      float64 `json:"used"`
 }
 
@@ -2614,10 +2717,12 @@ type DatabaseProxySelection struct {
 
 // DatabaseProxyServer defines model for DatabaseProxyServer.
 type DatabaseProxyServer struct {
-	Host      string `json:"host"`
-	Hostgroup int    `json:"hostgroup"`
-	Port      int    `json:"port"`
-	State     string `json:"state"`
+	Host           string `json:"host"`
+	Hostgroup      int    `json:"hostgroup"`
+	MaxConnections *int   `json:"max_connections,omitempty"`
+	Port           int    `json:"port"`
+	State          string `json:"state"`
+	Weight         *int   `json:"weight,omitempty"`
 }
 
 // DatabaseProxyUser defines model for DatabaseProxyUser.
@@ -2648,7 +2753,9 @@ type DatabaseSchema struct {
 
 // DatabaseStatus defines model for DatabaseStatus.
 type DatabaseStatus struct {
-	ActualMembers     *string                `json:"actual_members,omitempty"`
+	ActualMembers *string `json:"actual_members,omitempty"`
+
+	// CheckedAt 来源实例实际采集时间。
 	CheckedAt         time.Time              `json:"checked_at"`
 	ClusterId         *string                `json:"cluster_id,omitempty"`
 	ClusterName       *string                `json:"cluster_name,omitempty"`
@@ -2658,10 +2765,12 @@ type DatabaseStatus struct {
 	Databases         *[]DatabaseSchema      `json:"databases,omitempty"`
 	Error             *NetworkError          `json:"error,omitempty"`
 	FlowControl       *float64               `json:"flow_control,omitempty"`
+	MaxConnections    *int64                 `json:"max_connections,omitempty"`
 	MemberAddress     *string                `json:"member_address,omitempty"`
 	PendingChanges    *bool                  `json:"pending_changes,omitempty"`
 	Pools             *[]DatabaseProxyPool   `json:"pools,omitempty"`
 	Primary           *bool                  `json:"primary,omitempty"`
+	ProxyHostgroups   *ProxyHostgroups       `json:"proxy_hostgroups,omitempty"`
 	ProxyUsers        *[]DatabaseProxyUser   `json:"proxy_users,omitempty"`
 	Read              ReadStatus             `json:"read"`
 	ReadOnly          *bool                  `json:"read_only,omitempty"`
@@ -2669,13 +2778,15 @@ type DatabaseStatus struct {
 	ReceiveQueue      *float64               `json:"receive_queue,omitempty"`
 	SendQueue         *float64               `json:"send_queue,omitempty"`
 	Servers           *[]DatabaseProxyServer `json:"servers,omitempty"`
-	State             DatabaseStatusState    `json:"state"`
-	Synced            *bool                  `json:"synced,omitempty"`
-	Users             *[]DatabaseUser        `json:"users,omitempty"`
-	Version           *string                `json:"version,omitempty"`
+
+	// State 最近成功读取的服务健康；读取过程和故障由 read 独立表达。
+	State   DatabaseStatusState `json:"state"`
+	Synced  *bool               `json:"synced,omitempty"`
+	Users   *[]DatabaseUser     `json:"users,omitempty"`
+	Version *string             `json:"version,omitempty"`
 }
 
-// DatabaseStatusState defines model for DatabaseStatus.State.
+// DatabaseStatusState 最近成功读取的服务健康；读取过程和故障由 read 独立表达。
 type DatabaseStatusState string
 
 // DatabaseUser defines model for DatabaseUser.
@@ -2866,10 +2977,19 @@ type FirewallAction struct {
 	Action           FirewallActionAction `json:"action"`
 	Backend          *Backend             `json:"backend,omitempty"`
 	ExpectedRevision int64                `json:"expected_revision"`
+	Fingerprint      *string              `json:"fingerprint,omitempty"`
 }
 
 // FirewallActionAction defines model for FirewallAction.Action.
 type FirewallActionAction string
+
+// FirewallAdoption defines model for FirewallAdoption.
+type FirewallAdoption struct {
+	CheckedAt        time.Time          `json:"checked_at"`
+	Configuration    FirewallDefinition `json:"configuration"`
+	ExpectedRevision int64              `json:"expected_revision"`
+	Fingerprint      string             `json:"fingerprint"`
+}
 
 // FirewallChange defines model for FirewallChange.
 type FirewallChange struct {
@@ -2887,6 +3007,13 @@ type FirewallConfiguration struct {
 	Backend         Backend         `json:"backend"`
 	DefaultPolicies []ManagedPolicy `json:"default_policies"`
 	Revision        int64           `json:"revision"`
+	Rules           []ManagedRule   `json:"rules"`
+}
+
+// FirewallDefinition defines model for FirewallDefinition.
+type FirewallDefinition struct {
+	Backend         Backend         `json:"backend"`
+	DefaultPolicies []ManagedPolicy `json:"default_policies"`
 	Rules           []ManagedRule   `json:"rules"`
 }
 
@@ -2957,16 +3084,17 @@ type LoginRequest struct {
 
 // ManagedDatabaseCluster defines model for ManagedDatabaseCluster.
 type ManagedDatabaseCluster struct {
-	ClusterId    string        `json:"cluster_id"`
-	Coordinator  string        `json:"coordinator"`
-	Deleted      bool          `json:"deleted"`
-	Id           string        `json:"id"`
-	Members      []DatabaseRef `json:"members"`
-	Name         string        `json:"name"`
-	Proxies      []DatabaseRef `json:"proxies"`
-	Revision     int64         `json:"revision"`
-	UpdatedAt    time.Time     `json:"updated_at"`
-	WorkbenchUrl string        `json:"workbench_url"`
+	ClusterId    string              `json:"cluster_id"`
+	Coordinator  string              `json:"coordinator"`
+	Deleted      bool                `json:"deleted"`
+	Id           string              `json:"id"`
+	Members      []DatabaseRef       `json:"members"`
+	Name         string              `json:"name"`
+	Proxies      []DatabaseRef       `json:"proxies"`
+	ProxyRouting *ProxyRoutingPolicy `json:"proxy_routing,omitempty"`
+	Revision     int64               `json:"revision"`
+	UpdatedAt    time.Time           `json:"updated_at"`
+	WorkbenchUrl string              `json:"workbench_url"`
 }
 
 // ManagedDatabaseList defines model for ManagedDatabaseList.
@@ -2986,6 +3114,7 @@ type ManagedDatabaseMember struct {
 
 // ManagedDatabaseStatus defines model for ManagedDatabaseStatus.
 type ManagedDatabaseStatus struct {
+	// CheckedAt 本次响应生成时间。
 	CheckedAt time.Time               `json:"checked_at"`
 	Cluster   ManagedDatabaseCluster  `json:"cluster"`
 	Members   []ManagedDatabaseMember `json:"members"`
@@ -3252,6 +3381,7 @@ type NodeConfig struct {
 	LastSyncedAt     *time.Time              `json:"last_synced_at,omitempty"`
 	Listen           string                  `json:"listen"`
 	Name             string                  `json:"name"`
+	NetworkError     *NetworkError           `json:"network_error,omitempty"`
 	PreferredStorage string                  `json:"preferred_storage"`
 	Region           string                  `json:"region"`
 	RetentionDays    NodeConfigRetentionDays `json:"retention_days"`
@@ -3328,6 +3458,8 @@ type NodeStatus struct {
 
 // Operation defines model for Operation.
 type Operation struct {
+	// Action 受理时保存的具体动作；历史缺值保持未知。
+	Action                       *string           `json:"action,omitempty"`
 	Actor                        *string           `json:"actor,omitempty"`
 	ConfirmationDeadline         *time.Time        `json:"confirmation_deadline,omitempty"`
 	ConfirmationRemainingSeconds *int64            `json:"confirmation_remaining_seconds,omitempty"`
@@ -3335,21 +3467,26 @@ type Operation struct {
 	Decision                     OperationDecision `json:"decision"`
 
 	// Error 持久操作内部的领域故障；HTTP 错误使用 Problem，领域故障不要求 HTTP 请求 ID。
-	Error             *APIError         `json:"error,omitempty"`
-	Executor          OperationExecutor `json:"executor"`
-	Id                string            `json:"id"`
-	IdempotencyKey    *string           `json:"idempotency_key,omitempty"`
-	LastObservedAt    *time.Time        `json:"last_observed_at,omitempty"`
-	NodeId            string            `json:"node_id"`
-	PlanId            *string           `json:"plan_id,omitempty"`
-	QueueSequence     *int64            `json:"queue_sequence,omitempty"`
-	ResourceId        *string           `json:"resource_id,omitempty"`
-	ResultPendingSync bool              `json:"result_pending_sync"`
-	Revision          int64             `json:"revision"`
-	State             OperationState    `json:"state"`
-	Steps             []OperationStep   `json:"steps"`
-	Subject           OperationSubject  `json:"subject"`
-	UpdatedAt         time.Time         `json:"updated_at"`
+	Error             *APIError          `json:"error,omitempty"`
+	Executor          OperationExecutor  `json:"executor"`
+	Id                string             `json:"id"`
+	IdempotencyKey    *string            `json:"idempotency_key,omitempty"`
+	LastObservedAt    *time.Time         `json:"last_observed_at,omitempty"`
+	NodeId            string             `json:"node_id"`
+	PlanId            *string            `json:"plan_id,omitempty"`
+	QueueSequence     *int64             `json:"queue_sequence,omitempty"`
+	Resource          *OperationResource `json:"resource,omitempty"`
+	ResourceId        *string            `json:"resource_id,omitempty"`
+	ResultPendingSync bool               `json:"result_pending_sync"`
+	Revision          int64              `json:"revision"`
+	State             OperationState     `json:"state"`
+	Steps             []OperationStep    `json:"steps"`
+	Subject           OperationSubject   `json:"subject"`
+	SupportsLogs      *bool              `json:"supports_logs,omitempty"`
+
+	// TargetName 受理时的目标名称。
+	TargetName *string   `json:"target_name,omitempty"`
+	UpdatedAt  time.Time `json:"updated_at"`
 }
 
 // OperationDecision defines model for Operation.Decision.
@@ -3377,6 +3514,17 @@ type OperationList struct {
 	NextCursor  *string     `json:"next_cursor,omitempty"`
 	Unavailable *[]string   `json:"unavailable,omitempty"`
 }
+
+// OperationResource defines model for OperationResource.
+type OperationResource struct {
+	EngineId *string               `json:"engine_id,omitempty"`
+	Id       string                `json:"id"`
+	Kind     OperationResourceKind `json:"kind"`
+	NodeId   string                `json:"node_id"`
+}
+
+// OperationResourceKind defines model for OperationResource.Kind.
+type OperationResourceKind string
 
 // OperationRevision defines model for OperationRevision.
 type OperationRevision struct {
@@ -3593,6 +3741,140 @@ type ProblemField struct {
 // ProblemFieldLocation defines model for ProblemField.Location.
 type ProblemFieldLocation string
 
+// ProxyAccountBinding defines model for ProxyAccountBinding.
+type ProxyAccountBinding struct {
+	InstanceId string `json:"instance_id"`
+	Name       string `json:"name"`
+	NodeId     string `json:"node_id"`
+}
+
+// ProxyBackend defines model for ProxyBackend.
+type ProxyBackend struct {
+	Host       string `json:"host"`
+	InstanceId string `json:"instance_id"`
+	NodeId     string `json:"node_id"`
+	Port       int    `json:"port"`
+}
+
+// ProxyEndpoint defines model for ProxyEndpoint.
+type ProxyEndpoint struct {
+	Host string `json:"host"`
+	Port int    `json:"port"`
+}
+
+// ProxyHostgroups defines model for ProxyHostgroups.
+type ProxyHostgroups struct {
+	BackupWriter int `json:"backup_writer"`
+	Offline      int `json:"offline"`
+	Reader       int `json:"reader"`
+	Writer       int `json:"writer"`
+}
+
+// ProxyRankEntry defines model for ProxyRankEntry.
+type ProxyRankEntry struct {
+	Host       string     `json:"host"`
+	InstanceId string     `json:"instance_id"`
+	LatencyUs  *int64     `json:"latency_us,omitempty"`
+	Local      bool       `json:"local"`
+	NodeId     string     `json:"node_id"`
+	Port       int        `json:"port"`
+	Rank       int        `json:"rank"`
+	SampledAt  *time.Time `json:"sampled_at,omitempty"`
+	Samples    int        `json:"samples"`
+}
+
+// ProxyRouteAction defines model for ProxyRouteAction.
+type ProxyRouteAction struct {
+	ExpectedFingerprint   string             `json:"expected_fingerprint"`
+	Hostgroups            ProxyHostgroups    `json:"hostgroups"`
+	MaxTransactionsBehind int                `json:"max_transactions_behind"`
+	PolicyVersion         string             `json:"policy_version"`
+	Remove                []ProxyEndpoint    `json:"remove"`
+	Servers               []ProxyRouteServer `json:"servers"`
+	UnmanagedFingerprint  string             `json:"unmanaged_fingerprint"`
+}
+
+// ProxyRouteDiff defines model for ProxyRouteDiff.
+type ProxyRouteDiff struct {
+	AfterWeight  int                `json:"after_weight"`
+	BeforeWeight int                `json:"before_weight"`
+	Host         string             `json:"host"`
+	Kind         ProxyRouteDiffKind `json:"kind"`
+	Port         int                `json:"port"`
+}
+
+// ProxyRouteDiffKind defines model for ProxyRouteDiff.Kind.
+type ProxyRouteDiffKind string
+
+// ProxyRoutePreview defines model for ProxyRoutePreview.
+type ProxyRoutePreview struct {
+	Action           ProxyRouteAction `json:"action"`
+	Changes          []ProxyRouteDiff `json:"changes"`
+	InstanceId       string           `json:"instance_id"`
+	InstanceRevision int64            `json:"instance_revision"`
+	NodeId           string           `json:"node_id"`
+}
+
+// ProxyRouteServer defines model for ProxyRouteServer.
+type ProxyRouteServer struct {
+	Host           string `json:"host"`
+	Hostgroup      int    `json:"hostgroup"`
+	MaxConnections int    `json:"max_connections"`
+	Port           int    `json:"port"`
+	State          string `json:"state"`
+	UseSsl         bool   `json:"use_ssl"`
+	Weight         int    `json:"weight"`
+}
+
+// ProxyRoutingPolicy defines model for ProxyRoutingPolicy.
+type ProxyRoutingPolicy struct {
+	Accounts   []ProxyAccountBinding `json:"accounts"`
+	Automatic  bool                  `json:"automatic"`
+	Backends   []ProxyBackend        `json:"backends"`
+	Enabled    bool                  `json:"enabled"`
+	Hostgroups ProxyHostgroups       `json:"hostgroups"`
+	Retired    []ProxyEndpoint       `json:"retired"`
+}
+
+// ProxyRoutingPreview defines model for ProxyRoutingPreview.
+type ProxyRoutingPreview struct {
+	ExpectedRevision int64               `json:"expected_revision"`
+	Policy           ProxyRoutingPolicy  `json:"policy"`
+	Targets          []ProxyRoutePreview `json:"targets"`
+}
+
+// ProxyRoutingPreviewInput defines model for ProxyRoutingPreviewInput.
+type ProxyRoutingPreviewInput struct {
+	Automatic        bool            `json:"automatic"`
+	Backends         *[]ProxyBackend `json:"backends,omitempty"`
+	Enabled          bool            `json:"enabled"`
+	ExpectedRevision int64           `json:"expected_revision"`
+}
+
+// ProxyRoutingState defines model for ProxyRoutingState.
+type ProxyRoutingState struct {
+	ChangedAt     *time.Time             `json:"changed_at,omitempty"`
+	CheckedAt     *time.Time             `json:"checked_at,omitempty"`
+	CurrentWriter *ProxyEndpoint         `json:"current_writer,omitempty"`
+	Entries       []ProxyRankEntry       `json:"entries"`
+	Error         *NetworkError          `json:"error,omitempty"`
+	InstanceId    string                 `json:"instance_id"`
+	NodeId        string                 `json:"node_id"`
+	OperationId   *string                `json:"operation_id,omitempty"`
+	Order         []string               `json:"order"`
+	PolicyVersion string                 `json:"policy_version"`
+	State         ProxyRoutingStateState `json:"state"`
+}
+
+// ProxyRoutingStateState defines model for ProxyRoutingState.State.
+type ProxyRoutingStateState string
+
+// ProxyRoutingStatus defines model for ProxyRoutingStatus.
+type ProxyRoutingStatus struct {
+	Policy  *ProxyRoutingPolicy `json:"policy,omitempty"`
+	Proxies []ProxyRoutingState `json:"proxies"`
+}
+
 // PublicAddress defines model for PublicAddress.
 type PublicAddress struct {
 	Addresses    []string             `json:"addresses"`
@@ -3600,7 +3882,9 @@ type PublicAddress struct {
 	Mode         PublicAddressMode    `json:"mode"`
 	Observations []AddressObservation `json:"observations"`
 	State        PublicAddressState   `json:"state"`
-	UpdatedAt    *time.Time           `json:"updated_at,omitempty"`
+
+	// UpdatedAt 最近一次确认地址或确认该地址族不可用的时间；失败观测保留该时间。
+	UpdatedAt *time.Time `json:"updated_at,omitempty"`
 }
 
 // PublicAddressMode defines model for PublicAddress.Mode.
@@ -3662,10 +3946,13 @@ type ReadError struct {
 
 // ReadStatus defines model for ReadStatus.
 type ReadStatus struct {
-	AttemptedAt *time.Time      `json:"attempted_at,omitempty"`
-	DataAt      *time.Time      `json:"data_at,omitempty"`
-	Error       *NetworkError   `json:"error,omitempty"`
-	State       ReadStatusState `json:"state"`
+	// AttemptedAt 最近一次取得名额并开始读取的时间。
+	AttemptedAt *time.Time `json:"attempted_at,omitempty"`
+
+	// DataAt 当前保留结果的来源采集时间；重复返回缓存不会更新。
+	DataAt *time.Time      `json:"data_at,omitempty"`
+	Error  *NetworkError   `json:"error,omitempty"`
+	State  ReadStatusState `json:"state"`
 }
 
 // ReadStatusState defines model for ReadStatus.State.
@@ -4133,6 +4420,17 @@ type ChangeDatabaseParams struct {
 	IdempotencyKey string  `json:"Idempotency-Key"`
 }
 
+// ApplyProxyRoutingParams defines parameters for ApplyProxyRouting.
+type ApplyProxyRoutingParams struct {
+	XCSRFToken     *string `json:"X-CSRF-Token,omitempty"`
+	IdempotencyKey string  `json:"Idempotency-Key"`
+}
+
+// PreviewProxyRoutingParams defines parameters for PreviewProxyRouting.
+type PreviewProxyRoutingParams struct {
+	XCSRFToken *string `json:"X-CSRF-Token,omitempty"`
+}
+
 // GetDatabaseClusterParams defines parameters for GetDatabaseCluster.
 type GetDatabaseClusterParams struct {
 	View *GetDatabaseClusterParamsView `form:"view,omitempty" json:"view,omitempty"`
@@ -4414,6 +4712,12 @@ type UpdateDatabaseClusterApplicationMergePatchPlusJSONRequestBody = DatabaseClu
 
 // ChangeDatabaseJSONRequestBody defines body for ChangeDatabase for application/json ContentType.
 type ChangeDatabaseJSONRequestBody = DatabaseChange
+
+// ApplyProxyRoutingJSONRequestBody defines body for ApplyProxyRouting for application/json ContentType.
+type ApplyProxyRoutingJSONRequestBody = ProxyRoutingPreview
+
+// PreviewProxyRoutingJSONRequestBody defines body for PreviewProxyRouting for application/json ContentType.
+type PreviewProxyRoutingJSONRequestBody = ProxyRoutingPreviewInput
 
 // RenameNodeApplicationMergePatchPlusJSONRequestBody defines body for RenameNode for application/merge-patch+json ContentType.
 type RenameNodeApplicationMergePatchPlusJSONRequestBody = NodePatch
@@ -5059,6 +5363,15 @@ type ServerInterface interface {
 	// ChangeDatabase 受理数据库变更
 	// (POST /database-clusters/{id}/changes)
 	ChangeDatabase(w http.ResponseWriter, r *http.Request, id string, params ChangeDatabaseParams)
+	// GetProxyRouting 读取代理策略及本机排序
+	// (GET /database-clusters/{id}/proxy-routing)
+	GetProxyRouting(w http.ResponseWriter, r *http.Request, id string)
+	// ApplyProxyRouting 应用预览的代理配置
+	// (POST /database-clusters/{id}/proxy-routing/actions)
+	ApplyProxyRouting(w http.ResponseWriter, r *http.Request, id string, params ApplyProxyRoutingParams)
+	// PreviewProxyRouting 预览代理受管配置及排序
+	// (POST /database-clusters/{id}/proxy-routing/previews)
+	PreviewProxyRouting(w http.ResponseWriter, r *http.Request, id string, params PreviewProxyRoutingParams)
 	// GetDatabaseCluster 读取数据库集群
 	// (GET /database-clusters/{id}/status)
 	GetDatabaseCluster(w http.ResponseWriter, r *http.Request, id string, params GetDatabaseClusterParams)
@@ -5167,6 +5480,9 @@ type ServerInterface interface {
 	// FirewallAction 安装但不启用防火墙组件
 	// (POST /nodes/{node_id}/firewall/actions)
 	FirewallAction(w http.ResponseWriter, r *http.Request, nodeId string, params FirewallActionParams)
+	// PreviewFirewallAdoption 预览当前防火墙配置
+	// (GET /nodes/{node_id}/firewall/adoption)
+	PreviewFirewallAdoption(w http.ResponseWriter, r *http.Request, nodeId string)
 	// ChangeFirewallConfig changeFirewallConfig
 	// (POST /nodes/{node_id}/firewall/changes)
 	ChangeFirewallConfig(w http.ResponseWriter, r *http.Request, nodeId string, params ChangeFirewallConfigParams)
@@ -6180,6 +6496,155 @@ func (siw *ServerInterfaceWrapper) ChangeDatabase(w http.ResponseWriter, r *http
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.ChangeDatabase(w, r, id, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetProxyRouting operation middleware
+func (siw *ServerInterfaceWrapper) GetProxyRouting(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetProxyRouting(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ApplyProxyRouting operation middleware
+func (siw *ServerInterfaceWrapper) ApplyProxyRouting(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ApplyProxyRoutingParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "X-CSRF-Token" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-CSRF-Token")]; found {
+		var XCSRFToken string
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "X-CSRF-Token", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "X-CSRF-Token", valueList[0], &XCSRFToken, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-CSRF-Token", Err: err})
+			return
+		}
+
+		params.XCSRFToken = &XCSRFToken
+
+	}
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey string
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ApplyProxyRouting(w, r, id, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// PreviewProxyRouting operation middleware
+func (siw *ServerInterfaceWrapper) PreviewProxyRouting(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params PreviewProxyRoutingParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "X-CSRF-Token" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-CSRF-Token")]; found {
+		var XCSRFToken string
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "X-CSRF-Token", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "X-CSRF-Token", valueList[0], &XCSRFToken, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-CSRF-Token", Err: err})
+			return
+		}
+
+		params.XCSRFToken = &XCSRFToken
+
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PreviewProxyRouting(w, r, id, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -8354,6 +8819,32 @@ func (siw *ServerInterfaceWrapper) FirewallAction(w http.ResponseWriter, r *http
 	handler.ServeHTTP(w, r)
 }
 
+// PreviewFirewallAdoption operation middleware
+func (siw *ServerInterfaceWrapper) PreviewFirewallAdoption(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "node_id" -------------
+	var nodeId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "node_id", r.PathValue("node_id"), &nodeId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "node_id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PreviewFirewallAdoption(w, r, nodeId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // ChangeFirewallConfig operation middleware
 func (siw *ServerInterfaceWrapper) ChangeFirewallConfig(w http.ResponseWriter, r *http.Request) {
 
@@ -9949,6 +10440,9 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/database-clusters/{id}", wrapper.UpdateDatabaseCluster)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/database-clusters/{id}/backups", wrapper.GetDatabaseBackups)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/database-clusters/{id}/changes", wrapper.ChangeDatabase)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/database-clusters/{id}/proxy-routing", wrapper.GetProxyRouting)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/database-clusters/{id}/proxy-routing/actions", wrapper.ApplyProxyRouting)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/database-clusters/{id}/proxy-routing/previews", wrapper.PreviewProxyRouting)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/database-clusters/{id}/status", wrapper.GetDatabaseCluster)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/docs", wrapper.GetAPIDocumentation)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/enrollment-tokens", wrapper.ListEnrollmentTokens)
@@ -9985,6 +10479,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/nodes/{node_id}/engines/{engine_id}/containers/{container_id}/actions", wrapper.ChangeContainer)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/nodes/{node_id}/engines/{engine_id}/containers/{container_id}/logs", wrapper.GetContainerLogs)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/nodes/{node_id}/firewall/actions", wrapper.FirewallAction)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/nodes/{node_id}/firewall/adoption", wrapper.PreviewFirewallAdoption)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/nodes/{node_id}/firewall/changes", wrapper.ChangeFirewallConfig)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/nodes/{node_id}/firewall/configuration", wrapper.ReadFirewall)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/nodes/{node_id}/firewall/peer-trust", wrapper.GetNodePeerTrust)
@@ -17083,6 +17578,1050 @@ type ChangeDatabase504ApplicationProblemPlusJSONResponse struct {
 }
 
 func (response ChangeDatabase504ApplicationProblemPlusJSONResponse) VisitChangeDatabaseResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(504)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetProxyRoutingRequestObject struct {
+	Id string `json:"id"`
+}
+
+type GetProxyRoutingResponseObject interface {
+	VisitGetProxyRoutingResponse(w http.ResponseWriter) error
+}
+
+type GetProxyRouting200ResponseHeaders struct {
+	XRequestID string
+}
+
+type GetProxyRouting200JSONResponse struct {
+	Body    ProxyRoutingStatus
+	Headers GetProxyRouting200ResponseHeaders
+}
+
+func (response GetProxyRouting200JSONResponse) VisitGetProxyRoutingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetProxyRouting400ApplicationProblemPlusJSONResponse struct {
+	Error400ApplicationProblemPlusJSONResponse
+}
+
+func (response GetProxyRouting400ApplicationProblemPlusJSONResponse) VisitGetProxyRoutingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetProxyRouting401ApplicationProblemPlusJSONResponse struct {
+	Error401ApplicationProblemPlusJSONResponse
+}
+
+func (response GetProxyRouting401ApplicationProblemPlusJSONResponse) VisitGetProxyRoutingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetProxyRouting403ApplicationProblemPlusJSONResponse struct {
+	Error403ApplicationProblemPlusJSONResponse
+}
+
+func (response GetProxyRouting403ApplicationProblemPlusJSONResponse) VisitGetProxyRoutingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetProxyRouting404ApplicationProblemPlusJSONResponse struct {
+	Error404ApplicationProblemPlusJSONResponse
+}
+
+func (response GetProxyRouting404ApplicationProblemPlusJSONResponse) VisitGetProxyRoutingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetProxyRouting405ApplicationProblemPlusJSONResponse struct {
+	Error405ApplicationProblemPlusJSONResponse
+}
+
+func (response GetProxyRouting405ApplicationProblemPlusJSONResponse) VisitGetProxyRoutingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.Allow != nil {
+		w.Header().Set("Allow", fmt.Sprint(*response.Headers.Allow))
+	}
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(405)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetProxyRouting406ApplicationProblemPlusJSONResponse struct {
+	Error406ApplicationProblemPlusJSONResponse
+}
+
+func (response GetProxyRouting406ApplicationProblemPlusJSONResponse) VisitGetProxyRoutingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(406)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetProxyRouting409ApplicationProblemPlusJSONResponse struct {
+	Error409ApplicationProblemPlusJSONResponse
+}
+
+func (response GetProxyRouting409ApplicationProblemPlusJSONResponse) VisitGetProxyRoutingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetProxyRouting412ApplicationProblemPlusJSONResponse struct {
+	Error412ApplicationProblemPlusJSONResponse
+}
+
+func (response GetProxyRouting412ApplicationProblemPlusJSONResponse) VisitGetProxyRoutingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(412)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetProxyRouting413ApplicationProblemPlusJSONResponse struct {
+	Error413ApplicationProblemPlusJSONResponse
+}
+
+func (response GetProxyRouting413ApplicationProblemPlusJSONResponse) VisitGetProxyRoutingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(413)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetProxyRouting415ApplicationProblemPlusJSONResponse struct {
+	Error415ApplicationProblemPlusJSONResponse
+}
+
+func (response GetProxyRouting415ApplicationProblemPlusJSONResponse) VisitGetProxyRoutingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(415)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetProxyRouting422ApplicationProblemPlusJSONResponse struct {
+	Error422ApplicationProblemPlusJSONResponse
+}
+
+func (response GetProxyRouting422ApplicationProblemPlusJSONResponse) VisitGetProxyRoutingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetProxyRouting428ApplicationProblemPlusJSONResponse struct {
+	Error428ApplicationProblemPlusJSONResponse
+}
+
+func (response GetProxyRouting428ApplicationProblemPlusJSONResponse) VisitGetProxyRoutingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(428)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetProxyRouting429ApplicationProblemPlusJSONResponse struct {
+	Error429ApplicationProblemPlusJSONResponse
+}
+
+func (response GetProxyRouting429ApplicationProblemPlusJSONResponse) VisitGetProxyRoutingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.RetryAfter != nil {
+		w.Header().Set("Retry-After", fmt.Sprint(*response.Headers.RetryAfter))
+	}
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(429)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetProxyRouting500ApplicationProblemPlusJSONResponse struct {
+	Error500ApplicationProblemPlusJSONResponse
+}
+
+func (response GetProxyRouting500ApplicationProblemPlusJSONResponse) VisitGetProxyRoutingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetProxyRouting503ApplicationProblemPlusJSONResponse struct {
+	Error503ApplicationProblemPlusJSONResponse
+}
+
+func (response GetProxyRouting503ApplicationProblemPlusJSONResponse) VisitGetProxyRoutingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(503)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetProxyRouting504ApplicationProblemPlusJSONResponse struct {
+	Error504ApplicationProblemPlusJSONResponse
+}
+
+func (response GetProxyRouting504ApplicationProblemPlusJSONResponse) VisitGetProxyRoutingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(504)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ApplyProxyRoutingRequestObject struct {
+	Id     string `json:"id"`
+	Params ApplyProxyRoutingParams
+	Body   *ApplyProxyRoutingJSONRequestBody
+}
+
+type ApplyProxyRoutingResponseObject interface {
+	VisitApplyProxyRoutingResponse(w http.ResponseWriter) error
+}
+
+type ApplyProxyRouting202ResponseHeaders struct {
+	Location   string
+	XRequestID string
+}
+
+type ApplyProxyRouting202JSONResponse struct {
+	Body    Operation
+	Headers ApplyProxyRouting202ResponseHeaders
+}
+
+func (response ApplyProxyRouting202JSONResponse) VisitApplyProxyRoutingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Location", fmt.Sprint(response.Headers.Location))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(202)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ApplyProxyRouting400ApplicationProblemPlusJSONResponse struct {
+	Error400ApplicationProblemPlusJSONResponse
+}
+
+func (response ApplyProxyRouting400ApplicationProblemPlusJSONResponse) VisitApplyProxyRoutingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ApplyProxyRouting401ApplicationProblemPlusJSONResponse struct {
+	Error401ApplicationProblemPlusJSONResponse
+}
+
+func (response ApplyProxyRouting401ApplicationProblemPlusJSONResponse) VisitApplyProxyRoutingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ApplyProxyRouting403ApplicationProblemPlusJSONResponse struct {
+	Error403ApplicationProblemPlusJSONResponse
+}
+
+func (response ApplyProxyRouting403ApplicationProblemPlusJSONResponse) VisitApplyProxyRoutingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ApplyProxyRouting404ApplicationProblemPlusJSONResponse struct {
+	Error404ApplicationProblemPlusJSONResponse
+}
+
+func (response ApplyProxyRouting404ApplicationProblemPlusJSONResponse) VisitApplyProxyRoutingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ApplyProxyRouting405ApplicationProblemPlusJSONResponse struct {
+	Error405ApplicationProblemPlusJSONResponse
+}
+
+func (response ApplyProxyRouting405ApplicationProblemPlusJSONResponse) VisitApplyProxyRoutingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.Allow != nil {
+		w.Header().Set("Allow", fmt.Sprint(*response.Headers.Allow))
+	}
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(405)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ApplyProxyRouting406ApplicationProblemPlusJSONResponse struct {
+	Error406ApplicationProblemPlusJSONResponse
+}
+
+func (response ApplyProxyRouting406ApplicationProblemPlusJSONResponse) VisitApplyProxyRoutingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(406)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ApplyProxyRouting409ApplicationProblemPlusJSONResponse struct {
+	Error409ApplicationProblemPlusJSONResponse
+}
+
+func (response ApplyProxyRouting409ApplicationProblemPlusJSONResponse) VisitApplyProxyRoutingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ApplyProxyRouting412ApplicationProblemPlusJSONResponse struct {
+	Error412ApplicationProblemPlusJSONResponse
+}
+
+func (response ApplyProxyRouting412ApplicationProblemPlusJSONResponse) VisitApplyProxyRoutingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(412)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ApplyProxyRouting413ApplicationProblemPlusJSONResponse struct {
+	Error413ApplicationProblemPlusJSONResponse
+}
+
+func (response ApplyProxyRouting413ApplicationProblemPlusJSONResponse) VisitApplyProxyRoutingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(413)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ApplyProxyRouting415ApplicationProblemPlusJSONResponse struct {
+	Error415ApplicationProblemPlusJSONResponse
+}
+
+func (response ApplyProxyRouting415ApplicationProblemPlusJSONResponse) VisitApplyProxyRoutingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(415)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ApplyProxyRouting422ApplicationProblemPlusJSONResponse struct {
+	Error422ApplicationProblemPlusJSONResponse
+}
+
+func (response ApplyProxyRouting422ApplicationProblemPlusJSONResponse) VisitApplyProxyRoutingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ApplyProxyRouting428ApplicationProblemPlusJSONResponse struct {
+	Error428ApplicationProblemPlusJSONResponse
+}
+
+func (response ApplyProxyRouting428ApplicationProblemPlusJSONResponse) VisitApplyProxyRoutingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(428)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ApplyProxyRouting429ApplicationProblemPlusJSONResponse struct {
+	Error429ApplicationProblemPlusJSONResponse
+}
+
+func (response ApplyProxyRouting429ApplicationProblemPlusJSONResponse) VisitApplyProxyRoutingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.RetryAfter != nil {
+		w.Header().Set("Retry-After", fmt.Sprint(*response.Headers.RetryAfter))
+	}
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(429)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ApplyProxyRouting500ApplicationProblemPlusJSONResponse struct {
+	Error500ApplicationProblemPlusJSONResponse
+}
+
+func (response ApplyProxyRouting500ApplicationProblemPlusJSONResponse) VisitApplyProxyRoutingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ApplyProxyRouting503ApplicationProblemPlusJSONResponse struct {
+	Error503ApplicationProblemPlusJSONResponse
+}
+
+func (response ApplyProxyRouting503ApplicationProblemPlusJSONResponse) VisitApplyProxyRoutingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(503)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ApplyProxyRouting504ApplicationProblemPlusJSONResponse struct {
+	Error504ApplicationProblemPlusJSONResponse
+}
+
+func (response ApplyProxyRouting504ApplicationProblemPlusJSONResponse) VisitApplyProxyRoutingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(504)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PreviewProxyRoutingRequestObject struct {
+	Id     string `json:"id"`
+	Params PreviewProxyRoutingParams
+	Body   *PreviewProxyRoutingJSONRequestBody
+}
+
+type PreviewProxyRoutingResponseObject interface {
+	VisitPreviewProxyRoutingResponse(w http.ResponseWriter) error
+}
+
+type PreviewProxyRouting200ResponseHeaders struct {
+	XRequestID string
+}
+
+type PreviewProxyRouting200JSONResponse struct {
+	Body    ProxyRoutingPreview
+	Headers PreviewProxyRouting200ResponseHeaders
+}
+
+func (response PreviewProxyRouting200JSONResponse) VisitPreviewProxyRoutingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PreviewProxyRouting400ApplicationProblemPlusJSONResponse struct {
+	Error400ApplicationProblemPlusJSONResponse
+}
+
+func (response PreviewProxyRouting400ApplicationProblemPlusJSONResponse) VisitPreviewProxyRoutingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PreviewProxyRouting401ApplicationProblemPlusJSONResponse struct {
+	Error401ApplicationProblemPlusJSONResponse
+}
+
+func (response PreviewProxyRouting401ApplicationProblemPlusJSONResponse) VisitPreviewProxyRoutingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PreviewProxyRouting403ApplicationProblemPlusJSONResponse struct {
+	Error403ApplicationProblemPlusJSONResponse
+}
+
+func (response PreviewProxyRouting403ApplicationProblemPlusJSONResponse) VisitPreviewProxyRoutingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PreviewProxyRouting404ApplicationProblemPlusJSONResponse struct {
+	Error404ApplicationProblemPlusJSONResponse
+}
+
+func (response PreviewProxyRouting404ApplicationProblemPlusJSONResponse) VisitPreviewProxyRoutingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PreviewProxyRouting405ApplicationProblemPlusJSONResponse struct {
+	Error405ApplicationProblemPlusJSONResponse
+}
+
+func (response PreviewProxyRouting405ApplicationProblemPlusJSONResponse) VisitPreviewProxyRoutingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.Allow != nil {
+		w.Header().Set("Allow", fmt.Sprint(*response.Headers.Allow))
+	}
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(405)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PreviewProxyRouting406ApplicationProblemPlusJSONResponse struct {
+	Error406ApplicationProblemPlusJSONResponse
+}
+
+func (response PreviewProxyRouting406ApplicationProblemPlusJSONResponse) VisitPreviewProxyRoutingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(406)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PreviewProxyRouting409ApplicationProblemPlusJSONResponse struct {
+	Error409ApplicationProblemPlusJSONResponse
+}
+
+func (response PreviewProxyRouting409ApplicationProblemPlusJSONResponse) VisitPreviewProxyRoutingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PreviewProxyRouting412ApplicationProblemPlusJSONResponse struct {
+	Error412ApplicationProblemPlusJSONResponse
+}
+
+func (response PreviewProxyRouting412ApplicationProblemPlusJSONResponse) VisitPreviewProxyRoutingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(412)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PreviewProxyRouting413ApplicationProblemPlusJSONResponse struct {
+	Error413ApplicationProblemPlusJSONResponse
+}
+
+func (response PreviewProxyRouting413ApplicationProblemPlusJSONResponse) VisitPreviewProxyRoutingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(413)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PreviewProxyRouting415ApplicationProblemPlusJSONResponse struct {
+	Error415ApplicationProblemPlusJSONResponse
+}
+
+func (response PreviewProxyRouting415ApplicationProblemPlusJSONResponse) VisitPreviewProxyRoutingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(415)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PreviewProxyRouting422ApplicationProblemPlusJSONResponse struct {
+	Error422ApplicationProblemPlusJSONResponse
+}
+
+func (response PreviewProxyRouting422ApplicationProblemPlusJSONResponse) VisitPreviewProxyRoutingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PreviewProxyRouting428ApplicationProblemPlusJSONResponse struct {
+	Error428ApplicationProblemPlusJSONResponse
+}
+
+func (response PreviewProxyRouting428ApplicationProblemPlusJSONResponse) VisitPreviewProxyRoutingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(428)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PreviewProxyRouting429ApplicationProblemPlusJSONResponse struct {
+	Error429ApplicationProblemPlusJSONResponse
+}
+
+func (response PreviewProxyRouting429ApplicationProblemPlusJSONResponse) VisitPreviewProxyRoutingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.RetryAfter != nil {
+		w.Header().Set("Retry-After", fmt.Sprint(*response.Headers.RetryAfter))
+	}
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(429)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PreviewProxyRouting500ApplicationProblemPlusJSONResponse struct {
+	Error500ApplicationProblemPlusJSONResponse
+}
+
+func (response PreviewProxyRouting500ApplicationProblemPlusJSONResponse) VisitPreviewProxyRoutingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PreviewProxyRouting503ApplicationProblemPlusJSONResponse struct {
+	Error503ApplicationProblemPlusJSONResponse
+}
+
+func (response PreviewProxyRouting503ApplicationProblemPlusJSONResponse) VisitPreviewProxyRoutingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(503)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PreviewProxyRouting504ApplicationProblemPlusJSONResponse struct {
+	Error504ApplicationProblemPlusJSONResponse
+}
+
+func (response PreviewProxyRouting504ApplicationProblemPlusJSONResponse) VisitPreviewProxyRoutingResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
@@ -29697,6 +31236,352 @@ func (response FirewallAction504ApplicationProblemPlusJSONResponse) VisitFirewal
 	return err
 }
 
+type PreviewFirewallAdoptionRequestObject struct {
+	NodeId string `json:"node_id"`
+}
+
+type PreviewFirewallAdoptionResponseObject interface {
+	VisitPreviewFirewallAdoptionResponse(w http.ResponseWriter) error
+}
+
+type PreviewFirewallAdoption200ResponseHeaders struct {
+	XRequestID string
+}
+
+type PreviewFirewallAdoption200JSONResponse struct {
+	Body    FirewallAdoption
+	Headers PreviewFirewallAdoption200ResponseHeaders
+}
+
+func (response PreviewFirewallAdoption200JSONResponse) VisitPreviewFirewallAdoptionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PreviewFirewallAdoption400ApplicationProblemPlusJSONResponse struct {
+	Error400ApplicationProblemPlusJSONResponse
+}
+
+func (response PreviewFirewallAdoption400ApplicationProblemPlusJSONResponse) VisitPreviewFirewallAdoptionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PreviewFirewallAdoption401ApplicationProblemPlusJSONResponse struct {
+	Error401ApplicationProblemPlusJSONResponse
+}
+
+func (response PreviewFirewallAdoption401ApplicationProblemPlusJSONResponse) VisitPreviewFirewallAdoptionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PreviewFirewallAdoption403ApplicationProblemPlusJSONResponse struct {
+	Error403ApplicationProblemPlusJSONResponse
+}
+
+func (response PreviewFirewallAdoption403ApplicationProblemPlusJSONResponse) VisitPreviewFirewallAdoptionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PreviewFirewallAdoption404ApplicationProblemPlusJSONResponse struct {
+	Error404ApplicationProblemPlusJSONResponse
+}
+
+func (response PreviewFirewallAdoption404ApplicationProblemPlusJSONResponse) VisitPreviewFirewallAdoptionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PreviewFirewallAdoption405ApplicationProblemPlusJSONResponse struct {
+	Error405ApplicationProblemPlusJSONResponse
+}
+
+func (response PreviewFirewallAdoption405ApplicationProblemPlusJSONResponse) VisitPreviewFirewallAdoptionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.Allow != nil {
+		w.Header().Set("Allow", fmt.Sprint(*response.Headers.Allow))
+	}
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(405)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PreviewFirewallAdoption406ApplicationProblemPlusJSONResponse struct {
+	Error406ApplicationProblemPlusJSONResponse
+}
+
+func (response PreviewFirewallAdoption406ApplicationProblemPlusJSONResponse) VisitPreviewFirewallAdoptionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(406)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PreviewFirewallAdoption409ApplicationProblemPlusJSONResponse struct {
+	Error409ApplicationProblemPlusJSONResponse
+}
+
+func (response PreviewFirewallAdoption409ApplicationProblemPlusJSONResponse) VisitPreviewFirewallAdoptionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PreviewFirewallAdoption412ApplicationProblemPlusJSONResponse struct {
+	Error412ApplicationProblemPlusJSONResponse
+}
+
+func (response PreviewFirewallAdoption412ApplicationProblemPlusJSONResponse) VisitPreviewFirewallAdoptionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(412)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PreviewFirewallAdoption413ApplicationProblemPlusJSONResponse struct {
+	Error413ApplicationProblemPlusJSONResponse
+}
+
+func (response PreviewFirewallAdoption413ApplicationProblemPlusJSONResponse) VisitPreviewFirewallAdoptionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(413)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PreviewFirewallAdoption415ApplicationProblemPlusJSONResponse struct {
+	Error415ApplicationProblemPlusJSONResponse
+}
+
+func (response PreviewFirewallAdoption415ApplicationProblemPlusJSONResponse) VisitPreviewFirewallAdoptionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(415)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PreviewFirewallAdoption422ApplicationProblemPlusJSONResponse struct {
+	Error422ApplicationProblemPlusJSONResponse
+}
+
+func (response PreviewFirewallAdoption422ApplicationProblemPlusJSONResponse) VisitPreviewFirewallAdoptionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PreviewFirewallAdoption428ApplicationProblemPlusJSONResponse struct {
+	Error428ApplicationProblemPlusJSONResponse
+}
+
+func (response PreviewFirewallAdoption428ApplicationProblemPlusJSONResponse) VisitPreviewFirewallAdoptionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(428)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PreviewFirewallAdoption429ApplicationProblemPlusJSONResponse struct {
+	Error429ApplicationProblemPlusJSONResponse
+}
+
+func (response PreviewFirewallAdoption429ApplicationProblemPlusJSONResponse) VisitPreviewFirewallAdoptionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.RetryAfter != nil {
+		w.Header().Set("Retry-After", fmt.Sprint(*response.Headers.RetryAfter))
+	}
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(429)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PreviewFirewallAdoption500ApplicationProblemPlusJSONResponse struct {
+	Error500ApplicationProblemPlusJSONResponse
+}
+
+func (response PreviewFirewallAdoption500ApplicationProblemPlusJSONResponse) VisitPreviewFirewallAdoptionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PreviewFirewallAdoption503ApplicationProblemPlusJSONResponse struct {
+	Error503ApplicationProblemPlusJSONResponse
+}
+
+func (response PreviewFirewallAdoption503ApplicationProblemPlusJSONResponse) VisitPreviewFirewallAdoptionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(503)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PreviewFirewallAdoption504ApplicationProblemPlusJSONResponse struct {
+	Error504ApplicationProblemPlusJSONResponse
+}
+
+func (response PreviewFirewallAdoption504ApplicationProblemPlusJSONResponse) VisitPreviewFirewallAdoptionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(504)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type ChangeFirewallConfigRequestObject struct {
 	NodeId string `json:"node_id"`
 	Params ChangeFirewallConfigParams
@@ -40513,6 +42398,15 @@ type StrictServerInterface interface {
 	// ChangeDatabase 受理数据库变更
 	// (POST /database-clusters/{id}/changes)
 	ChangeDatabase(ctx context.Context, request ChangeDatabaseRequestObject) (ChangeDatabaseResponseObject, error)
+	// GetProxyRouting 读取代理策略及本机排序
+	// (GET /database-clusters/{id}/proxy-routing)
+	GetProxyRouting(ctx context.Context, request GetProxyRoutingRequestObject) (GetProxyRoutingResponseObject, error)
+	// ApplyProxyRouting 应用预览的代理配置
+	// (POST /database-clusters/{id}/proxy-routing/actions)
+	ApplyProxyRouting(ctx context.Context, request ApplyProxyRoutingRequestObject) (ApplyProxyRoutingResponseObject, error)
+	// PreviewProxyRouting 预览代理受管配置及排序
+	// (POST /database-clusters/{id}/proxy-routing/previews)
+	PreviewProxyRouting(ctx context.Context, request PreviewProxyRoutingRequestObject) (PreviewProxyRoutingResponseObject, error)
 	// GetDatabaseCluster 读取数据库集群
 	// (GET /database-clusters/{id}/status)
 	GetDatabaseCluster(ctx context.Context, request GetDatabaseClusterRequestObject) (GetDatabaseClusterResponseObject, error)
@@ -40621,6 +42515,9 @@ type StrictServerInterface interface {
 	// FirewallAction 安装但不启用防火墙组件
 	// (POST /nodes/{node_id}/firewall/actions)
 	FirewallAction(ctx context.Context, request FirewallActionRequestObject) (FirewallActionResponseObject, error)
+	// PreviewFirewallAdoption 预览当前防火墙配置
+	// (GET /nodes/{node_id}/firewall/adoption)
+	PreviewFirewallAdoption(ctx context.Context, request PreviewFirewallAdoptionRequestObject) (PreviewFirewallAdoptionResponseObject, error)
 	// ChangeFirewallConfig changeFirewallConfig
 	// (POST /nodes/{node_id}/firewall/changes)
 	ChangeFirewallConfig(ctx context.Context, request ChangeFirewallConfigRequestObject) (ChangeFirewallConfigResponseObject, error)
@@ -41312,6 +43209,100 @@ func (sh *strictHandler) ChangeDatabase(w http.ResponseWriter, r *http.Request, 
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(ChangeDatabaseResponseObject); ok {
 		if err := validResponse.VisitChangeDatabaseResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetProxyRouting operation middleware
+func (sh *strictHandler) GetProxyRouting(w http.ResponseWriter, r *http.Request, id string) {
+	var request GetProxyRoutingRequestObject
+
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetProxyRouting(ctx, request.(GetProxyRoutingRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetProxyRouting")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetProxyRoutingResponseObject); ok {
+		if err := validResponse.VisitGetProxyRoutingResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ApplyProxyRouting operation middleware
+func (sh *strictHandler) ApplyProxyRouting(w http.ResponseWriter, r *http.Request, id string, params ApplyProxyRoutingParams) {
+	var request ApplyProxyRoutingRequestObject
+
+	request.Id = id
+	request.Params = params
+
+	var body ApplyProxyRoutingJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ApplyProxyRouting(ctx, request.(ApplyProxyRoutingRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ApplyProxyRouting")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ApplyProxyRoutingResponseObject); ok {
+		if err := validResponse.VisitApplyProxyRoutingResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// PreviewProxyRouting operation middleware
+func (sh *strictHandler) PreviewProxyRouting(w http.ResponseWriter, r *http.Request, id string, params PreviewProxyRoutingParams) {
+	var request PreviewProxyRoutingRequestObject
+
+	request.Id = id
+	request.Params = params
+
+	var body PreviewProxyRoutingJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.PreviewProxyRouting(ctx, request.(PreviewProxyRoutingRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "PreviewProxyRouting")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(PreviewProxyRoutingResponseObject); ok {
+		if err := validResponse.VisitPreviewProxyRoutingResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -42365,6 +44356,32 @@ func (sh *strictHandler) FirewallAction(w http.ResponseWriter, r *http.Request, 
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(FirewallActionResponseObject); ok {
 		if err := validResponse.VisitFirewallActionResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// PreviewFirewallAdoption operation middleware
+func (sh *strictHandler) PreviewFirewallAdoption(w http.ResponseWriter, r *http.Request, nodeId string) {
+	var request PreviewFirewallAdoptionRequestObject
+
+	request.NodeId = nodeId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.PreviewFirewallAdoption(ctx, request.(PreviewFirewallAdoptionRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "PreviewFirewallAdoption")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(PreviewFirewallAdoptionResponseObject); ok {
+		if err := validResponse.VisitPreviewFirewallAdoptionResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

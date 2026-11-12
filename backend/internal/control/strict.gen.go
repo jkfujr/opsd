@@ -851,6 +851,138 @@ func (a *strictAPI) ChangeDatabase(ctx context.Context, request httpapi.ChangeDa
 	return nil, fmt.Errorf("ChangeDatabase 返回未声明状态 %d", w.status())
 }
 
+func (a *strictAPI) GetProxyRouting(ctx context.Context, request httpapi.GetProxyRoutingRequestObject) (httpapi.GetProxyRoutingResponseObject, error) {
+	r := strictRequest(ctx)
+	w := newAPIResponse(r)
+	a.server.GetProxyRouting(w, r, request.Id)
+	a.server.prepareAPIResponse(w, r)
+	switch w.status() {
+	case 200:
+		return strictResponse[httpapi.GetProxyRouting200JSONResponse](w)
+	case 400:
+		return strictResponse[httpapi.GetProxyRouting400ApplicationProblemPlusJSONResponse](w)
+	case 401:
+		return strictResponse[httpapi.GetProxyRouting401ApplicationProblemPlusJSONResponse](w)
+	case 403:
+		return strictResponse[httpapi.GetProxyRouting403ApplicationProblemPlusJSONResponse](w)
+	case 404:
+		return strictResponse[httpapi.GetProxyRouting404ApplicationProblemPlusJSONResponse](w)
+	case 405:
+		return strictResponse[httpapi.GetProxyRouting405ApplicationProblemPlusJSONResponse](w)
+	case 406:
+		return strictResponse[httpapi.GetProxyRouting406ApplicationProblemPlusJSONResponse](w)
+	case 409:
+		return strictResponse[httpapi.GetProxyRouting409ApplicationProblemPlusJSONResponse](w)
+	case 412:
+		return strictResponse[httpapi.GetProxyRouting412ApplicationProblemPlusJSONResponse](w)
+	case 413:
+		return strictResponse[httpapi.GetProxyRouting413ApplicationProblemPlusJSONResponse](w)
+	case 415:
+		return strictResponse[httpapi.GetProxyRouting415ApplicationProblemPlusJSONResponse](w)
+	case 422:
+		return strictResponse[httpapi.GetProxyRouting422ApplicationProblemPlusJSONResponse](w)
+	case 428:
+		return strictResponse[httpapi.GetProxyRouting428ApplicationProblemPlusJSONResponse](w)
+	case 429:
+		return strictResponse[httpapi.GetProxyRouting429ApplicationProblemPlusJSONResponse](w)
+	case 500:
+		return strictResponse[httpapi.GetProxyRouting500ApplicationProblemPlusJSONResponse](w)
+	case 503:
+		return strictResponse[httpapi.GetProxyRouting503ApplicationProblemPlusJSONResponse](w)
+	case 504:
+		return strictResponse[httpapi.GetProxyRouting504ApplicationProblemPlusJSONResponse](w)
+	}
+	return nil, fmt.Errorf("GetProxyRouting 返回未声明状态 %d", w.status())
+}
+
+func (a *strictAPI) ApplyProxyRouting(ctx context.Context, request httpapi.ApplyProxyRoutingRequestObject) (httpapi.ApplyProxyRoutingResponseObject, error) {
+	r := strictRequest(ctx)
+	w := newAPIResponse(r)
+	a.server.ApplyProxyRouting(w, r, request.Id, request.Params)
+	a.server.prepareAPIResponse(w, r)
+	switch w.status() {
+	case 202:
+		return strictResponse[httpapi.ApplyProxyRouting202JSONResponse](w)
+	case 400:
+		return strictResponse[httpapi.ApplyProxyRouting400ApplicationProblemPlusJSONResponse](w)
+	case 401:
+		return strictResponse[httpapi.ApplyProxyRouting401ApplicationProblemPlusJSONResponse](w)
+	case 403:
+		return strictResponse[httpapi.ApplyProxyRouting403ApplicationProblemPlusJSONResponse](w)
+	case 404:
+		return strictResponse[httpapi.ApplyProxyRouting404ApplicationProblemPlusJSONResponse](w)
+	case 405:
+		return strictResponse[httpapi.ApplyProxyRouting405ApplicationProblemPlusJSONResponse](w)
+	case 406:
+		return strictResponse[httpapi.ApplyProxyRouting406ApplicationProblemPlusJSONResponse](w)
+	case 409:
+		return strictResponse[httpapi.ApplyProxyRouting409ApplicationProblemPlusJSONResponse](w)
+	case 412:
+		return strictResponse[httpapi.ApplyProxyRouting412ApplicationProblemPlusJSONResponse](w)
+	case 413:
+		return strictResponse[httpapi.ApplyProxyRouting413ApplicationProblemPlusJSONResponse](w)
+	case 415:
+		return strictResponse[httpapi.ApplyProxyRouting415ApplicationProblemPlusJSONResponse](w)
+	case 422:
+		return strictResponse[httpapi.ApplyProxyRouting422ApplicationProblemPlusJSONResponse](w)
+	case 428:
+		return strictResponse[httpapi.ApplyProxyRouting428ApplicationProblemPlusJSONResponse](w)
+	case 429:
+		return strictResponse[httpapi.ApplyProxyRouting429ApplicationProblemPlusJSONResponse](w)
+	case 500:
+		return strictResponse[httpapi.ApplyProxyRouting500ApplicationProblemPlusJSONResponse](w)
+	case 503:
+		return strictResponse[httpapi.ApplyProxyRouting503ApplicationProblemPlusJSONResponse](w)
+	case 504:
+		return strictResponse[httpapi.ApplyProxyRouting504ApplicationProblemPlusJSONResponse](w)
+	}
+	return nil, fmt.Errorf("ApplyProxyRouting 返回未声明状态 %d", w.status())
+}
+
+func (a *strictAPI) PreviewProxyRouting(ctx context.Context, request httpapi.PreviewProxyRoutingRequestObject) (httpapi.PreviewProxyRoutingResponseObject, error) {
+	r := strictRequest(ctx)
+	w := newAPIResponse(r)
+	a.server.PreviewProxyRouting(w, r, request.Id, request.Params)
+	a.server.prepareAPIResponse(w, r)
+	switch w.status() {
+	case 200:
+		return strictResponse[httpapi.PreviewProxyRouting200JSONResponse](w)
+	case 400:
+		return strictResponse[httpapi.PreviewProxyRouting400ApplicationProblemPlusJSONResponse](w)
+	case 401:
+		return strictResponse[httpapi.PreviewProxyRouting401ApplicationProblemPlusJSONResponse](w)
+	case 403:
+		return strictResponse[httpapi.PreviewProxyRouting403ApplicationProblemPlusJSONResponse](w)
+	case 404:
+		return strictResponse[httpapi.PreviewProxyRouting404ApplicationProblemPlusJSONResponse](w)
+	case 405:
+		return strictResponse[httpapi.PreviewProxyRouting405ApplicationProblemPlusJSONResponse](w)
+	case 406:
+		return strictResponse[httpapi.PreviewProxyRouting406ApplicationProblemPlusJSONResponse](w)
+	case 409:
+		return strictResponse[httpapi.PreviewProxyRouting409ApplicationProblemPlusJSONResponse](w)
+	case 412:
+		return strictResponse[httpapi.PreviewProxyRouting412ApplicationProblemPlusJSONResponse](w)
+	case 413:
+		return strictResponse[httpapi.PreviewProxyRouting413ApplicationProblemPlusJSONResponse](w)
+	case 415:
+		return strictResponse[httpapi.PreviewProxyRouting415ApplicationProblemPlusJSONResponse](w)
+	case 422:
+		return strictResponse[httpapi.PreviewProxyRouting422ApplicationProblemPlusJSONResponse](w)
+	case 428:
+		return strictResponse[httpapi.PreviewProxyRouting428ApplicationProblemPlusJSONResponse](w)
+	case 429:
+		return strictResponse[httpapi.PreviewProxyRouting429ApplicationProblemPlusJSONResponse](w)
+	case 500:
+		return strictResponse[httpapi.PreviewProxyRouting500ApplicationProblemPlusJSONResponse](w)
+	case 503:
+		return strictResponse[httpapi.PreviewProxyRouting503ApplicationProblemPlusJSONResponse](w)
+	case 504:
+		return strictResponse[httpapi.PreviewProxyRouting504ApplicationProblemPlusJSONResponse](w)
+	}
+	return nil, fmt.Errorf("PreviewProxyRouting 返回未声明状态 %d", w.status())
+}
+
 func (a *strictAPI) GetDatabaseCluster(ctx context.Context, request httpapi.GetDatabaseClusterRequestObject) (httpapi.GetDatabaseClusterResponseObject, error) {
 	r := strictRequest(ctx)
 	w := newAPIResponse(r)
@@ -2315,6 +2447,50 @@ func (a *strictAPI) FirewallAction(ctx context.Context, request httpapi.Firewall
 		return strictResponse[httpapi.FirewallAction504ApplicationProblemPlusJSONResponse](w)
 	}
 	return nil, fmt.Errorf("FirewallAction 返回未声明状态 %d", w.status())
+}
+
+func (a *strictAPI) PreviewFirewallAdoption(ctx context.Context, request httpapi.PreviewFirewallAdoptionRequestObject) (httpapi.PreviewFirewallAdoptionResponseObject, error) {
+	r := strictRequest(ctx)
+	w := newAPIResponse(r)
+	a.server.PreviewFirewallAdoption(w, r, request.NodeId)
+	a.server.prepareAPIResponse(w, r)
+	switch w.status() {
+	case 200:
+		return strictResponse[httpapi.PreviewFirewallAdoption200JSONResponse](w)
+	case 400:
+		return strictResponse[httpapi.PreviewFirewallAdoption400ApplicationProblemPlusJSONResponse](w)
+	case 401:
+		return strictResponse[httpapi.PreviewFirewallAdoption401ApplicationProblemPlusJSONResponse](w)
+	case 403:
+		return strictResponse[httpapi.PreviewFirewallAdoption403ApplicationProblemPlusJSONResponse](w)
+	case 404:
+		return strictResponse[httpapi.PreviewFirewallAdoption404ApplicationProblemPlusJSONResponse](w)
+	case 405:
+		return strictResponse[httpapi.PreviewFirewallAdoption405ApplicationProblemPlusJSONResponse](w)
+	case 406:
+		return strictResponse[httpapi.PreviewFirewallAdoption406ApplicationProblemPlusJSONResponse](w)
+	case 409:
+		return strictResponse[httpapi.PreviewFirewallAdoption409ApplicationProblemPlusJSONResponse](w)
+	case 412:
+		return strictResponse[httpapi.PreviewFirewallAdoption412ApplicationProblemPlusJSONResponse](w)
+	case 413:
+		return strictResponse[httpapi.PreviewFirewallAdoption413ApplicationProblemPlusJSONResponse](w)
+	case 415:
+		return strictResponse[httpapi.PreviewFirewallAdoption415ApplicationProblemPlusJSONResponse](w)
+	case 422:
+		return strictResponse[httpapi.PreviewFirewallAdoption422ApplicationProblemPlusJSONResponse](w)
+	case 428:
+		return strictResponse[httpapi.PreviewFirewallAdoption428ApplicationProblemPlusJSONResponse](w)
+	case 429:
+		return strictResponse[httpapi.PreviewFirewallAdoption429ApplicationProblemPlusJSONResponse](w)
+	case 500:
+		return strictResponse[httpapi.PreviewFirewallAdoption500ApplicationProblemPlusJSONResponse](w)
+	case 503:
+		return strictResponse[httpapi.PreviewFirewallAdoption503ApplicationProblemPlusJSONResponse](w)
+	case 504:
+		return strictResponse[httpapi.PreviewFirewallAdoption504ApplicationProblemPlusJSONResponse](w)
+	}
+	return nil, fmt.Errorf("PreviewFirewallAdoption 返回未声明状态 %d", w.status())
 }
 
 func (a *strictAPI) ChangeFirewallConfig(ctx context.Context, request httpapi.ChangeFirewallConfigRequestObject) (httpapi.ChangeFirewallConfigResponseObject, error) {

@@ -41,6 +41,9 @@ func (e *Engine) database(ctx context.Context, l *Local) error {
 		l.Record.Steps = []protocol.OperationStep{}
 		for _, stage := range stages {
 			name := map[string]string{"database": "更新数据库", "memory": "更新代理账号", "runtime": "应用代理运行配置", "disk": "保存代理磁盘配置"}[stage]
+			if a.Kind == "proxy_route" && stage == "memory" {
+				name = "更新代理后端路由"
+			}
 			l.Record.Steps = append(l.Record.Steps, protocol.OperationStep{Name: name, State: "pending"})
 		}
 		l.Record.State = protocol.Applying
@@ -60,7 +63,7 @@ func (e *Engine) database(ctx context.Context, l *Local) error {
 			return e.end(ctx, l, protocol.ResolvedManually, nil)
 		}
 		if state.Source != "" && stage != "memory" && observed.Source != state.Source {
-			return e.attention(ctx, l, fmt.Errorf("ProxySQL 账号配置出现外部修改"))
+			return e.attention(ctx, l, fmt.Errorf("ProxySQL 配置出现外部修改"))
 		}
 		if !observed.Satisfied {
 			if state.Attempted {

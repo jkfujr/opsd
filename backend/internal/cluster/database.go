@@ -40,6 +40,15 @@ func validateStorage(c StorageConfig) error {
 func dbClient() *http.Client {
 	return &http.Client{Transport: &http.Transport{MaxIdleConns: 4, MaxIdleConnsPerHost: 2, MaxConnsPerHost: 4, IdleConnTimeout: time.Minute, ResponseHeaderTimeout: 5 * time.Second}, Timeout: 15 * time.Second}
 }
+
+func (n *Node) databaseClient() *http.Client {
+	n.storageMu.Lock()
+	defer n.storageMu.Unlock()
+	if n.databaseHTTP == nil {
+		n.databaseHTTP = dbClient()
+	}
+	return n.databaseHTTP
+}
 func (d *database) request(ctx context.Context, method, path string, body, out any) (int, error) {
 	var r io.Reader
 	if body != nil {
@@ -63,6 +72,7 @@ func (d *database) request(ctx context.Context, method, path string, body, out a
 	}
 	defer response.Body.Close()
 	if response.StatusCode >= 400 {
+		_, _ = io.Copy(io.Discard, io.LimitReader(response.Body, 64*1024))
 		return response.StatusCode, fmt.Errorf("数据库请求失败（%d）", response.StatusCode)
 	}
 	if out != nil {
@@ -136,7 +146,7 @@ func (n *Node) selectDatabase(ctx context.Context) (*database, error) {
 				continue
 			}
 		}
-		d := &database{ID: m.ID, URL: m.Storage, Region: m.Region, Auth: auth, Client: dbClient()}
+		d := &database{ID: m.ID, URL: m.Storage, Region: m.Region, Auth: auth, Client: n.databaseClient()}
 		start := time.Now()
 		probe, cancel := context.WithTimeout(ctx, 1500*time.Millisecond)
 		_, err = d.request(probe, "GET", "/_up", nil, nil)
@@ -219,13 +229,37 @@ func (n *Node) sampleLoop() {
 }
 
 func (n *Node) maintenanceLoop() {
-	ticker := time.NewTicker(30 * time.Second)
-	defer ticker.Stop()
+	var last string
+	var next time.Time
+	delay := 5 * time.Second
 	for {
 		ctx, cancel := context.WithTimeout(n.ctx, 25*time.Second)
 		c, e := n.Config(ctx)
 		if e == nil && c.Storage.Enabled {
-			e = n.manageDatabase(ctx)
+			var key string
+			key, e = n.maintenanceKey(ctx, c)
+			if e == nil && (key != last || !n.Now().Before(next)) {
+				if key != last {
+					delay = 5 * time.Second
+				}
+				last = key
+				e = n.manageDatabase(ctx)
+				if e == nil {
+					next, delay = n.Now().Add(5*time.Minute), 5*time.Second
+				} else {
+					next = n.Now().Add(delay)
+					delay = min(delay*2, 5*time.Minute)
+				}
+			} else if e == nil {
+				// 保留上次维护错误，等待本轮重试期限。
+				cancel()
+				if !n.waitMaintenance(next) {
+					return
+				}
+				continue
+			}
+		} else if e == nil {
+			last, next = "", time.Time{}
 		}
 		n.storageMu.Lock()
 		n.maintenanceError = ""
@@ -234,12 +268,46 @@ func (n *Node) maintenanceLoop() {
 		}
 		n.storageMu.Unlock()
 		cancel()
-		select {
-		case <-n.ctx.Done():
+		if !n.waitMaintenance(next) {
 			return
-		case <-ticker.C:
 		}
 	}
+}
+
+func (n *Node) waitMaintenance(next time.Time) bool {
+	wait := 30 * time.Second
+	if remaining := next.Sub(n.Now()); remaining > 0 {
+		wait = min(wait, remaining)
+	}
+	timer := time.NewTimer(wait)
+	defer timer.Stop()
+	select {
+	case <-n.ctx.Done():
+		return false
+	case <-n.maintenanceWake:
+		return true
+	case <-timer.C:
+		return true
+	}
+}
+
+func (n *Node) maintenanceKey(ctx context.Context, c Config) (string, error) {
+	d, err := n.Directory(ctx)
+	if err != nil {
+		return "", err
+	}
+	type member struct{ ID, Storage string }
+	members := []member{}
+	for _, m := range d.Members {
+		members = append(members, member{m.ID, m.Storage})
+	}
+	b, err := json.Marshal(struct {
+		Storage     StorageConfig
+		Members     []member
+		Revocations []Revocation
+		Day         string
+	}{c.Storage, members, d.Revocations, n.Now().UTC().Format("20060102")})
+	return string(b), err
 }
 func (n *Node) upload(ctx context.Context, d *database) error {
 	rows, e := n.DB.QueryContext(ctx, "SELECT body,database_name FROM records WHERE uploaded=0 ORDER BY sequence LIMIT 100")

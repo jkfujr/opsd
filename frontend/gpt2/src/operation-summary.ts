@@ -1,37 +1,20 @@
-import type { QueryClient } from '@tanstack/react-query';
 import type { components } from './api/types';
 
 type Operation = components['schemas']['Operation'];
 export const operationSubjectNames: Record<Operation['subject'], string> = { task_run: '执行任务', task_save: '保存任务', name: '修改节点名称', config: '修改节点配置', account: '修改节点账号', firewall: '应用防火墙变更', firewall_config: '更新防火墙配置', container: '容器操作', component: '组件操作', compose: 'Compose 项目操作', compose_register: '登记 Compose 项目', database: '数据库变更', database_step: '数据库执行步骤' };
 
-export function operationTarget(operation: Operation, client: QueryClient): string | undefined {
-  const { resource_id: id, node_id: node, subject } = operation;
-  if (!id) return;
-  if (subject === 'task_run' || subject === 'task_save') {
-    for (const [, value] of client.getQueriesData<components['schemas']['ScheduledTaskList']>({ queryKey: ['tasks'] })) {
-      const task = value?.items?.find(item => item.node_id === node && item.id === id);
-      if (task) return task.name;
-    }
-  }
-  if (subject === 'container') {
-    for (const [, value] of client.getQueriesData<components['schemas']['ContainerList']>({ queryKey: ['containers'] })) {
-      const container = value?.items?.find(item => item.node_id === node && item.container_id === id);
-      if (container) return container.name;
-    }
-  }
-  if (subject === 'compose' || subject === 'compose_register') {
-    for (const [, value] of client.getQueriesData<components['schemas']['ComposeProjectList']>({ queryKey: ['compose'] })) {
-      const project = value?.items?.find(item => item.node_id === node && item.id === id);
-      if (project) return project.name;
-    }
-  }
-  if (subject === 'database' || subject === 'database_step') {
-    for (const [, value] of client.getQueriesData<components['schemas']['ManagedDatabaseList']>({ queryKey: ['databases', 'list'] })) {
-      const cluster = value?.items?.find(item => item.cluster.id === id);
-      if (cluster) return cluster.cluster.name;
-    }
-    const detail = client.getQueryData<components['schemas']['ManagedDatabaseStatus']>(['databases', 'detail', id, 'health']);
-    if (detail) return detail.cluster.name;
-  }
-  return id.length <= 64 && !/^[a-f\d-]{24,}$/i.test(id) ? id : undefined;
+export function operationTitle(operation: Operation) {
+  const names: Record<string, Record<string, string>> = {
+    container: { start: '启动容器', stop: '停止容器', restart: '重启容器', update: '更新容器镜像' },
+    compose: { pull: '拉取项目镜像', start: '启动 Compose 项目', stop: '停止 Compose 项目', recreate: '重建 Compose 项目', update: '更新 Compose 项目' },
+    database: { create_database: '创建数据库', delete_database: '删除数据库', create_user: '创建数据库账号', password: '修改数据库密码', delete_user: '删除数据库账号', grant: '授予库权限', revoke: '撤销库权限', sync_user: '同步代理账号', configure_proxy_routes: '应用代理路由' },
+    database_step: { proxy_route: '应用代理路由', proxy_upsert: '同步代理账号', proxy_disable: '停用代理账号', proxy_delete: '删除代理账号' },
+    firewall_config: { adopt_current: '接纳当前防火墙配置' }, component: { install: '安装组件' },
+    firewall: { add_rule: '添加防火墙规则', edit_rule: '修改防火墙规则', delete_rule: '删除防火墙规则', move_rule: '调整防火墙顺序', set_default_policy: '修改默认入站策略', set_enabled: '启停防火墙' },
+  };
+  return names[operation.subject]?.[operation.action ?? ''] ?? operationSubjectNames[operation.subject];
+}
+
+export function operationTarget(operation: Operation): string | undefined {
+  return operation.target_name || undefined;
 }

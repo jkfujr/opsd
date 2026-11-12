@@ -48,17 +48,18 @@ type DatabaseRef struct {
 	Address          string `json:"address"`
 }
 type ManagedDatabaseCluster struct {
-	ID           string        `json:"id"`
-	Name         string        `json:"name"`
-	Coordinator  string        `json:"coordinator"`
-	ClusterID    string        `json:"cluster_id"`
-	Revision     uint64        `json:"revision"`
-	Members      []DatabaseRef `json:"members"`
-	Proxies      []DatabaseRef `json:"proxies"`
-	WorkbenchURL string        `json:"workbench_url"`
-	Deleted      bool          `json:"deleted"`
-	UpdatedAt    time.Time     `json:"updated_at"`
-	Signature    []byte        `json:"signature,omitempty"`
+	ProxyRouting *protocol.ProxyRoutingPolicy `json:"proxy_routing,omitempty"`
+	ID           string                       `json:"id"`
+	Name         string                       `json:"name"`
+	Coordinator  string                       `json:"coordinator"`
+	ClusterID    string                       `json:"cluster_id"`
+	Revision     uint64                       `json:"revision"`
+	Members      []DatabaseRef                `json:"members"`
+	Proxies      []DatabaseRef                `json:"proxies"`
+	WorkbenchURL string                       `json:"workbench_url"`
+	Deleted      bool                         `json:"deleted"`
+	UpdatedAt    time.Time                    `json:"updated_at"`
+	Signature    []byte                       `json:"signature,omitempty"`
 }
 type ManagedDatabaseMember struct {
 	DatabaseRef
@@ -126,6 +127,10 @@ func (n *Node) saveDatabaseCluster(ctx context.Context, c ManagedDatabaseCluster
 	if c.ID == "" {
 		c.ID = NewOperationID(n.ID)
 	}
+	if previous, err := n.DatabaseCluster(ctx, c.ID); err == nil {
+		// 路由策略通过预览和持久操作更新，普通定义编辑保留当前策略。
+		c.ProxyRouting = previous.ProxyRouting
+	}
 	if OperationOwner(c.ID) != n.ID || c.Coordinator != n.ID || c.Name == "" || len(c.Name) > 128 || c.ClusterID == "" || len(c.Members) == 0 || len(c.Members) > 100 || len(c.Proxies) > 100 {
 		return c, fault("invalid_request", "数据库集群配置无效")
 	}
@@ -188,6 +193,13 @@ func (n *Node) saveDatabaseCluster(ctx context.Context, c ManagedDatabaseCluster
 	}
 	if revision != c.Revision {
 		return c, fault("precondition_failed", "数据库集群配置已经变化")
+	}
+	var routingPending int
+	if e = tx.QueryRowContext(ctx, "SELECT count(*) FROM queue WHERE kind='database' AND terminal=0 AND json_extract(body,'$.resource_id')=? AND json_extract(body,'$.action')='configure_proxy_routes'", c.ID).Scan(&routingPending); e != nil {
+		return c, e
+	}
+	if routingPending > 0 {
+		return c, fault("node_busy", "代理路由仍有未结束操作")
 	}
 	c.Revision++
 	c.UpdatedAt = n.Now().UTC()
@@ -436,6 +448,12 @@ func (n *Node) databaseDispatch(ctx context.Context, origin, method string, body
 			return n.cachedManagedDatabaseRead(ctx, request.InstanceID, request.Scope)
 		}
 		return n.managedDatabaseRead(ctx, request.InstanceID, request.Backups, request.User, request.Host, request)
+	case "database.proxy_routing.read":
+		return n.readProxyRouting(ctx, request.InstanceID, request.Hostgroups)
+	case "database.proxy_routing.state":
+		return n.proxyRoutingState(ctx, request.ResourceID, request.InstanceID)
+	case "database.proxy_routing.applied":
+		return nil, n.noteProxyRouteApplied(ctx, request.ResourceID, request.InstanceID, request.OperationID, request.Action.Routing)
 	case "database.execute":
 		if OperationOwner(request.OperationID) != n.ID {
 			return nil, fault("invalid_request", "数据库步骤目标无效")
@@ -498,21 +516,22 @@ func (n *Node) databaseDispatch(ctx context.Context, origin, method string, body
 }
 
 type DatabaseRPC struct {
-	Write             *requeststate.Write     `json:"write,omitempty"`
-	Scope             string                  `json:"scope,omitempty"`
-	Instance          DatabaseInstanceInput   `json:"instance"`
-	Cluster           ManagedDatabaseCluster  `json:"cluster"`
-	InstanceID        string                  `json:"instance_id"`
-	InstanceRevision  uint64                  `json:"instance_revision"`
-	ExpectedClusterID string                  `json:"expected_cluster_id"`
-	Actor             string                  `json:"actor"`
-	ResourceID        string                  `json:"resource_id"`
-	OperationID       string                  `json:"operation_id"`
-	Action            protocol.DatabaseAction `json:"action"`
-	Revision          uint64                  `json:"revision"`
-	Backups           bool                    `json:"backups"`
-	User              string                  `json:"user"`
-	Host              string                  `json:"host"`
+	Hostgroups        *protocol.ProxyHostgroups `json:"hostgroups,omitempty"`
+	Write             *requeststate.Write       `json:"write,omitempty"`
+	Scope             string                    `json:"scope,omitempty"`
+	Instance          DatabaseInstanceInput     `json:"instance"`
+	Cluster           ManagedDatabaseCluster    `json:"cluster"`
+	InstanceID        string                    `json:"instance_id"`
+	InstanceRevision  uint64                    `json:"instance_revision"`
+	ExpectedClusterID string                    `json:"expected_cluster_id"`
+	Actor             string                    `json:"actor"`
+	ResourceID        string                    `json:"resource_id"`
+	OperationID       string                    `json:"operation_id"`
+	Action            protocol.DatabaseAction   `json:"action"`
+	Revision          uint64                    `json:"revision"`
+	Backups           bool                      `json:"backups"`
+	User              string                    `json:"user"`
+	Host              string                    `json:"host"`
 }
 
 func (n *Node) ManagedDatabaseStatus(ctx context.Context, c ManagedDatabaseCluster, scope ...string) (ManagedDatabaseStatus, error) {

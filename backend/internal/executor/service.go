@@ -74,6 +74,9 @@ func (s *Services) Handle(ctx context.Context, payload protocol.Payload) (protoc
 		return s.discoverDatabases(ctx)
 	case *protocol.DatabaseRead:
 		return s.readDatabase(ctx, *body)
+	case *protocol.ProxyRoutingRead:
+		value, err := (databaseengine.Manager{}).ReadProxyRouting(ctx, body.Connection, body.Hostgroups)
+		return &protocol.ProxyRoutingReadResult{Routing: value}, err
 	case *protocol.DockerRead:
 		if s.Docker == nil {
 			return nil, fmt.Errorf("Docker 读取入口不可用")
@@ -104,7 +107,7 @@ func (s *Services) Handle(ctx context.Context, payload protocol.Payload) (protoc
 			return nil, e
 		}
 		defer unlock()
-		return s.Engine.InspectFirewall(ctx, body.Import)
+		return s.Engine.InspectFirewall(ctx, body.Import, body.PreviewCurrent)
 	case *protocol.MonitoringRead:
 		if body.Stream != "live" && body.Stream != "history" {
 			return nil, firewall.Unsupported("未知采集类型")

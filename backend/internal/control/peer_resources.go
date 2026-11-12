@@ -71,6 +71,7 @@ func (s *Server) ChangeNodeSettings(w http.ResponseWriter, r *http.Request, id s
 	c.Revision = expectedRevision(r)
 	c.Cached = false
 	c.LastSyncedAt = nil
+	c.NetworkError = nil
 	s.submit(w, r, id, "config", c, r.Header.Get("Idempotency-Key"), "")
 }
 func (s *Server) GetNodeAccount(w http.ResponseWriter, r *http.Request, id string) {

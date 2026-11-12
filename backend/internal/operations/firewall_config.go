@@ -25,12 +25,14 @@ func confirmedFrom(ctx context.Context, q querier) (protocol.FirewallTarget, err
 }
 
 func sameTarget(a, b protocol.FirewallTarget) bool {
+	a.AdoptFingerprint, b.AdoptFingerprint = "", ""
 	a.Automatic, b.Automatic = false, false
 	a.PeerTrustMigration, b.PeerTrustMigration = nil, nil
 	return reflect.DeepEqual(a, b)
 }
 
 func saveConfirmed(ctx context.Context, q confirmedWriter, target protocol.FirewallTarget) error {
+	target.AdoptFingerprint = ""
 	target.Automatic = false
 	target.PeerTrustMigration = nil
 	body, e := json.Marshal(target)
@@ -45,7 +47,7 @@ func (s Store) ConfirmedFirewall(ctx context.Context) (protocol.FirewallTarget, 
 	return confirmedFrom(ctx, s.DB)
 }
 
-func (e *Engine) InspectFirewall(ctx context.Context, importCurrent bool) (*protocol.FirewallInspected, error) {
+func (e *Engine) InspectFirewall(ctx context.Context, importCurrent bool, previewCurrent ...bool) (*protocol.FirewallInspected, error) {
 	s, err := e.Manager.Read(ctx)
 	if err != nil {
 		return nil, err
@@ -53,6 +55,14 @@ func (e *Engine) InspectFirewall(ctx context.Context, importCurrent bool) (*prot
 	result := &protocol.FirewallInspected{Backend: s.Backend, ServiceActive: s.ServiceActive, Capabilities: s.Capabilities, CheckedAt: s.CollectedAt}
 	if !s.Complete {
 		return nil, firewall.Conflict("系统防火墙读取不完整")
+	}
+	if len(previewCurrent) > 0 && previewCurrent[0] {
+		current, err := firewall.ImportConfiguration(s)
+		if err != nil {
+			return nil, err
+		}
+		result.Current, result.Fingerprint = &current, firewall.AdoptionFingerprint(s)
+		return result, nil
 	}
 	if s.Backend == "none" {
 		return result, nil
@@ -104,6 +114,24 @@ func (e *Engine) InspectFirewall(ctx context.Context, importCurrent bool) (*prot
 	result.Capabilities.Reorder = protocol.Capability{Supported: true}
 	result.Capabilities.DefaultPolicy = protocol.Capability{Supported: true}
 	return result, nil
+}
+
+func (e *Engine) adoptFirewall(ctx context.Context, l *Local) error {
+	target := l.Action.FirewallConfig
+	state, err := e.Manager.Read(ctx)
+	if err != nil {
+		return e.end(ctx, l, protocol.Rejected, err)
+	}
+	current, err := firewall.ImportConfiguration(state)
+	if err != nil {
+		return e.end(ctx, l, protocol.Rejected, err)
+	}
+	if target.Automatic || target.PeerTrustMigration != nil || target.AdoptFingerprint != firewall.AdoptionFingerprint(state) || firewall.ConfigurationFingerprint(target.Configuration) != firewall.ConfigurationFingerprint(current) {
+		return e.end(ctx, l, protocol.Rejected, firewall.Conflict("实际防火墙配置已经变化，请重新预览"))
+	}
+	l.Record.LastObservedAt = &state.CollectedAt
+	l.Record.Steps = []protocol.OperationStep{{Name: "读回并接纳当前防火墙配置", State: "completed"}}
+	return e.end(ctx, l, protocol.Succeeded, nil)
 }
 
 func managedConfirmation(target *protocol.FirewallTarget, steps []firewall.Step) bool {

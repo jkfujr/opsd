@@ -55,7 +55,8 @@ func (n *Node) dispatch(ctx context.Context, origin, method string, body json.Ra
 	case "api.capabilities":
 		return struct {
 			AuthorizationVersion int `json:"authorization_version"`
-		}{APIAuthorizationVersion}, nil
+			ProxyRoutingVersion  int `json:"proxy_routing_version"`
+		}{APIAuthorizationVersion, 1}, nil
 	case "api.request":
 		var request requeststate.Write
 		if e := json.Unmarshal(body, &request); e != nil {
@@ -93,6 +94,8 @@ func (n *Node) dispatch(ctx context.Context, origin, method string, body json.Ra
 		return n.LocalTrustRules(ctx)
 	case "firewall.config.read":
 		return n.FirewallConfig(ctx)
+	case "firewall.config.preview_adoption":
+		return n.PreviewFirewallAdoption(ctx)
 	case "firewall.config.write":
 		var request FirewallWrite
 		if e := json.Unmarshal(body, &request); e != nil {
@@ -118,7 +121,13 @@ func (n *Node) dispatch(ctx context.Context, origin, method string, body json.Ra
 		}
 		return DirectoryExchange{Summary: directorySummary(d), Delta: directoryDelta(d, exchange.Summary)}, nil
 	case "config.read":
-		return n.Config(ctx)
+		config, err := n.Config(ctx)
+		if err == nil {
+			if issue := networkConfigurationError(config); issue != nil {
+				config.NetworkError = wireError(issue)
+			}
+		}
+		return config, err
 	case "account.read":
 		return n.Account(ctx)
 	case "submit":
@@ -259,9 +268,14 @@ func (n *Node) enqueue(ctx context.Context, origin string, r Request) (Operation
 		sum := sha256.Sum256([]byte(origin + "\x00" + r.Key))
 		r.ID = n.ID + "_" + hex.EncodeToString(sum[:])
 	}
-	if operationOwner(r.ID) != n.ID || !operations.ValidID(r.ID) || len(r.Key) > 128 || len(r.Payload) > 256*1024 {
+	payloadLimit := 256 * 1024
+	if r.Kind == "database" {
+		payloadLimit = 4 * 1024 * 1024
+	}
+	if operationOwner(r.ID) != n.ID || !operations.ValidID(r.ID) || len(r.Key) > 128 || len(r.Payload) > payloadLimit {
 		return Operation{}, fault("invalid_request", "请求标识或内容无效")
 	}
+	var targetName string
 	switch r.Kind {
 	case "compose_register":
 		var selection ComposeSelection
@@ -352,6 +366,23 @@ func (n *Node) enqueue(ctx context.Context, origin string, r Request) (Operation
 			if protocol.ContainerRevision(current.Container.ContainerSummary) != action.ExpectedRevision {
 				return Operation{}, fault("conflict", "容器已经变化，请重新读取")
 			}
+			targetName = current.Container.Name
+		} else {
+			// 已有读取结果可提供显示名称，不增加一次没有版本条件的系统读取。
+			n.dockerMu.Lock()
+			for _, entry := range n.dockerReads {
+				if entry.done != nil {
+					continue
+				}
+				if result, ok := entry.value.(*protocol.DockerReadResult); ok {
+					for _, container := range result.State.Containers {
+						if container.ContainerRef == action.ContainerRef {
+							targetName = container.Name
+						}
+					}
+				}
+			}
+			n.dockerMu.Unlock()
 		}
 	case "firewall":
 		var p protocol.ChangePlan
@@ -384,6 +415,18 @@ func (n *Node) enqueue(ctx context.Context, origin string, r Request) (Operation
 		}
 		if c.Cached || c.LastSyncedAt != nil {
 			return Operation{}, fault("conflict", "请重新读取节点配置")
+		}
+		before, err := n.Config(ctx)
+		if err != nil {
+			return Operation{}, err
+		}
+		if c.Listen != before.Listen {
+			return Operation{}, fault("restart_required", "节点通信监听地址需要通过 opsd network 修改后重启节点")
+		}
+		if c.Address != before.Address || c.AddressMode != before.AddressMode {
+			if err = networkConfigurationError(c); err != nil {
+				return Operation{}, err
+			}
 		}
 	case "account":
 		var a AccountChange
@@ -505,6 +548,9 @@ func (n *Node) enqueue(ctx context.Context, origin string, r Request) (Operation
 		}
 	}
 	op := Operation{Key: r.Key, OperationRecord: protocol.OperationRecord{ID: r.ID, State: protocol.Accepted, Revision: 1, Decision: "undecided", Steps: []protocol.OperationStep{}}, NodeID: n.ID, Subject: r.Kind, Actor: origin, CreatedAt: n.Now().UTC(), UpdatedAt: n.Now().UTC(), Executor: "node"}
+	if e = n.describeOperation(ctx, tx, r, targetName, &op); e != nil {
+		return Operation{}, e
+	}
 	if r.Kind == "compose_register" || r.Kind == "compose" || r.Kind == "task_save" || r.Kind == "task_run" {
 		op.ResourceID = r.ResourceID
 	}
@@ -846,7 +892,12 @@ func (n *Node) applyLocal(ctx context.Context, kind string, plain []byte, op *Op
 			return fault("conflict", "节点配置已改变，请重新读取")
 		}
 		if next.Listen != c.Listen {
-			return fault("invalid_request", "节点通信监听地址须通过本机配置修改")
+			return fault("restart_required", "节点通信监听地址需要通过 opsd network 修改后重启节点")
+		}
+		if next.Address != c.Address || next.AddressMode != c.AddressMode {
+			if e = networkConfigurationError(next); e != nil {
+				return e
+			}
 		}
 		if e = ValidateConfig(next); e != nil {
 			return e

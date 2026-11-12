@@ -20,16 +20,16 @@ export async function checkLayout(env) {
 
   await step('数据库首次读取、旧数据、部分待确认和真实故障展示', async () => {
     try {
-      for (const [state, label, count, data] of [['queued', '等待读取', '— / 1', false], ['reading', '读取中', '— / 1', false], ['stale', '待更新', '— / 1', true], ['offline', '节点离线', '— / 1', true], ['timeout', '读取超时', '— / 1', true], ['error', '读取失败', '— / 1', true], ['unavailable', '不可用', '0 / 1', true], ['mismatch', '关联不一致', '0 / 1', true], ['ready', '可用', '1 / 1', true]]) {
+      for (const [state, label, count, data] of [['queued', '—', '— / 1', false], ['reading', '—', '— / 1', false], ['stale', '可用', '1 / 1', true], ['offline', '节点离线', '1 / 1', true], ['timeout', '读取超时', '1 / 1', true], ['error', '读取失败', '1 / 1', true], ['unavailable', '不可用', '0 / 1', true], ['mismatch', '关联不一致', '0 / 1', true], ['ready', '可用', '1 / 1', true]]) {
         fixtures.database = database(state, data);
         await go('/databases');
         const row = page.getByRole('row').filter({ has: page.getByRole('link', { name: original.cluster.name, exact: true }) });
         await row.waitFor(); assert((await row.locator('td').nth(1).innerText()).includes(label));
         assert((await row.locator('td').nth(2).innerText()).includes(count));
-        if (data && !['ready', 'unavailable', 'mismatch'].includes(state)) assert((await row.innerText()).includes('上次结果 1 / 1'));
+        assert(!/等待读取|读取中|待更新|上次结果|待确认/.test(await row.innerText()));
         await row.getByRole('link', { name: original.cluster.name, exact: true }).click();
-        await wait(async () => (await page.locator('.page-meta').innerText()).includes(label), `${state} 列表与详情不一致`);
-        if (state === 'stale') { assert((await page.locator('.page-meta').innerText()).includes('上次可用')); await capture('layout-database-stale'); }
+        if (label === '—') assert.equal(await page.locator('.page-meta .status').count(), 0); else await wait(async () => (await page.locator('.page-meta').innerText()).includes(label), `${state} 列表与详情不一致`);
+        if (state === 'stale') { assert((await page.locator('.page-meta').innerText()).includes('可用')); await capture('layout-database-stale'); }
         if (state === 'queued') await capture('layout-database-first');
         if (data) {
           const expected = await page.evaluate(at => new Date(at).toLocaleString('zh-CN', { hour12: false }), at);
@@ -41,8 +41,8 @@ export async function checkLayout(env) {
       partial.members.push({ ...member, node_id: 'waiting-member', instance_id: 'waiting', status: { state: 'queued', checked_at: at, read: { state: 'queued' } } });
       fixtures.database = partial;
       await go('/databases'); await page.getByRole('link', { name: original.cluster.name, exact: true }).waitFor();
-      assert((await page.locator('tbody').innerText()).includes('部分可用')); assert((await page.locator('tbody').innerText()).includes('1 / 2'));
-      await page.getByRole('link', { name: original.cluster.name, exact: true }).click(); await page.getByText('1 个待确认', { exact: true }).waitFor(); await capture('layout-database-partial');
+      assert((await page.locator('tbody').innerText()).includes('— / 2')); assert(!(await page.locator('tbody').innerText()).includes('待确认'));
+      await page.getByRole('link', { name: original.cluster.name, exact: true }).click(); await page.getByRole('tab', { name: '概览', exact: true }).waitFor(); assert.equal(await page.getByText('1 个待确认', { exact: true }).count(), 0); await capture('layout-database-partial');
     } finally { fixtures.database = original; }
   });
 
@@ -71,14 +71,14 @@ export async function checkLayout(env) {
       assert(await page.getByRole('button', { name: '创建库', exact: true }).isDisabled());
       await capture('layout-database-category-error');
       failCategory = false; failHealth = true;
-      await page.getByRole('button', { name: '刷新', exact: true }).click(); await page.getByRole('alert').filter({ hasText: '健康读取失败' }).waitFor(); await page.getByText('上次结果', { exact: true }).waitFor();
+      await page.getByRole('button', { name: '刷新', exact: true }).click(); await page.getByRole('alert').filter({ hasText: '健康读取失败' }).waitFor();
       await page.getByRole('tab', { name: '概览', exact: true }).click(); assert((await page.locator('.tab-content').innerText()).includes('29'), '健康 HTTP 失败丢失已保留数值');
       await capture('layout-database-health-error');
       const listPath = url => url.pathname === '/api/v2/database-clusters';
       await page.route(listPath, route => route.fulfill({ status: 503, json: { detail: '集群列表读取失败', code: 'dependency_unavailable' } }));
       try {
         await page.getByRole('link', { name: '返回数据库', exact: true }).click(); await page.getByRole('button', { name: '刷新', exact: true }).click();
-        await page.getByRole('alert').filter({ hasText: '集群列表读取失败' }).waitFor(); await page.getByText('上次结果', { exact: true }).waitFor();
+        await page.getByRole('alert').filter({ hasText: '集群列表读取失败' }).waitFor();
         assert((await page.locator('tbody').innerText()).includes('29'), '列表 HTTP 失败丢失已保留数值');
       } finally { await page.unroute(listPath); }
       metrics.push({ check: 'database-cache', detailToList: true, oldListRejected: true, categoryIndependent: true });
@@ -90,7 +90,7 @@ export async function checkLayout(env) {
     const reads = [];
     await page.route(path, route => { reads.push({ at: Date.now(), view: new URL(route.request().url()).searchParams.get('view') }); return route.fulfill({ json: fixtures.database }); });
     try {
-      fixtures.database = database('queued', false); await go('/databases/ui-db'); await page.getByText('等待读取', { exact: true }).first().waitFor();
+      fixtures.database = database('queued', false); await go('/databases/ui-db'); await wait(() => reads.length > 0, '健康读取未开始'); assert.equal(await page.getByText('等待读取', { exact: true }).count(), 0);
       await page.waitForTimeout(5800); const bounded = reads.length; assert(bounded >= 3 && bounded <= 12, `快速读取次数 ${bounded}`);
       await page.waitForTimeout(1100); assert.equal(reads.length, bounded, '超过五秒仍快速读取');
       await page.getByRole('button', { name: '刷新', exact: true }).click(); await page.waitForTimeout(650); assert(reads.length > bounded + 1, '手动刷新未重新开始快速读取');

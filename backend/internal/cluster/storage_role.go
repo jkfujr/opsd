@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/url"
+	"reflect"
 	"sort"
 	"strings"
 	"time"
@@ -36,7 +37,7 @@ func (n *Node) adminDatabase(ctx context.Context) (*database, error) {
 	if e != nil {
 		return nil, e
 	}
-	return &database{ID: n.ID, URL: storageURL(c.Storage), Region: c.Region, Auth: auth, Client: dbClient()}, nil
+	return &database{ID: n.ID, URL: storageURL(c.Storage), Region: c.Region, Auth: auth, Client: n.databaseClient()}, nil
 }
 func (n *Node) databaseCredentials(ctx context.Context, id string) (Credentials, error) {
 	if !n.Active(ctx, id) {
@@ -65,12 +66,33 @@ func (n *Node) databaseCredentials(ctx context.Context, id string) (Credentials,
 	return c, e
 }
 func (n *Node) ensureDatabase(ctx context.Context, d *database, name string) error {
-	status, e := d.request(ctx, "PUT", "/"+name, nil, nil)
-	if e != nil && status != 412 {
+	status, e := d.request(ctx, "GET", "/"+name, nil, nil)
+	if e != nil && status != 404 {
 		return e
 	}
-	if _, e = d.request(ctx, "PUT", "/"+name+"/_security", map[string]any{"admins": map[string]any{"names": []string{}, "roles": []string{}}, "members": map[string]any{"names": []string{}, "roles": []string{"opsd_member"}}}, nil); e != nil {
+	if status == 404 {
+		status, e = d.request(ctx, "PUT", "/"+name, nil, nil)
+		if e != nil && status != 412 {
+			return e
+		}
+	}
+	var security struct {
+		Admins struct {
+			Names []string `json:"names"`
+			Roles []string `json:"roles"`
+		} `json:"admins"`
+		Members struct {
+			Names []string `json:"names"`
+			Roles []string `json:"roles"`
+		} `json:"members"`
+	}
+	if _, e = d.request(ctx, "GET", "/"+name+"/_security", nil, &security); e != nil {
 		return e
+	}
+	if len(security.Admins.Names) != 0 || len(security.Admins.Roles) != 0 || len(security.Members.Names) != 0 || !reflect.DeepEqual(security.Members.Roles, []string{"opsd_member"}) {
+		if _, e = d.request(ctx, "PUT", "/"+name+"/_security", map[string]any{"admins": map[string]any{"names": []string{}, "roles": []string{}}, "members": map[string]any{"names": []string{}, "roles": []string{"opsd_member"}}}, nil); e != nil {
+			return e
+		}
 	}
 	if name == "opsd_operations" {
 		path := "/" + name + "/_design/opsd"
@@ -94,9 +116,15 @@ func (n *Node) manageDatabase(ctx context.Context) error {
 		return e
 	}
 	for _, name := range []string{"_users", "_replicator", "_global_changes"} {
-		status, err := d.request(ctx, "PUT", "/"+name, nil, nil)
-		if err != nil && status != 412 {
+		status, err := d.request(ctx, "GET", "/"+name, nil, nil)
+		if err != nil && status != 404 {
 			return err
+		}
+		if status == 404 {
+			status, err = d.request(ctx, "PUT", "/"+name, nil, nil)
+			if err != nil && status != 412 {
+				return err
+			}
 		}
 	}
 	names := []string{"opsd_state", "opsd_operations"}

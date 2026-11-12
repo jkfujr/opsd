@@ -28,7 +28,7 @@ func (s *Server) operationError(w http.ResponseWriter, r *http.Request, e error)
 	switch code {
 	case "unauthenticated":
 		status = 401
-	case "invalid_request":
+	case "invalid_request", "logs_unsupported":
 		status = 422
 	case "precondition_failed":
 		status = 412
@@ -36,13 +36,13 @@ func (s *Server) operationError(w http.ResponseWriter, r *http.Request, e error)
 		status = 409
 	case "outcome_unknown":
 		status = 504
-	case "conflict", "node_busy":
+	case "conflict", "node_busy", "restart_required":
 		status = 409
 	case "forbidden":
 		status = 403
 	case "not_found":
 		status = 404
-	case "node_unavailable", "dependency_unavailable":
+	case "node_unavailable", "dependency_unavailable", "logs_read_failed":
 		status = 503
 	}
 	if code == "secret_unavailable" {

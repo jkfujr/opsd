@@ -8,6 +8,7 @@ import { Badge } from '@appica/ui-react/badge';
 import { Progress } from '@appica/ui-react/progress';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogBody, DialogFooter } from '@appica/ui-react/dialog';
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter } from '@appica/ui-react/alert-dialog';
+import { beginReadRefresh } from './read-polling';
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerBody } from '@appica/ui-react/drawer';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@appica/ui-react/table';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@appica/ui-react/tabs';
@@ -48,7 +49,7 @@ export function Panel({ title, actions, children, className = '', meta }: { titl
 export function Heading({ title, meta, children, back }: { title: string; meta?: ReactNode; children?: ReactNode; back?: ReactNode }) {
   return <header className="page-heading"><div className="page-title"><div className="page-title-row">{back}<h1>{title}</h1></div>{meta && <div className="page-meta">{meta}</div>}</div>{children && <div className="heading-actions">{children}</div>}</header>;
 }
-export function Refresh({ onRefresh }: { onRefresh?: () => void | Promise<unknown> }) { const [busy, setBusy] = useState(false); return <IconButton icon={RotateCw} label={busy ? '刷新中…' : '刷新'} disabled={busy} aria-busy={busy} onClick={() => { setBusy(true); void Promise.resolve(onRefresh ? onRefresh() : queryClient.invalidateQueries({ type: 'active' })).finally(() => setBusy(false)); }}/>; }
+export function Refresh({ onRefresh }: { onRefresh?: () => void | Promise<unknown> }) { const [busy, setBusy] = useState(false); return <IconButton icon={RotateCw} label={busy ? '刷新中…' : '刷新'} disabled={busy} aria-busy={busy} onClick={() => { setBusy(true); beginReadRefresh(); void Promise.resolve(onRefresh ? onRefresh() : queryClient.invalidateQueries({ type: 'active' })).finally(() => setBusy(false)); }}/>; }
 export function Copy({ value }: { value: string }) { const { setToast } = useUI(); const [copied, setCopied] = useState(false); return <button type="button" className="copy-value" title={`复制 ${value}`} aria-label={`复制 ${value}`} onClick={() => { void navigator.clipboard.writeText(value).then(() => { setCopied(true); setToast('已复制'); }).catch(() => setToast('复制失败，请选择文本复制')); }}><span>{value}</span>{copied ? <Check size={14} aria-hidden/> : <CopyIcon size={14} aria-hidden/>}</button>; }
 export function Meter({ value, label, color, className = '' }: { value: number; label: string; color?: string; className?: string }) { return <Progress className={`meter ${className}`} value={value} aria-label={label} thickness={6} indicatorColor={color ?? (value >= 90 ? 'var(--error)' : value >= 80 ? 'var(--warning)' : 'var(--success)')}/>; }
 export function Empty({ title = '没有匹配的结果', action, icon: Icon = SearchX }: { title?: string; action?: ReactNode; icon?: LucideIcon }) { return <div className="empty-state"><Icon size={32} aria-hidden/><h3>{title}</h3>{action}</div>; }

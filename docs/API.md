@@ -150,6 +150,10 @@ curl -fsS -X POST "$OPSD_API_URL/operations/原操作ID/actions" \
 
 revision 使用刚读取的原操作版本；`resolve` 按模型提供 `accept_current`。未知 Shell、容器或 Compose 步骤保持原恢复契约，不因请求重试重放。防火墙确认期限和定向恢复继续由原操作管理。
 
+新 Operation 持久返回 `action`、受理时 `target_name`、`resource` 和 `supports_logs`，列表、详情及原请求键查询使用相同记录；旧记录缺值保持未知。容器 `resource` 包含 `node_id/engine_id/id`。日志能力为 false 时跳过日志请求；不支持返回 `422 logs_unsupported`，读取失败返回 `503 logs_read_failed`，成功空日志返回正常分页结构。日志读取故障保留业务操作的原状态。
+
+`status.state/error` 为最近实际服务结果，`status.read` 为读取进度和故障；冷缓存服务状态为 `unknown`。`read.data_at` 为数据采集时间，`read.attempted_at` 为尝试时间，外层 `checked_at` 为响应生成时间。旧数据过期保留读取错误、超时或离线状态。
+
 ## 任务、Compose 与数据库
 
 `GET /tasks`、`GET /nodes/{node_id}/tasks/{task_id}` 只提供元数据、状态和记录，不返回脚本。`GET/PUT …/{task_id}/definition` 要求 `tasks.manage`；PUT 提交完整 `name`、`schedule`、`timezone`、`script`、`directory`、`enabled`，并发送条件头和请求键。
@@ -166,6 +170,10 @@ curl -fsS -X PUT "$OPSD_API_URL/nodes/$OPSD_NODE_ID/tasks/check/definition" \
 Compose 集合为 `/compose-projects`，详情位于 `/nodes/{node_id}/engines/{engine_id}/compose-projects/{project_id}`。单项 `GET /registration` 读取已登记配置和 ETag，`PUT /registration` 首次使用 `If-None-Match: *`、替换使用原登记的 `If-Match`，并提供请求键。`POST /actions` 发送 `action`、`expected_revision` 和请求键。定义文件内容参与动作版本核验；执行前再次检查实际项目，配置编辑继续使用 SSH。容器详情、日志与动作采用相同节点／Engine／完整容器 ID 归属。
 
 数据库定义位于 `/database-clusters`，配置详情与 `/{id}/status` 分类运行读取分开；`POST /{id}/changes` 提交业务变更，`/{id}/backups` 读取备份。连接凭据留在所属节点，Galera 变更执行一次，各代理保留独立持久结果。部分完成读取原操作后显式处理；其他待应用差异保留。系统及已登记服务账号继续受保护。
+
+`GET /database-clusters/{id}/proxy-routing` 返回受管策略和各代理本机排序、应用状态及采集时间。`POST …/proxy-routing/previews` 发送 `expected_revision/enabled/automatic` 和可选 `backends`，首次从实际数据库地址与代理配置导入，返回完整策略、目标动作及差异；`POST …/proxy-routing/actions` 原样提交预览并附请求键。版本、连接配置或指纹变化时重新预览；未知应答查询原请求键和 Operation。首次接管要求全部有效成员支持 `proxy_routing_version=1`，代理所属节点可独立于数据库成员。
+
+`GET /nodes/{node_id}/firewall/adoption` 返回当前配置、版本和指纹；既有防火墙 actions 接口使用 `action=adopt_current`、`expected_revision` 和预览 `fingerprint` 接纳当前配置。操作重新读取现场后保存两端确认状态，预览后变化返回冲突。节点配置的只读 `network_error` 报告监听不匹配；需要更改监听的更新返回 `restart_required`。
 
 ## 主题上传、SSE 与终端
 

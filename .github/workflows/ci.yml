@@ -51,7 +51,8 @@ jobs:
         run: |
           npm install --prefix artifacts/theme-ui/vue-runtime --no-save --package-lock=false vue@3.5.45
           npm exec -- playwright install --with-deps chromium
-          OPSD_THEME_UI=1 go -C backend test ./internal/control -run '^TestConsoleThemeBrowser$' -v -count=1 -timeout=4m
+          npm --prefix frontend/gpt2 run check:presentation
+          OPSD_THEME_UI=1 go -C backend test ./internal/control -run '^TestConsoleThemeBrowser$' -v -count=1 -timeout=8m
       - name: 安装生产程序并准备 API 验收
         run: |
           chmod +x artifacts/opsd-linux-amd64
@@ -88,6 +89,7 @@ jobs:
             artifacts/theme-ui/failure.png
             artifacts/theme-ui/screenshots/
             artifacts/theme-ui/*.zip
+            artifacts/frontend/gpt2/integration*/
           if-no-files-found: ignore
       - uses: actions/upload-artifact@v4
         if: always()

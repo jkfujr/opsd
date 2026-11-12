@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { join } from 'node:path';
 import { chromium, request } from 'playwright';
 import { checkLayout } from './check-layout.mjs';
+import { checkBackendContract } from './check-backend-contract.mjs';
 const root = fileURLToPath(new URL('../', import.meta.url));
 const artifacts = join(root, '../../artifacts/frontend/gpt2');
 const base = process.env.OPSD_GPT2_URL ?? 'http://127.0.0.1:5183';
@@ -15,6 +16,8 @@ const entry = process.env.OPSD_GPT2_ENTRANCE ?? '/signin';
 const resultDirectory = mode === 'theme' ? 'integration' : `integration-${mode}`;
 const { version } = JSON.parse(await readFile(join(root, '../../package.json'), 'utf8'));
 const forced = (process.argv.find(arg => arg.startsWith('--rerun='))?.slice(8) ?? '').split('|');
+const backendContract = process.argv.includes('--backend-contract');
+const contractSteps = ['资源历史节点集合、节点配置草稿和支持的写入', '数据库六页签、保护账号与受支持变更', '防火墙能力、规则写入、服务端确认期限和操作跨页保留', '独立日志页、日志错误、ANSI、字节分页、搜索复制与返回筛选', '受管代理预览、未知应答恢复、连接预算与窄屏', '防火墙接纳当前配置及原请求查询', '操作历史保存原名称、动作和完整目标'];
 const resume = process.argv.includes('--resume'), replace = process.argv.includes('--replace'), resourceState = process.argv.includes('--resource-state');
 let previous = { results: [] }; if (resume) { try { previous = JSON.parse(await readFile(join(artifacts, resultDirectory, 'result.json'), 'utf8')); } catch {} }
 const rerunVisuals = forced.some(value => value && '深浅模式、320/768/1440px、200% 等效视口与键盘焦点'.includes(value));
@@ -27,17 +30,18 @@ let session, id, installation, context, page;
 const checked = new Date().toISOString(), rev = 'a'.repeat(64), containerID = 'b'.repeat(64);
 const ready = { state: 'ready', data_at: checked, attempted_at: checked };
 async function api(path, method = 'GET', data, extra = {}) { const response = await apiContext.fetch('/api/v2' + path, { method, data, headers: { Origin: base, ...(session ? { 'X-CSRF-Token': session.csrf_token } : {}), ...extra } }); const body = response.status() === 204 ? null : await response.json(); assert(response.ok(), `${method} ${path}: ${response.status()} ${body?.detail ?? ''}`); return { body, response }; }
-async function step(name, action) { if (resume && name !== '真实主题 ZIP 安装、启用与主题登录' && previous.results.some(item => item.name === name && item.passed) && !forced.some(value => value && name.includes(value)) && !(resourceState && name === '任务元数据、定义编辑启停、执行、取消与分页 UTF-8 日志')) { results.push({ name, passed: true, reused: true }); console.log(`复用此前结果：${name}`); return; } try { await action(); results.push({ name, passed: true }); console.log(`通过：${name}`); } catch (error) { results.push({ name, passed: false, error: String(error) }); throw error; } }
+async function step(name, action) { if (backendContract && name !== '真实主题 ZIP 安装、启用与主题登录' && !contractSteps.includes(name)) return; if (resume && name !== '真实主题 ZIP 安装、启用与主题登录' && previous.results.some(item => item.name === name && item.passed) && !forced.some(value => value && name.includes(value)) && !(resourceState && name === '任务元数据、定义编辑启停、执行、取消与分页 UTF-8 日志')) { results.push({ name, passed: true, reused: true }); console.log(`复用此前结果：${name}`); return; } try { await action(); results.push({ name, passed: true }); console.log(`通过：${name}`); } catch (error) { results.push({ name, passed: false, error: String(error) }); throw error; } }
 async function login(p) { await p.goto(base + entry + (mode === 'recovery' ? '?builtin=1' : '')); await p.getByLabel('账号', { exact: true }).fill('admin'); await p.getByLabel('密码', { exact: true }).fill(password); await p.getByRole('button', { name: '登录', exact: true }).click(); await p.waitForURL(base + prefix + '/'); await p.getByRole('heading', { name: '概览', exact: true }).waitFor(); }
 async function go(path) { await page.goto(base + prefix + path); await page.locator('.page-content h1, .terminal-identity h1').first().waitFor(); }
 async function wait(check, message) { for (let n = 0; n < 100; n++) { if (await check()) return; await page.waitForTimeout(100); } throw Error(message); }
 async function closeDrawers() { const close = page.getByRole('button', { name: '关闭侧栏', exact: true }); if (await close.isVisible()) await close.click(); }
-async function capture(name) { const prior = resume && !rerunVisuals && previous.captures?.find(item => item.name === name); if (prior) { captures.push({ ...prior, reused: true }); return; } await page.evaluate(async () => { await document.fonts.ready; await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))); }); await page.screenshot({ path: join(output, name + '.png'), fullPage: true, animations: 'disabled' }); const size = await page.evaluate(() => ({ width: innerWidth, scrollWidth: document.documentElement.scrollWidth })); assert(size.scrollWidth <= size.width + 1, `${name} 横向溢出 ${JSON.stringify(size)}`); captures.push({ name, ...size }); }
+async function capture(name) { await page.evaluate(async () => { await document.fonts.ready; await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))); }); await page.screenshot({ path: join(output, name + '.png'), fullPage: true, animations: 'disabled' }); const size = await page.evaluate(() => ({ width: innerWidth, scrollWidth: document.documentElement.scrollWidth })); assert(size.scrollWidth <= size.width + 1, `${name} 横向溢出 ${JSON.stringify(size)}`); captures.push({ name, ...size }); }
 function op(subject = 'container', state = 'succeeded') { const value = { id: `ui-${operations.size + 1}`, node_id: id, executor: 'node', subject, state, revision: 1, result_pending_sync: false, created_at: checked, updated_at: checked, decision: 'undecided', steps: [{ name: '执行并读取', state: state === 'succeeded' ? 'completed' : 'pending' }], ...(state === 'awaiting_confirmation' ? { confirmation_remaining_seconds: 17, confirmation_deadline: new Date(Date.now() + 17000).toISOString() } : {}) }; operations.set(value.id, value); return value; }
 let overview, nodeList, container, project, task, databaseValue, firewall, config;
 const historyQueries = [];
 let operationReadError = false, paging = false, pageAvailable = false, nextPageReads = 0, lostDatabase = false, missingReceipt = false, conflictFirewall = false;
 const receiptTargets = [];
+let routingManaged = false, routingUnknown = false, adoptionUnknown = false;
 let resourceMode = 'normal', definitionReads = 0, taskSaves = [], actions = [], operationLists = 0;
 async function installFixtures(c) {
   await c.route('**/api/v2/**', async route => {
@@ -68,6 +72,24 @@ async function installFixtures(c) {
     if (path === `/nodes/${id}/tasks/daily/executions`) { if (method === 'GET') return json({ items: [...operations.values()].filter(o => o.subject === 'task_run') }); actions.push({ kind: 'task-run', body: req.postDataJSON() }); return accepted('task_run', 'applying'); }
     if (path === '/database-clusters' && method === 'GET') return json({ items: [databaseValue] });
     if (path === '/database-clusters/ui-db/status') return json(databaseValue);
+    if (path === '/database-clusters/ui-db/proxy-routing') {
+      const groups = { writer: 10, backup_writer: 20, reader: 30, offline: 40 }, backend = { host: '100.100.201.1', port: 3306, node_id: id, instance_id: 'galera' };
+      return json({ ...(routingManaged ? { policy: { enabled: true, automatic: true, hostgroups: groups, backends: [backend], retired: [{ host: '100.100.201.71', port: 3306 }], accounts: [] } } : {}), proxies: databaseValue.proxies.map(proxy => ({ node_id: proxy.node_id, instance_id: proxy.instance_id, state: routingManaged ? 'ready' : 'unmanaged', policy_version: routingManaged ? rev : '', order: routingManaged ? ['100.100.201.1:3306'] : [], entries: routingManaged ? [{ ...backend, rank: 1, local: true, latency_us: 300, samples: 5, sampled_at: checked }] : [], current_writer: { host: backend.host, port: backend.port }, checked_at: checked })) });
+    }
+    if (path === '/database-clusters/ui-db/proxy-routing/previews') {
+      const input = req.postDataJSON(), groups = { writer: 10, backup_writer: 20, reader: 30, offline: 40 }, backends = input.backends ?? [{ host: '100.100.201.1', port: 3306, node_id: id, instance_id: 'galera' }];
+      return json({ expected_revision: 1, policy: { enabled: true, automatic: input.automatic, hostgroups: groups, backends, retired: [{ host: '100.100.201.71', port: 3306 }], accounts: [] }, targets: databaseValue.proxies.map(proxy => ({ node_id: proxy.node_id, instance_id: proxy.instance_id, instance_revision: 1, action: { hostgroups: groups, servers: backends.map(backend => ({ host: backend.host, port: backend.port, hostgroup: 10, state: 'ONLINE', weight: 1000, max_connections: 100, use_ssl: false })), remove: [{ host: '100.100.201.71', port: 3306 }], max_transactions_behind: 10, expected_fingerprint: rev, unmanaged_fingerprint: rev, policy_version: rev }, changes: [{ kind: 'weight', host: backends[0].host, port: backends[0].port, before_weight: 900, after_weight: 1000 }, { kind: 'remove', host: '100.100.201.71', port: 3306, before_weight: 0, after_weight: 0 }] })) });
+    }
+    if (path === '/database-clusters/ui-db/proxy-routing/actions') {
+      const value = op('database'); value.action = 'configure_proxy_routes'; actions.push({ kind: 'proxy-routing', body: req.postDataJSON(), key: req.headers()['idempotency-key'] }); receipts.set(req.headers()['idempotency-key'], value); routingManaged = true;
+      return routingUnknown ? json({ detail: '应用应答丢失', code: 'outcome_unknown', outcome: 'unknown' }, 504) : json(value, 202);
+    }
+    if (path.endsWith('/firewall/adoption')) return json({ expected_revision: firewall.revision, fingerprint: rev, configuration: { backend: firewall.backend, rules: [], default_policies: [] }, checked_at: checked });
+    if (path.endsWith('/firewall/actions') && req.postDataJSON()?.action === 'adopt_current') {
+      const value = op('firewall_config'); value.action = 'adopt_current'; actions.push({ kind: 'firewall-adoption', body: req.postDataJSON(), key: req.headers()['idempotency-key'] }); receipts.set(req.headers()['idempotency-key'], value);
+      return adoptionUnknown ? json({ detail: '接纳应答丢失', code: 'outcome_unknown', outcome: 'unknown' }, 504) : json(value, 202);
+    }
+
     if (path === '/database-clusters/ui-db/backups') return json({ items: [{ node_id: id, instance_id: 'galera', items: [{ name: 'daily', schedule: '每天 03:00', state: 'failed', last_run: checked, artifacts: [], error: '备份目录空间不足' }] }] });
     if (path === '/database-clusters/ui-db/changes') {
       actions.push({ kind: 'database', body: req.postDataJSON() });
@@ -80,7 +102,7 @@ async function installFixtures(c) {
     if (path === `/nodes/${id}/configuration`) { if (method === 'GET') return json(config, 200, { ETag: `"config:${config.revision}"` }); actions.push({ kind: 'config', body: req.postDataJSON() }); return accepted('config'); }
     if (path === '/operations') { operationLists++; const items = [...operations.values()].filter(o => !url.searchParams.has('pending') || ['accepted', 'prepared', 'applying', 'awaiting_confirmation', 'attention_required'].includes(o.state)); return json({ items }); }
     const operation = path.match(/^\/operations\/(ui-\d+)$/)?.[1]; if (operation && operations.has(operation)) return operationReadError ? json({ detail: '操作状态读取失败', code: 'dependency_unavailable' }, 503) : json(operations.get(operation));
-    const logID = path.match(/^\/operations\/(ui-\d+)\/logs$/)?.[1]; if (logID) { const bytes = Buffer.from('日志中文完成\n'), offset = Number(url.searchParams.get('offset') ?? 0), chunk = offset ? bytes.subarray(4) : bytes.subarray(0, 4); return json({ data: chunk.toString('base64'), next_offset: offset ? bytes.length : 4, has_more: !offset, truncated: false }); }
+    const logID = path.match(/^\/operations\/(ui-\d+)\/logs$/)?.[1]; if (logID) { const bytes = Buffer.from('日志中文完成\n'), offset = Number(url.searchParams.get('offset') ?? 0), chunk = bytes.subarray(offset, offset ? bytes.length : 4); return json({ data: chunk.toString('base64'), offset, next_offset: offset + chunk.length, has_more: offset + chunk.length < bytes.length, truncated: false }); }
     const actionID = path.match(/^\/operations\/(ui-\d+)\/actions$/)?.[1]; if (actionID) { const previous = operations.get(actionID), body = req.postDataJSON(); actions.push({ kind: 'operation', body }); const value = { ...previous, revision: previous.revision + 1, state: body.action === 'cancel' ? 'cancelled' : 'succeeded' }; operations.set(actionID, value); return json(value); }
     const requestKey = path.match(/^\/requests\/(.+)$/)?.[1];
     if (requestKey && receipts.has(requestKey)) {
@@ -192,7 +214,7 @@ try {
     await go(`/nodes/${id}?tab=configuration`); await page.getByLabel('名称', { exact: true }).fill('保留草稿'); await page.getByRole('button', { name: '刷新', exact: true }).first().click(); assert.equal(await page.getByLabel('名称', { exact: true }).inputValue(), '保留草稿'); await page.getByRole('button', { name: '保存', exact: true }).click(); await page.locator('.operation-detail').waitFor(); assert(actions.some(a => a.kind === 'config' && a.body.name === '保留草稿')); await closeDrawers();
   });
   await step('容器读取、详情日志、操作与错误及离线只读', async () => {
-    await go('/containers'); await page.getByRole('button', { name: '查看 web 详情与日志', exact: true }).click(); await page.getByRole('tab', { name: '最近日志', exact: true }).click(); await page.getByText('中文 UTF-8 正常', { exact: false }).waitFor(); await page.getByRole('button', { name: '关闭弹窗', exact: true }).click(); await page.getByRole('button', { name: '重启', exact: true }).click(); await page.getByRole('alertdialog').getByRole('button', { name: '重启', exact: true }).click(); await page.locator('.operation-detail').waitFor(); assert(actions.some(a => a.kind === 'container' && a.body.expected_revision === rev)); await closeDrawers();
+    await go('/containers'); await page.getByRole('button', { name: '查看 web 详情与日志', exact: true }).click(); await page.getByRole('tab', { name: '最近日志', exact: true }).click(); await page.getByText('中文 UTF-8 正常', { exact: false }).waitFor(); await page.getByRole('button', { name: '返回容器详情', exact: true }).click(); await page.getByRole('button', { name: '关闭弹窗', exact: true }).click(); await page.getByRole('button', { name: '重启', exact: true }).click(); await page.getByRole('alertdialog').getByRole('button', { name: '重启', exact: true }).click(); await page.locator('.operation-detail').waitFor(); assert(actions.some(a => a.kind === 'container' && a.body.expected_revision === rev)); await closeDrawers();
     resourceMode = 'offline'; await page.getByRole('button', { name: '刷新', exact: true }).click(); await wait(() => page.getByRole('button', { name: '重启', exact: true }).isDisabled(), '离线容器仍可写'); resourceMode = 'empty'; await page.getByRole('button', { name: '刷新', exact: true }).click(); await page.getByRole('heading', { name: '暂无匹配容器', exact: true }).waitFor(); resourceMode = 'error'; await page.getByRole('button', { name: '刷新', exact: true }).click(); await page.getByRole('alert').filter({ hasText: '容器读取失败' }).waitFor(); resourceMode = 'normal'; await page.getByRole('button', { name: '重试', exact: true }).click();
   });
   await step('Compose 发现配置、条件登记与受支持操作', async () => {
@@ -200,7 +222,7 @@ try {
   });
   await step('任务元数据、定义编辑启停、执行、取消与分页 UTF-8 日志', async () => {
     await go('/tools/tasks'); assert.equal(definitionReads, 0); await page.getByRole('button', { name: '编辑 每日检查', exact: true }).click(); await page.getByLabel('脚本', { exact: true }).fill('printf "中文脚本"\n'); await page.getByRole('switch', { name: '启用任务', exact: true }).click(); await page.getByRole('button', { name: '保存', exact: true }).click(); await page.locator('.operation-detail').waitFor(); assert(definitionReads >= 1); assert.equal(taskSaves.at(-1).body.enabled, false); assert.equal(taskSaves.at(-1).headers['if-match'], '"task:1"'); await closeDrawers();
-    await page.getByRole('button', { name: '立即执行', exact: true }).click(); await page.getByRole('alertdialog').getByRole('button', { name: '立即执行', exact: true }).click(); await page.locator('.operation-detail').waitFor(); await page.getByRole('button', { name: '取消执行', exact: true }).click(); await page.getByRole('alertdialog').getByRole('button', { name: '取消执行', exact: true }).click(); await wait(() => page.locator('.operation-detail-heading .status').innerText().then(t => t === '已取消'), '任务未显示取消'); await page.getByRole('button', { name: '加载更多', exact: true }).click(); await page.getByText('日志中文完成', { exact: false }).waitFor(); assert(!(await page.locator('.log-output').innerText()).includes('�')); await closeDrawers();
+    await page.getByRole('button', { name: '立即执行', exact: true }).click(); await page.getByRole('alertdialog').getByRole('button', { name: '立即执行', exact: true }).click(); await page.locator('.operation-detail').waitFor(); await page.getByRole('button', { name: '取消执行', exact: true }).click(); await page.getByRole('alertdialog').getByRole('button', { name: '取消执行', exact: true }).click(); await wait(() => page.locator('.operation-detail-heading .status').innerText().then(t => t === '已取消'), '任务未显示取消'); await page.getByRole('button', { name: '查看执行日志', exact: true }).click(); await page.getByRole('button', { name: '加载更多', exact: true }).click(); await page.getByText('日志中文完成', { exact: false }).waitFor(); assert(!(await page.locator('.log-document').innerText()).includes('�')); await page.getByRole('button', { name: '返回操作记录', exact: true }).click(); await closeDrawers();
   });
   await step('数据库六页签、保护账号与受支持变更', async () => {
     await go('/databases/ui-db'); for (const name of ['概览','成员','库','账号','代理','备份']) { const tab = page.getByRole('tab', { name, exact: true }); if (await tab.getAttribute('aria-selected') !== 'true') await tab.click(); }
@@ -285,6 +307,77 @@ try {
     await page.getByRole('button',{name:/^操作记录/}).click(); await page.getByRole('button',{name:'读取原资源',exact:true}).click(); await page.getByText('已读取当前资源，请到原页面核对。',{exact:true}).waitFor(); await page.getByRole('button',{name:'已核对',exact:true}).click(); await closeDrawers();
     await page.getByRole('button',{name:'重新读取',exact:true}).click(); assert.equal(writes,1); await page.unroute(match); await page.getByRole('button',{name:'恢复默认',exact:true}).click(); await page.getByRole('button',{name:'保存',exact:true}).click(); await wait(async()=>(await api('/settings/navigation')).body.order[3]==='databases','恢复后未保存默认顺序');
   });
+  await step('资源首次等待自动重查、保留内容、确认空结果和 stale 错误', async () => {
+    for (const [endpoint, address, item, empty] of [['/containers','/containers',container,'暂无匹配容器'], ['/compose-projects','/containers?tab=compose',project,'暂无 Compose 项目'], ['/tasks','/tools/tasks',task,'暂无定时任务']]) {
+      let stage='waiting', reads=0;
+      const path=url=>url.pathname==='/api/v2'+endpoint;
+      await page.route(path, route=> { reads++; const read=stage==='waiting'||stage==='reading'?{state:stage==='waiting'?'queued':'reading',attempted_at:new Date().toISOString()}:stage==='error'?{state:'stale',data_at:checked,error:{code:'timeout',message:'目标读取超时'}}:ready; return route.fulfill({json:{items:['waiting','reading','empty'].includes(stage)?[]:[item],nodes:[{node_id:id,node_name:'当前目标节点',read}],unavailable:[]}}); });
+      try {
+        await go(address); await wait(()=>reads>=2,'首次等待没有自动重查');
+        assert.equal(await page.getByRole('heading',{name:empty,exact:true}).count(),0);
+        assert(!/等待读取|读取中|待更新/.test(await page.locator('.page-content').innerText()));
+        stage='ready'; await wait(async()=>await page.locator('tbody tr').filter({hasText:item.name}).count()===1,'后台结果没有自动出现');
+        stage='reading'; await page.getByRole('button',{name:'刷新',exact:true}).click();
+        assert.equal(await page.locator('tbody tr').filter({hasText:item.name}).count(),1,'普通刷新清空已有内容');
+        stage='error'; await page.getByRole('button',{name:'刷新',exact:true}).click();
+        await page.getByRole('alert').filter({hasText:'当前目标节点：目标读取超时'}).waitFor();
+        assert.equal(await page.getByRole('heading',{name:empty,exact:true}).count(),0);
+        stage='empty'; await page.getByRole('button',{name:'刷新',exact:true}).click(); await page.getByRole('heading',{name:empty,exact:true}).waitFor();
+        if(endpoint==='/containers') {
+          await page.evaluate(()=>{Object.defineProperty(document,'visibilityState',{configurable:true,value:'hidden'});document.dispatchEvent(new Event('visibilitychange'));});
+          await page.waitForTimeout(600); const before=reads; await page.waitForTimeout(3300); assert.equal(reads,before,'隐藏页面仍读取容器');
+          await page.evaluate(()=>{delete document.visibilityState;document.dispatchEvent(new Event('visibilitychange'));});
+        }
+      } finally { await page.unroute(path); }
+    }
+  });
+  await step('独立日志页、日志错误、ANSI、字节分页、搜索复制与返回筛选', async () => {
+    const configOperation=op('config'), execution=op('task_run'); configOperation.steps=[]; execution.steps=[];
+    const logPath=url=>/\/api\/v2\/operations\/[^/]+\/logs$/.test(url.pathname);
+    let fail=true, reads=0, configReads=0, bytes=Buffer.from('日志中文完成\n\x1b[32m服务启动\x1b[0m\n'+Array.from({length:600},(_,n)=>'第 '+n+' 行 日志目标 中文输出 '+ '长内容'.repeat(8)).join('\n')+'\n');
+    await page.route(logPath,route=>{const url=new URL(route.request().url()); if(url.pathname.includes(configOperation.id)){configReads++;return route.fallback();} if(!url.pathname.includes(execution.id))return route.fallback(); reads++; if(fail)return route.fulfill({status:503,json:{detail:'节点操作未完成',request_id:'log-read-test',code:'dependency_unavailable'}}); const offset=Number(url.searchParams.get('offset')),end=Math.min(bytes.length,offset===0?4:offset+65536),chunk=bytes.subarray(offset,end);return route.fulfill({json:{offset,next_offset:end,data:chunk.toString('base64'),has_more:end<bytes.length,truncated:false}});});
+    try {
+      const source='/tools/tasks?node_id='+id;
+      await go(source); await page.getByRole('button',{name:/^操作记录/}).click(); await page.locator('.operation-row[data-operation-id="'+configOperation.id+'"]').click();
+      assert.equal(await page.getByRole('button',{name:'查看执行日志',exact:true}).count(),0); assert.equal(await page.locator('.operation-detail ol').count(),0); assert.equal(configReads,0);
+      await go('/tools?view=logs&operation='+configOperation.id); await page.getByRole('heading',{name:'此操作没有执行日志',exact:true}).waitFor(); assert.equal(configReads,0);
+      await go(source); await page.getByRole('button',{name:/^操作记录/}).click(); await page.getByLabel('操作节点',{exact:true}).click(); await page.getByRole('option',{name:'本地验收节点',exact:true}).click(); await page.locator('.operation-row[data-operation-id="'+execution.id+'"]').click(); await page.getByRole('button',{name:'查看执行日志',exact:true}).click();
+      await page.getByRole('alert').filter({hasText:'日志读取失败'}).waitFor(); assert((await page.locator('.page-meta').innerText()).includes('已成功')); assert.equal(await page.getByRole('heading',{name:'暂无日志',exact:true}).count(),0);
+      await page.locator('.log-failure summary').click(); await page.getByText('请求 ID：log-read-test',{exact:true}).waitFor();
+      fail=false; await page.getByRole('button',{name:'重试',exact:true}).click(); await page.getByRole('button',{name:'加载更多',exact:true}).click();
+      await wait(()=>page.evaluate(()=>{const button=document.querySelector('.log-footer button');return !button||!button.disabled;}),'日志分页请求未结束');
+      while(await page.locator('.log-footer button').count()){await page.locator('.log-footer button').click();await wait(()=>page.evaluate(()=>{const button=document.querySelector('.log-footer button');return !button||!button.disabled;}),'日志分页请求未结束');}
+      await wait(async()=>(await page.locator('.log-document').innerText()).includes('第 599 行'),'字节分页没有读完');
+      const text=await page.locator('.log-document pre').innerText();assert(!text.includes('�')&&!text.includes('\x1b')); assert(text.includes('服务启动'));
+      await page.getByRole('button',{name:'自动刷新',exact:true}).click();
+      await page.getByLabel('搜索已加载日志',{exact:true}).fill('日志目标'); await page.locator('.log-document mark').waitFor(); assert((await page.locator('.log-match').innerText()).endsWith('/ 600'));
+      await page.getByLabel('搜索已加载日志',{exact:true}).press('Enter'); assert((await page.locator('.log-match').innerText()).startsWith('2 /'));
+      await page.getByLabel('搜索已加载日志',{exact:true}).fill(''); await page.locator('.log-document').evaluate(el=>el.scrollTop=100); await page.waitForTimeout(100);
+      bytes=Buffer.concat([bytes,Buffer.from('刷新追加\n')]); await page.getByRole('button',{name:'刷新日志',exact:true}).click();
+      await wait(async()=>(await page.locator('.log-document pre').innerText()).endsWith('刷新追加\n'),'刷新没有追加'); assert.equal(await page.locator('.log-document pre').innerText(),text+'刷新追加\n'); assert((await page.locator('.log-document').evaluate(el=>el.scrollTop))<130,'刷新强制滚动到底部');
+      await context.grantPermissions(['clipboard-read','clipboard-write']); await page.getByRole('button',{name:'复制已加载日志',exact:true}).click(); assert.equal((await page.evaluate(()=>navigator.clipboard.readText())).replaceAll('\r\n','\n'),text+'刷新追加\n');
+      const stopped=reads;await page.waitForTimeout(3300);assert.equal(reads,stopped,'关闭自动刷新后仍请求日志');
+      await page.getByRole('button',{name:'自动刷新',exact:true}).click();await wait(()=>reads>stopped,'开启自动刷新后没有读取日志');
+      await page.evaluate(()=>{Object.defineProperty(document,'visibilityState',{configurable:true,value:'hidden'});document.dispatchEvent(new Event('visibilitychange'));});await page.waitForTimeout(600);const hiddenReads=reads;await page.waitForTimeout(3300);assert.equal(reads,hiddenReads,'隐藏页面仍周期读取日志');
+      await page.evaluate(()=>{delete document.visibilityState;document.dispatchEvent(new Event('visibilitychange'));});await page.getByRole('button',{name:'自动刷新',exact:true}).click();
+      fail=true; await page.getByRole('button',{name:'刷新日志',exact:true}).click(); await page.getByRole('alert').filter({hasText:'日志读取失败'}).waitFor(); assert.equal(await page.locator('.log-document pre').innerText(),text+'刷新追加\n'); fail=false; await page.getByRole('button',{name:'重试',exact:true}).click();
+      for(const theme of ['dark','light'])for(const width of [320,768,1440]) { await page.evaluate(theme=>{localStorage.setItem('opsd.frontend-gpt2.theme',theme);document.documentElement.classList.toggle('dark',theme==='dark');},theme); await page.setViewportSize({width,height:950}); assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'日志页横向溢出'); await capture('reading-operation-logs-'+theme+'-'+width); }
+      await page.setViewportSize({width:720,height:450}); await page.getByRole('button',{name:'自动换行',exact:true}).focus(); await page.keyboard.press('Space'); assert.equal(await page.getByRole('button',{name:'自动换行',exact:true}).getAttribute('aria-pressed'),'false'); await capture('reading-operation-logs-zoom200');
+      await page.reload(); await page.getByRole('heading',{name:'执行日志',exact:true}).waitFor(); await page.getByRole('button',{name:'返回操作记录',exact:true}).click(); await page.locator('.operation-detail').waitFor(); assert(new URL(page.url()).searchParams.get('node_id')===id); assert((await page.locator('.operation-technical').textContent()).includes(execution.id)); await page.getByRole('button',{name:'返回操作列表',exact:true}).click(); assert((await page.getByLabel('操作节点',{exact:true}).innerText()).includes('本地验收节点')); await closeDrawers();
+    } finally { await page.unroute(logPath); }
+    const containerPath=url=>url.pathname.endsWith('/containers/'+containerID+'/logs'); let containerFail=false;
+    const containerText='\x1b[33m容器日志\x1b[0m\n'+Array.from({length:400},(_,i)=>'中文内容 '+i+' '+ '长日志'.repeat(20)).join('\n');
+    await page.route(containerPath,route=>containerFail?route.fulfill({status:503,json:{detail:'容器日志不可用',request_id:'container-log-test'}}):route.fulfill({json:{engine_id:'docker',container_id:containerID,text:containerText,truncated:true,checked_at:checked}}));
+    try {
+      await page.setViewportSize({width:1440,height:950});await go('/containers?node_id='+id+'&q=web&state=running');await page.getByRole('button',{name:'查看 web 详情与日志',exact:true}).click();await page.getByRole('tab',{name:'最近日志',exact:true}).click();await page.getByText('日志已截断',{exact:true}).waitFor();assert(!(await page.locator('.log-document').innerText()).includes('\x1b'));
+      await page.getByLabel('日志行数',{exact:true}).click();await page.getByRole('option',{name:'最近 1000 行',exact:true}).click();await page.locator('.log-document pre').waitFor();
+      containerFail=true;await page.getByRole('button',{name:'刷新日志',exact:true}).click();await page.getByRole('alert').filter({hasText:'日志读取失败'}).waitFor();assert((await page.locator('.log-document pre').innerText()).includes('中文内容 399'));containerFail=false;await page.getByRole('button',{name:'重试',exact:true}).click();
+      for(const theme of ['dark','light'])for(const width of [320,768,1440]){await page.evaluate(theme=>{localStorage.setItem('opsd.frontend-gpt2.theme',theme);document.documentElement.classList.toggle('dark',theme==='dark');},theme);await page.setViewportSize({width,height:950});assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));await capture('reading-container-logs-'+theme+'-'+width);}
+      await page.reload();await page.getByRole('heading',{name:'容器日志',exact:true}).waitFor();await page.getByRole('button',{name:'返回容器详情',exact:true}).click();await page.getByRole('dialog').waitFor();assert.equal(new URL(page.url()).searchParams.get('q'),'web');assert.equal(new URL(page.url()).searchParams.get('state'),'running');await page.getByRole('button',{name:'关闭弹窗',exact:true}).click();
+      await go('/containers?view=logs&node_id='+id+'&engine_id=docker&container_id='+containerID);await page.locator('.log-document pre').waitFor();await page.getByRole('button',{name:'返回容器详情',exact:true}).click();await page.getByRole('dialog').waitFor();await page.getByRole('button',{name:'关闭弹窗',exact:true}).click();
+    } finally { await page.unroute(containerPath);await page.setViewportSize({width:1440,height:1000}); }
+  });
+  await checkBackendContract({ page, go, step, capture, closeDrawers, id, checked, rev, op, actions, counts, fixtures: { get database() { return databaseValue; }, set database(value) { databaseValue = value; }, get firewall() { return firewall; }, set firewall(value) { firewall = value; }, set routingManaged(value) { routingManaged = value; }, set routingUnknown(value) { routingUnknown = value; }, set adoptionUnknown(value) { adoptionUnknown = value; } } });
   await step('终端字节、输入尺寸、深层别名、跨页输出、重连及票据错误', async () => {
     await go(`/terminal?node=${id}`); await page.waitForURL(base + prefix + '/tools/terminal?session=*'); await page.locator('.terminal-surface[data-ready]').waitFor(); await page.getByText('已连接', { exact: true }).waitFor(); await page.locator('.xterm-accessibility-tree').getByText('中文 UTF-8 正常', { exact: false }).waitFor(); await page.locator('.xterm-helper-textarea').focus(); await page.keyboard.type('echo '); await page.locator('.xterm-helper-textarea').evaluate(async el => { const text = '输入中文'; el.dispatchEvent(new CompositionEvent('compositionstart', { bubbles: true })); el.value += text; el.dispatchEvent(new CompositionEvent('compositionupdate', { bubbles: true, data: text })); await new Promise(resolve => setTimeout(resolve, 10)); el.dispatchEvent(new CompositionEvent('compositionend', { bubbles: true, data: text })); await new Promise(resolve => setTimeout(resolve, 10)); }); await page.keyboard.press('Enter'); await wait(async () => inputs.join('').includes('输入中文') && sizes.length > 0, `终端输入或尺寸未发送 ${JSON.stringify({inputs,sizes})}`); assert.equal(tickets, 1); const before = inputs.length;
     await page.getByRole('navigation', { name: '主导航', exact: true }).getByRole('link', { name: '节点', exact: true }).click(); assert.equal(socketsClosed, 0); await page.getByRole('navigation', { name: '会话导航', exact: true }).getByRole('link').first().click(); assert.equal(tickets, 1); await page.locator('.xterm-accessibility-tree').getByText('输入中文', { exact: false }).waitFor();
@@ -292,14 +385,37 @@ try {
     await page.getByRole('button', { name: '终端更多操作', exact: true }).click(); await page.getByRole('menuitem', { name: '断开会话', exact: true }).click(); await page.getByRole('button', { name: '重新连接', exact: true }).click(); await page.getByText('已连接', { exact: true }).waitFor(); assert.equal(tickets, 3); assert.equal(inputs.length, before);
     await page.getByRole('button', { name: '终端更多操作', exact: true }).click(); await page.getByRole('menuitem', { name: '断开会话', exact: true }).click(); terminalMode = 'expired'; await page.getByRole('button', { name: '重新连接', exact: true }).click(); await page.getByText('终端票据已过期，请重新连接', { exact: true }).waitFor(); terminalMode = 'rate'; await page.getByRole('button', { name: '重新连接', exact: true }).click(); await page.getByText('终端连接过多，请稍后重试', { exact: true }).waitFor(); terminalMode = 'normal'; await page.getByRole('button', { name: '重新连接', exact: true }).click(); await page.getByText('已连接', { exact: true }).waitFor(); sockets.at(-1).send(JSON.stringify({type:'exit',message:'进程已退出（测试）'})); await page.getByText('进程已退出（测试）',{exact:true}).waitFor(); await page.getByRole('button',{name:'重新连接',exact:true}).click(); await page.getByText('已连接',{exact:true}).waitFor();
   });
-  await checkLayout({ page, go, step, capture, wait, metrics: layoutMetrics, id, containerID, op, tickets: () => tickets, fixtures: { get database() { return databaseValue; }, set database(value) { databaseValue = value; }, get nodes() { return nodeList; }, set nodes(value) { nodeList = value; } } });
+  await step('终端资源慢加载、载入失败重新加载和单处连接状态', async () => {
+    let fontMode='slow', releaseFont; const fontGate=new Promise(resolve=>releaseFont=resolve), fonts=url=>/JetBrainsMono-Regular.*\.woff2$/.test(url.pathname); let fontRequests=0;
+    await page.route(fonts,async route=>{fontRequests++;if(fontMode==='slow')await fontGate;return fontMode==='fail'?route.abort('failed'):route.continue();});
+    try {
+      const before=tickets;
+      await page.goto(base+prefix+'/tools/terminal?node='+id,{waitUntil:'domcontentloaded'});await page.getByText('加载中',{exact:true}).waitFor();assert.equal(await page.getByText('连接中',{exact:true}).count(),0);assert.equal(await page.getByText('正在载入终端…',{exact:true}).count(),0);assert.equal(tickets,before);
+      fontMode='fail';releaseFont();await page.getByRole('button',{name:'重新加载',exact:true}).waitFor();assert.equal(tickets,before);await capture('reading-terminal-load-error');
+      fontMode='ready';await page.getByRole('button',{name:'重新加载',exact:true}).click();await page.getByText('已连接',{exact:true}).waitFor();assert(fontRequests>=2,'重新加载没有请求失败资源');assert.equal(tickets,before+1);
+      const ticketPath=url=>url.pathname==='/api/v2/nodes/'+id+'/terminal';let releaseTicket;const ticketGate=new Promise(resolve=>releaseTicket=resolve);
+      await page.route(ticketPath,async route=>{await ticketGate;return route.fallback();});
+      try {
+        await page.getByRole('button',{name:'终端更多操作',exact:true}).click();await page.getByRole('menuitem',{name:'断开会话',exact:true}).click();await page.getByRole('button',{name:'重新连接',exact:true}).click();await page.getByText('连接中',{exact:true}).waitFor();assert.equal(await page.getByText('加载中',{exact:true}).count(),0);assert(!(await page.locator('.terminal-identity .status').getAttribute('class')).includes('warning'));releaseTicket();await page.getByText('已连接',{exact:true}).waitFor();
+      } finally { releaseTicket();await page.unroute(ticketPath); }
+    } finally { releaseFont();await page.unroute(fonts); }
+  });
+  await step('终端脚本下载失败后重新加载', async () => {
+    const modules=url=>/\/assets\/xterm-[^/]+\.js$/.test(url.pathname);let failed=true,requests=0;
+    await page.route(modules,route=>{requests++;return failed?route.abort('failed'):route.continue();});
+    try {
+      await page.goto(base+prefix+'/tools/terminal?node='+id,{waitUntil:'domcontentloaded'});await page.getByRole('button',{name:'重新加载',exact:true}).waitFor();
+      failed=false;await page.getByRole('button',{name:'重新加载',exact:true}).click();await wait(()=>page.getByText('已连接',{exact:true}).isVisible(),'终端脚本失败后未恢复连接');assert(requests>=2,'未重新请求失败脚本');
+    } finally {await page.unroute(modules);}
+  });
+  if (!backendContract) await checkLayout({ page, go, step, capture, wait, metrics: layoutMetrics, id, containerID, op, tickets: () => tickets, fixtures: { get database() { return databaseValue; }, set database(value) { databaseValue = value; }, get nodes() { return nodeList; }, set nodes(value) { nodeList = value; } } });
   await step('深浅模式、320/768/1440px、200% 等效视口与键盘焦点', async () => {
     const routes = [['overview','/'], ['nodes','/nodes'], ['node',`/nodes/${id}`], ['containers','/containers'], ['compose','/containers?tab=compose'], ['databases','/databases'], ['database','/databases/ui-db'], ['node-settings',`/nodes/${id}?tab=configuration`], ['node-addresses',`/nodes/${id}?tab=addresses`], ['firewall-settings',`/firewall/settings?node=${id}`], ['account','/settings/account'], ['version','/settings/version'], ['storage','/storage'], ['firewall',`/firewall?node=${id}`], ['tasks','/tools/tasks'], ['appearance','/settings/appearance'], ['sessions','/settings/sessions'], ['api','/settings/api']];
     if (!(resume && !rerunVisuals && previous.captures?.some(item => item.name === 'light-1440-terminal'))) for (const theme of ['dark','light']) { await page.evaluate(theme => localStorage.setItem('opsd.frontend-gpt2.theme', theme), theme); for (const width of [320,768,1440]) { await page.setViewportSize({ width, height: 950 }); for (const [name,path] of routes) { await go(path); await capture(`${theme}-${width}-${name}`); }
       await go('/databases/ui-db'); for (const [tab,name] of [['成员','members'],['库','schemas'],['账号','users'],['代理','proxies'],['备份','backups']]) { await page.getByRole('tab',{name:tab,exact:true}).click(); await capture(`${theme}-${width}-database-${name}`); }
       await go('/nodes'); await page.getByRole('button',{name:'编辑 本地验收节点',exact:true}).click(); await page.getByLabel('名称',{exact:true}).waitFor(); await capture(`${theme}-${width}-node-editor`); await page.getByRole('button',{name:'关闭弹窗',exact:true}).click();
       await go('/tools/tasks'); await page.getByRole('button',{name:'编辑 每日检查',exact:true}).click(); await page.getByLabel('脚本',{exact:true}).waitFor(); await capture(`${theme}-${width}-task-editor`); await page.getByRole('button',{name:'关闭弹窗',exact:true}).click();
-      await go('/containers'); await page.getByRole('button',{name:'查看 web 详情与日志',exact:true}).click(); await page.getByRole('dialog').waitFor(); await capture(`${theme}-${width}-container-detail`); await page.getByRole('tab',{name:'最近日志',exact:true}).click(); await page.getByText('中文 UTF-8 正常',{exact:false}).waitFor(); await capture(`${theme}-${width}-container-logs`); await page.getByRole('button',{name:'关闭弹窗',exact:true}).click();
+      await go('/containers'); await page.getByRole('button',{name:'查看 web 详情与日志',exact:true}).click(); await page.getByRole('dialog').waitFor(); await capture(`${theme}-${width}-container-detail`); await page.getByRole('tab',{name:'最近日志',exact:true}).click(); await page.getByText('中文 UTF-8 正常',{exact:false}).waitFor(); await capture(`${theme}-${width}-container-logs`); await page.getByRole('button',{name:'返回容器详情',exact:true}).click(); await page.getByRole('button',{name:'关闭弹窗',exact:true}).click();
       await go('/containers?tab=compose'); await page.getByRole('button',{name:'查看 web 配置',exact:true}).click(); await page.getByRole('dialog').waitFor(); await capture(`${theme}-${width}-compose-registration`); await page.getByRole('button',{name:'关闭弹窗',exact:true}).click();
       await go('/tools/terminal'); await capture(`${theme}-${width}-terminal`); assert.equal(await page.locator('.terminal-workspace').evaluate(e => getComputedStyle(e).backgroundColor), 'rgb(0, 0, 0)'); } }
     await page.setViewportSize({ width:720, height:450 }); await go('/settings/appearance'); await capture('zoom200-appearance'); await go('/tools/terminal'); await capture('zoom200-terminal'); await page.getByRole('button', { name:'终端更多操作',exact:true }).focus(); await page.keyboard.press('Enter'); await page.keyboard.press('Escape'); await wait(() => page.getByRole('button', { name:'终端更多操作',exact:true }).evaluate(e => e === document.activeElement), 'Escape 后未恢复菜单入口焦点');

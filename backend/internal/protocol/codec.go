@@ -91,6 +91,16 @@ func decodeJSON(data []byte, target any) error {
 func validatePayload(payload Payload) error {
 	var operationID string
 	switch body := payload.(type) {
+	case *ProxyRoutingRead:
+		if body.Connection.Kind != "proxysql" {
+			return fmt.Errorf("代理连接类型无效")
+		}
+		if err := body.Connection.Validate(); err != nil {
+			return err
+		}
+		if body.Hostgroups != nil {
+			return body.Hostgroups.Validate()
+		}
 	case *OperationCancel:
 		if body.OperationID == "" || body.ExpectedRevision == 0 {
 			return fmt.Errorf("取消操作缺少标识或版本")

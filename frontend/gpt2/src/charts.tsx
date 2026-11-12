@@ -28,10 +28,12 @@ export function TrendChart({ nodes, range = '24h', metric = 'network', compact =
   const last = query.data?.items.at(-1)?.summary.valid_nodes;
   const usable = network ? last?.network ?? 0 : metric === 'memory' ? last?.memory ?? 0 : last?.cpu ?? 0;
   const height = compact ? 226 : 282;
+  const unavailable = query.data?.unavailable?.map(id => nodes.find(node => node.id === id)?.name ?? id) ?? [];
+  const errors = <><Failure error={query.error} retry={() => void query.refetch()}/>{unavailable.length > 0 && <p className="notice" role="alert">历史数据读取失败：{unavailable.join('、')}</p>}</>;
   if (query.isPending && nodes.length > 0) return <div className="chart-loading" style={{ height }}><Skeleton/><Skeleton/><Skeleton/></div>;
-  if (!points.length || !points.some(point => keys.some(key => point[key as 'rx' | 'tx' | 'cpu' | 'memory'] !== null))) return <div className="chart-empty" style={{ minHeight: height }}><Failure error={query.error} retry={() => void query.refetch()}/><Empty title="暂无监控数据"/></div>;
+  if (!points.length || !points.some(point => keys.some(key => point[key as 'rx' | 'tx' | 'cpu' | 'memory'] !== null))) return <div className="chart-empty" style={{ minHeight: height }}>{errors}{!query.error && !unavailable.length && <Empty title="暂无监控数据"/>}</div>;
   return <>
-    <Failure error={query.error} retry={() => void query.refetch()}/>{!!query.data?.unavailable?.length && <p className="notice" role="status">部分历史数据不可用：{query.data.unavailable.join("、")}</p>}
+    {errors}
     <div className="chart-canvas" style={{ height }} role="group" aria-label={`${range === '24h' ? '24 小时' : '7 天'}${network ? '网络流量' : metric === 'resources' ? '资源使用率' : labels[metric]}趋势，左右方向键查看读数`}>
       <ResponsiveContainer width="100%" height="100%" minWidth={0}>
         <AreaChart data={points} accessibilityLayer margin={{ top: 16, right: 10, bottom: 4, left: 0 }}>

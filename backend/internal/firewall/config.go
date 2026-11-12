@@ -1,6 +1,8 @@
 package firewall
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"slices"
@@ -37,6 +39,9 @@ func ImportConfiguration(s protocol.FirewallState) (protocol.FirewallDefinition,
 	if !s.Complete {
 		return d, Conflict("系统防火墙读取不完整")
 	}
+	if s.Backend == "iptables" {
+		return d, nil
+	}
 	scope := protocol.Permanent
 	if s.ServiceActive != nil && *s.ServiceActive {
 		scope = protocol.Runtime
@@ -57,6 +62,44 @@ func ImportConfiguration(s protocol.FirewallState) (protocol.FirewallDefinition,
 		}
 	}
 	return d, ValidateConfiguration(d)
+}
+
+func ConfigurationFingerprint(d protocol.FirewallDefinition) string {
+	d.Rules = append([]protocol.ManagedRule(nil), d.Rules...)
+	for i := range d.Rules {
+		d.Rules[i].ID = ""
+	}
+	b, _ := json.Marshal(d)
+	sum := sha256.Sum256(b)
+	return hex.EncodeToString(sum[:])
+}
+
+// AdoptionFingerprint 不包含采集时刻和计数器；原生只读条件仍参与核对。
+func AdoptionFingerprint(s protocol.FirewallState) string {
+	type rule struct {
+		Spec                    *protocol.RuleSpec
+		Scope                   protocol.ConfigScope
+		Chain, Zone, Expression string
+	}
+	rules := []rule{}
+	for _, value := range s.Rules {
+		if isTrustRule(value) {
+			continue
+		}
+		expression := ""
+		if value.Spec == nil {
+			expression = value.NativeExpression
+		}
+		rules = append(rules, rule{value.Spec, value.Scope, value.Native.Chain, value.Native.Zone, expression})
+	}
+	b, _ := json.Marshal(struct {
+		Backend  protocol.Backend
+		Active   *bool
+		Rules    []rule
+		Policies []protocol.DefaultPolicy
+	}{s.Backend, s.ServiceActive, rules, s.DefaultPolicies})
+	sum := sha256.Sum256(b)
+	return hex.EncodeToString(sum[:])
 }
 
 func ValidateConfiguration(d protocol.FirewallDefinition) error {

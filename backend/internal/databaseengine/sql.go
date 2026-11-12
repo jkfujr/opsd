@@ -160,7 +160,7 @@ func status(ctx context.Context, s *session) (map[string]string, error) {
 	return out, nil
 }
 func variables(ctx context.Context, s *session) (map[string]string, error) {
-	values, e := rows(ctx, s, "SHOW GLOBAL VARIABLES WHERE Variable_name IN ('wsrep_cluster_name','wsrep_cluster_address','wsrep_node_address','read_only','wsrep_sst_auth','version')")
+	values, e := rows(ctx, s, "SHOW GLOBAL VARIABLES WHERE Variable_name IN ('wsrep_cluster_name','wsrep_cluster_address','wsrep_node_address','read_only','wsrep_sst_auth','version','max_connections')")
 	if e != nil {
 		return nil, e
 	}
@@ -227,6 +227,7 @@ func (Manager) Read(ctx context.Context, c protocol.DatabaseConnection, scopes .
 	out.Synced = v["wsrep_local_state_comment"] == "Synced"
 	out.ReadOnly = vars["read_only"] == "ON"
 	out.Connections = int64(number(v["threads_connected"]))
+	out.MaxConnections = int64(number(vars["max_connections"]))
 	out.ReceiveQueue = number(v["wsrep_local_recv_queue"])
 	out.SendQueue = number(v["wsrep_local_send_queue"])
 	out.FlowControl = number(v["wsrep_flow_control_paused"])
@@ -344,20 +345,28 @@ func readProxy(ctx context.Context, s *session, c protocol.DatabaseConnection, o
 			}
 			out.ProxyUsers = append(out.ProxyUsers, protocol.DatabaseProxyUser{Name: u["username"], Active: u["active"] == "1", Hostgroup: int(number(u["default_hostgroup"])), State: state, Protected: protocol.SystemDatabaseUser(u["username"], c)})
 		}
-		servers, e := rows(ctx, s, "SELECT hostgroup_id,hostname,port,status FROM runtime_mysql_servers ORDER BY hostgroup_id,hostname,port")
+		servers, e := rows(ctx, s, "SELECT hostgroup_id,hostname,port,status,weight,max_connections FROM runtime_mysql_servers ORDER BY hostgroup_id,hostname,port")
 		if e != nil {
 			return out, e
 		}
 		for _, v := range servers {
-			out.Servers = append(out.Servers, protocol.DatabaseProxyServer{Hostgroup: int(number(v["hostgroup_id"])), Host: v["hostname"], Port: int(number(v["port"])), State: v["status"]})
+			out.Servers = append(out.Servers, protocol.DatabaseProxyServer{Hostgroup: int(number(v["hostgroup_id"])), Host: v["hostname"], Port: int(number(v["port"])), State: v["status"], Weight: int(number(v["weight"])), MaxConnections: int(number(v["max_connections"]))})
+		}
+		groups, err := rows(ctx, s, "SELECT writer_hostgroup,backup_writer_hostgroup,reader_hostgroup,offline_hostgroup FROM mysql_galera_hostgroups")
+		if err != nil {
+			return out, err
+		}
+		if len(groups) == 1 {
+			row := groups[0]
+			out.ProxyHostgroups = &protocol.ProxyHostgroups{Writer: int(number(row["writer_hostgroup"])), BackupWriter: int(number(row["backup_writer_hostgroup"])), Reader: int(number(row["reader_hostgroup"])), Offline: int(number(row["offline_hostgroup"]))}
 		}
 	}
-	pools, e := rows(ctx, s, "SELECT hostgroup,srv_host,srv_port,ConnUsed,ConnFree,ConnERR FROM stats_mysql_connection_pool ORDER BY hostgroup,srv_host,srv_port")
+	pools, e := rows(ctx, s, "SELECT hostgroup,srv_host,srv_port,status,ConnUsed,ConnFree,MaxConnUsed,ConnERR,Queries,Latency_us FROM stats_mysql_connection_pool ORDER BY hostgroup,srv_host,srv_port")
 	if e != nil {
 		return out, e
 	}
 	for _, v := range pools {
-		out.Pools = append(out.Pools, protocol.DatabaseProxyPool{Hostgroup: int(number(v["hostgroup"])), Host: v["srv_host"], Port: int(number(v["srv_port"])), Used: int64(number(v["connused"])), Free: int64(number(v["connfree"])), Errors: int64(number(v["connerr"]))})
+		out.Pools = append(out.Pools, protocol.DatabaseProxyPool{Hostgroup: int(number(v["hostgroup"])), Host: v["srv_host"], Port: int(number(v["srv_port"])), Used: int64(number(v["connused"])), Free: int64(number(v["connfree"])), Errors: int64(number(v["connerr"])), State: v["status"], PeakUsed: int64(number(v["maxconnused"])), Queries: int64(number(v["queries"])), LatencyUS: int64(number(v["latency_us"]))})
 		out.Connections += int64(number(v["connused"]))
 	}
 	out.State = "ready"
@@ -405,6 +414,9 @@ func (Manager) Prepare(ctx context.Context, a protocol.DatabaseAction) ([]string
 	}
 	defer s.Close()
 	if a.Connection.Kind == "proxysql" {
+		if a.Kind == "proxy_route" {
+			return prepareProxyRoute(ctx, s, *a.Routing)
+		}
 		layers, e := proxyLayers(ctx, s)
 		if e != nil {
 			return nil, e
@@ -465,6 +477,9 @@ func (Manager) Observe(ctx context.Context, a protocol.DatabaseAction, step stri
 	}
 	defer s.Close()
 	if a.Connection.Kind == "proxysql" {
+		if a.Kind == "proxy_route" {
+			return observeProxyRoute(ctx, s, *a.Routing, step)
+		}
 		layers, e := proxyLayers(ctx, s)
 		if e != nil {
 			return out, e
@@ -556,6 +571,9 @@ func (Manager) Apply(ctx context.Context, a protocol.DatabaseAction, step string
 	defer s.Close()
 	query := ""
 	if a.Connection.Kind == "proxysql" {
+		if a.Kind == "proxy_route" {
+			return applyProxyRoute(ctx, s, *a.Routing, step)
+		}
 		switch step {
 		case "runtime":
 			query = "LOAD MYSQL USERS TO RUNTIME"

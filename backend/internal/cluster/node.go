@@ -7,6 +7,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"os"
 	"path/filepath"
 	"sync"
@@ -53,6 +54,8 @@ type Node struct {
 	storage          *database
 	storageError     string
 	maintenanceError string
+	maintenanceWake  chan struct{}
+	databaseHTTP     *http.Client
 	Configure        func(context.Context, Config) (func(bool), error)
 	subscribers      map[chan Change]struct{}
 	readings         map[string]monitoring.Reading
@@ -67,6 +70,7 @@ type Node struct {
 	dockerMu         sync.Mutex
 	dockerReads      map[string]*containerRead
 	databaseMu       sync.Mutex
+	proxyMu          sync.Mutex
 	apiDecisionMu    sync.Mutex
 	databaseReads    map[string]*managedDatabaseReadEntry
 	current          map[string]*currentRead
@@ -211,6 +215,7 @@ func Open(ctx context.Context, path string, o Options) (*Node, error) {
 		return nil, e
 	}
 	n.networkWake = make(chan struct{}, 1)
+	n.maintenanceWake = make(chan struct{}, 1)
 	n.ctx, n.cancel = context.WithCancel(ctx)
 	return n, nil
 }
@@ -221,7 +226,7 @@ func (n *Node) Start() {
 		return
 	}
 	n.started = true
-	n.wg.Add(9)
+	n.wg.Add(10)
 	n.mu.Unlock()
 	go func() { defer n.wg.Done(); n.discovery() }()
 	go func() { defer n.wg.Done(); n.queueLoop() }()
@@ -232,6 +237,7 @@ func (n *Node) Start() {
 	go func() { defer n.wg.Done(); n.maintenanceLoop() }()
 	go func() { defer n.wg.Done(); n.firewallLoop() }()
 	go func() { defer n.wg.Done(); n.networkLoop() }()
+	go func() { defer n.wg.Done(); n.proxyRoutingLoop() }()
 }
 func (n *Node) Close() error {
 	n.cancel()
@@ -245,6 +251,11 @@ func (n *Node) Close() error {
 	}
 	n.mu.Unlock()
 	n.wg.Wait()
+	n.storageMu.Lock()
+	if n.databaseHTTP != nil {
+		n.databaseHTTP.CloseIdleConnections()
+	}
+	n.storageMu.Unlock()
 	return n.DB.Close()
 }
 func (n *Node) Config(ctx context.Context) (Config, error) {
@@ -267,6 +278,12 @@ type Change struct {
 func (n *Node) notify() { n.notifyChange(Change{Resource: "nodes"}) }
 
 func (n *Node) notifyChange(change Change) {
+	if change.Resource == "nodes" || change.Resource == "all" {
+		select {
+		case n.maintenanceWake <- struct{}{}:
+		default:
+		}
+	}
 	select {
 	case n.changed <- struct{}{}:
 	default:

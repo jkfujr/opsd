@@ -25,6 +25,7 @@ func TestLocalNetworkConfigPreservesIdentityAndAccount(t *testing.T) {
 	listen := listener.Addr().String()
 	listener.Close()
 	_, port, _ := net.SplitHostPort(listen)
+	listen = ":" + port
 	if err = n.ConfigureNetwork(t.Context(), listen, "auto", ""); err != nil {
 		t.Fatal(err)
 	}

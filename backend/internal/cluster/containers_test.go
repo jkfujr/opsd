@@ -53,9 +53,15 @@ func TestContainerPeerReadsAndLostWriteResponse(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	if op.Action != "restart" || op.TargetName != "同名容器" || op.Resource == nil || op.Resource.NodeID != b.ID || op.Resource.EngineID != "Docker-B" || op.Resource.ID != strings.Repeat("a", 64) || op.SupportsLogs == nil || !*op.SupportsLogs {
+		t.Fatal("操作缺少受理时动作或完整目标", op)
+	}
 	duplicate, err := a.Submit(t.Context(), b.ID, request)
 	if err != nil || duplicate.ID != op.ID {
 		t.Fatal("重复请求生成新操作", duplicate, err)
+	}
+	if duplicate.TargetName != op.TargetName || duplicate.Action != op.Action {
+		t.Fatal("重复请求改变历史描述", duplicate)
 	}
 	b.advance()
 	b.advance()

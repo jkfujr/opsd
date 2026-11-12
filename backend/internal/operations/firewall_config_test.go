@@ -120,6 +120,42 @@ func TestManagedImportPersistsAndOnlyConfirmedTargetCanAutoApply(t *testing.T) {
 	}
 }
 
+func TestAdoptCurrentFirewallReadsAgainAndPreservesNativeRules(t *testing.T) {
+	for _, changed := range []bool{false, true} {
+		t.Run(fmt.Sprint(changed), func(t *testing.T) {
+			e, _, _ := operationFixture(t)
+			h, _ := managedAction(t, e, false)
+			h.files["/etc/default/ufw"] = []byte("IPV6=no\nDEFAULT_INPUT_POLICY=ACCEPT\n")
+			preview, err := e.InspectFirewall(t.Context(), false, true)
+			if err != nil || preview.Current == nil || preview.Fingerprint == "" {
+				t.Fatal(preview, err)
+			}
+			action := protocol.OperationAction{Kind: "firewall_config", FirewallConfig: &protocol.FirewallTarget{Revision: 2, Configuration: *preview.Current, AdoptFingerprint: preview.Fingerprint}}
+			if _, _, err = e.Store.Receive(t.Context(), "adopt-current", protocol.ContractVersion, action, "boot"); err != nil {
+				t.Fatal(err)
+			}
+			if changed {
+				h.files["/etc/default/ufw"] = []byte("IPV6=no\nDEFAULT_INPUT_POLICY=DROP\n")
+			}
+			if err = e.Run(t.Context(), "adopt-current"); err != nil {
+				t.Fatal(err)
+			}
+			record, _ := e.Record(t.Context(), "adopt-current")
+			confirmed, err := e.Store.ConfirmedFirewall(t.Context())
+			if err != nil || h.writes != 0 {
+				t.Fatal("接纳过程修改了规则", h.writes, err)
+			}
+			if changed {
+				if record.State != protocol.Rejected || confirmed.Revision != 1 {
+					t.Fatal("接受了预览后的外部变化", record, confirmed)
+				}
+			} else if record.State != protocol.Succeeded || confirmed.Revision != 2 || confirmed.AdoptFingerprint != "" || confirmed.Configuration.DefaultPolicies[0].Action != "allow" {
+				t.Fatal(record, confirmed)
+			}
+		})
+	}
+}
+
 func TestManagedConfigurationConfirmationFailureAndRecovery(t *testing.T) {
 	for _, mode := range []string{"confirm", "timeout", "interrupted", "failed", "inactive"} {
 		t.Run(mode, func(t *testing.T) {
