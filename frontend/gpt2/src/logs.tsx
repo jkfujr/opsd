@@ -63,7 +63,7 @@ function OperationLogPage() {
   const [params] = useSearchParams(), location = useLocation(), navigate = useNavigate(), context = useOperations();
   const id = params.get('operation') ?? '';
   const operation = useQuery({ queryKey: ['operations', id], enabled: !!id, queryFn: async ({ signal }) => unwrap(await api.GET('/operations/{id}', { signal, params: { path: { id } } })), refetchInterval: 3000 });
-  const value = operation.data, target = value && operationTarget(value, queryClient);
+  const value = operation.data, target = value && operationTarget(value);
   const back = () => navigate(logReturnURL(params.get('return_to'), '/tools/tasks'), { state: { ...location.state, operation: id }, replace: true });
   return <div className="log-page"><Heading title="执行日志" back={<IconButton icon={ArrowLeft} label="返回操作记录" onClick={back}/>} meta={value && <><span>{operationTitle(value)} · {context.nodeName(value.node_id)}{target ? ` · ${target}` : ''}</span><Status tone={value.state === 'succeeded' ? 'success' : ['failed', 'rejected'].includes(value.state) ? 'error' : 'neutral'}>{operationStates[value.state]}</Status></>}/><Failure error={operation.error} retry={() => void operation.refetch()}/>{!id ? <Empty title="缺少操作记录"/> : value ? operationHasLogs(value) ? <OperationLogContent id={id}/> : <Empty title="此操作没有执行日志"/> : operation.isPending && <p role="status">正在读取操作…</p>}</div>;
 }

@@ -6,7 +6,8 @@ import { api, findOperation, targetNode, unwrap, unknownResult } from './api/cli
 import type { components } from './api/types';
 import { queryClient } from './state';
 import { useOperations, invalidateOperations } from './operations';
-import { BusyButton, Button, ChoiceField, CommandError, date, Failure, newRequestKey, StatusLabel, TextField } from './business-ui';
+import { BusyButton, Button, ChoiceField, date, Failure, newRequestKey, StatusLabel, TextField } from './business-ui';
+import { CommandError } from './commands';
 import { usePageVisible } from './read-polling';
 
 type Cluster = components['schemas']['ManagedDatabaseCluster'];
