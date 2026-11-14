@@ -278,9 +278,11 @@ func (n *Node) persistDatabaseWorkflow(ctx context.Context, op *Operation, flow 
 		if step.Import != nil {
 			op.Steps[len(op.Steps)-1].Name = name + " · 接入已有实例"
 		}
-		for _, child := range step.Children {
-			child.Name = name + " · " + child.Name
-			op.Steps = append(op.Steps, child)
+		if flow.Cluster != nil {
+			for _, child := range step.Children {
+				child.Name = name + " · " + child.Name
+				op.Steps = append(op.Steps, child)
+			}
 		}
 	}
 	opBody, _ := json.Marshal(op)

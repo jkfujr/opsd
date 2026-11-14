@@ -291,7 +291,7 @@ func deploymentFiles(d protocol.DatabaseDeployment) (map[string]string, error) {
 	}
 	files["start.sh"] = "#!/bin/sh\nset -eu\n"
 	if d.Bootstrap {
-		files["start.sh"] += "if [ ! -e /opsd-state/bootstrap.started ]; then\n  (set -C; printf '%s\\n' started > /opsd-state/bootstrap.started)\n  exec docker-entrypoint.sh mariadbd --wsrep-new-cluster\nfi\n"
+		files["start.sh"] += "if [ ! -e /opsd-state/bootstrap.started ]; then\n  (set -C; printf '%s\\n' started > /opsd-state/bootstrap.started)\n  sync -f /opsd-state/bootstrap.started\n  exec docker-entrypoint.sh mariadbd --wsrep-new-cluster\nfi\n"
 	}
 	files["start.sh"] += "exec docker-entrypoint.sh mariadbd\n"
 	return files, nil

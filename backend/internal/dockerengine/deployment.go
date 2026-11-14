@@ -126,7 +126,7 @@ func (m *Manager) CreateDeployment(ctx context.Context, d protocol.DatabaseDeplo
 		if len(d.TLS) > 0 {
 			bind("tls", "/etc/opsd-database-tls", true)
 		}
-		config.Env = []string{"MARIADB_ROOT_PASSWORD_FILE=/run/secrets/opsd-root", "MARIADB_ROOT_HOST=localhost"}
+		config.Env = []string{"MARIADB_ROOT_PASSWORD_FILE=/run/secrets/opsd-root", "MARIADB_ROOT_HOST=127.0.0.1"}
 		config.Entrypoint = []string{"/bin/sh", "/opsd-start.sh"}
 	} else {
 		bind("data", "/var/lib/proxysql", false)

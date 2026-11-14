@@ -2,6 +2,7 @@ package cluster
 
 import (
 	"context"
+	"crypto/sha256"
 	"errors"
 	"fmt"
 	"strings"
@@ -79,7 +80,7 @@ func deploymentNode(t *testing.T) (*Node, *deploymentExecutor) {
 }
 func commitDeployment(t *testing.T, n *Node, preview DatabaseDeploymentPreview, key, mode string) Operation {
 	t.Helper()
-	op, err := n.SubmitDatabaseDeployment(t.Context(), DatabaseDeploymentCommit{Coordinator: preview.Coordinator, Token: preview.Token, Revision: preview.Revision, Actor: n.ID, Key: key, Digest: key, ExpectedMode: mode})
+	op, err := n.SubmitDatabaseDeployment(t.Context(), DatabaseDeploymentCommit{Coordinator: preview.Coordinator, Token: preview.Token, Revision: preview.Revision, Actor: n.ID, Key: key, Digest: fmt.Sprintf("%x", sha256.Sum256([]byte(key))), ExpectedMode: mode})
 	if err != nil {
 		t.Fatal(err)
 	}

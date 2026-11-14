@@ -221,7 +221,13 @@ func (n *Node) ScanDatabases(ctx context.Context, input DatabaseScanInput) (Data
 			readCtx, cancel := context.WithTimeout(ctx, 20*time.Second)
 			defer cancel()
 			var items []DatabaseScanItem
-			err := n.Call(readCtx, node, "database.discovery.scan", input, &items)
+			local := DatabaseScanInput{Nodes: []string{node}}
+			for _, credential := range input.Credentials {
+				if credential.NodeID == node {
+					local.Credentials = append(local.Credentials, credential)
+				}
+			}
+			err := n.Call(readCtx, node, "database.discovery.scan", local, &items)
 			mu.Lock()
 			defer mu.Unlock()
 			if err != nil {
