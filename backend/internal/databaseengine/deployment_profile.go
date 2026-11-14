@@ -65,7 +65,9 @@ func (m Manager) DeploymentProfile(ctx context.Context, request protocol.Databas
 		d.Address = host
 	}
 	d.SSTMethod = v["wsrep_sst_method"]
-	d.SSTUser, d.SSTPassword, _ = strings.Cut(v["wsrep_sst_auth"], ":")
+	if user, password, ok := strings.Cut(v["wsrep_sst_auth"], ":"); ok && user != "" && password != "" {
+		d.SSTUser, d.SSTPassword = user, password
+	}
 	if _, port, e := net.SplitHostPort(v["wsrep_sst_receive_address"]); e == nil {
 		d.SSTPort, _ = strconv.Atoi(port)
 	}
@@ -76,7 +78,8 @@ func (m Manager) DeploymentProfile(ctx context.Context, request protocol.Databas
 		}
 		key, value = strings.TrimSpace(key), strings.TrimSpace(value)
 		if key == "gmcast.listen_addr" || key == "ist.recv_addr" {
-			if _, port, e := net.SplitHostPort(strings.TrimPrefix(value, "tcp://")); e == nil {
+			address := strings.TrimPrefix(strings.TrimPrefix(value, "tcp://"), "ssl://")
+			if _, port, e := net.SplitHostPort(address); e == nil {
 				p, _ := strconv.Atoi(port)
 				if key == "gmcast.listen_addr" {
 					d.ReplicationPort = p
