@@ -278,3 +278,72 @@ func TestDatabaseExpansionRechecksExistingCluster(t *testing.T) {
 		})
 	}
 }
+
+func TestDatabaseDeploymentCoordinatorReopenAndQueuedCancel(t *testing.T) {
+	n, executor := deploymentNode(t)
+	input := DatabaseDeploymentInput{Mode: "create", Name: "恢复创建", Targets: []DatabaseDeploymentTargetInput{{NodeID: n.ID, Address: "192.0.2.10"}}}
+	preview, err := n.PreviewDatabaseDeployment(t.Context(), input, n.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cancelled := commitDeployment(t, n, preview, "cancel", "create_or_import")
+	if _, err = n.cancelQueued(t.Context(), cancelled.ID); err != nil {
+		t.Fatal(err)
+	}
+	n.advance()
+	if executor.submits != 0 {
+		t.Fatal("已取消操作仍然部署")
+	}
+	executor.lost = true
+	op := commitDeployment(t, n, preview, "restart", "create_or_import")
+	op = advanceDeploymentTest(t, n, op.ID, n)
+	if op.State != protocol.AttentionRequired {
+		t.Fatal(op.State)
+	}
+	var path string
+	if err = n.DB.QueryRow("SELECT file FROM pragma_database_list WHERE name='main'").Scan(&path); err != nil {
+		t.Fatal(err)
+	}
+	n.Close()
+	reopened, err := Open(t.Context(), path, Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { reopened.Close() })
+	reopened.Executor = executor
+	if duplicate := commitDeployment(t, reopened, preview, "restart", "create_or_import"); duplicate.ID != op.ID {
+		t.Fatal("重启后生成了新操作")
+	}
+	if _, err = reopened.decideDatabase(t.Context(), "operation.recover", OperationDecision{ID: op.ID, ExpectedRevision: op.Revision}, op); err != nil {
+		t.Fatal(err)
+	}
+	op = advanceDeploymentTest(t, reopened, op.ID, reopened)
+	if op.State != protocol.Succeeded || executor.submits != 1 {
+		t.Fatal("协调节点重启后重复部署", op.State, op.Error, executor.submits)
+	}
+}
+
+func TestDatabaseDeploymentMultipleTargetsKeepsCompletedMember(t *testing.T) {
+	a, x := deploymentNode(t)
+	b, y := deploymentNode(t)
+	joinTest(t, b, a)
+	y.lost = true
+	preview, err := a.PreviewDatabaseDeployment(t.Context(), DatabaseDeploymentInput{Mode: "create", Name: "多节点创建", Targets: []DatabaseDeploymentTargetInput{{NodeID: a.ID, Address: "192.0.2.10"}, {NodeID: b.ID, Address: "192.0.2.11"}}}, a.ID)
+	if err != nil || len(preview.Problems) > 0 {
+		t.Fatal(preview.Problems, err)
+	}
+	op := commitDeployment(t, a, preview, "multi", "create_or_import")
+	op = advanceDeploymentTest(t, a, op.ID, a, b)
+	c, err := a.DatabaseCluster(t.Context(), preview.ClusterID)
+	if err != nil || op.State != protocol.AttentionRequired || len(c.Members) != 1 || x.submits != 1 {
+		t.Fatal("后续失败未保留首成员", op.State, c.Members, err)
+	}
+	if _, err = a.decideDatabase(t.Context(), "operation.recover", OperationDecision{ID: op.ID, ExpectedRevision: op.Revision}, op); err != nil {
+		t.Fatal(err)
+	}
+	op = advanceDeploymentTest(t, a, op.ID, a, b)
+	c, err = a.DatabaseCluster(t.Context(), preview.ClusterID)
+	if err != nil || op.State != protocol.Succeeded || len(c.Members) != 2 || x.submits != 1 || y.submits != 1 || y.d.Bootstrap || y.d.ClusterID != c.ClusterID {
+		t.Fatal("多节点创建恢复失败", op.State, op.Error, err)
+	}
+}

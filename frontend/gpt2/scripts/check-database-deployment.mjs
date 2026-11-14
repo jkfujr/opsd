@@ -6,7 +6,7 @@ export async function checkDatabaseDeployment({ page, go, step, capture, closeDr
     let lost = false, blocked = false;
     const match = url => /^\/api\/v2\/database-clusters\/(discovery|deployment-previews|deployments|ui-db\/(members|proxies)\/actions)$/.test(url.pathname);
     const originalNodes = fixtures.nodes;
-    const second = { ...originalNodes.items[0], id: 'deployment-node', name: '数据库候选节点', online: true, state: 'online' };
+    const second = { ...originalNodes.items[0], id: 'deployment-node', name: '数据库候选节点', connected: true, writable: true };
     fixtures.nodes = { ...originalNodes, items: [...originalNodes.items, second] };
     const instance = { id: 'found-galera', node_id: id, name: 'MariaDB', kind: 'galera', address: '127.0.0.1:3306', username: 'root', credentials_available: true, running: true, revision: 0, protected_users: [] };
     await page.route(match, async route => {
@@ -51,7 +51,8 @@ export async function checkDatabaseDeployment({ page, go, step, capture, closeDr
       await page.setViewportSize({ width: 320, height: 780 });
       await go('/databases/ui-db'); await page.getByRole('tab', { name: '成员', exact: true }).click();
       await page.getByRole('button', { name: '添加节点', exact: true }).click();
-      await page.getByRole('dialog').getByRole('checkbox').first().check(); blocked = true;
+      const candidate = page.getByRole('dialog').getByRole('checkbox', { name: /数据库候选节点/ });
+      await candidate.focus(); await candidate.press('Space'); assert(await candidate.isChecked()); blocked = true;
       await page.getByRole('button', { name: '预览变更', exact: true }).click();
       await page.getByText('TCP 端口被占用，请调整端口', { exact: true }).waitFor();
       assert(await page.getByRole('button', { name: '确认添加节点', exact: true }).isDisabled());
@@ -65,7 +66,7 @@ export async function checkDatabaseDeployment({ page, go, step, capture, closeDr
       await page.setViewportSize({ width: 1440, height: 900 });
       await go('/databases/ui-db'); await page.getByRole('tab', { name: '代理', exact: true }).click();
       await page.getByRole('button', { name: '添加代理', exact: true }).click();
-      await page.getByRole('dialog').getByRole('checkbox').last().check();
+      await page.getByRole('dialog').getByRole('checkbox', { name: /数据库候选节点/ }).check();
       await page.getByRole('button', { name: '预览变更', exact: true }).click();
       await page.getByRole('button', { name: '确认添加代理', exact: true }).click(); await page.locator('.operation-detail').waitFor(); await closeDrawers();
       assert(writes.at(-1).path.endsWith('/proxies/actions')); assert.equal(previews.at(-1).targets[0].node_id, 'deployment-node');
