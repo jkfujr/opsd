@@ -48,6 +48,9 @@ func (e *Engine) database(ctx context.Context, l *Local) error {
 			if stage == "deploy_network" {
 				name = "检查成员连接"
 			}
+			if stage == "deployment_seeds" {
+				name = "保存重启成员地址"
+			}
 			l.Record.Steps = append(l.Record.Steps, protocol.OperationStep{Name: name, State: "pending"})
 		}
 		l.Record.State = protocol.Applying

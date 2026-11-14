@@ -213,8 +213,8 @@ func (m Manager) observeDeployment(ctx context.Context, d protocol.DatabaseDeplo
 			out.Satisfied = state == "running" || state == "restarting"
 			return out, nil
 		}
-		if state != "running" && state != "restarting" {
-			return out, fmt.Errorf("数据库容器已停止，请核对原容器日志")
+		if state != "running" {
+			return out, fmt.Errorf("数据库容器已停止或正在异常重启，请核对原容器日志后重新处理")
 		}
 		result, err := m.Read(ctx, d.Connection, "health")
 		if err != nil {
@@ -293,7 +293,7 @@ func deploymentFiles(d protocol.DatabaseDeployment) (map[string]string, error) {
 	if d.Bootstrap {
 		files["start.sh"] += "if [ ! -e /opsd-state/bootstrap.started ]; then\n  (set -C; printf '%s\\n' started > /opsd-state/bootstrap.started)\n  sync -f /opsd-state/bootstrap.started\n  exec docker-entrypoint.sh mariadbd --wsrep-new-cluster\nfi\n"
 	}
-	files["start.sh"] += "exec docker-entrypoint.sh mariadbd\n"
+	files["start.sh"] += "if [ -s /opsd-state/seeds ]; then\n  IFS= read -r seeds < /opsd-state/seeds\n  exec docker-entrypoint.sh mariadbd --wsrep-cluster-address=\"gcomm://$seeds\"\nfi\nexec docker-entrypoint.sh mariadbd\n"
 	return files, nil
 }
 

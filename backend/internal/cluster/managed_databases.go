@@ -466,7 +466,7 @@ func (n *Node) databaseDispatch(ctx context.Context, origin, method string, body
 		}
 		return n.executeRead(ctx, request.NetworkCheck)
 	case "database.deployment.execute":
-		if request.Action.Kind != "deploy_database" || request.Action.Deployment == nil || OperationOwner(request.OperationID) != n.ID {
+		if request.Action.Kind != "deploy_database" && request.Action.Kind != "deployment_seeds" || OperationOwner(request.OperationID) != n.ID {
 			return nil, fault("invalid_request", "数据库部署步骤无效")
 		}
 		if err := request.Action.Validate(); err != nil {

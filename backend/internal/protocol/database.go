@@ -166,6 +166,7 @@ func (*DatabaseReadResult) isPayload() {}
 
 type DatabaseAction struct {
 	Deployment   *DatabaseDeployment `json:"deployment,omitempty"`
+	SeedUpdate   *DatabaseSeedUpdate `json:"seed_update,omitempty"`
 	Routing      *ProxyRouteAction   `json:"routing,omitempty"`
 	Connection   DatabaseConnection  `json:"connection"`
 	ClusterID    string              `json:"cluster_id"`
@@ -191,6 +192,9 @@ func SystemDatabaseUser(name string, c DatabaseConnection) bool {
 	return name == c.Username || slices.Contains(c.ProtectedUsers, name) || slices.Contains([]string{"root", "mysql", "mariadb.sys", "mysql.sys", "sst", "galera_sst", "galera_backup", "proxysql_monitor", "mysqld_exporter", "mysql_exporter"}, name)
 }
 func (a DatabaseAction) Validate() error {
+	if a.Kind == "deployment_seeds" && a.SeedUpdate != nil {
+		return a.SeedUpdate.Validate()
+	}
 	if a.Kind == "deploy_database" && a.Deployment != nil {
 		return a.Deployment.Validate()
 	}

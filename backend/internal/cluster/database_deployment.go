@@ -479,7 +479,27 @@ func deploymentStepID(owner, id string, index int) string {
 
 func (n *Node) buildDeploymentWorkflow(ctx context.Context, id string, input DatabaseSubmission) (databaseWorkflow, error) {
 	p := input.Change.Deployment
-	flow := databaseWorkflow{Steps: []databaseWorkflowStep{}, Cluster: &p.Cluster}
+	flow := databaseWorkflow{Steps: []databaseWorkflowStep{}, Cluster: &p.Cluster, UpdateSeeds: p.Mode == "create" || p.Mode == "members"}
+	dataBytes := uint64(0)
+	if p.Mode == "members" || p.Mode == "proxy" {
+		for _, ref := range p.Cluster.Members {
+			var profile protocol.DatabaseDeploymentProfile
+			if err := n.Call(ctx, ref.NodeID, "database.deployment.profile", DatabaseRPC{InstanceID: ref.InstanceID}, &profile); err != nil {
+				return flow, err
+			}
+			if profile.State.ClusterID != p.Cluster.ClusterID || !profile.State.Primary || !profile.State.Ready || !profile.State.Synced {
+				return flow, fault("conflict", ref.Name+"：已有成员身份或同步状态已经变化")
+			}
+			if p.Mode == "members" && ref.NodeID == p.Cluster.Coordinator {
+				dataBytes = profile.DataBytes
+				for _, target := range p.Targets {
+					if profile.Deployment.Image != target.Deployment.Image || profile.Deployment.SSTMethod != target.Deployment.SSTMethod {
+						return flow, fault("conflict", "原集群版本或同步方式已经变化，请重新预览")
+					}
+				}
+			}
+		}
+	}
 	for _, target := range p.Targets {
 		var env protocol.DatabaseDeploymentEnvironment
 		if err := n.Call(ctx, target.Ref.NodeID, "database.deployment.check", DatabaseRPC{Action: protocol.DatabaseAction{Deployment: &target.Deployment}}, &env); err != nil {
@@ -487,6 +507,9 @@ func (n *Node) buildDeploymentWorkflow(ctx context.Context, id string, input Dat
 		}
 		if len(env.Problems) > 0 || env.Fingerprint != target.Fingerprint {
 			return flow, fault("conflict", target.Ref.Name+"：环境已变化，请核对端口、目录及 Docker")
+		}
+		if dataBytes > 0 && env.FreeBytes < dataBytes*2+512*1024*1024 {
+			return flow, fault("conflict", target.Ref.Name+"：可用空间不足以保存已有数据与同步临时文件")
 		}
 	}
 	for _, network := range p.Network {
@@ -572,6 +595,33 @@ func (n *Node) finishDeploymentStep(ctx context.Context, step *databaseWorkflowS
 
 func (n *Node) finishDeploymentWorkflow(ctx context.Context, op *Operation, flow *databaseWorkflow) error {
 	c := flow.Cluster
+	if flow.UpdateSeeds && !flow.SeedsBuilt {
+		seeds := []string{}
+		profiles := []protocol.DatabaseDeploymentProfile{}
+		for _, ref := range c.Members {
+			var profile protocol.DatabaseDeploymentProfile
+			if err := n.Call(ctx, ref.NodeID, "database.deployment.profile", DatabaseRPC{InstanceID: ref.InstanceID}, &profile); err != nil {
+				return err
+			}
+			if profile.State.ClusterID != c.ClusterID || !profile.State.Primary || !profile.State.Ready || !profile.State.Synced {
+				return fault("conflict", "保存启动地址前，请先恢复集群成员同步")
+			}
+			seeds = append(seeds, net.JoinHostPort(profile.Deployment.Address, strconv.Itoa(profile.Deployment.ReplicationPort)))
+			profiles = append(profiles, profile)
+		}
+		for index, profile := range profiles {
+			if !profile.Managed {
+				continue
+			}
+			ref := c.Members[index]
+			update := &protocol.DatabaseSeedUpdate{ContainerID: profile.ContainerID, Seeds: seeds}
+			flow.Steps = append(flow.Steps, databaseWorkflowStep{Ref: ref, ID: deploymentStepID(ref.NodeID, op.ID, len(flow.Steps)), State: "pending", Action: protocol.DatabaseAction{Kind: "deployment_seeds", SeedUpdate: update}})
+		}
+		flow.SeedsBuilt = true
+		if flow.Index < len(flow.Steps) {
+			return nil
+		}
+	}
 	if c.ProxyRouting != nil && c.ProxyRouting.Enabled && len(c.Proxies) > 0 && !flow.RoutingBuilt {
 		preview, err := n.PreviewProxyRouting(ctx, *c, ProxyRoutingPreviewInput{ExpectedRevision: c.Revision, Enabled: true, Automatic: c.ProxyRouting.Automatic})
 		if err != nil {

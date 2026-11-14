@@ -132,10 +132,29 @@ func (*DatabaseDeploymentProfileRead) Kind() Kind { return "database.deployment.
 func (*DatabaseDeploymentProfileRead) isPayload() {}
 
 type DatabaseDeploymentProfile struct {
-	Deployment DatabaseDeployment `json:"deployment"`
-	State      DatabaseState      `json:"state"`
-	DataBytes  uint64             `json:"data_bytes"`
-	Problems   []string           `json:"problems"`
+	Deployment  DatabaseDeployment `json:"deployment"`
+	Managed     bool               `json:"managed"`
+	ContainerID string             `json:"container_id,omitempty"`
+	State       DatabaseState      `json:"state"`
+	DataBytes   uint64             `json:"data_bytes"`
+	Problems    []string           `json:"problems"`
+}
+
+type DatabaseSeedUpdate struct {
+	ContainerID string   `json:"container_id"`
+	Seeds       []string `json:"seeds"`
+}
+
+func (u DatabaseSeedUpdate) Validate() error {
+	if len(u.ContainerID) != 64 || strings.Trim(u.ContainerID, "0123456789abcdef") != "" || len(u.Seeds) == 0 || len(u.Seeds) > 100 {
+		return fmt.Errorf("数据库启动地址参数无效")
+	}
+	for _, address := range u.Seeds {
+		if _, err := netip.ParseAddrPort(address); err != nil {
+			return fmt.Errorf("数据库成员地址无效")
+		}
+	}
+	return nil
 }
 
 func (*DatabaseDeploymentProfile) Kind() Kind { return "database.deployment.profile" }

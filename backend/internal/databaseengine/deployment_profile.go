@@ -23,6 +23,9 @@ func (m Manager) DeploymentProfile(ctx context.Context, request protocol.Databas
 	out.State = state
 	d := protocol.DatabaseDeployment{Kind: "galera", Connection: request.Connection, ClusterName: state.ClusterName, ClusterID: state.ClusterID, Address: state.MemberAddress, SQLPort: 3306, ReplicationPort: 4567, ISTPort: 4568, SSTPort: 4444}
 	if request.ContainerID != "" && m.Docker != nil {
+		if _, err := m.managedDeployment(ctx, request.ContainerID); err == nil {
+			out.Managed, out.ContainerID = true, request.ContainerID
+		}
 		container, e := m.Docker.DeploymentContainer(ctx, request.ContainerID)
 		if e != nil {
 			return out, e

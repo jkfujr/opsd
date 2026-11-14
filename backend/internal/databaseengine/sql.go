@@ -406,6 +406,15 @@ func (Manager) PasswordHash(ctx context.Context, c protocol.DatabaseConnection, 
 	return r[0]["authentication_string"], nil
 }
 func (m Manager) Prepare(ctx context.Context, a protocol.DatabaseAction) ([]string, error) {
+	if a.Kind == "deployment_seeds" {
+		if err := a.Validate(); err != nil {
+			return nil, err
+		}
+		if _, err := m.observeDeploymentSeeds(ctx, *a.SeedUpdate); err != nil {
+			return nil, err
+		}
+		return []string{"deployment_seeds"}, nil
+	}
 	if a.Kind == "deploy_database" {
 		return m.prepareDeployment(ctx, a)
 	}
@@ -474,6 +483,9 @@ func (m Manager) Prepare(ctx context.Context, a protocol.DatabaseAction) ([]stri
 	return []string{"database"}, nil
 }
 func (m Manager) Observe(ctx context.Context, a protocol.DatabaseAction, step string) (Observation, error) {
+	if a.Kind == "deployment_seeds" {
+		return m.observeDeploymentSeeds(ctx, *a.SeedUpdate)
+	}
 	if a.Kind == "deploy_database" {
 		return m.observeDeployment(ctx, *a.Deployment, step)
 	}
@@ -568,6 +580,9 @@ func (m Manager) Observe(ctx context.Context, a protocol.DatabaseAction, step st
 	return out, nil
 }
 func (m Manager) Apply(ctx context.Context, a protocol.DatabaseAction, step string) error {
+	if a.Kind == "deployment_seeds" {
+		return m.applyDeploymentSeeds(ctx, *a.SeedUpdate)
+	}
 	if a.Kind == "deploy_database" {
 		return m.applyDeployment(ctx, *a.Deployment, step)
 	}

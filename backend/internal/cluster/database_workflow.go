@@ -61,6 +61,8 @@ type databaseWorkflow struct {
 	Cluster      *ManagedDatabaseCluster      `json:"cluster,omitempty"`
 	RoutingBuilt bool                         `json:"routing_built,omitempty"`
 	Routing      *protocol.ProxyRoutingPolicy `json:"routing,omitempty"`
+	UpdateSeeds  bool                         `json:"update_seeds,omitempty"`
+	SeedsBuilt   bool                         `json:"seeds_built,omitempty"`
 }
 
 func validateDatabaseSubmission(input DatabaseSubmission) error {
@@ -325,6 +327,9 @@ func (n *Node) persistDatabaseWorkflow(ctx context.Context, op *Operation, flow 
 	return e
 }
 func databaseActionName(kind string) string {
+	if kind == "deployment_seeds" {
+		return "保存重启成员地址"
+	}
 	if kind == "deploy_database" {
 		return "部署数据库"
 	}
@@ -411,7 +416,7 @@ func (n *Node) advanceDatabase(ctx context.Context, op *Operation, plain []byte)
 		}
 		var reply protocol.OperationUpdated
 		method := "database.execute"
-		if step.Action.Kind == "deploy_database" {
+		if step.Action.Kind == "deploy_database" || step.Action.Kind == "deployment_seeds" {
 			method = "database.deployment.execute"
 		}
 		e = n.Call(ctx, step.Ref.NodeID, method, request, &reply)

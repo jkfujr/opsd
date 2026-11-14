@@ -88,7 +88,7 @@ func TestDatabaseDeploymentNative(t *testing.T) {
 				message := strings.ReplaceAll(string(data), d.Connection.Password, "[已隐藏]")
 				message = strings.ReplaceAll(message, d.SSTPassword, "[已隐藏]")
 				t.Log(message)
-				logs, _ := filepath.Glob(filepath.Join(d.Directory, "data", "*.log"))
+				logs, _ := filepath.Glob(filepath.Join(d.Directory, "data", "mariabackup.*.log"))
 				for _, path := range logs {
 					data, _ := os.ReadFile(path)
 					if len(data) > 12000 {
@@ -168,6 +168,25 @@ func TestDatabaseDeploymentNative(t *testing.T) {
 	}
 	for _, d := range members {
 		wait(d, 3)
+		id, _, err := m.Docker.DeploymentState(ctx, d)
+		if err != nil {
+			t.Fatal(err)
+		}
+		seeds := []string{}
+		for _, member := range members {
+			seeds = append(seeds, net.JoinHostPort(address, fmt.Sprint(member.ReplicationPort)))
+		}
+		update := protocol.DatabaseAction{Kind: "deployment_seeds", SeedUpdate: &protocol.DatabaseSeedUpdate{ContainerID: id, Seeds: seeds}}
+		stages, err := m.Prepare(ctx, update)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err = m.Apply(ctx, update, stages[0]); err != nil {
+			t.Fatal(err)
+		}
+		if observed, err := m.Observe(ctx, update, stages[0]); err != nil || !observed.Satisfied {
+			t.Fatal("启动成员地址未保存", err)
+		}
 		s, err := connect(ctx, d.Connection)
 		if err != nil {
 			t.Fatal(err)

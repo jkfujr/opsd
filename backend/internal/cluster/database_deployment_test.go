@@ -18,10 +18,12 @@ type deploymentExecutor struct {
 	d           protocol.DatabaseDeployment
 	records     map[string]protocol.OperationRecord
 	submits     int
+	seedUpdates int
 	lost        bool
 	waiting     bool
 	problems    []string
 	dockerState string
+	unhealthy   bool
 }
 
 func (*deploymentExecutor) Storage(context.Context, StorageConfig) (Credentials, error) {
@@ -31,6 +33,7 @@ func (e *deploymentExecutor) Call(_ context.Context, p protocol.Payload) (protoc
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	state := protocol.DatabaseState{State: "ready", Version: "11.8.9", ClusterID: "test-galera", ClusterName: "业务集群", Primary: true, Ready: true, Synced: true, MemberAddress: "192.0.2.10:3306", ActualMembers: "192.0.2.10:3306", CheckedAt: time.Now().UTC()}
+	state.Ready = !e.unhealthy
 	switch p := p.(type) {
 	case *protocol.DatabaseDeploymentCheck:
 		return &protocol.DatabaseDeploymentEnvironment{DockerState: e.dockerState, FreeBytes: 10 << 30, Fingerprint: "initial", Problems: append([]string{}, e.problems...)}, nil
@@ -38,6 +41,12 @@ func (e *deploymentExecutor) Call(_ context.Context, p protocol.Payload) (protoc
 		return &protocol.DatabaseNetworkChecked{Checked: true}, nil
 	case *protocol.OperationSubmit:
 		if record, ok := e.records[p.OperationID]; ok {
+			return &protocol.OperationUpdated{Record: record}, nil
+		}
+		if p.Action.Database.Kind == "deployment_seeds" {
+			e.seedUpdates++
+			record := protocol.OperationRecord{ID: p.OperationID, Revision: 2, State: protocol.Succeeded}
+			e.records[p.OperationID] = record
 			return &protocol.OperationUpdated{Record: record}, nil
 		}
 		e.submits++
@@ -61,7 +70,7 @@ func (e *deploymentExecutor) Call(_ context.Context, p protocol.Payload) (protoc
 	case *protocol.DockerRead:
 		return &protocol.DockerReadResult{State: protocol.DockerState{State: "ready", Containers: []protocol.ContainerSummary{{Name: "opsd-galera-" + e.d.ID, ContainerRef: protocol.ContainerRef{EngineID: "engine", ContainerID: strings.Repeat("a", 64)}}}}}, nil
 	case *protocol.DatabaseDeploymentProfileRead:
-		return &protocol.DatabaseDeploymentProfile{Deployment: e.d, State: state, DataBytes: 1 << 20, Problems: []string{}}, nil
+		return &protocol.DatabaseDeploymentProfile{Deployment: e.d, State: state, DataBytes: 1 << 20, Problems: []string{}, Managed: e.d.ID != "", ContainerID: strings.Repeat("a", 64)}, nil
 	case *protocol.DatabaseDiscovery:
 		return &protocol.DatabaseDiscovered{Instances: []protocol.DatabaseCandidate{{ID: "legacy", Name: "已有 MariaDB", Running: true, Connection: protocol.DatabaseConnection{Kind: "galera", Address: "127.0.0.1:3306", Username: "root", Password: "private-secret"}}}}, nil
 	}
@@ -143,6 +152,9 @@ func TestDatabaseDeploymentSingleNodeExpansionAndLostReply(t *testing.T) {
 	expand = advanceDeploymentTest(t, a, expand.ID, a, b)
 	if expand.State != protocol.Succeeded || y.submits != 1 || y.d.Bootstrap || y.d.ClusterID != c.ClusterID || y.d.SSTPassword != x.d.SSTPassword {
 		t.Fatal("扩容未沿用原集群", expand.State, expand.Error)
+	}
+	if x.seedUpdates != 2 || y.seedUpdates != 1 {
+		t.Fatal("扩容未更新受管实例启动地址", x.seedUpdates, y.seedUpdates)
 	}
 	c, err = a.DatabaseCluster(t.Context(), c.ID)
 	if err != nil || len(c.Members) != 2 {
@@ -228,5 +240,41 @@ func TestDatabaseDeploymentPreviewRejectsChangedEnvironmentAndExpiry(t *testing.
 	op = advanceDeploymentTest(t, n, op.ID, n)
 	if op.State != protocol.AttentionRequired || e.submits != 0 {
 		t.Fatal("环境改变后仍然部署", op.State, e.submits)
+	}
+}
+
+func TestDatabaseExpansionRechecksExistingCluster(t *testing.T) {
+	for _, change := range []string{"version", "health"} {
+		t.Run(change, func(t *testing.T) {
+			a, source := deploymentNode(t)
+			b, target := deploymentNode(t)
+			joinTest(t, b, a)
+			preview, err := a.PreviewDatabaseDeployment(t.Context(), DatabaseDeploymentInput{Mode: "create", Name: "原集群", Targets: []DatabaseDeploymentTargetInput{{NodeID: a.ID, Address: "192.0.2.10"}}}, a.ID)
+			if err != nil {
+				t.Fatal(err)
+			}
+			op := commitDeployment(t, a, preview, "create", "create_or_import")
+			if op = advanceDeploymentTest(t, a, op.ID, a, b); op.State != protocol.Succeeded {
+				t.Fatal(op.State, op.Error)
+			}
+			c, err := a.DatabaseCluster(t.Context(), preview.ClusterID)
+			if err != nil {
+				t.Fatal(err)
+			}
+			preview, err = a.PreviewDatabaseDeployment(t.Context(), DatabaseDeploymentInput{Mode: "members", ClusterID: c.ID, ExpectedRevision: c.Revision, Targets: []DatabaseDeploymentTargetInput{{NodeID: b.ID, Address: "192.0.2.11"}}}, a.ID)
+			if err != nil || len(preview.Problems) > 0 {
+				t.Fatal(preview.Problems, err)
+			}
+			if change == "version" {
+				source.d.Image = "mariadb:11.8.8"
+			} else {
+				source.unhealthy = true
+			}
+			op = commitDeployment(t, a, preview, "expand", "members")
+			op = advanceDeploymentTest(t, a, op.ID, a, b)
+			if op.State != protocol.AttentionRequired || target.submits != 0 {
+				t.Fatal("原集群改变后仍然部署", op.State, target.submits)
+			}
+		})
 	}
 }
