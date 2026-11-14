@@ -3,6 +3,7 @@ package operations
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/jkfujr/opsd/internal/databaseengine"
 	"github.com/jkfujr/opsd/internal/protocol"
@@ -40,9 +41,12 @@ func (e *Engine) database(ctx context.Context, l *Local) error {
 		l.DatabaseState = &databaseState{Stages: stages}
 		l.Record.Steps = []protocol.OperationStep{}
 		for _, stage := range stages {
-			name := map[string]string{"database": "更新数据库", "memory": "更新代理账号", "runtime": "应用代理运行配置", "disk": "保存代理磁盘配置"}[stage]
+			name := map[string]string{"database": "更新数据库", "memory": "更新代理账号", "runtime": "应用代理运行配置", "disk": "保存代理磁盘配置", "deploy_docker": "准备 Docker", "deploy_pull": "下载数据库镜像", "deploy_files": "准备空目录与配置", "deploy_create": "创建数据库容器", "deploy_start": "启动数据库", "deploy_ready": "等待数据同步"}[stage]
 			if a.Kind == "proxy_route" && stage == "memory" {
 				name = "更新代理后端路由"
+			}
+			if stage == "deploy_network" {
+				name = "检查成员连接"
 			}
 			l.Record.Steps = append(l.Record.Steps, protocol.OperationStep{Name: name, State: "pending"})
 		}
@@ -66,6 +70,21 @@ func (e *Engine) database(ctx context.Context, l *Local) error {
 			return e.attention(ctx, l, fmt.Errorf("ProxySQL 配置出现外部修改"))
 		}
 		if !observed.Satisfied {
+			if stage == "deploy_ready" {
+				if l.Record.Steps[state.Index].State != "applying" {
+					l.Record.State = protocol.Applying
+					l.Record.Steps[state.Index].State = "applying"
+					if err = e.Store.Save(ctx, l); err != nil {
+						return err
+					}
+				}
+				select {
+				case <-ctx.Done():
+					return ctx.Err()
+				case <-time.After(5 * time.Second):
+					continue
+				}
+			}
 			if state.Attempted {
 				if l.Request != "recover" || l.RequestRevision != l.Record.Revision || observed.Fingerprint != state.Before {
 					return e.attention(ctx, l, fmt.Errorf("原步骤结果待核对，请重新处理或接受现状"))

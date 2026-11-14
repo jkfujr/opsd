@@ -101,7 +101,9 @@ jobs:
         if: always()
         with:
           name: database-check
-          path: artifacts/database-result.json
+          path: |
+            artifacts/database-result.json
+            artifacts/database-deployment-result.json
           if-no-files-found: ignore
       - uses: actions/upload-artifact@v4
         with:

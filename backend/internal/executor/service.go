@@ -34,7 +34,7 @@ type Services struct {
 func NewServices(db *sql.DB) *Services {
 	m := firewall.New()
 	docker := dockerengine.New()
-	engine := &operations.Engine{Store: operations.Store{DB: db}, Manager: m, Containers: docker, Databases: databaseengine.Manager{}}
+	engine := &operations.Engine{Store: operations.Store{DB: db}, Manager: m, Containers: docker, Databases: databaseengine.Manager{Docker: docker}}
 	engine.Install = func(ctx context.Context, l *operations.Local, persist func() error) error {
 		if l.ComponentState == nil {
 			l.ComponentState = &firewall.InstallState{Backend: l.Action.Component.Backend}
@@ -72,6 +72,15 @@ func (s *Services) Handle(ctx context.Context, payload protocol.Payload) (protoc
 		return &protocol.ExecutionLogsResult{Logs: logs}, e
 	case *protocol.DatabaseDiscovery:
 		return s.discoverDatabases(ctx)
+	case *protocol.DatabaseDeploymentCheck:
+		value, err := (databaseengine.Manager{Docker: s.Docker}).CheckDeployment(ctx, body.Deployment)
+		return &value, err
+	case *protocol.DatabaseNetworkCheck:
+		err := databaseengine.CheckDeploymentNetwork(ctx, *body)
+		return &protocol.DatabaseNetworkChecked{Checked: err == nil}, err
+	case *protocol.DatabaseDeploymentProfileRead:
+		value, err := (databaseengine.Manager{Docker: s.Docker}).DeploymentProfile(ctx, *body)
+		return &value, err
 	case *protocol.DatabaseRead:
 		return s.readDatabase(ctx, *body)
 	case *protocol.ProxyRoutingRead:

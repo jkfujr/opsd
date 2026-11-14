@@ -426,6 +426,16 @@ func (n *Node) managedDatabaseRead(ctx context.Context, id string, backups bool,
 	return *result, nil
 }
 func (n *Node) databaseDispatch(ctx context.Context, origin, method string, body json.RawMessage) (any, error) {
+	if method == "database.deployment.preview" || method == "database.deployment.submit" {
+		return n.deploymentDispatch(ctx, origin, method, body)
+	}
+	if method == "database.discovery.scan" {
+		var input DatabaseScanInput
+		if err := json.Unmarshal(body, &input); err != nil {
+			return nil, err
+		}
+		return n.scanLocalDatabases(ctx, input)
+	}
 	var request DatabaseRPC
 	if len(body) > 0 && string(body) != "null" {
 		if e := json.Unmarshal(body, &request); e != nil {
@@ -433,6 +443,43 @@ func (n *Node) databaseDispatch(ctx context.Context, origin, method string, body
 		}
 	}
 	switch method {
+	case "database.discovery.inspect", "database.discovery.register":
+		return n.inspectDiscoveredDatabase(ctx, request.Instance, method == "database.discovery.register", request.ExpectedClusterID)
+	case "database.deployment.check":
+		if request.Action.Deployment == nil {
+			return nil, fault("invalid_request", "缺少部署参数")
+		}
+		return n.executeRead(ctx, &protocol.DatabaseDeploymentCheck{Deployment: *request.Action.Deployment})
+	case "database.deployment.profile":
+		instance, err := n.databaseInstance(ctx, request.InstanceID)
+		if err != nil {
+			return nil, err
+		}
+		connection, err := n.databaseConnection(ctx, request.InstanceID)
+		if err != nil {
+			return nil, err
+		}
+		return n.executeRead(ctx, &protocol.DatabaseDeploymentProfileRead{Connection: connection, ContainerID: instance.ContainerID})
+	case "database.deployment.connectivity":
+		if request.NetworkCheck == nil {
+			return nil, fault("invalid_request", "缺少连接检查参数")
+		}
+		return n.executeRead(ctx, request.NetworkCheck)
+	case "database.deployment.execute":
+		if request.Action.Kind != "deploy_database" || request.Action.Deployment == nil || OperationOwner(request.OperationID) != n.ID {
+			return nil, fault("invalid_request", "数据库部署步骤无效")
+		}
+		if err := request.Action.Validate(); err != nil {
+			return nil, err
+		}
+		if origin != n.ID {
+			data, _ := json.Marshal(request.Action)
+			op, err := n.enqueue(ctx, origin, Request{ID: request.OperationID, Actor: request.Actor, ResourceID: request.ResourceID, Kind: "database_step", Payload: data})
+			return &protocol.OperationUpdated{Record: op.OperationRecord}, err
+		}
+		return n.executeRead(ctx, &protocol.OperationSubmit{OperationID: request.OperationID, ContractVersion: protocol.ContractVersion, Action: protocol.OperationAction{Kind: "database", Database: &request.Action}})
+	case "database.deployment.register":
+		return n.registerDatabaseDeployment(ctx, request)
 	case "database.discover":
 		return n.discoverDatabaseInstances(ctx)
 	case "database.instance.save":
@@ -516,22 +563,23 @@ func (n *Node) databaseDispatch(ctx context.Context, origin, method string, body
 }
 
 type DatabaseRPC struct {
-	Hostgroups        *protocol.ProxyHostgroups `json:"hostgroups,omitempty"`
-	Write             *requeststate.Write       `json:"write,omitempty"`
-	Scope             string                    `json:"scope,omitempty"`
-	Instance          DatabaseInstanceInput     `json:"instance"`
-	Cluster           ManagedDatabaseCluster    `json:"cluster"`
-	InstanceID        string                    `json:"instance_id"`
-	InstanceRevision  uint64                    `json:"instance_revision"`
-	ExpectedClusterID string                    `json:"expected_cluster_id"`
-	Actor             string                    `json:"actor"`
-	ResourceID        string                    `json:"resource_id"`
-	OperationID       string                    `json:"operation_id"`
-	Action            protocol.DatabaseAction   `json:"action"`
-	Revision          uint64                    `json:"revision"`
-	Backups           bool                      `json:"backups"`
-	User              string                    `json:"user"`
-	Host              string                    `json:"host"`
+	NetworkCheck      *protocol.DatabaseNetworkCheck `json:"network_check,omitempty"`
+	Hostgroups        *protocol.ProxyHostgroups      `json:"hostgroups,omitempty"`
+	Write             *requeststate.Write            `json:"write,omitempty"`
+	Scope             string                         `json:"scope,omitempty"`
+	Instance          DatabaseInstanceInput          `json:"instance"`
+	Cluster           ManagedDatabaseCluster         `json:"cluster"`
+	InstanceID        string                         `json:"instance_id"`
+	InstanceRevision  uint64                         `json:"instance_revision"`
+	ExpectedClusterID string                         `json:"expected_cluster_id"`
+	Actor             string                         `json:"actor"`
+	ResourceID        string                         `json:"resource_id"`
+	OperationID       string                         `json:"operation_id"`
+	Action            protocol.DatabaseAction        `json:"action"`
+	Revision          uint64                         `json:"revision"`
+	Backups           bool                           `json:"backups"`
+	User              string                         `json:"user"`
+	Host              string                         `json:"host"`
 }
 
 func (n *Node) ManagedDatabaseStatus(ctx context.Context, c ManagedDatabaseCluster, scope ...string) (ManagedDatabaseStatus, error) {

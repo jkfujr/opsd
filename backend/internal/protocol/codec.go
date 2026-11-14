@@ -91,6 +91,10 @@ func decodeJSON(data []byte, target any) error {
 func validatePayload(payload Payload) error {
 	var operationID string
 	switch body := payload.(type) {
+	case *DatabaseDeploymentCheck:
+		return body.Deployment.Validate()
+	case *DatabaseDeploymentProfileRead:
+		return body.Connection.Validate()
 	case *ProxyRoutingRead:
 		if body.Connection.Kind != "proxysql" {
 			return fmt.Errorf("代理连接类型无效")

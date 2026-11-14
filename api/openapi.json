@@ -10682,6 +10682,605 @@
         "description": " Idempotency-Key 作用于稳定调用身份和所属目标；未知结果先查询原请求，禁止自动换键重做。",
         "x-opsd-max-body": 4194304
       }
+    },
+    "/database-clusters/discovery": {
+      "post": {
+        "operationId": "scanDatabaseClusters",
+        "summary": "只读扫描现有数据库集群",
+        "tags": [
+          "databases"
+        ],
+        "responses": {
+          "200": {
+            "description": "请求成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DatabaseScanResult"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-ID": {
+                "schema": {
+                  "type": "string"
+                },
+                "required": true
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "405": {
+            "$ref": "#/components/responses/Error405"
+          },
+          "406": {
+            "$ref": "#/components/responses/Error406"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "412": {
+            "$ref": "#/components/responses/Error412"
+          },
+          "413": {
+            "$ref": "#/components/responses/Error413"
+          },
+          "415": {
+            "$ref": "#/components/responses/Error415"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error422"
+          },
+          "428": {
+            "$ref": "#/components/responses/Error428"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          },
+          "504": {
+            "$ref": "#/components/responses/Error504"
+          }
+        },
+        "parameters": [
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DatabaseScanInput"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "SessionCookie": []
+          }
+        ],
+        "x-opsd-access": {
+          "level": "manage",
+          "mode": "session"
+        },
+        "x-opsd-max-body": 4194304
+      }
+    },
+    "/database-clusters/deployment-previews": {
+      "post": {
+        "operationId": "previewDatabaseDeployment",
+        "summary": "预览数据库创建、接入或扩容",
+        "tags": [
+          "databases"
+        ],
+        "responses": {
+          "200": {
+            "description": "请求成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DatabaseDeploymentPreview"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-ID": {
+                "schema": {
+                  "type": "string"
+                },
+                "required": true
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "405": {
+            "$ref": "#/components/responses/Error405"
+          },
+          "406": {
+            "$ref": "#/components/responses/Error406"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "412": {
+            "$ref": "#/components/responses/Error412"
+          },
+          "413": {
+            "$ref": "#/components/responses/Error413"
+          },
+          "415": {
+            "$ref": "#/components/responses/Error415"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error422"
+          },
+          "428": {
+            "$ref": "#/components/responses/Error428"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          },
+          "504": {
+            "$ref": "#/components/responses/Error504"
+          }
+        },
+        "parameters": [
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DatabaseDeploymentInput"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "SessionCookie": []
+          }
+        ],
+        "x-opsd-access": {
+          "level": "manage",
+          "mode": "session"
+        },
+        "x-opsd-max-body": 4194304
+      }
+    },
+    "/database-clusters/deployments": {
+      "post": {
+        "operationId": "createDatabaseDeployment",
+        "summary": "创建或接入数据库集群",
+        "tags": [
+          "databases"
+        ],
+        "responses": {
+          "202": {
+            "description": "请求成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Operation"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-ID": {
+                "schema": {
+                  "type": "string"
+                },
+                "required": true
+              },
+              "Location": {
+                "schema": {
+                  "type": "string"
+                },
+                "required": true
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "405": {
+            "$ref": "#/components/responses/Error405"
+          },
+          "406": {
+            "$ref": "#/components/responses/Error406"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "412": {
+            "$ref": "#/components/responses/Error412"
+          },
+          "413": {
+            "$ref": "#/components/responses/Error413"
+          },
+          "415": {
+            "$ref": "#/components/responses/Error415"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error422"
+          },
+          "428": {
+            "$ref": "#/components/responses/Error428"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          },
+          "504": {
+            "$ref": "#/components/responses/Error504"
+          }
+        },
+        "parameters": [
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DatabaseDeploymentCommit"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "SessionCookie": []
+          }
+        ],
+        "x-opsd-access": {
+          "level": "manage",
+          "mode": "session"
+        },
+        "x-opsd-idempotent": true,
+        "x-opsd-max-body": 4194304
+      }
+    },
+    "/database-clusters/{id}/members/actions": {
+      "post": {
+        "operationId": "addDatabaseMembers",
+        "summary": "添加数据库成员",
+        "tags": [
+          "databases"
+        ],
+        "responses": {
+          "202": {
+            "description": "请求成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Operation"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-ID": {
+                "schema": {
+                  "type": "string"
+                },
+                "required": true
+              },
+              "Location": {
+                "schema": {
+                  "type": "string"
+                },
+                "required": true
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "405": {
+            "$ref": "#/components/responses/Error405"
+          },
+          "406": {
+            "$ref": "#/components/responses/Error406"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "412": {
+            "$ref": "#/components/responses/Error412"
+          },
+          "413": {
+            "$ref": "#/components/responses/Error413"
+          },
+          "415": {
+            "$ref": "#/components/responses/Error415"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error422"
+          },
+          "428": {
+            "$ref": "#/components/responses/Error428"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          },
+          "504": {
+            "$ref": "#/components/responses/Error504"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DatabaseDeploymentCommit"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "SessionCookie": []
+          }
+        ],
+        "x-opsd-access": {
+          "level": "manage",
+          "mode": "session"
+        },
+        "x-opsd-idempotent": true,
+        "x-opsd-max-body": 4194304
+      }
+    },
+    "/database-clusters/{id}/proxies/actions": {
+      "post": {
+        "operationId": "addDatabaseProxy",
+        "summary": "部署数据库代理",
+        "tags": [
+          "databases"
+        ],
+        "responses": {
+          "202": {
+            "description": "请求成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Operation"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-ID": {
+                "schema": {
+                  "type": "string"
+                },
+                "required": true
+              },
+              "Location": {
+                "schema": {
+                  "type": "string"
+                },
+                "required": true
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "405": {
+            "$ref": "#/components/responses/Error405"
+          },
+          "406": {
+            "$ref": "#/components/responses/Error406"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "412": {
+            "$ref": "#/components/responses/Error412"
+          },
+          "413": {
+            "$ref": "#/components/responses/Error413"
+          },
+          "415": {
+            "$ref": "#/components/responses/Error415"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error422"
+          },
+          "428": {
+            "$ref": "#/components/responses/Error428"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          },
+          "504": {
+            "$ref": "#/components/responses/Error504"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DatabaseDeploymentCommit"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "SessionCookie": []
+          }
+        ],
+        "x-opsd-access": {
+          "level": "manage",
+          "mode": "session"
+        },
+        "x-opsd-idempotent": true,
+        "x-opsd-max-body": 4194304
+      }
     }
   },
   "components": {
@@ -17387,6 +17986,442 @@
         },
         "required": [
           "proxies"
+        ]
+      },
+      "DatabaseScanInstance": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "node_id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "galera",
+              "proxysql"
+            ]
+          },
+          "address": {
+            "type": "string"
+          },
+          "socket": {
+            "type": "string"
+          },
+          "username": {
+            "type": "string"
+          },
+          "credentials_available": {
+            "type": "boolean"
+          },
+          "container_id": {
+            "type": "string"
+          },
+          "running": {
+            "type": "boolean"
+          },
+          "protected_users": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "backup_root": {
+            "type": "string"
+          },
+          "revision": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "id",
+          "node_id",
+          "name",
+          "kind",
+          "address",
+          "username",
+          "credentials_available",
+          "running",
+          "revision"
+        ]
+      },
+      "DatabaseScanItem": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "instance": {
+            "$ref": "#/components/schemas/DatabaseScanInstance"
+          },
+          "status": {
+            "$ref": "#/components/schemas/DatabaseStatus"
+          }
+        },
+        "required": [
+          "instance",
+          "status"
+        ]
+      },
+      "DatabaseScanInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "nodes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "credentials": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DatabaseInstanceInput"
+            }
+          }
+        },
+        "required": [
+          "nodes",
+          "credentials"
+        ]
+      },
+      "DatabaseScanGroup": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "cluster_id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "registered_id": {
+            "type": "string"
+          },
+          "members": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DatabaseScanItem"
+            }
+          },
+          "proxies": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DatabaseScanItem"
+            }
+          }
+        },
+        "required": [
+          "cluster_id",
+          "name",
+          "registered_id",
+          "members",
+          "proxies"
+        ]
+      },
+      "DatabaseScanResult": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "groups": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DatabaseScanGroup"
+            }
+          },
+          "unresolved": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DatabaseScanItem"
+            }
+          },
+          "problems": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "groups",
+          "unresolved",
+          "problems"
+        ]
+      },
+      "DatabaseDeploymentTargetInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "node_id": {
+            "type": "string"
+          },
+          "address": {
+            "type": "string"
+          },
+          "directory": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "node_id"
+        ]
+      },
+      "DatabaseDeploymentOptions": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "image": {
+            "type": "string"
+          },
+          "sql_port": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "replication_port": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "ist_port": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "sst_port": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "admin_port": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "sst_user": {
+            "type": "string"
+          },
+          "sst_password": {
+            "type": "string",
+            "writeOnly": true
+          },
+          "tls": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          }
+        },
+        "required": []
+      },
+      "DatabaseDeploymentInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "mode": {
+            "type": "string",
+            "enum": [
+              "create",
+              "members",
+              "proxy",
+              "import"
+            ]
+          },
+          "name": {
+            "type": "string"
+          },
+          "cluster_id": {
+            "type": "string"
+          },
+          "expected_revision": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "targets": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DatabaseDeploymentTargetInput"
+            }
+          },
+          "options": {
+            "$ref": "#/components/schemas/DatabaseDeploymentOptions"
+          },
+          "imports": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DatabaseInstanceInput"
+            }
+          },
+          "galera_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "mode",
+          "name",
+          "expected_revision",
+          "targets",
+          "options",
+          "imports"
+        ]
+      },
+      "DatabaseDeploymentTargetPreview": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "node_id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "address": {
+            "type": "string"
+          },
+          "directory": {
+            "type": "string"
+          },
+          "image": {
+            "type": "string"
+          },
+          "docker_state": {
+            "type": "string"
+          },
+          "free_bytes": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "ports": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int64",
+              "minimum": 0
+            }
+          },
+          "problems": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "node_id",
+          "name",
+          "address",
+          "directory",
+          "image",
+          "docker_state",
+          "free_bytes",
+          "ports",
+          "problems"
+        ]
+      },
+      "DatabaseDeploymentNetwork": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "node_id": {
+            "type": "string"
+          },
+          "source": {
+            "type": "string"
+          },
+          "protocol": {
+            "type": "string"
+          },
+          "ports": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "node_id",
+          "source",
+          "protocol",
+          "ports"
+        ]
+      },
+      "DatabaseDeploymentPreview": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "coordinator": {
+            "type": "string"
+          },
+          "cluster_id": {
+            "type": "string"
+          },
+          "revision": {
+            "type": "string"
+          },
+          "token": {
+            "type": "string"
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "targets": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DatabaseDeploymentTargetPreview"
+            }
+          },
+          "network": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DatabaseDeploymentNetwork"
+            }
+          },
+          "problems": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "coordinator",
+          "cluster_id",
+          "revision",
+          "token",
+          "expires_at",
+          "targets",
+          "network",
+          "problems"
+        ]
+      },
+      "DatabaseDeploymentCommit": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "coordinator": {
+            "type": "string"
+          },
+          "token": {
+            "type": "string"
+          },
+          "revision": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "coordinator",
+          "token",
+          "revision"
         ]
       }
     },

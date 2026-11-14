@@ -1306,6 +1306,91 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/database-clusters/discovery": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 只读扫描现有数据库集群 */
+        post: operations["scanDatabaseClusters"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/database-clusters/deployment-previews": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 预览数据库创建、接入或扩容 */
+        post: operations["previewDatabaseDeployment"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/database-clusters/deployments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 创建或接入数据库集群 */
+        post: operations["createDatabaseDeployment"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/database-clusters/{id}/members/actions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 添加数据库成员 */
+        post: operations["addDatabaseMembers"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/database-clusters/{id}/proxies/actions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 部署数据库代理 */
+        post: operations["addDatabaseProxy"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -3038,6 +3123,113 @@ export interface components {
         ProxyRoutingStatus: {
             policy?: components["schemas"]["ProxyRoutingPolicy"];
             proxies: components["schemas"]["ProxyRoutingState"][];
+        };
+        DatabaseScanInstance: {
+            id: string;
+            node_id: string;
+            name: string;
+            /** @enum {string} */
+            kind: "galera" | "proxysql";
+            address: string;
+            socket?: string;
+            username: string;
+            credentials_available: boolean;
+            container_id?: string;
+            running: boolean;
+            protected_users?: string[];
+            backup_root?: string;
+            /** Format: int64 */
+            revision: number;
+        };
+        DatabaseScanItem: {
+            instance: components["schemas"]["DatabaseScanInstance"];
+            status: components["schemas"]["DatabaseStatus"];
+        };
+        DatabaseScanInput: {
+            nodes: string[];
+            credentials: components["schemas"]["DatabaseInstanceInput"][];
+        };
+        DatabaseScanGroup: {
+            cluster_id: string;
+            name: string;
+            registered_id: string;
+            members: components["schemas"]["DatabaseScanItem"][];
+            proxies: components["schemas"]["DatabaseScanItem"][];
+        };
+        DatabaseScanResult: {
+            groups: components["schemas"]["DatabaseScanGroup"][];
+            unresolved: components["schemas"]["DatabaseScanItem"][];
+            problems: string[];
+        };
+        DatabaseDeploymentTargetInput: {
+            node_id: string;
+            address?: string;
+            directory?: string;
+        };
+        DatabaseDeploymentOptions: {
+            image?: string;
+            /** Format: int64 */
+            sql_port?: number;
+            /** Format: int64 */
+            replication_port?: number;
+            /** Format: int64 */
+            ist_port?: number;
+            /** Format: int64 */
+            sst_port?: number;
+            /** Format: int64 */
+            admin_port?: number;
+            sst_user?: string;
+            sst_password?: string;
+            tls?: {
+                [key: string]: string;
+            };
+        };
+        DatabaseDeploymentInput: {
+            /** @enum {string} */
+            mode: "create" | "members" | "proxy" | "import";
+            name: string;
+            cluster_id?: string;
+            /** Format: int64 */
+            expected_revision: number;
+            targets: components["schemas"]["DatabaseDeploymentTargetInput"][];
+            options: components["schemas"]["DatabaseDeploymentOptions"];
+            imports: components["schemas"]["DatabaseInstanceInput"][];
+            galera_id?: string;
+        };
+        DatabaseDeploymentTargetPreview: {
+            node_id: string;
+            name: string;
+            address: string;
+            directory: string;
+            image: string;
+            docker_state: string;
+            /** Format: int64 */
+            free_bytes: number;
+            ports: number[];
+            problems: string[];
+        };
+        DatabaseDeploymentNetwork: {
+            node_id: string;
+            source: string;
+            protocol: string;
+            ports: string;
+        };
+        DatabaseDeploymentPreview: {
+            id: string;
+            coordinator: string;
+            cluster_id: string;
+            revision: string;
+            token: string;
+            /** Format: date-time */
+            expires_at: string;
+            targets: components["schemas"]["DatabaseDeploymentTargetPreview"][];
+            network: components["schemas"]["DatabaseDeploymentNetwork"][];
+            problems: string[];
+        };
+        DatabaseDeploymentCommit: {
+            coordinator: string;
+            token: string;
+            revision: string;
         };
     };
     responses: {
@@ -7038,6 +7230,231 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["ProxyRoutingPreview"];
+            };
+        };
+        responses: {
+            /** @description 请求成功 */
+            202: {
+                headers: {
+                    "X-Request-ID": string;
+                    Location: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Operation"];
+                };
+            };
+            400: components["responses"]["Error400"];
+            401: components["responses"]["Error401"];
+            403: components["responses"]["Error403"];
+            404: components["responses"]["Error404"];
+            405: components["responses"]["Error405"];
+            406: components["responses"]["Error406"];
+            409: components["responses"]["Error409"];
+            412: components["responses"]["Error412"];
+            413: components["responses"]["Error413"];
+            415: components["responses"]["Error415"];
+            422: components["responses"]["Error422"];
+            428: components["responses"]["Error428"];
+            429: components["responses"]["Error429"];
+            500: components["responses"]["Error500"];
+            503: components["responses"]["Error503"];
+            504: components["responses"]["Error504"];
+        };
+    };
+    scanDatabaseClusters: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-CSRF-Token"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DatabaseScanInput"];
+            };
+        };
+        responses: {
+            /** @description 请求成功 */
+            200: {
+                headers: {
+                    "X-Request-ID": string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DatabaseScanResult"];
+                };
+            };
+            400: components["responses"]["Error400"];
+            401: components["responses"]["Error401"];
+            403: components["responses"]["Error403"];
+            404: components["responses"]["Error404"];
+            405: components["responses"]["Error405"];
+            406: components["responses"]["Error406"];
+            409: components["responses"]["Error409"];
+            412: components["responses"]["Error412"];
+            413: components["responses"]["Error413"];
+            415: components["responses"]["Error415"];
+            422: components["responses"]["Error422"];
+            428: components["responses"]["Error428"];
+            429: components["responses"]["Error429"];
+            500: components["responses"]["Error500"];
+            503: components["responses"]["Error503"];
+            504: components["responses"]["Error504"];
+        };
+    };
+    previewDatabaseDeployment: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-CSRF-Token"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DatabaseDeploymentInput"];
+            };
+        };
+        responses: {
+            /** @description 请求成功 */
+            200: {
+                headers: {
+                    "X-Request-ID": string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DatabaseDeploymentPreview"];
+                };
+            };
+            400: components["responses"]["Error400"];
+            401: components["responses"]["Error401"];
+            403: components["responses"]["Error403"];
+            404: components["responses"]["Error404"];
+            405: components["responses"]["Error405"];
+            406: components["responses"]["Error406"];
+            409: components["responses"]["Error409"];
+            412: components["responses"]["Error412"];
+            413: components["responses"]["Error413"];
+            415: components["responses"]["Error415"];
+            422: components["responses"]["Error422"];
+            428: components["responses"]["Error428"];
+            429: components["responses"]["Error429"];
+            500: components["responses"]["Error500"];
+            503: components["responses"]["Error503"];
+            504: components["responses"]["Error504"];
+        };
+    };
+    createDatabaseDeployment: {
+        parameters: {
+            query?: never;
+            header: {
+                "X-CSRF-Token"?: string;
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DatabaseDeploymentCommit"];
+            };
+        };
+        responses: {
+            /** @description 请求成功 */
+            202: {
+                headers: {
+                    "X-Request-ID": string;
+                    Location: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Operation"];
+                };
+            };
+            400: components["responses"]["Error400"];
+            401: components["responses"]["Error401"];
+            403: components["responses"]["Error403"];
+            404: components["responses"]["Error404"];
+            405: components["responses"]["Error405"];
+            406: components["responses"]["Error406"];
+            409: components["responses"]["Error409"];
+            412: components["responses"]["Error412"];
+            413: components["responses"]["Error413"];
+            415: components["responses"]["Error415"];
+            422: components["responses"]["Error422"];
+            428: components["responses"]["Error428"];
+            429: components["responses"]["Error429"];
+            500: components["responses"]["Error500"];
+            503: components["responses"]["Error503"];
+            504: components["responses"]["Error504"];
+        };
+    };
+    addDatabaseMembers: {
+        parameters: {
+            query?: never;
+            header: {
+                "X-CSRF-Token"?: string;
+                "Idempotency-Key": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DatabaseDeploymentCommit"];
+            };
+        };
+        responses: {
+            /** @description 请求成功 */
+            202: {
+                headers: {
+                    "X-Request-ID": string;
+                    Location: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Operation"];
+                };
+            };
+            400: components["responses"]["Error400"];
+            401: components["responses"]["Error401"];
+            403: components["responses"]["Error403"];
+            404: components["responses"]["Error404"];
+            405: components["responses"]["Error405"];
+            406: components["responses"]["Error406"];
+            409: components["responses"]["Error409"];
+            412: components["responses"]["Error412"];
+            413: components["responses"]["Error413"];
+            415: components["responses"]["Error415"];
+            422: components["responses"]["Error422"];
+            428: components["responses"]["Error428"];
+            429: components["responses"]["Error429"];
+            500: components["responses"]["Error500"];
+            503: components["responses"]["Error503"];
+            504: components["responses"]["Error504"];
+        };
+    };
+    addDatabaseProxy: {
+        parameters: {
+            query?: never;
+            header: {
+                "X-CSRF-Token"?: string;
+                "Idempotency-Key": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DatabaseDeploymentCommit"];
             };
         };
         responses: {

@@ -675,6 +675,138 @@ func (a *strictAPI) CreateDatabaseCluster(ctx context.Context, request httpapi.C
 	return nil, fmt.Errorf("CreateDatabaseCluster 返回未声明状态 %d", w.status())
 }
 
+func (a *strictAPI) PreviewDatabaseDeployment(ctx context.Context, request httpapi.PreviewDatabaseDeploymentRequestObject) (httpapi.PreviewDatabaseDeploymentResponseObject, error) {
+	r := strictRequest(ctx)
+	w := newAPIResponse(r)
+	a.server.PreviewDatabaseDeployment(w, r, request.Params)
+	a.server.prepareAPIResponse(w, r)
+	switch w.status() {
+	case 200:
+		return strictResponse[httpapi.PreviewDatabaseDeployment200JSONResponse](w)
+	case 400:
+		return strictResponse[httpapi.PreviewDatabaseDeployment400ApplicationProblemPlusJSONResponse](w)
+	case 401:
+		return strictResponse[httpapi.PreviewDatabaseDeployment401ApplicationProblemPlusJSONResponse](w)
+	case 403:
+		return strictResponse[httpapi.PreviewDatabaseDeployment403ApplicationProblemPlusJSONResponse](w)
+	case 404:
+		return strictResponse[httpapi.PreviewDatabaseDeployment404ApplicationProblemPlusJSONResponse](w)
+	case 405:
+		return strictResponse[httpapi.PreviewDatabaseDeployment405ApplicationProblemPlusJSONResponse](w)
+	case 406:
+		return strictResponse[httpapi.PreviewDatabaseDeployment406ApplicationProblemPlusJSONResponse](w)
+	case 409:
+		return strictResponse[httpapi.PreviewDatabaseDeployment409ApplicationProblemPlusJSONResponse](w)
+	case 412:
+		return strictResponse[httpapi.PreviewDatabaseDeployment412ApplicationProblemPlusJSONResponse](w)
+	case 413:
+		return strictResponse[httpapi.PreviewDatabaseDeployment413ApplicationProblemPlusJSONResponse](w)
+	case 415:
+		return strictResponse[httpapi.PreviewDatabaseDeployment415ApplicationProblemPlusJSONResponse](w)
+	case 422:
+		return strictResponse[httpapi.PreviewDatabaseDeployment422ApplicationProblemPlusJSONResponse](w)
+	case 428:
+		return strictResponse[httpapi.PreviewDatabaseDeployment428ApplicationProblemPlusJSONResponse](w)
+	case 429:
+		return strictResponse[httpapi.PreviewDatabaseDeployment429ApplicationProblemPlusJSONResponse](w)
+	case 500:
+		return strictResponse[httpapi.PreviewDatabaseDeployment500ApplicationProblemPlusJSONResponse](w)
+	case 503:
+		return strictResponse[httpapi.PreviewDatabaseDeployment503ApplicationProblemPlusJSONResponse](w)
+	case 504:
+		return strictResponse[httpapi.PreviewDatabaseDeployment504ApplicationProblemPlusJSONResponse](w)
+	}
+	return nil, fmt.Errorf("PreviewDatabaseDeployment 返回未声明状态 %d", w.status())
+}
+
+func (a *strictAPI) CreateDatabaseDeployment(ctx context.Context, request httpapi.CreateDatabaseDeploymentRequestObject) (httpapi.CreateDatabaseDeploymentResponseObject, error) {
+	r := strictRequest(ctx)
+	w := newAPIResponse(r)
+	a.server.CreateDatabaseDeployment(w, r, request.Params)
+	a.server.prepareAPIResponse(w, r)
+	switch w.status() {
+	case 202:
+		return strictResponse[httpapi.CreateDatabaseDeployment202JSONResponse](w)
+	case 400:
+		return strictResponse[httpapi.CreateDatabaseDeployment400ApplicationProblemPlusJSONResponse](w)
+	case 401:
+		return strictResponse[httpapi.CreateDatabaseDeployment401ApplicationProblemPlusJSONResponse](w)
+	case 403:
+		return strictResponse[httpapi.CreateDatabaseDeployment403ApplicationProblemPlusJSONResponse](w)
+	case 404:
+		return strictResponse[httpapi.CreateDatabaseDeployment404ApplicationProblemPlusJSONResponse](w)
+	case 405:
+		return strictResponse[httpapi.CreateDatabaseDeployment405ApplicationProblemPlusJSONResponse](w)
+	case 406:
+		return strictResponse[httpapi.CreateDatabaseDeployment406ApplicationProblemPlusJSONResponse](w)
+	case 409:
+		return strictResponse[httpapi.CreateDatabaseDeployment409ApplicationProblemPlusJSONResponse](w)
+	case 412:
+		return strictResponse[httpapi.CreateDatabaseDeployment412ApplicationProblemPlusJSONResponse](w)
+	case 413:
+		return strictResponse[httpapi.CreateDatabaseDeployment413ApplicationProblemPlusJSONResponse](w)
+	case 415:
+		return strictResponse[httpapi.CreateDatabaseDeployment415ApplicationProblemPlusJSONResponse](w)
+	case 422:
+		return strictResponse[httpapi.CreateDatabaseDeployment422ApplicationProblemPlusJSONResponse](w)
+	case 428:
+		return strictResponse[httpapi.CreateDatabaseDeployment428ApplicationProblemPlusJSONResponse](w)
+	case 429:
+		return strictResponse[httpapi.CreateDatabaseDeployment429ApplicationProblemPlusJSONResponse](w)
+	case 500:
+		return strictResponse[httpapi.CreateDatabaseDeployment500ApplicationProblemPlusJSONResponse](w)
+	case 503:
+		return strictResponse[httpapi.CreateDatabaseDeployment503ApplicationProblemPlusJSONResponse](w)
+	case 504:
+		return strictResponse[httpapi.CreateDatabaseDeployment504ApplicationProblemPlusJSONResponse](w)
+	}
+	return nil, fmt.Errorf("CreateDatabaseDeployment 返回未声明状态 %d", w.status())
+}
+
+func (a *strictAPI) ScanDatabaseClusters(ctx context.Context, request httpapi.ScanDatabaseClustersRequestObject) (httpapi.ScanDatabaseClustersResponseObject, error) {
+	r := strictRequest(ctx)
+	w := newAPIResponse(r)
+	a.server.ScanDatabaseClusters(w, r, request.Params)
+	a.server.prepareAPIResponse(w, r)
+	switch w.status() {
+	case 200:
+		return strictResponse[httpapi.ScanDatabaseClusters200JSONResponse](w)
+	case 400:
+		return strictResponse[httpapi.ScanDatabaseClusters400ApplicationProblemPlusJSONResponse](w)
+	case 401:
+		return strictResponse[httpapi.ScanDatabaseClusters401ApplicationProblemPlusJSONResponse](w)
+	case 403:
+		return strictResponse[httpapi.ScanDatabaseClusters403ApplicationProblemPlusJSONResponse](w)
+	case 404:
+		return strictResponse[httpapi.ScanDatabaseClusters404ApplicationProblemPlusJSONResponse](w)
+	case 405:
+		return strictResponse[httpapi.ScanDatabaseClusters405ApplicationProblemPlusJSONResponse](w)
+	case 406:
+		return strictResponse[httpapi.ScanDatabaseClusters406ApplicationProblemPlusJSONResponse](w)
+	case 409:
+		return strictResponse[httpapi.ScanDatabaseClusters409ApplicationProblemPlusJSONResponse](w)
+	case 412:
+		return strictResponse[httpapi.ScanDatabaseClusters412ApplicationProblemPlusJSONResponse](w)
+	case 413:
+		return strictResponse[httpapi.ScanDatabaseClusters413ApplicationProblemPlusJSONResponse](w)
+	case 415:
+		return strictResponse[httpapi.ScanDatabaseClusters415ApplicationProblemPlusJSONResponse](w)
+	case 422:
+		return strictResponse[httpapi.ScanDatabaseClusters422ApplicationProblemPlusJSONResponse](w)
+	case 428:
+		return strictResponse[httpapi.ScanDatabaseClusters428ApplicationProblemPlusJSONResponse](w)
+	case 429:
+		return strictResponse[httpapi.ScanDatabaseClusters429ApplicationProblemPlusJSONResponse](w)
+	case 500:
+		return strictResponse[httpapi.ScanDatabaseClusters500ApplicationProblemPlusJSONResponse](w)
+	case 503:
+		return strictResponse[httpapi.ScanDatabaseClusters503ApplicationProblemPlusJSONResponse](w)
+	case 504:
+		return strictResponse[httpapi.ScanDatabaseClusters504ApplicationProblemPlusJSONResponse](w)
+	}
+	return nil, fmt.Errorf("ScanDatabaseClusters 返回未声明状态 %d", w.status())
+}
+
 func (a *strictAPI) GetDatabaseDefinition(ctx context.Context, request httpapi.GetDatabaseDefinitionRequestObject) (httpapi.GetDatabaseDefinitionResponseObject, error) {
 	r := strictRequest(ctx)
 	w := newAPIResponse(r)
@@ -849,6 +981,94 @@ func (a *strictAPI) ChangeDatabase(ctx context.Context, request httpapi.ChangeDa
 		return strictResponse[httpapi.ChangeDatabase504ApplicationProblemPlusJSONResponse](w)
 	}
 	return nil, fmt.Errorf("ChangeDatabase 返回未声明状态 %d", w.status())
+}
+
+func (a *strictAPI) AddDatabaseMembers(ctx context.Context, request httpapi.AddDatabaseMembersRequestObject) (httpapi.AddDatabaseMembersResponseObject, error) {
+	r := strictRequest(ctx)
+	w := newAPIResponse(r)
+	a.server.AddDatabaseMembers(w, r, request.Id, request.Params)
+	a.server.prepareAPIResponse(w, r)
+	switch w.status() {
+	case 202:
+		return strictResponse[httpapi.AddDatabaseMembers202JSONResponse](w)
+	case 400:
+		return strictResponse[httpapi.AddDatabaseMembers400ApplicationProblemPlusJSONResponse](w)
+	case 401:
+		return strictResponse[httpapi.AddDatabaseMembers401ApplicationProblemPlusJSONResponse](w)
+	case 403:
+		return strictResponse[httpapi.AddDatabaseMembers403ApplicationProblemPlusJSONResponse](w)
+	case 404:
+		return strictResponse[httpapi.AddDatabaseMembers404ApplicationProblemPlusJSONResponse](w)
+	case 405:
+		return strictResponse[httpapi.AddDatabaseMembers405ApplicationProblemPlusJSONResponse](w)
+	case 406:
+		return strictResponse[httpapi.AddDatabaseMembers406ApplicationProblemPlusJSONResponse](w)
+	case 409:
+		return strictResponse[httpapi.AddDatabaseMembers409ApplicationProblemPlusJSONResponse](w)
+	case 412:
+		return strictResponse[httpapi.AddDatabaseMembers412ApplicationProblemPlusJSONResponse](w)
+	case 413:
+		return strictResponse[httpapi.AddDatabaseMembers413ApplicationProblemPlusJSONResponse](w)
+	case 415:
+		return strictResponse[httpapi.AddDatabaseMembers415ApplicationProblemPlusJSONResponse](w)
+	case 422:
+		return strictResponse[httpapi.AddDatabaseMembers422ApplicationProblemPlusJSONResponse](w)
+	case 428:
+		return strictResponse[httpapi.AddDatabaseMembers428ApplicationProblemPlusJSONResponse](w)
+	case 429:
+		return strictResponse[httpapi.AddDatabaseMembers429ApplicationProblemPlusJSONResponse](w)
+	case 500:
+		return strictResponse[httpapi.AddDatabaseMembers500ApplicationProblemPlusJSONResponse](w)
+	case 503:
+		return strictResponse[httpapi.AddDatabaseMembers503ApplicationProblemPlusJSONResponse](w)
+	case 504:
+		return strictResponse[httpapi.AddDatabaseMembers504ApplicationProblemPlusJSONResponse](w)
+	}
+	return nil, fmt.Errorf("AddDatabaseMembers 返回未声明状态 %d", w.status())
+}
+
+func (a *strictAPI) AddDatabaseProxy(ctx context.Context, request httpapi.AddDatabaseProxyRequestObject) (httpapi.AddDatabaseProxyResponseObject, error) {
+	r := strictRequest(ctx)
+	w := newAPIResponse(r)
+	a.server.AddDatabaseProxy(w, r, request.Id, request.Params)
+	a.server.prepareAPIResponse(w, r)
+	switch w.status() {
+	case 202:
+		return strictResponse[httpapi.AddDatabaseProxy202JSONResponse](w)
+	case 400:
+		return strictResponse[httpapi.AddDatabaseProxy400ApplicationProblemPlusJSONResponse](w)
+	case 401:
+		return strictResponse[httpapi.AddDatabaseProxy401ApplicationProblemPlusJSONResponse](w)
+	case 403:
+		return strictResponse[httpapi.AddDatabaseProxy403ApplicationProblemPlusJSONResponse](w)
+	case 404:
+		return strictResponse[httpapi.AddDatabaseProxy404ApplicationProblemPlusJSONResponse](w)
+	case 405:
+		return strictResponse[httpapi.AddDatabaseProxy405ApplicationProblemPlusJSONResponse](w)
+	case 406:
+		return strictResponse[httpapi.AddDatabaseProxy406ApplicationProblemPlusJSONResponse](w)
+	case 409:
+		return strictResponse[httpapi.AddDatabaseProxy409ApplicationProblemPlusJSONResponse](w)
+	case 412:
+		return strictResponse[httpapi.AddDatabaseProxy412ApplicationProblemPlusJSONResponse](w)
+	case 413:
+		return strictResponse[httpapi.AddDatabaseProxy413ApplicationProblemPlusJSONResponse](w)
+	case 415:
+		return strictResponse[httpapi.AddDatabaseProxy415ApplicationProblemPlusJSONResponse](w)
+	case 422:
+		return strictResponse[httpapi.AddDatabaseProxy422ApplicationProblemPlusJSONResponse](w)
+	case 428:
+		return strictResponse[httpapi.AddDatabaseProxy428ApplicationProblemPlusJSONResponse](w)
+	case 429:
+		return strictResponse[httpapi.AddDatabaseProxy429ApplicationProblemPlusJSONResponse](w)
+	case 500:
+		return strictResponse[httpapi.AddDatabaseProxy500ApplicationProblemPlusJSONResponse](w)
+	case 503:
+		return strictResponse[httpapi.AddDatabaseProxy503ApplicationProblemPlusJSONResponse](w)
+	case 504:
+		return strictResponse[httpapi.AddDatabaseProxy504ApplicationProblemPlusJSONResponse](w)
+	}
+	return nil, fmt.Errorf("AddDatabaseProxy 返回未声明状态 %d", w.status())
 }
 
 func (a *strictAPI) GetProxyRouting(ctx context.Context, request httpapi.GetProxyRoutingRequestObject) (httpapi.GetProxyRoutingResponseObject, error) {

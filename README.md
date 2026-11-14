@@ -8,6 +8,8 @@
 
 “设置 → 外观”支持从公开 GitHub Release 或 ZIP 安装整套前端主题，按当前控制台节点切换；打包格式与内置恢复入口见 [控制台主题](docs/THEMES.md)。
 
+“数据库”支持选择现有 OPSD 节点创建 MariaDB Galera 集群、接入已发现集群，以及从成员页添加节点。允许单节点起步；确认版本、目录、Docker 和防火墙变更后，由持久操作完成部署和数据同步。ProxySQL 可单独部署到业务节点。自动安装 Docker 支持 Debian／Ubuntu；其他 Linux 节点复用已安装的 Docker。新建及扩容使用空目录，已有业务数据与配置保留。
+
 ## 开发
 
 需要 Go 1.26.2、Node.js 24.14.1 及 npm。

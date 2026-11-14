@@ -14,6 +14,7 @@ import (
 )
 
 type databaseRuntime struct {
+	stages     []string
 	goals      map[string]bool
 	writes     map[string]int
 	source     string
@@ -24,7 +25,60 @@ type databaseRuntime struct {
 }
 
 func (d *databaseRuntime) Prepare(context.Context, protocol.DatabaseAction) ([]string, error) {
+	if len(d.stages) > 0 {
+		return d.stages, nil
+	}
 	return []string{"memory", "runtime", "disk"}, nil
+}
+
+func TestDatabaseDeploymentWaitSurvivesRestart(t *testing.T) {
+	e, _, _ := operationFixture(t)
+	runtime := databaseRuntimeFixture()
+	runtime.stages = []string{"deploy_docker", "deploy_create", "deploy_start", "deploy_ready"}
+	e.Databases = runtime
+	accept(t, e, "deployment-wait", databaseAction())
+	ctx, cancel := context.WithCancel(t.Context())
+	runtime.interrupt = func() {
+		if runtime.writes["deploy_start"] == 1 {
+			cancel()
+		}
+	}
+	if err := e.Run(ctx, "deployment-wait"); !errors.Is(err, context.Canceled) {
+		t.Fatal(err)
+	}
+	local, err := e.Store.Get(t.Context(), "deployment-wait")
+	if err != nil || local.DatabaseState == nil || !local.DatabaseState.Attempted {
+		t.Fatal("启动意图未保留", err)
+	}
+	runtime.interrupt = nil
+	waitCtx, waitCancel := context.WithTimeout(t.Context(), 30*time.Millisecond)
+	defer waitCancel()
+	if err = e.Run(waitCtx, "deployment-wait"); !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatal(err)
+	}
+	local, err = e.Store.Get(t.Context(), "deployment-wait")
+	if err != nil || local.Record.State != protocol.Applying || local.Record.Steps[3].State != "applying" || runtime.writes["deploy_ready"] != 0 {
+		t.Fatal("同步等待被执行为写操作", err)
+	}
+	var path string
+	if err = e.Store.DB.QueryRow("SELECT file FROM pragma_database_list WHERE name='main'").Scan(&path); err != nil {
+		t.Fatal(err)
+	}
+	e.Store.DB.Close()
+	db, err := storage.Open(t.Context(), path, storage.Executor)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { db.Close() })
+	runtime.goals["deploy_ready"] = true
+	restarted := &Engine{Store: Store{DB: db}, Clock: e.Clock, Databases: runtime}
+	if err = restarted.Run(t.Context(), "deployment-wait"); err != nil {
+		t.Fatal(err)
+	}
+	local, err = restarted.Store.Get(t.Context(), "deployment-wait")
+	if err != nil || local.Record.State != protocol.Succeeded || runtime.writes["deploy_docker"] != 1 || runtime.writes["deploy_create"] != 1 || runtime.writes["deploy_start"] != 1 || runtime.writes["deploy_ready"] != 0 {
+		t.Fatal("重启后重复执行部署步骤", runtime.writes, err)
+	}
 }
 func (d *databaseRuntime) Observe(_ context.Context, _ protocol.DatabaseAction, stage string) (databaseengine.Observation, error) {
 	source := d.source

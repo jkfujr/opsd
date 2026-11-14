@@ -7,8 +7,8 @@ export function operationTitle(operation: Operation) {
   const names: Record<string, Record<string, string>> = {
     container: { start: '启动容器', stop: '停止容器', restart: '重启容器', update: '更新容器镜像' },
     compose: { pull: '拉取项目镜像', start: '启动 Compose 项目', stop: '停止 Compose 项目', recreate: '重建 Compose 项目', update: '更新 Compose 项目' },
-    database: { create_database: '创建数据库', delete_database: '删除数据库', create_user: '创建数据库账号', password: '修改数据库密码', delete_user: '删除数据库账号', grant: '授予库权限', revoke: '撤销库权限', sync_user: '同步代理账号', configure_proxy_routes: '应用代理路由' },
-    database_step: { proxy_route: '应用代理路由', proxy_upsert: '同步代理账号', proxy_disable: '停用代理账号', proxy_delete: '删除代理账号' },
+    database: { create_cluster: '创建数据库集群', import_cluster: '接入数据库集群', add_members: '添加数据库节点', add_proxy: '添加数据库代理', create_database: '创建数据库', delete_database: '删除数据库', create_user: '创建数据库账号', password: '修改数据库密码', delete_user: '删除数据库账号', grant: '授予库权限', revoke: '撤销库权限', sync_user: '同步代理账号', configure_proxy_routes: '应用代理路由' },
+    database_step: { deploy_database: '部署数据库', proxy_route: '应用代理路由', proxy_upsert: '同步代理账号', proxy_disable: '停用代理账号', proxy_delete: '删除代理账号' },
     firewall_config: { adopt_current: '接纳当前防火墙配置' }, component: { install: '安装组件' },
     firewall: { add_rule: '添加防火墙规则', edit_rule: '修改防火墙规则', delete_rule: '删除防火墙规则', move_rule: '调整防火墙顺序', set_default_policy: '修改默认入站策略', set_enabled: '启停防火墙' },
   };

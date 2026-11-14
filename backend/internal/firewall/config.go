@@ -213,6 +213,15 @@ func ChangeConfiguration(before protocol.FirewallDefinition, c protocol.Firewall
 				r.Chain = ufwPrefix(r.Spec.Family) + "-user-input"
 			}
 			d.Rules = append(d.Rules, r)
+			if c.BeforeRuleID != "" {
+				at := slices.IndexFunc(d.Rules, func(v protocol.ManagedRule) bool {
+					return v.ID == c.BeforeRuleID && v.Chain == r.Chain && v.Zone == r.Zone && v.Spec.Family == r.Spec.Family
+				})
+				if at < 0 {
+					return d, Conflict("规则插入位置已经改变")
+				}
+				d.Rules = slices.Insert(d.Rules[:len(d.Rules)-1], at, r)
+			}
 		}
 	case "delete_rule":
 		d.Rules = slices.Delete(d.Rules, index, index+1)

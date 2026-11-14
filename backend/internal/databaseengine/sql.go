@@ -18,10 +18,11 @@ import (
 	"time"
 
 	"github.com/go-sql-driver/mysql"
+	"github.com/jkfujr/opsd/internal/dockerengine"
 	"github.com/jkfujr/opsd/internal/protocol"
 )
 
-type Manager struct{}
+type Manager struct{ Docker *dockerengine.Manager }
 type Observation struct {
 	Fingerprint string
 	Source      string
@@ -404,7 +405,10 @@ func (Manager) PasswordHash(ctx context.Context, c protocol.DatabaseConnection, 
 	}
 	return r[0]["authentication_string"], nil
 }
-func (Manager) Prepare(ctx context.Context, a protocol.DatabaseAction) ([]string, error) {
+func (m Manager) Prepare(ctx context.Context, a protocol.DatabaseAction) ([]string, error) {
+	if a.Kind == "deploy_database" {
+		return m.prepareDeployment(ctx, a)
+	}
 	if e := a.Validate(); e != nil {
 		return nil, e
 	}
@@ -469,7 +473,10 @@ func (Manager) Prepare(ctx context.Context, a protocol.DatabaseAction) ([]string
 	}
 	return []string{"database"}, nil
 }
-func (Manager) Observe(ctx context.Context, a protocol.DatabaseAction, step string) (Observation, error) {
+func (m Manager) Observe(ctx context.Context, a protocol.DatabaseAction, step string) (Observation, error) {
+	if a.Kind == "deploy_database" {
+		return m.observeDeployment(ctx, *a.Deployment, step)
+	}
 	out := Observation{CheckedAt: time.Now().UTC()}
 	s, e := connect(ctx, a.Connection)
 	if e != nil {
@@ -560,7 +567,10 @@ func (Manager) Observe(ctx context.Context, a protocol.DatabaseAction, step stri
 	}
 	return out, nil
 }
-func (Manager) Apply(ctx context.Context, a protocol.DatabaseAction, step string) error {
+func (m Manager) Apply(ctx context.Context, a protocol.DatabaseAction, step string) error {
+	if a.Kind == "deploy_database" {
+		return m.applyDeployment(ctx, *a.Deployment, step)
+	}
 	if e := a.Validate(); e != nil {
 		return e
 	}

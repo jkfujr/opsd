@@ -36,28 +36,38 @@ type DatabaseChange struct {
 	Privileges       []string                     `json:"privileges,omitempty"`
 	Grants           []protocol.DatabaseGrant     `json:"grants,omitempty"`
 	Proxies          []DatabaseProxySelection     `json:"proxies"`
+	Deployment       *DatabaseDeploymentPlan      `json:"deployment,omitempty"`
 }
 type DatabaseSubmission struct {
 	Change  DatabaseChange         `json:"change"`
 	Cluster ManagedDatabaseCluster `json:"cluster"`
 }
 type databaseWorkflowStep struct {
-	Ref      DatabaseRef             `json:"ref"`
-	Action   protocol.DatabaseAction `json:"action"`
-	ID       string                  `json:"id"`
-	State    string                  `json:"state"`
-	Revision uint64                  `json:"revision"`
-	Attempts uint64                  `json:"attempts"`
+	Ref      DatabaseRef              `json:"ref"`
+	Action   protocol.DatabaseAction  `json:"action"`
+	ID       string                   `json:"id"`
+	State    string                   `json:"state"`
+	Revision uint64                   `json:"revision"`
+	Attempts uint64                   `json:"attempts"`
+	Firewall *FirewallWrite           `json:"firewall,omitempty"`
+	Children []protocol.OperationStep `json:"children,omitempty"`
+	Import   *DatabaseInstanceInput   `json:"import,omitempty"`
 }
 type databaseWorkflow struct {
-	Built   bool                   `json:"built"`
-	Index   int                    `json:"index"`
-	Steps   []databaseWorkflowStep `json:"steps"`
-	Request string                 `json:"request"`
+	Built        bool                         `json:"built"`
+	Index        int                          `json:"index"`
+	Steps        []databaseWorkflowStep       `json:"steps"`
+	Request      string                       `json:"request"`
+	Cluster      *ManagedDatabaseCluster      `json:"cluster,omitempty"`
+	RoutingBuilt bool                         `json:"routing_built,omitempty"`
+	Routing      *protocol.ProxyRoutingPolicy `json:"routing,omitempty"`
 }
 
 func validateDatabaseSubmission(input DatabaseSubmission) error {
 	c, d := input.Cluster, input.Change
+	if d.Deployment != nil {
+		return validateDeploymentSubmission(input)
+	}
 	if d.Kind == "configure_proxy_routes" {
 		return validateRoutingSubmission(input)
 	}
@@ -158,6 +168,9 @@ func (n *Node) SubmitDatabaseChange(ctx context.Context, change DatabaseChange, 
 	return n.Submit(ctx, c.Coordinator, Request{Actor: actor, Kind: "database", Payload: body, Key: key, InputDigest: digest})
 }
 func (n *Node) buildDatabaseWorkflow(ctx context.Context, id string, input DatabaseSubmission) (databaseWorkflow, error) {
+	if input.Change.Deployment != nil {
+		return n.buildDeploymentWorkflow(ctx, id, input)
+	}
 	c, d := input.Cluster, input.Change
 	out := databaseWorkflow{Steps: []databaseWorkflowStep{}}
 	var source DatabaseRef
@@ -233,7 +246,18 @@ func (n *Node) loadDatabaseWorkflow(ctx context.Context, id string) (databaseWor
 	var b string
 	e := n.DB.QueryRowContext(ctx, "SELECT body FROM database_workflows WHERE id=?", id).Scan(&b)
 	if e == nil {
-		e = json.Unmarshal([]byte(b), &out)
+		var encrypted struct {
+			Secret *Secret `json:"secret"`
+		}
+		if e = json.Unmarshal([]byte(b), &encrypted); e == nil && encrypted.Secret != nil {
+			var plain []byte
+			plain, e = unseal(*encrypted.Secret, n.age)
+			if e == nil {
+				e = json.Unmarshal(plain, &out)
+			}
+		} else if e == nil {
+			e = json.Unmarshal([]byte(b), &out)
+		}
 	}
 	return out, e
 }
@@ -248,9 +272,26 @@ func (n *Node) persistDatabaseWorkflow(ctx context.Context, op *Operation, flow 
 			name = step.Ref.NodeID
 		}
 		op.Steps = append(op.Steps, protocol.OperationStep{Name: name + " · " + databaseActionName(step.Action.Kind), State: step.State})
+		if step.Firewall != nil {
+			op.Steps[len(op.Steps)-1].Name = name + " · 配置数据库网络"
+		}
+		if step.Import != nil {
+			op.Steps[len(op.Steps)-1].Name = name + " · 接入已有实例"
+		}
+		for _, child := range step.Children {
+			child.Name = name + " · " + child.Name
+			op.Steps = append(op.Steps, child)
+		}
 	}
 	opBody, _ := json.Marshal(op)
 	flowBody, _ := json.Marshal(flow)
+	secret, err := seal(flowBody, []string{n.age.Recipient().String()})
+	if err != nil {
+		return err
+	}
+	flowBody, _ = json.Marshal(struct {
+		Secret Secret `json:"secret"`
+	}{secret})
 	tx, e := n.DB.BeginTx(ctx, nil)
 	if e != nil {
 		return e
@@ -282,6 +323,9 @@ func (n *Node) persistDatabaseWorkflow(ctx context.Context, op *Operation, flow 
 	return e
 }
 func databaseActionName(kind string) string {
+	if kind == "deploy_database" {
+		return "部署数据库"
+	}
 	return map[string]string{"create_database": "创建库", "delete_database": "删除库", "create_user": "创建账号", "password": "修改密码", "delete_user": "删除账号", "grant": "授权", "revoke": "撤权", "proxy_upsert": "同步代理账号", "proxy_disable": "停用代理账号", "proxy_delete": "删除代理账号", "proxy_route": "应用代理路由"}[kind]
 }
 func (n *Node) advanceDatabase(ctx context.Context, op *Operation, plain []byte) {
@@ -298,7 +342,8 @@ func (n *Node) advanceDatabase(ctx context.Context, op *Operation, plain []byte)
 			return
 		}
 		current, err := n.DatabaseCluster(ctx, input.Cluster.ID)
-		if err != nil || current.Revision != input.Change.ExpectedRevision {
+		creating := input.Change.Deployment != nil && input.Cluster.Revision == 0
+		if !creating && (err != nil || current.Revision != input.Change.ExpectedRevision) || creating && err != sql.ErrNoRows {
 			op.State = protocol.Rejected
 			op.Error = &protocol.Error{Code: "conflict", Message: "数据库集群配置已经改变，未执行原请求"}
 			_ = n.persistDatabaseWorkflow(ctx, op, flow)
@@ -326,6 +371,16 @@ func (n *Node) advanceDatabase(ctx context.Context, op *Operation, plain []byte)
 		return
 	}
 	if flow.Index >= len(flow.Steps) {
+		if flow.Cluster != nil {
+			if err := n.finishDeploymentWorkflow(ctx, op, &flow); err != nil {
+				attention(err)
+				return
+			}
+			if flow.Index < len(flow.Steps) {
+				_ = n.persistDatabaseWorkflow(ctx, op, flow)
+				return
+			}
+		}
 		op.State = protocol.Succeeded
 		op.Error = nil
 		if err := n.persistDatabaseWorkflow(ctx, op, flow); err != nil {
@@ -337,6 +392,14 @@ func (n *Node) advanceDatabase(ctx context.Context, op *Operation, plain []byte)
 		return
 	}
 	step := &flow.Steps[flow.Index]
+	if step.Firewall != nil {
+		n.advanceDeploymentFirewall(ctx, op, &flow)
+		return
+	}
+	if step.Import != nil {
+		n.advanceDeploymentImport(ctx, op, &flow)
+		return
+	}
 	request := DatabaseRPC{Actor: op.Actor, ResourceID: op.ResourceID, InstanceID: step.Ref.InstanceID, InstanceRevision: step.Ref.InstanceRevision, OperationID: step.ID, Action: step.Action}
 	if step.State == "pending" {
 		step.State = "intent"
@@ -345,7 +408,11 @@ func (n *Node) advanceDatabase(ctx context.Context, op *Operation, plain []byte)
 			return
 		}
 		var reply protocol.OperationUpdated
-		e = n.Call(ctx, step.Ref.NodeID, "database.execute", request, &reply)
+		method := "database.execute"
+		if step.Action.Kind == "deploy_database" {
+			method = "database.deployment.execute"
+		}
+		e = n.Call(ctx, step.Ref.NodeID, method, request, &reply)
 		if e != nil {
 			attention(e)
 			return
@@ -384,6 +451,7 @@ func (n *Node) advanceDatabase(ctx context.Context, op *Operation, plain []byte)
 		return
 	}
 	record := *result.Record
+	step.Children = record.Steps
 	priorRevision := step.Revision
 	step.Revision = record.Revision
 	op.LastObservedAt = record.LastObservedAt
@@ -394,6 +462,12 @@ func (n *Node) advanceDatabase(ctx context.Context, op *Operation, plain []byte)
 		return
 	}
 	if record.State == protocol.Succeeded {
+		if step.Action.Kind == "deploy_database" {
+			if e = n.finishDeploymentStep(ctx, step, &flow); e != nil {
+				attention(e)
+				return
+			}
+		}
 		if step.Action.Kind == "proxy_route" {
 			if e = n.Call(ctx, step.Ref.NodeID, "database.proxy_routing.applied", request, nil); e != nil {
 				attention(e)
@@ -472,6 +546,9 @@ func (n *Node) advanceDatabase(ctx context.Context, op *Operation, plain []byte)
 	if operations.Terminal(record.State) {
 		attention(fmt.Errorf("数据库步骤已结束，请核对原操作"))
 		return
+	}
+	if priorRevision != record.Revision {
+		_ = n.persistDatabaseWorkflow(ctx, op, flow)
 	}
 }
 func (n *Node) decideDatabase(ctx context.Context, method string, d OperationDecision, op Operation) (Operation, error) {

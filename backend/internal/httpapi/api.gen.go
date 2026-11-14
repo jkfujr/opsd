@@ -387,13 +387,13 @@ func (e ContainerActionTargetAction) Valid() bool {
 
 // Defines values for CreatePortainerKind.
 const (
-	Create CreatePortainerKind = "create"
+	CreatePortainerKindCreate CreatePortainerKind = "create"
 )
 
 // Valid indicates whether the value is a known member of the CreatePortainerKind enum.
 func (e CreatePortainerKind) Valid() bool {
 	switch e {
-	case Create:
+	case CreatePortainerKindCreate:
 		return true
 	default:
 		return false
@@ -475,6 +475,30 @@ func (e DatabaseChangeKind) Valid() bool {
 	}
 }
 
+// Defines values for DatabaseDeploymentInputMode.
+const (
+	DatabaseDeploymentInputModeCreate  DatabaseDeploymentInputMode = "create"
+	DatabaseDeploymentInputModeImport  DatabaseDeploymentInputMode = "import"
+	DatabaseDeploymentInputModeMembers DatabaseDeploymentInputMode = "members"
+	DatabaseDeploymentInputModeProxy   DatabaseDeploymentInputMode = "proxy"
+)
+
+// Valid indicates whether the value is a known member of the DatabaseDeploymentInputMode enum.
+func (e DatabaseDeploymentInputMode) Valid() bool {
+	switch e {
+	case DatabaseDeploymentInputModeCreate:
+		return true
+	case DatabaseDeploymentInputModeImport:
+		return true
+	case DatabaseDeploymentInputModeMembers:
+		return true
+	case DatabaseDeploymentInputModeProxy:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for DatabaseInstanceKind.
 const (
 	DatabaseInstanceKindGalera   DatabaseInstanceKind = "galera"
@@ -505,6 +529,24 @@ func (e DatabaseInstanceInputKind) Valid() bool {
 	case DatabaseInstanceInputKindGalera:
 		return true
 	case DatabaseInstanceInputKindProxysql:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for DatabaseScanInstanceKind.
+const (
+	DatabaseScanInstanceKindGalera   DatabaseScanInstanceKind = "galera"
+	DatabaseScanInstanceKindProxysql DatabaseScanInstanceKind = "proxysql"
+)
+
+// Valid indicates whether the value is a known member of the DatabaseScanInstanceKind enum.
+func (e DatabaseScanInstanceKind) Valid() bool {
+	switch e {
+	case DatabaseScanInstanceKindGalera:
+		return true
+	case DatabaseScanInstanceKindProxysql:
 		return true
 	default:
 		return false
@@ -2635,6 +2677,82 @@ type DatabaseClusterPatch struct {
 	WorkbenchUrl *string        `json:"workbench_url,omitempty"`
 }
 
+// DatabaseDeploymentCommit defines model for DatabaseDeploymentCommit.
+type DatabaseDeploymentCommit struct {
+	Coordinator string `json:"coordinator"`
+	Revision    string `json:"revision"`
+	Token       string `json:"token"`
+}
+
+// DatabaseDeploymentInput defines model for DatabaseDeploymentInput.
+type DatabaseDeploymentInput struct {
+	ClusterId        *string                         `json:"cluster_id,omitempty"`
+	ExpectedRevision int64                           `json:"expected_revision"`
+	GaleraId         *string                         `json:"galera_id,omitempty"`
+	Imports          []DatabaseInstanceInput         `json:"imports"`
+	Mode             DatabaseDeploymentInputMode     `json:"mode"`
+	Name             string                          `json:"name"`
+	Options          DatabaseDeploymentOptions       `json:"options"`
+	Targets          []DatabaseDeploymentTargetInput `json:"targets"`
+}
+
+// DatabaseDeploymentInputMode defines model for DatabaseDeploymentInput.Mode.
+type DatabaseDeploymentInputMode string
+
+// DatabaseDeploymentNetwork defines model for DatabaseDeploymentNetwork.
+type DatabaseDeploymentNetwork struct {
+	NodeId   string `json:"node_id"`
+	Ports    string `json:"ports"`
+	Protocol string `json:"protocol"`
+	Source   string `json:"source"`
+}
+
+// DatabaseDeploymentOptions defines model for DatabaseDeploymentOptions.
+type DatabaseDeploymentOptions struct {
+	AdminPort       *int64             `json:"admin_port,omitempty"`
+	Image           *string            `json:"image,omitempty"`
+	IstPort         *int64             `json:"ist_port,omitempty"`
+	ReplicationPort *int64             `json:"replication_port,omitempty"`
+	SqlPort         *int64             `json:"sql_port,omitempty"`
+	SstPassword     *string            `json:"sst_password,omitempty"`
+	SstPort         *int64             `json:"sst_port,omitempty"`
+	SstUser         *string            `json:"sst_user,omitempty"`
+	Tls             *map[string]string `json:"tls,omitempty"`
+}
+
+// DatabaseDeploymentPreview defines model for DatabaseDeploymentPreview.
+type DatabaseDeploymentPreview struct {
+	ClusterId   string                            `json:"cluster_id"`
+	Coordinator string                            `json:"coordinator"`
+	ExpiresAt   time.Time                         `json:"expires_at"`
+	Id          string                            `json:"id"`
+	Network     []DatabaseDeploymentNetwork       `json:"network"`
+	Problems    []string                          `json:"problems"`
+	Revision    string                            `json:"revision"`
+	Targets     []DatabaseDeploymentTargetPreview `json:"targets"`
+	Token       string                            `json:"token"`
+}
+
+// DatabaseDeploymentTargetInput defines model for DatabaseDeploymentTargetInput.
+type DatabaseDeploymentTargetInput struct {
+	Address   *string `json:"address,omitempty"`
+	Directory *string `json:"directory,omitempty"`
+	NodeId    string  `json:"node_id"`
+}
+
+// DatabaseDeploymentTargetPreview defines model for DatabaseDeploymentTargetPreview.
+type DatabaseDeploymentTargetPreview struct {
+	Address     string   `json:"address"`
+	Directory   string   `json:"directory"`
+	DockerState string   `json:"docker_state"`
+	FreeBytes   int64    `json:"free_bytes"`
+	Image       string   `json:"image"`
+	Name        string   `json:"name"`
+	NodeId      string   `json:"node_id"`
+	Ports       []int64  `json:"ports"`
+	Problems    []string `json:"problems"`
+}
+
 // DatabaseDiscoveryList defines model for DatabaseDiscoveryList.
 type DatabaseDiscoveryList struct {
 	Items []DiscoveredDatabaseInstance `json:"items"`
@@ -2740,6 +2858,54 @@ type DatabaseRef struct {
 	InstanceId string `json:"instance_id"`
 	Name       string `json:"name"`
 	NodeId     string `json:"node_id"`
+}
+
+// DatabaseScanGroup defines model for DatabaseScanGroup.
+type DatabaseScanGroup struct {
+	ClusterId    string             `json:"cluster_id"`
+	Members      []DatabaseScanItem `json:"members"`
+	Name         string             `json:"name"`
+	Proxies      []DatabaseScanItem `json:"proxies"`
+	RegisteredId string             `json:"registered_id"`
+}
+
+// DatabaseScanInput defines model for DatabaseScanInput.
+type DatabaseScanInput struct {
+	Credentials []DatabaseInstanceInput `json:"credentials"`
+	Nodes       []string                `json:"nodes"`
+}
+
+// DatabaseScanInstance defines model for DatabaseScanInstance.
+type DatabaseScanInstance struct {
+	Address              string                   `json:"address"`
+	BackupRoot           *string                  `json:"backup_root,omitempty"`
+	ContainerId          *string                  `json:"container_id,omitempty"`
+	CredentialsAvailable bool                     `json:"credentials_available"`
+	Id                   string                   `json:"id"`
+	Kind                 DatabaseScanInstanceKind `json:"kind"`
+	Name                 string                   `json:"name"`
+	NodeId               string                   `json:"node_id"`
+	ProtectedUsers       *[]string                `json:"protected_users,omitempty"`
+	Revision             int64                    `json:"revision"`
+	Running              bool                     `json:"running"`
+	Socket               *string                  `json:"socket,omitempty"`
+	Username             string                   `json:"username"`
+}
+
+// DatabaseScanInstanceKind defines model for DatabaseScanInstance.Kind.
+type DatabaseScanInstanceKind string
+
+// DatabaseScanItem defines model for DatabaseScanItem.
+type DatabaseScanItem struct {
+	Instance DatabaseScanInstance `json:"instance"`
+	Status   DatabaseStatus       `json:"status"`
+}
+
+// DatabaseScanResult defines model for DatabaseScanResult.
+type DatabaseScanResult struct {
+	Groups     []DatabaseScanGroup `json:"groups"`
+	Problems   []string            `json:"problems"`
+	Unresolved []DatabaseScanItem  `json:"unresolved"`
 }
 
 // DatabaseSchema defines model for DatabaseSchema.
@@ -4408,6 +4574,22 @@ type CreateDatabaseClusterParams struct {
 	IdempotencyKey string  `json:"Idempotency-Key"`
 }
 
+// PreviewDatabaseDeploymentParams defines parameters for PreviewDatabaseDeployment.
+type PreviewDatabaseDeploymentParams struct {
+	XCSRFToken *string `json:"X-CSRF-Token,omitempty"`
+}
+
+// CreateDatabaseDeploymentParams defines parameters for CreateDatabaseDeployment.
+type CreateDatabaseDeploymentParams struct {
+	XCSRFToken     *string `json:"X-CSRF-Token,omitempty"`
+	IdempotencyKey string  `json:"Idempotency-Key"`
+}
+
+// ScanDatabaseClustersParams defines parameters for ScanDatabaseClusters.
+type ScanDatabaseClustersParams struct {
+	XCSRFToken *string `json:"X-CSRF-Token,omitempty"`
+}
+
 // UpdateDatabaseClusterParams defines parameters for UpdateDatabaseCluster.
 type UpdateDatabaseClusterParams struct {
 	XCSRFToken *string `json:"X-CSRF-Token,omitempty"`
@@ -4416,6 +4598,18 @@ type UpdateDatabaseClusterParams struct {
 
 // ChangeDatabaseParams defines parameters for ChangeDatabase.
 type ChangeDatabaseParams struct {
+	XCSRFToken     *string `json:"X-CSRF-Token,omitempty"`
+	IdempotencyKey string  `json:"Idempotency-Key"`
+}
+
+// AddDatabaseMembersParams defines parameters for AddDatabaseMembers.
+type AddDatabaseMembersParams struct {
+	XCSRFToken     *string `json:"X-CSRF-Token,omitempty"`
+	IdempotencyKey string  `json:"Idempotency-Key"`
+}
+
+// AddDatabaseProxyParams defines parameters for AddDatabaseProxy.
+type AddDatabaseProxyParams struct {
 	XCSRFToken     *string `json:"X-CSRF-Token,omitempty"`
 	IdempotencyKey string  `json:"Idempotency-Key"`
 }
@@ -4707,11 +4901,26 @@ type ActivateThemeJSONRequestBody = ThemeSelection
 // CreateDatabaseClusterJSONRequestBody defines body for CreateDatabaseCluster for application/json ContentType.
 type CreateDatabaseClusterJSONRequestBody = DatabaseClusterInput
 
+// PreviewDatabaseDeploymentJSONRequestBody defines body for PreviewDatabaseDeployment for application/json ContentType.
+type PreviewDatabaseDeploymentJSONRequestBody = DatabaseDeploymentInput
+
+// CreateDatabaseDeploymentJSONRequestBody defines body for CreateDatabaseDeployment for application/json ContentType.
+type CreateDatabaseDeploymentJSONRequestBody = DatabaseDeploymentCommit
+
+// ScanDatabaseClustersJSONRequestBody defines body for ScanDatabaseClusters for application/json ContentType.
+type ScanDatabaseClustersJSONRequestBody = DatabaseScanInput
+
 // UpdateDatabaseClusterApplicationMergePatchPlusJSONRequestBody defines body for UpdateDatabaseCluster for application/merge-patch+json ContentType.
 type UpdateDatabaseClusterApplicationMergePatchPlusJSONRequestBody = DatabaseClusterPatch
 
 // ChangeDatabaseJSONRequestBody defines body for ChangeDatabase for application/json ContentType.
 type ChangeDatabaseJSONRequestBody = DatabaseChange
+
+// AddDatabaseMembersJSONRequestBody defines body for AddDatabaseMembers for application/json ContentType.
+type AddDatabaseMembersJSONRequestBody = DatabaseDeploymentCommit
+
+// AddDatabaseProxyJSONRequestBody defines body for AddDatabaseProxy for application/json ContentType.
+type AddDatabaseProxyJSONRequestBody = DatabaseDeploymentCommit
 
 // ApplyProxyRoutingJSONRequestBody defines body for ApplyProxyRouting for application/json ContentType.
 type ApplyProxyRoutingJSONRequestBody = ProxyRoutingPreview
@@ -5351,6 +5560,15 @@ type ServerInterface interface {
 	// CreateDatabaseCluster 登记数据库集群
 	// (POST /database-clusters)
 	CreateDatabaseCluster(w http.ResponseWriter, r *http.Request, params CreateDatabaseClusterParams)
+	// PreviewDatabaseDeployment 预览数据库创建、接入或扩容
+	// (POST /database-clusters/deployment-previews)
+	PreviewDatabaseDeployment(w http.ResponseWriter, r *http.Request, params PreviewDatabaseDeploymentParams)
+	// CreateDatabaseDeployment 创建或接入数据库集群
+	// (POST /database-clusters/deployments)
+	CreateDatabaseDeployment(w http.ResponseWriter, r *http.Request, params CreateDatabaseDeploymentParams)
+	// ScanDatabaseClusters 只读扫描现有数据库集群
+	// (POST /database-clusters/discovery)
+	ScanDatabaseClusters(w http.ResponseWriter, r *http.Request, params ScanDatabaseClustersParams)
 	// GetDatabaseDefinition 读取数据库集群定义
 	// (GET /database-clusters/{id})
 	GetDatabaseDefinition(w http.ResponseWriter, r *http.Request, id string)
@@ -5363,6 +5581,12 @@ type ServerInterface interface {
 	// ChangeDatabase 受理数据库变更
 	// (POST /database-clusters/{id}/changes)
 	ChangeDatabase(w http.ResponseWriter, r *http.Request, id string, params ChangeDatabaseParams)
+	// AddDatabaseMembers 添加数据库成员
+	// (POST /database-clusters/{id}/members/actions)
+	AddDatabaseMembers(w http.ResponseWriter, r *http.Request, id string, params AddDatabaseMembersParams)
+	// AddDatabaseProxy 部署数据库代理
+	// (POST /database-clusters/{id}/proxies/actions)
+	AddDatabaseProxy(w http.ResponseWriter, r *http.Request, id string, params AddDatabaseProxyParams)
 	// GetProxyRouting 读取代理策略及本机排序
 	// (GET /database-clusters/{id}/proxy-routing)
 	GetProxyRouting(w http.ResponseWriter, r *http.Request, id string)
@@ -6307,6 +6531,152 @@ func (siw *ServerInterfaceWrapper) CreateDatabaseCluster(w http.ResponseWriter, 
 	handler.ServeHTTP(w, r)
 }
 
+// PreviewDatabaseDeployment operation middleware
+func (siw *ServerInterfaceWrapper) PreviewDatabaseDeployment(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params PreviewDatabaseDeploymentParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "X-CSRF-Token" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-CSRF-Token")]; found {
+		var XCSRFToken string
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "X-CSRF-Token", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "X-CSRF-Token", valueList[0], &XCSRFToken, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-CSRF-Token", Err: err})
+			return
+		}
+
+		params.XCSRFToken = &XCSRFToken
+
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PreviewDatabaseDeployment(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateDatabaseDeployment operation middleware
+func (siw *ServerInterfaceWrapper) CreateDatabaseDeployment(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params CreateDatabaseDeploymentParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "X-CSRF-Token" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-CSRF-Token")]; found {
+		var XCSRFToken string
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "X-CSRF-Token", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "X-CSRF-Token", valueList[0], &XCSRFToken, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-CSRF-Token", Err: err})
+			return
+		}
+
+		params.XCSRFToken = &XCSRFToken
+
+	}
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey string
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateDatabaseDeployment(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ScanDatabaseClusters operation middleware
+func (siw *ServerInterfaceWrapper) ScanDatabaseClusters(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ScanDatabaseClustersParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "X-CSRF-Token" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-CSRF-Token")]; found {
+		var XCSRFToken string
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "X-CSRF-Token", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "X-CSRF-Token", valueList[0], &XCSRFToken, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-CSRF-Token", Err: err})
+			return
+		}
+
+		params.XCSRFToken = &XCSRFToken
+
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ScanDatabaseClusters(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // GetDatabaseDefinition operation middleware
 func (siw *ServerInterfaceWrapper) GetDatabaseDefinition(w http.ResponseWriter, r *http.Request) {
 
@@ -6496,6 +6866,152 @@ func (siw *ServerInterfaceWrapper) ChangeDatabase(w http.ResponseWriter, r *http
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.ChangeDatabase(w, r, id, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// AddDatabaseMembers operation middleware
+func (siw *ServerInterfaceWrapper) AddDatabaseMembers(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params AddDatabaseMembersParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "X-CSRF-Token" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-CSRF-Token")]; found {
+		var XCSRFToken string
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "X-CSRF-Token", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "X-CSRF-Token", valueList[0], &XCSRFToken, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-CSRF-Token", Err: err})
+			return
+		}
+
+		params.XCSRFToken = &XCSRFToken
+
+	}
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey string
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.AddDatabaseMembers(w, r, id, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// AddDatabaseProxy operation middleware
+func (siw *ServerInterfaceWrapper) AddDatabaseProxy(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params AddDatabaseProxyParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "X-CSRF-Token" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-CSRF-Token")]; found {
+		var XCSRFToken string
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "X-CSRF-Token", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "X-CSRF-Token", valueList[0], &XCSRFToken, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-CSRF-Token", Err: err})
+			return
+		}
+
+		params.XCSRFToken = &XCSRFToken
+
+	}
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey string
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.AddDatabaseProxy(w, r, id, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -10436,10 +10952,15 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/containers", wrapper.ListContainers)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/database-clusters", wrapper.ListDatabaseClusters)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/database-clusters", wrapper.CreateDatabaseCluster)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/database-clusters/deployment-previews", wrapper.PreviewDatabaseDeployment)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/database-clusters/deployments", wrapper.CreateDatabaseDeployment)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/database-clusters/discovery", wrapper.ScanDatabaseClusters)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/database-clusters/{id}", wrapper.GetDatabaseDefinition)
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/database-clusters/{id}", wrapper.UpdateDatabaseCluster)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/database-clusters/{id}/backups", wrapper.GetDatabaseBackups)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/database-clusters/{id}/changes", wrapper.ChangeDatabase)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/database-clusters/{id}/members/actions", wrapper.AddDatabaseMembers)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/database-clusters/{id}/proxies/actions", wrapper.AddDatabaseProxy)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/database-clusters/{id}/proxy-routing", wrapper.GetProxyRouting)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/database-clusters/{id}/proxy-routing/actions", wrapper.ApplyProxyRouting)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/database-clusters/{id}/proxy-routing/previews", wrapper.PreviewProxyRouting)
@@ -16200,6 +16721,1049 @@ func (response CreateDatabaseCluster504ApplicationProblemPlusJSONResponse) Visit
 	return err
 }
 
+type PreviewDatabaseDeploymentRequestObject struct {
+	Params PreviewDatabaseDeploymentParams
+	Body   *PreviewDatabaseDeploymentJSONRequestBody
+}
+
+type PreviewDatabaseDeploymentResponseObject interface {
+	VisitPreviewDatabaseDeploymentResponse(w http.ResponseWriter) error
+}
+
+type PreviewDatabaseDeployment200ResponseHeaders struct {
+	XRequestID string
+}
+
+type PreviewDatabaseDeployment200JSONResponse struct {
+	Body    DatabaseDeploymentPreview
+	Headers PreviewDatabaseDeployment200ResponseHeaders
+}
+
+func (response PreviewDatabaseDeployment200JSONResponse) VisitPreviewDatabaseDeploymentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PreviewDatabaseDeployment400ApplicationProblemPlusJSONResponse struct {
+	Error400ApplicationProblemPlusJSONResponse
+}
+
+func (response PreviewDatabaseDeployment400ApplicationProblemPlusJSONResponse) VisitPreviewDatabaseDeploymentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PreviewDatabaseDeployment401ApplicationProblemPlusJSONResponse struct {
+	Error401ApplicationProblemPlusJSONResponse
+}
+
+func (response PreviewDatabaseDeployment401ApplicationProblemPlusJSONResponse) VisitPreviewDatabaseDeploymentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PreviewDatabaseDeployment403ApplicationProblemPlusJSONResponse struct {
+	Error403ApplicationProblemPlusJSONResponse
+}
+
+func (response PreviewDatabaseDeployment403ApplicationProblemPlusJSONResponse) VisitPreviewDatabaseDeploymentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PreviewDatabaseDeployment404ApplicationProblemPlusJSONResponse struct {
+	Error404ApplicationProblemPlusJSONResponse
+}
+
+func (response PreviewDatabaseDeployment404ApplicationProblemPlusJSONResponse) VisitPreviewDatabaseDeploymentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PreviewDatabaseDeployment405ApplicationProblemPlusJSONResponse struct {
+	Error405ApplicationProblemPlusJSONResponse
+}
+
+func (response PreviewDatabaseDeployment405ApplicationProblemPlusJSONResponse) VisitPreviewDatabaseDeploymentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.Allow != nil {
+		w.Header().Set("Allow", fmt.Sprint(*response.Headers.Allow))
+	}
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(405)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PreviewDatabaseDeployment406ApplicationProblemPlusJSONResponse struct {
+	Error406ApplicationProblemPlusJSONResponse
+}
+
+func (response PreviewDatabaseDeployment406ApplicationProblemPlusJSONResponse) VisitPreviewDatabaseDeploymentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(406)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PreviewDatabaseDeployment409ApplicationProblemPlusJSONResponse struct {
+	Error409ApplicationProblemPlusJSONResponse
+}
+
+func (response PreviewDatabaseDeployment409ApplicationProblemPlusJSONResponse) VisitPreviewDatabaseDeploymentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PreviewDatabaseDeployment412ApplicationProblemPlusJSONResponse struct {
+	Error412ApplicationProblemPlusJSONResponse
+}
+
+func (response PreviewDatabaseDeployment412ApplicationProblemPlusJSONResponse) VisitPreviewDatabaseDeploymentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(412)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PreviewDatabaseDeployment413ApplicationProblemPlusJSONResponse struct {
+	Error413ApplicationProblemPlusJSONResponse
+}
+
+func (response PreviewDatabaseDeployment413ApplicationProblemPlusJSONResponse) VisitPreviewDatabaseDeploymentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(413)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PreviewDatabaseDeployment415ApplicationProblemPlusJSONResponse struct {
+	Error415ApplicationProblemPlusJSONResponse
+}
+
+func (response PreviewDatabaseDeployment415ApplicationProblemPlusJSONResponse) VisitPreviewDatabaseDeploymentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(415)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PreviewDatabaseDeployment422ApplicationProblemPlusJSONResponse struct {
+	Error422ApplicationProblemPlusJSONResponse
+}
+
+func (response PreviewDatabaseDeployment422ApplicationProblemPlusJSONResponse) VisitPreviewDatabaseDeploymentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PreviewDatabaseDeployment428ApplicationProblemPlusJSONResponse struct {
+	Error428ApplicationProblemPlusJSONResponse
+}
+
+func (response PreviewDatabaseDeployment428ApplicationProblemPlusJSONResponse) VisitPreviewDatabaseDeploymentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(428)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PreviewDatabaseDeployment429ApplicationProblemPlusJSONResponse struct {
+	Error429ApplicationProblemPlusJSONResponse
+}
+
+func (response PreviewDatabaseDeployment429ApplicationProblemPlusJSONResponse) VisitPreviewDatabaseDeploymentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.RetryAfter != nil {
+		w.Header().Set("Retry-After", fmt.Sprint(*response.Headers.RetryAfter))
+	}
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(429)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PreviewDatabaseDeployment500ApplicationProblemPlusJSONResponse struct {
+	Error500ApplicationProblemPlusJSONResponse
+}
+
+func (response PreviewDatabaseDeployment500ApplicationProblemPlusJSONResponse) VisitPreviewDatabaseDeploymentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PreviewDatabaseDeployment503ApplicationProblemPlusJSONResponse struct {
+	Error503ApplicationProblemPlusJSONResponse
+}
+
+func (response PreviewDatabaseDeployment503ApplicationProblemPlusJSONResponse) VisitPreviewDatabaseDeploymentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(503)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PreviewDatabaseDeployment504ApplicationProblemPlusJSONResponse struct {
+	Error504ApplicationProblemPlusJSONResponse
+}
+
+func (response PreviewDatabaseDeployment504ApplicationProblemPlusJSONResponse) VisitPreviewDatabaseDeploymentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(504)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateDatabaseDeploymentRequestObject struct {
+	Params CreateDatabaseDeploymentParams
+	Body   *CreateDatabaseDeploymentJSONRequestBody
+}
+
+type CreateDatabaseDeploymentResponseObject interface {
+	VisitCreateDatabaseDeploymentResponse(w http.ResponseWriter) error
+}
+
+type CreateDatabaseDeployment202ResponseHeaders struct {
+	Location   string
+	XRequestID string
+}
+
+type CreateDatabaseDeployment202JSONResponse struct {
+	Body    Operation
+	Headers CreateDatabaseDeployment202ResponseHeaders
+}
+
+func (response CreateDatabaseDeployment202JSONResponse) VisitCreateDatabaseDeploymentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Location", fmt.Sprint(response.Headers.Location))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(202)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateDatabaseDeployment400ApplicationProblemPlusJSONResponse struct {
+	Error400ApplicationProblemPlusJSONResponse
+}
+
+func (response CreateDatabaseDeployment400ApplicationProblemPlusJSONResponse) VisitCreateDatabaseDeploymentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateDatabaseDeployment401ApplicationProblemPlusJSONResponse struct {
+	Error401ApplicationProblemPlusJSONResponse
+}
+
+func (response CreateDatabaseDeployment401ApplicationProblemPlusJSONResponse) VisitCreateDatabaseDeploymentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateDatabaseDeployment403ApplicationProblemPlusJSONResponse struct {
+	Error403ApplicationProblemPlusJSONResponse
+}
+
+func (response CreateDatabaseDeployment403ApplicationProblemPlusJSONResponse) VisitCreateDatabaseDeploymentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateDatabaseDeployment404ApplicationProblemPlusJSONResponse struct {
+	Error404ApplicationProblemPlusJSONResponse
+}
+
+func (response CreateDatabaseDeployment404ApplicationProblemPlusJSONResponse) VisitCreateDatabaseDeploymentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateDatabaseDeployment405ApplicationProblemPlusJSONResponse struct {
+	Error405ApplicationProblemPlusJSONResponse
+}
+
+func (response CreateDatabaseDeployment405ApplicationProblemPlusJSONResponse) VisitCreateDatabaseDeploymentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.Allow != nil {
+		w.Header().Set("Allow", fmt.Sprint(*response.Headers.Allow))
+	}
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(405)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateDatabaseDeployment406ApplicationProblemPlusJSONResponse struct {
+	Error406ApplicationProblemPlusJSONResponse
+}
+
+func (response CreateDatabaseDeployment406ApplicationProblemPlusJSONResponse) VisitCreateDatabaseDeploymentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(406)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateDatabaseDeployment409ApplicationProblemPlusJSONResponse struct {
+	Error409ApplicationProblemPlusJSONResponse
+}
+
+func (response CreateDatabaseDeployment409ApplicationProblemPlusJSONResponse) VisitCreateDatabaseDeploymentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateDatabaseDeployment412ApplicationProblemPlusJSONResponse struct {
+	Error412ApplicationProblemPlusJSONResponse
+}
+
+func (response CreateDatabaseDeployment412ApplicationProblemPlusJSONResponse) VisitCreateDatabaseDeploymentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(412)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateDatabaseDeployment413ApplicationProblemPlusJSONResponse struct {
+	Error413ApplicationProblemPlusJSONResponse
+}
+
+func (response CreateDatabaseDeployment413ApplicationProblemPlusJSONResponse) VisitCreateDatabaseDeploymentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(413)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateDatabaseDeployment415ApplicationProblemPlusJSONResponse struct {
+	Error415ApplicationProblemPlusJSONResponse
+}
+
+func (response CreateDatabaseDeployment415ApplicationProblemPlusJSONResponse) VisitCreateDatabaseDeploymentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(415)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateDatabaseDeployment422ApplicationProblemPlusJSONResponse struct {
+	Error422ApplicationProblemPlusJSONResponse
+}
+
+func (response CreateDatabaseDeployment422ApplicationProblemPlusJSONResponse) VisitCreateDatabaseDeploymentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateDatabaseDeployment428ApplicationProblemPlusJSONResponse struct {
+	Error428ApplicationProblemPlusJSONResponse
+}
+
+func (response CreateDatabaseDeployment428ApplicationProblemPlusJSONResponse) VisitCreateDatabaseDeploymentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(428)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateDatabaseDeployment429ApplicationProblemPlusJSONResponse struct {
+	Error429ApplicationProblemPlusJSONResponse
+}
+
+func (response CreateDatabaseDeployment429ApplicationProblemPlusJSONResponse) VisitCreateDatabaseDeploymentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.RetryAfter != nil {
+		w.Header().Set("Retry-After", fmt.Sprint(*response.Headers.RetryAfter))
+	}
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(429)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateDatabaseDeployment500ApplicationProblemPlusJSONResponse struct {
+	Error500ApplicationProblemPlusJSONResponse
+}
+
+func (response CreateDatabaseDeployment500ApplicationProblemPlusJSONResponse) VisitCreateDatabaseDeploymentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateDatabaseDeployment503ApplicationProblemPlusJSONResponse struct {
+	Error503ApplicationProblemPlusJSONResponse
+}
+
+func (response CreateDatabaseDeployment503ApplicationProblemPlusJSONResponse) VisitCreateDatabaseDeploymentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(503)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateDatabaseDeployment504ApplicationProblemPlusJSONResponse struct {
+	Error504ApplicationProblemPlusJSONResponse
+}
+
+func (response CreateDatabaseDeployment504ApplicationProblemPlusJSONResponse) VisitCreateDatabaseDeploymentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(504)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ScanDatabaseClustersRequestObject struct {
+	Params ScanDatabaseClustersParams
+	Body   *ScanDatabaseClustersJSONRequestBody
+}
+
+type ScanDatabaseClustersResponseObject interface {
+	VisitScanDatabaseClustersResponse(w http.ResponseWriter) error
+}
+
+type ScanDatabaseClusters200ResponseHeaders struct {
+	XRequestID string
+}
+
+type ScanDatabaseClusters200JSONResponse struct {
+	Body    DatabaseScanResult
+	Headers ScanDatabaseClusters200ResponseHeaders
+}
+
+func (response ScanDatabaseClusters200JSONResponse) VisitScanDatabaseClustersResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ScanDatabaseClusters400ApplicationProblemPlusJSONResponse struct {
+	Error400ApplicationProblemPlusJSONResponse
+}
+
+func (response ScanDatabaseClusters400ApplicationProblemPlusJSONResponse) VisitScanDatabaseClustersResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ScanDatabaseClusters401ApplicationProblemPlusJSONResponse struct {
+	Error401ApplicationProblemPlusJSONResponse
+}
+
+func (response ScanDatabaseClusters401ApplicationProblemPlusJSONResponse) VisitScanDatabaseClustersResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ScanDatabaseClusters403ApplicationProblemPlusJSONResponse struct {
+	Error403ApplicationProblemPlusJSONResponse
+}
+
+func (response ScanDatabaseClusters403ApplicationProblemPlusJSONResponse) VisitScanDatabaseClustersResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ScanDatabaseClusters404ApplicationProblemPlusJSONResponse struct {
+	Error404ApplicationProblemPlusJSONResponse
+}
+
+func (response ScanDatabaseClusters404ApplicationProblemPlusJSONResponse) VisitScanDatabaseClustersResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ScanDatabaseClusters405ApplicationProblemPlusJSONResponse struct {
+	Error405ApplicationProblemPlusJSONResponse
+}
+
+func (response ScanDatabaseClusters405ApplicationProblemPlusJSONResponse) VisitScanDatabaseClustersResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.Allow != nil {
+		w.Header().Set("Allow", fmt.Sprint(*response.Headers.Allow))
+	}
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(405)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ScanDatabaseClusters406ApplicationProblemPlusJSONResponse struct {
+	Error406ApplicationProblemPlusJSONResponse
+}
+
+func (response ScanDatabaseClusters406ApplicationProblemPlusJSONResponse) VisitScanDatabaseClustersResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(406)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ScanDatabaseClusters409ApplicationProblemPlusJSONResponse struct {
+	Error409ApplicationProblemPlusJSONResponse
+}
+
+func (response ScanDatabaseClusters409ApplicationProblemPlusJSONResponse) VisitScanDatabaseClustersResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ScanDatabaseClusters412ApplicationProblemPlusJSONResponse struct {
+	Error412ApplicationProblemPlusJSONResponse
+}
+
+func (response ScanDatabaseClusters412ApplicationProblemPlusJSONResponse) VisitScanDatabaseClustersResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(412)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ScanDatabaseClusters413ApplicationProblemPlusJSONResponse struct {
+	Error413ApplicationProblemPlusJSONResponse
+}
+
+func (response ScanDatabaseClusters413ApplicationProblemPlusJSONResponse) VisitScanDatabaseClustersResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(413)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ScanDatabaseClusters415ApplicationProblemPlusJSONResponse struct {
+	Error415ApplicationProblemPlusJSONResponse
+}
+
+func (response ScanDatabaseClusters415ApplicationProblemPlusJSONResponse) VisitScanDatabaseClustersResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(415)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ScanDatabaseClusters422ApplicationProblemPlusJSONResponse struct {
+	Error422ApplicationProblemPlusJSONResponse
+}
+
+func (response ScanDatabaseClusters422ApplicationProblemPlusJSONResponse) VisitScanDatabaseClustersResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ScanDatabaseClusters428ApplicationProblemPlusJSONResponse struct {
+	Error428ApplicationProblemPlusJSONResponse
+}
+
+func (response ScanDatabaseClusters428ApplicationProblemPlusJSONResponse) VisitScanDatabaseClustersResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(428)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ScanDatabaseClusters429ApplicationProblemPlusJSONResponse struct {
+	Error429ApplicationProblemPlusJSONResponse
+}
+
+func (response ScanDatabaseClusters429ApplicationProblemPlusJSONResponse) VisitScanDatabaseClustersResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.RetryAfter != nil {
+		w.Header().Set("Retry-After", fmt.Sprint(*response.Headers.RetryAfter))
+	}
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(429)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ScanDatabaseClusters500ApplicationProblemPlusJSONResponse struct {
+	Error500ApplicationProblemPlusJSONResponse
+}
+
+func (response ScanDatabaseClusters500ApplicationProblemPlusJSONResponse) VisitScanDatabaseClustersResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ScanDatabaseClusters503ApplicationProblemPlusJSONResponse struct {
+	Error503ApplicationProblemPlusJSONResponse
+}
+
+func (response ScanDatabaseClusters503ApplicationProblemPlusJSONResponse) VisitScanDatabaseClustersResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(503)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ScanDatabaseClusters504ApplicationProblemPlusJSONResponse struct {
+	Error504ApplicationProblemPlusJSONResponse
+}
+
+func (response ScanDatabaseClusters504ApplicationProblemPlusJSONResponse) VisitScanDatabaseClustersResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(504)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type GetDatabaseDefinitionRequestObject struct {
 	Id string `json:"id"`
 }
@@ -17578,6 +19142,706 @@ type ChangeDatabase504ApplicationProblemPlusJSONResponse struct {
 }
 
 func (response ChangeDatabase504ApplicationProblemPlusJSONResponse) VisitChangeDatabaseResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(504)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AddDatabaseMembersRequestObject struct {
+	Id     string `json:"id"`
+	Params AddDatabaseMembersParams
+	Body   *AddDatabaseMembersJSONRequestBody
+}
+
+type AddDatabaseMembersResponseObject interface {
+	VisitAddDatabaseMembersResponse(w http.ResponseWriter) error
+}
+
+type AddDatabaseMembers202ResponseHeaders struct {
+	Location   string
+	XRequestID string
+}
+
+type AddDatabaseMembers202JSONResponse struct {
+	Body    Operation
+	Headers AddDatabaseMembers202ResponseHeaders
+}
+
+func (response AddDatabaseMembers202JSONResponse) VisitAddDatabaseMembersResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Location", fmt.Sprint(response.Headers.Location))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(202)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AddDatabaseMembers400ApplicationProblemPlusJSONResponse struct {
+	Error400ApplicationProblemPlusJSONResponse
+}
+
+func (response AddDatabaseMembers400ApplicationProblemPlusJSONResponse) VisitAddDatabaseMembersResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AddDatabaseMembers401ApplicationProblemPlusJSONResponse struct {
+	Error401ApplicationProblemPlusJSONResponse
+}
+
+func (response AddDatabaseMembers401ApplicationProblemPlusJSONResponse) VisitAddDatabaseMembersResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AddDatabaseMembers403ApplicationProblemPlusJSONResponse struct {
+	Error403ApplicationProblemPlusJSONResponse
+}
+
+func (response AddDatabaseMembers403ApplicationProblemPlusJSONResponse) VisitAddDatabaseMembersResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AddDatabaseMembers404ApplicationProblemPlusJSONResponse struct {
+	Error404ApplicationProblemPlusJSONResponse
+}
+
+func (response AddDatabaseMembers404ApplicationProblemPlusJSONResponse) VisitAddDatabaseMembersResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AddDatabaseMembers405ApplicationProblemPlusJSONResponse struct {
+	Error405ApplicationProblemPlusJSONResponse
+}
+
+func (response AddDatabaseMembers405ApplicationProblemPlusJSONResponse) VisitAddDatabaseMembersResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.Allow != nil {
+		w.Header().Set("Allow", fmt.Sprint(*response.Headers.Allow))
+	}
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(405)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AddDatabaseMembers406ApplicationProblemPlusJSONResponse struct {
+	Error406ApplicationProblemPlusJSONResponse
+}
+
+func (response AddDatabaseMembers406ApplicationProblemPlusJSONResponse) VisitAddDatabaseMembersResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(406)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AddDatabaseMembers409ApplicationProblemPlusJSONResponse struct {
+	Error409ApplicationProblemPlusJSONResponse
+}
+
+func (response AddDatabaseMembers409ApplicationProblemPlusJSONResponse) VisitAddDatabaseMembersResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AddDatabaseMembers412ApplicationProblemPlusJSONResponse struct {
+	Error412ApplicationProblemPlusJSONResponse
+}
+
+func (response AddDatabaseMembers412ApplicationProblemPlusJSONResponse) VisitAddDatabaseMembersResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(412)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AddDatabaseMembers413ApplicationProblemPlusJSONResponse struct {
+	Error413ApplicationProblemPlusJSONResponse
+}
+
+func (response AddDatabaseMembers413ApplicationProblemPlusJSONResponse) VisitAddDatabaseMembersResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(413)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AddDatabaseMembers415ApplicationProblemPlusJSONResponse struct {
+	Error415ApplicationProblemPlusJSONResponse
+}
+
+func (response AddDatabaseMembers415ApplicationProblemPlusJSONResponse) VisitAddDatabaseMembersResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(415)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AddDatabaseMembers422ApplicationProblemPlusJSONResponse struct {
+	Error422ApplicationProblemPlusJSONResponse
+}
+
+func (response AddDatabaseMembers422ApplicationProblemPlusJSONResponse) VisitAddDatabaseMembersResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AddDatabaseMembers428ApplicationProblemPlusJSONResponse struct {
+	Error428ApplicationProblemPlusJSONResponse
+}
+
+func (response AddDatabaseMembers428ApplicationProblemPlusJSONResponse) VisitAddDatabaseMembersResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(428)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AddDatabaseMembers429ApplicationProblemPlusJSONResponse struct {
+	Error429ApplicationProblemPlusJSONResponse
+}
+
+func (response AddDatabaseMembers429ApplicationProblemPlusJSONResponse) VisitAddDatabaseMembersResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.RetryAfter != nil {
+		w.Header().Set("Retry-After", fmt.Sprint(*response.Headers.RetryAfter))
+	}
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(429)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AddDatabaseMembers500ApplicationProblemPlusJSONResponse struct {
+	Error500ApplicationProblemPlusJSONResponse
+}
+
+func (response AddDatabaseMembers500ApplicationProblemPlusJSONResponse) VisitAddDatabaseMembersResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AddDatabaseMembers503ApplicationProblemPlusJSONResponse struct {
+	Error503ApplicationProblemPlusJSONResponse
+}
+
+func (response AddDatabaseMembers503ApplicationProblemPlusJSONResponse) VisitAddDatabaseMembersResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(503)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AddDatabaseMembers504ApplicationProblemPlusJSONResponse struct {
+	Error504ApplicationProblemPlusJSONResponse
+}
+
+func (response AddDatabaseMembers504ApplicationProblemPlusJSONResponse) VisitAddDatabaseMembersResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(504)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AddDatabaseProxyRequestObject struct {
+	Id     string `json:"id"`
+	Params AddDatabaseProxyParams
+	Body   *AddDatabaseProxyJSONRequestBody
+}
+
+type AddDatabaseProxyResponseObject interface {
+	VisitAddDatabaseProxyResponse(w http.ResponseWriter) error
+}
+
+type AddDatabaseProxy202ResponseHeaders struct {
+	Location   string
+	XRequestID string
+}
+
+type AddDatabaseProxy202JSONResponse struct {
+	Body    Operation
+	Headers AddDatabaseProxy202ResponseHeaders
+}
+
+func (response AddDatabaseProxy202JSONResponse) VisitAddDatabaseProxyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Location", fmt.Sprint(response.Headers.Location))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(202)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AddDatabaseProxy400ApplicationProblemPlusJSONResponse struct {
+	Error400ApplicationProblemPlusJSONResponse
+}
+
+func (response AddDatabaseProxy400ApplicationProblemPlusJSONResponse) VisitAddDatabaseProxyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AddDatabaseProxy401ApplicationProblemPlusJSONResponse struct {
+	Error401ApplicationProblemPlusJSONResponse
+}
+
+func (response AddDatabaseProxy401ApplicationProblemPlusJSONResponse) VisitAddDatabaseProxyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AddDatabaseProxy403ApplicationProblemPlusJSONResponse struct {
+	Error403ApplicationProblemPlusJSONResponse
+}
+
+func (response AddDatabaseProxy403ApplicationProblemPlusJSONResponse) VisitAddDatabaseProxyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AddDatabaseProxy404ApplicationProblemPlusJSONResponse struct {
+	Error404ApplicationProblemPlusJSONResponse
+}
+
+func (response AddDatabaseProxy404ApplicationProblemPlusJSONResponse) VisitAddDatabaseProxyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AddDatabaseProxy405ApplicationProblemPlusJSONResponse struct {
+	Error405ApplicationProblemPlusJSONResponse
+}
+
+func (response AddDatabaseProxy405ApplicationProblemPlusJSONResponse) VisitAddDatabaseProxyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.Allow != nil {
+		w.Header().Set("Allow", fmt.Sprint(*response.Headers.Allow))
+	}
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(405)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AddDatabaseProxy406ApplicationProblemPlusJSONResponse struct {
+	Error406ApplicationProblemPlusJSONResponse
+}
+
+func (response AddDatabaseProxy406ApplicationProblemPlusJSONResponse) VisitAddDatabaseProxyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(406)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AddDatabaseProxy409ApplicationProblemPlusJSONResponse struct {
+	Error409ApplicationProblemPlusJSONResponse
+}
+
+func (response AddDatabaseProxy409ApplicationProblemPlusJSONResponse) VisitAddDatabaseProxyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AddDatabaseProxy412ApplicationProblemPlusJSONResponse struct {
+	Error412ApplicationProblemPlusJSONResponse
+}
+
+func (response AddDatabaseProxy412ApplicationProblemPlusJSONResponse) VisitAddDatabaseProxyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(412)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AddDatabaseProxy413ApplicationProblemPlusJSONResponse struct {
+	Error413ApplicationProblemPlusJSONResponse
+}
+
+func (response AddDatabaseProxy413ApplicationProblemPlusJSONResponse) VisitAddDatabaseProxyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(413)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AddDatabaseProxy415ApplicationProblemPlusJSONResponse struct {
+	Error415ApplicationProblemPlusJSONResponse
+}
+
+func (response AddDatabaseProxy415ApplicationProblemPlusJSONResponse) VisitAddDatabaseProxyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(415)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AddDatabaseProxy422ApplicationProblemPlusJSONResponse struct {
+	Error422ApplicationProblemPlusJSONResponse
+}
+
+func (response AddDatabaseProxy422ApplicationProblemPlusJSONResponse) VisitAddDatabaseProxyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AddDatabaseProxy428ApplicationProblemPlusJSONResponse struct {
+	Error428ApplicationProblemPlusJSONResponse
+}
+
+func (response AddDatabaseProxy428ApplicationProblemPlusJSONResponse) VisitAddDatabaseProxyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(428)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AddDatabaseProxy429ApplicationProblemPlusJSONResponse struct {
+	Error429ApplicationProblemPlusJSONResponse
+}
+
+func (response AddDatabaseProxy429ApplicationProblemPlusJSONResponse) VisitAddDatabaseProxyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.RetryAfter != nil {
+		w.Header().Set("Retry-After", fmt.Sprint(*response.Headers.RetryAfter))
+	}
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(429)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AddDatabaseProxy500ApplicationProblemPlusJSONResponse struct {
+	Error500ApplicationProblemPlusJSONResponse
+}
+
+func (response AddDatabaseProxy500ApplicationProblemPlusJSONResponse) VisitAddDatabaseProxyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AddDatabaseProxy503ApplicationProblemPlusJSONResponse struct {
+	Error503ApplicationProblemPlusJSONResponse
+}
+
+func (response AddDatabaseProxy503ApplicationProblemPlusJSONResponse) VisitAddDatabaseProxyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(503)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AddDatabaseProxy504ApplicationProblemPlusJSONResponse struct {
+	Error504ApplicationProblemPlusJSONResponse
+}
+
+func (response AddDatabaseProxy504ApplicationProblemPlusJSONResponse) VisitAddDatabaseProxyResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
@@ -42386,6 +44650,15 @@ type StrictServerInterface interface {
 	// CreateDatabaseCluster 登记数据库集群
 	// (POST /database-clusters)
 	CreateDatabaseCluster(ctx context.Context, request CreateDatabaseClusterRequestObject) (CreateDatabaseClusterResponseObject, error)
+	// PreviewDatabaseDeployment 预览数据库创建、接入或扩容
+	// (POST /database-clusters/deployment-previews)
+	PreviewDatabaseDeployment(ctx context.Context, request PreviewDatabaseDeploymentRequestObject) (PreviewDatabaseDeploymentResponseObject, error)
+	// CreateDatabaseDeployment 创建或接入数据库集群
+	// (POST /database-clusters/deployments)
+	CreateDatabaseDeployment(ctx context.Context, request CreateDatabaseDeploymentRequestObject) (CreateDatabaseDeploymentResponseObject, error)
+	// ScanDatabaseClusters 只读扫描现有数据库集群
+	// (POST /database-clusters/discovery)
+	ScanDatabaseClusters(ctx context.Context, request ScanDatabaseClustersRequestObject) (ScanDatabaseClustersResponseObject, error)
 	// GetDatabaseDefinition 读取数据库集群定义
 	// (GET /database-clusters/{id})
 	GetDatabaseDefinition(ctx context.Context, request GetDatabaseDefinitionRequestObject) (GetDatabaseDefinitionResponseObject, error)
@@ -42398,6 +44671,12 @@ type StrictServerInterface interface {
 	// ChangeDatabase 受理数据库变更
 	// (POST /database-clusters/{id}/changes)
 	ChangeDatabase(ctx context.Context, request ChangeDatabaseRequestObject) (ChangeDatabaseResponseObject, error)
+	// AddDatabaseMembers 添加数据库成员
+	// (POST /database-clusters/{id}/members/actions)
+	AddDatabaseMembers(ctx context.Context, request AddDatabaseMembersRequestObject) (AddDatabaseMembersResponseObject, error)
+	// AddDatabaseProxy 部署数据库代理
+	// (POST /database-clusters/{id}/proxies/actions)
+	AddDatabaseProxy(ctx context.Context, request AddDatabaseProxyRequestObject) (AddDatabaseProxyResponseObject, error)
 	// GetProxyRouting 读取代理策略及本机排序
 	// (GET /database-clusters/{id}/proxy-routing)
 	GetProxyRouting(ctx context.Context, request GetProxyRoutingRequestObject) (GetProxyRoutingResponseObject, error)
@@ -43096,6 +45375,105 @@ func (sh *strictHandler) CreateDatabaseCluster(w http.ResponseWriter, r *http.Re
 	}
 }
 
+// PreviewDatabaseDeployment operation middleware
+func (sh *strictHandler) PreviewDatabaseDeployment(w http.ResponseWriter, r *http.Request, params PreviewDatabaseDeploymentParams) {
+	var request PreviewDatabaseDeploymentRequestObject
+
+	request.Params = params
+
+	var body PreviewDatabaseDeploymentJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.PreviewDatabaseDeployment(ctx, request.(PreviewDatabaseDeploymentRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "PreviewDatabaseDeployment")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(PreviewDatabaseDeploymentResponseObject); ok {
+		if err := validResponse.VisitPreviewDatabaseDeploymentResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CreateDatabaseDeployment operation middleware
+func (sh *strictHandler) CreateDatabaseDeployment(w http.ResponseWriter, r *http.Request, params CreateDatabaseDeploymentParams) {
+	var request CreateDatabaseDeploymentRequestObject
+
+	request.Params = params
+
+	var body CreateDatabaseDeploymentJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CreateDatabaseDeployment(ctx, request.(CreateDatabaseDeploymentRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CreateDatabaseDeployment")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CreateDatabaseDeploymentResponseObject); ok {
+		if err := validResponse.VisitCreateDatabaseDeploymentResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ScanDatabaseClusters operation middleware
+func (sh *strictHandler) ScanDatabaseClusters(w http.ResponseWriter, r *http.Request, params ScanDatabaseClustersParams) {
+	var request ScanDatabaseClustersRequestObject
+
+	request.Params = params
+
+	var body ScanDatabaseClustersJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ScanDatabaseClusters(ctx, request.(ScanDatabaseClustersRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ScanDatabaseClusters")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ScanDatabaseClustersResponseObject); ok {
+		if err := validResponse.VisitScanDatabaseClustersResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // GetDatabaseDefinition operation middleware
 func (sh *strictHandler) GetDatabaseDefinition(w http.ResponseWriter, r *http.Request, id string) {
 	var request GetDatabaseDefinitionRequestObject
@@ -43209,6 +45587,74 @@ func (sh *strictHandler) ChangeDatabase(w http.ResponseWriter, r *http.Request, 
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(ChangeDatabaseResponseObject); ok {
 		if err := validResponse.VisitChangeDatabaseResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// AddDatabaseMembers operation middleware
+func (sh *strictHandler) AddDatabaseMembers(w http.ResponseWriter, r *http.Request, id string, params AddDatabaseMembersParams) {
+	var request AddDatabaseMembersRequestObject
+
+	request.Id = id
+	request.Params = params
+
+	var body AddDatabaseMembersJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.AddDatabaseMembers(ctx, request.(AddDatabaseMembersRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "AddDatabaseMembers")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(AddDatabaseMembersResponseObject); ok {
+		if err := validResponse.VisitAddDatabaseMembersResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// AddDatabaseProxy operation middleware
+func (sh *strictHandler) AddDatabaseProxy(w http.ResponseWriter, r *http.Request, id string, params AddDatabaseProxyParams) {
+	var request AddDatabaseProxyRequestObject
+
+	request.Id = id
+	request.Params = params
+
+	var body AddDatabaseProxyJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.AddDatabaseProxy(ctx, request.(AddDatabaseProxyRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "AddDatabaseProxy")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(AddDatabaseProxyResponseObject); ok {
+		if err := validResponse.VisitAddDatabaseProxyResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

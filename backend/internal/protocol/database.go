@@ -165,17 +165,18 @@ func (*DatabaseReadResult) Kind() Kind { return "database.read.result" }
 func (*DatabaseReadResult) isPayload() {}
 
 type DatabaseAction struct {
-	Routing      *ProxyRouteAction  `json:"routing,omitempty"`
-	Connection   DatabaseConnection `json:"connection"`
-	ClusterID    string             `json:"cluster_id"`
-	Kind         string             `json:"kind"`
-	Database     string             `json:"database,omitempty"`
-	Charset      string             `json:"charset,omitempty"`
-	User         string             `json:"user,omitempty"`
-	Host         string             `json:"host,omitempty"`
-	PasswordHash string             `json:"password_hash,omitempty"`
-	Privileges   []string           `json:"privileges,omitempty"`
-	Hostgroup    int                `json:"hostgroup,omitempty"`
+	Deployment   *DatabaseDeployment `json:"deployment,omitempty"`
+	Routing      *ProxyRouteAction   `json:"routing,omitempty"`
+	Connection   DatabaseConnection  `json:"connection"`
+	ClusterID    string              `json:"cluster_id"`
+	Kind         string              `json:"kind"`
+	Database     string              `json:"database,omitempty"`
+	Charset      string              `json:"charset,omitempty"`
+	User         string              `json:"user,omitempty"`
+	Host         string              `json:"host,omitempty"`
+	PasswordHash string              `json:"password_hash,omitempty"`
+	Privileges   []string            `json:"privileges,omitempty"`
+	Hostgroup    int                 `json:"hostgroup,omitempty"`
 }
 
 var databaseName = regexp.MustCompile(`^[A-Za-z0-9_][A-Za-z0-9_$-]{0,63}$`)
@@ -190,6 +191,9 @@ func SystemDatabaseUser(name string, c DatabaseConnection) bool {
 	return name == c.Username || slices.Contains(c.ProtectedUsers, name) || slices.Contains([]string{"root", "mysql", "mariadb.sys", "mysql.sys", "sst", "galera_sst", "galera_backup", "proxysql_monitor", "mysqld_exporter", "mysql_exporter"}, name)
 }
 func (a DatabaseAction) Validate() error {
+	if a.Kind == "deploy_database" && a.Deployment != nil {
+		return a.Deployment.Validate()
+	}
 	if e := a.Connection.Validate(); e != nil {
 		return e
 	}

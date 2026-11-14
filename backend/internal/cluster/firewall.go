@@ -18,12 +18,13 @@ import (
 )
 
 type FirewallWrite struct {
-	AdoptFingerprint string                   `json:"adopt_fingerprint,omitempty"`
-	InputDigest      string                   `json:"input_digest,omitempty"`
-	Actor            string                   `json:"actor,omitempty"`
-	ExpectedRevision uint64                   `json:"expected_revision"`
-	Change           *protocol.FirewallChange `json:"change,omitempty"`
-	Key              string                   `json:"key"`
+	AdoptFingerprint string                    `json:"adopt_fingerprint,omitempty"`
+	InputDigest      string                    `json:"input_digest,omitempty"`
+	Actor            string                    `json:"actor,omitempty"`
+	ExpectedRevision uint64                    `json:"expected_revision"`
+	Change           *protocol.FirewallChange  `json:"change,omitempty"`
+	Changes          []protocol.FirewallChange `json:"changes,omitempty"`
+	Key              string                    `json:"key"`
 	migration        bool
 }
 
@@ -158,7 +159,7 @@ func (n *Node) writeFirewall(ctx context.Context, origin string, request Firewal
 	}
 	target := protocol.FirewallTarget{Revision: state.Revision, Configuration: state.FirewallDefinition}
 	if request.AdoptFingerprint != "" {
-		if maintenance || request.Change != nil {
+		if maintenance || request.Change != nil || len(request.Changes) > 0 {
 			return out, fault("invalid_request", "接纳配置不能与规则修改同时执行")
 		}
 		preview, err := n.previewFirewallAdoption(ctx)
@@ -181,10 +182,19 @@ func (n *Node) writeFirewall(ctx context.Context, origin string, request Firewal
 		if request.migration && request.Key != trustMigrationKey(target) {
 			return out, fault("conflict", "互信目标已经改变")
 		}
-	} else if request.Change != nil {
-		target.Configuration, e = firewall.ChangeConfiguration(state.FirewallDefinition, *request.Change)
-		if e != nil {
-			return out, e
+	} else if request.Change != nil || len(request.Changes) > 0 {
+		changes := request.Changes
+		if request.Change != nil {
+			changes = append([]protocol.FirewallChange{*request.Change}, changes...)
+		}
+		if len(changes) > 1000 {
+			return out, fault("invalid_request", "防火墙变更过多")
+		}
+		for _, change := range changes {
+			target.Configuration, e = firewall.ChangeConfiguration(target.Configuration, change)
+			if e != nil {
+				return out, e
+			}
 		}
 		target.Revision++
 		state.FirewallDefinition = target.Configuration
