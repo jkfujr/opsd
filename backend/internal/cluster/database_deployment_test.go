@@ -20,6 +20,7 @@ type deploymentExecutor struct {
 	submits     int
 	seedUpdates int
 	lost        bool
+	failed      bool
 	waiting     bool
 	problems    []string
 	dockerState string
@@ -56,6 +57,11 @@ func (e *deploymentExecutor) Call(_ context.Context, p protocol.Payload) (protoc
 			record.State = protocol.Applying
 			record.Steps[0].State = "applying"
 		}
+		if e.failed {
+			record.State = protocol.AttentionRequired
+			record.Steps[0].State = "unknown"
+			record.Error = &protocol.Error{Code: "dependency_unavailable", Message: "数据同步中断"}
+		}
 		e.records[p.OperationID] = record
 		if e.lost {
 			e.lost = false
@@ -65,6 +71,17 @@ func (e *deploymentExecutor) Call(_ context.Context, p protocol.Payload) (protoc
 	case *protocol.OperationQuery:
 		record, found := e.records[p.OperationID]
 		return &protocol.OperationQueryResult{OperationID: p.OperationID, Found: found, Record: &record}, nil
+	case *protocol.OperationRecover:
+		record, found := e.records[p.OperationID]
+		if !found || record.Revision != p.ExpectedRevision {
+			return nil, errors.New("原部署步骤版本已经变化")
+		}
+		record.Revision++
+		record.State = protocol.Succeeded
+		record.Error = nil
+		record.Steps[0].State = "completed"
+		e.records[p.OperationID] = record
+		return &protocol.OperationUpdated{Record: record}, nil
 	case *protocol.DatabaseRead:
 		return &protocol.DatabaseReadResult{State: state}, nil
 	case *protocol.DockerRead:
@@ -327,7 +344,7 @@ func TestDatabaseDeploymentMultipleTargetsKeepsCompletedMember(t *testing.T) {
 	a, x := deploymentNode(t)
 	b, y := deploymentNode(t)
 	joinTest(t, b, a)
-	y.lost = true
+	y.failed = true
 	preview, err := a.PreviewDatabaseDeployment(t.Context(), DatabaseDeploymentInput{Mode: "create", Name: "多节点创建", Targets: []DatabaseDeploymentTargetInput{{NodeID: a.ID, Address: "192.0.2.10"}, {NodeID: b.ID, Address: "192.0.2.11"}}}, a.ID)
 	if err != nil || len(preview.Problems) > 0 {
 		t.Fatal(preview.Problems, err)
