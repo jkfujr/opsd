@@ -284,7 +284,7 @@ func deploymentFiles(d protocol.DatabaseDeployment) (map[string]string, error) {
 	}
 	files["database.cnf"] = fmt.Sprintf("[mariadb]\nport=%d\nbind-address=127.0.0.1,%s\nwsrep_on=ON\nwsrep_provider=/usr/lib/galera/libgalera_smm.so\nwsrep_cluster_name=%s\nwsrep_cluster_address=gcomm://%s\nwsrep_node_name=%s\nwsrep_node_address=%s\nwsrep_node_incoming_address=%s\nwsrep_sst_receive_address=%s\nwsrep_provider_options=\"%s\"\nwsrep_sst_method=%s\nwsrep_sst_auth=\"%s:%s\"\nbinlog_format=ROW\ninnodb_autoinc_lock_mode=2\ninnodb_buffer_pool_size=128M\nmax_connections=128\n", d.SQLPort, d.Address, d.ClusterName, strings.Join(d.Seeds, ","), d.ID, d.Address, net.JoinHostPort(d.Address, strconv.Itoa(d.SQLPort)), net.JoinHostPort(d.Address, strconv.Itoa(d.SSTPort)), strings.Join(options, ";"), d.SSTMethod, d.SSTUser, d.SSTPassword)
 	if len(d.TLS) > 0 {
-		files["database.cnf"] += "[sst]\nencrypt=3\ntca=/etc/opsd-database-tls/ca.pem\ntcert=/etc/opsd-database-tls/cert.pem\ntkey=/etc/opsd-database-tls/key.pem\n"
+		files["database.cnf"] += "[sst]\nencrypt=4\ntca=/etc/opsd-database-tls/ca.pem\ntcert=/etc/opsd-database-tls/cert.pem\ntkey=/etc/opsd-database-tls/key.pem\n"
 		for name, value := range d.TLS {
 			files["tls/"+name] = value
 		}

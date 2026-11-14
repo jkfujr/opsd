@@ -84,10 +84,20 @@ func TestDatabaseDeploymentNative(t *testing.T) {
 		t.Cleanup(func() {
 			name := "opsd-" + d.Kind + "-" + d.ID
 			if t.Failed() {
-				data, _ := exec.Command("docker", "logs", "--tail", "70", name).CombinedOutput()
+				data, _ := exec.Command("docker", "logs", "--tail", "180", name).CombinedOutput()
 				message := strings.ReplaceAll(string(data), d.Connection.Password, "[已隐藏]")
 				message = strings.ReplaceAll(message, d.SSTPassword, "[已隐藏]")
 				t.Log(message)
+				logs, _ := filepath.Glob(filepath.Join(d.Directory, "data", "*.log"))
+				for _, path := range logs {
+					data, _ := os.ReadFile(path)
+					if len(data) > 12000 {
+						data = data[len(data)-12000:]
+					}
+					message := strings.ReplaceAll(string(data), d.Connection.Password, "[已隐藏]")
+					message = strings.ReplaceAll(message, d.SSTPassword, "[已隐藏]")
+					t.Log(filepath.Base(path), message)
+				}
 			}
 			_ = exec.Command("docker", "rm", "-f", name).Run()
 		})
