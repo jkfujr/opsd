@@ -171,6 +171,8 @@ Compose 集合为 `/compose-projects`，详情位于 `/nodes/{node_id}/engines/{
 
 数据库定义位于 `/database-clusters`，配置详情与 `/{id}/status` 分类运行读取分开；`POST /{id}/changes` 提交业务变更，`/{id}/backups` 读取备份。连接凭据留在所属节点，Galera 变更执行一次，各代理保留独立持久结果。部分完成读取原操作后显式处理；其他待应用差异保留。系统及已登记服务账号继续受保护。
 
+数据库创建与接入要求管理员会话。`POST /database-clusters/discovery` 只读发现实例并按实际 Galera 身份归组，缺失凭据通过 `credentials` 按实例补充；扫描和预览均不登记实例。`POST /database-clusters/deployment-previews` 的 `mode` 为 `create/import/members/proxy`，返回环境、Docker 与防火墙变更、阻断原因及有效期。确认时将预览的 `coordinator/token/revision` 和原请求键提交到 `/database-clusters/deployments`、`/{id}/members/actions` 或 `/{id}/proxies/actions`，返回 `202 + Operation`。任务沿用原操作查询、排队取消和重新处理入口；已完成成员保留，版本或环境变化后重新预览。
+
 `GET /database-clusters/{id}/proxy-routing` 返回受管策略和各代理本机排序、应用状态及采集时间。`POST …/proxy-routing/previews` 发送 `expected_revision/enabled/automatic` 和可选 `backends`，首次从实际数据库地址与代理配置导入，返回完整策略、目标动作及差异；`POST …/proxy-routing/actions` 原样提交预览并附请求键。版本、连接配置或指纹变化时重新预览；未知应答查询原请求键和 Operation。首次接管要求全部有效成员支持 `proxy_routing_version=1`，代理所属节点可独立于数据库成员。
 
 `GET /nodes/{node_id}/firewall/adoption` 返回当前配置、版本和指纹；既有防火墙 actions 接口使用 `action=adopt_current`、`expected_revision` 和预览 `fingerprint` 接纳当前配置。操作重新读取现场后保存两端确认状态，预览后变化返回冲突。节点配置的只读 `network_error` 报告监听不匹配；需要更改监听的更新返回 `restart_required`。

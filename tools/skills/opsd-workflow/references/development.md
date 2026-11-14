@@ -57,6 +57,8 @@ UFW 互信只改写 OPSD 所属链与带标记的引用，`INPUT` 首条引用�
 
 后端 CI 设置 `OPSD_DATABASE_TEST=1` 启用三成员 Galera、两个 ProxySQL 和实际 Prometheus／Grafana，结果位于 `artifacts/database-result.json`。四逻辑 OPSD 节点和真实数据库容器运行在同一 CI 主机，其中一台仅管理代理；受管配置、应答丢失、事务保持、故障切换、代理重启与多写冲突复用该环境。生产页面检查创建令牌后的实际 JSON／指标请求与 Web/API 独立启停；数据库界面注入状态数据，数据库变更由后端真实集群检查。三模式受影响界面结果随 `theme-check` 保存，数据库结果位于 `database-check`。
 
+同一数据库检查还运行固定部署模板：从单成员起步扩为三个成员，验证 TLS 全量同步、已有业务库保留、启动地址持久化与首成员正常重启入群、ProxySQL 部署，输出 `artifacts/database-deployment-result.json`。Docker 缺失、已有安装及软件包失败由安装入口替身检查；只读扫描、原请求恢复及预览失效使用现有节点与执行器测试。部署失败先查看原操作和容器日志，保留目录与 bootstrap 标记。
+
 本批使用 GitHub Actions，流程见 [验收文档](../../../../docs/VALIDATION.md)。`npm run build` 包含接口生成、前端类型检查、构建与双架构程序编译；同提交成功产物直接用于发布。当前成功结果输入未变就复用。
 
 本批停止旧前端开发，CI 使用 `OPSD_API_TEST=1 go -C backend test ./internal/control -run '^TestProductionBackendAPI$'` 在实际安装程序上检查 HTTP、终端 WebSocket、任务取消和日志、容器更新与 Compose。结果为 `api-check`；`frontend/gpt2` 为默认业务与内置恢复界面，开发和检查入口见 [前端开发](../../../../frontend/README.md)，其他方案保留在 `frontend/variants`。以下旧界面流程仅在后续明确要求界面工作时使用。
