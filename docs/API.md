@@ -14,7 +14,7 @@ export OPSD_API_TOKEN='生成的令牌'
 curl -fsS "$OPSD_API_URL/" -H "Authorization: Bearer $OPSD_API_TOKEN"
 ```
 
-`GET /` 返回 API／程序／前端版本、入口节点 ID、当前调用身份、授权及文档地址。API 和网页共用 Web 地址，分别启停；两者均关闭时释放监听。成员通信、本机 Socket 和已受理操作独立继续。
+`GET /` 返回 API／程序／前端版本、构建提交与协议契约信息、入口节点 ID、当前调用身份、授权及文档地址。API 和网页共用 Web 地址，分别启停；两者均关闭时释放监听。成员通信、本机 Socket 和已受理操作独立继续。
 
 `/api/v2/docs` 提供 Swagger UI；完整规范 `/api/v2/openapi.json` 和业务接口要求有效会话或 Bearer。页面使用随程序分发的 `swagger-ui-dist@5.34.1`，关闭外部校验和持久授权。已有管理员会话自动使用同源 Cookie，写入自动附加 CSRF；也可在页面填写 Bearer 令牌。令牌保存在当前页面内存，刷新后重新填写。请求键与版本条件由调用者明确填写，文档不会自动换键重发。
 
@@ -34,7 +34,7 @@ curl -fsS "$OPSD_API_URL/" -H "Authorization: Bearer $OPSD_API_TOKEN"
 
 manage 包含 read。节点／地域权限按当前有效成员归属核验，数据库使用稳定集群 ID。`tasks.manage` 可以执行任意 root Shell，创建令牌时须明确选择，普通模板默认不包含。已有令牌保留原授权，新增模块不自动授予。
 
-账号、令牌管理、连接与实例登记、接入码、成员撤销、全局互信、主题和 root 终端要求管理员会话。每个操作的具体身份与权限声明在 OpenAPI 的 `security`、`x-opsd-access` 中；缺少规则默认拒绝。操作详情、日志和后续处置继承原操作模块及资源权限。
+账号、令牌管理、连接与实例登记、接入码、成员撤销、全局互信、OPSD 共享数据、主备管理节点、协调权转交、主题和 root 终端要求管理员会话。每个操作的具体身份与权限声明在 OpenAPI 的 `security`、`x-opsd-access` 中；缺少规则默认拒绝。操作详情、日志和后续处置继承原操作模块及资源权限。
 
 ### 管理员会话
 
@@ -87,7 +87,7 @@ GET 保持只读，可采集当前状态。配置与运行状态使用独立资�
 
 ### 条件更新
 
-可修改资源的 GET 返回强 `ETag`。更新或删除发送原 GET 的 `If-Match`；创建已知 ID 的定义发送 `If-None-Match: *`。ETag 是不透明配置标签，不能根据运行检查时间或本地递增数字自行拼接。
+节点等资源的 GET 返回强 `ETag`。更新或删除发送原 GET 的 `If-Match`；创建已知 ID 的定义发送 `If-None-Match: *`。ETag 是不透明配置标签，直接使用原响应值。
 
 下面先读取节点配置标签，再受理改名：
 
@@ -102,7 +102,7 @@ curl -fsS -X PATCH "$OPSD_API_URL/nodes/$OPSD_NODE_ID" \
   -H 'Idempotency-Key: rename-20261110-1' --data '{"name":"东京节点"}'
 ```
 
-条件在所属节点核验。异步受理固定预期版本，执行时再次核对；受理后发生冲突写入原操作，不改变此前 202 的含义。`/actions`、`/changes` 使用请求模型中的 `expected_revision` 指向操作对象，资源 CRUD 使用 HTTP 条件头。
+条件在所属节点核验。异步受理固定预期版本，执行时再次核对；受理后发生冲突写入原操作，不改变此前 202 的含义。`/actions`、`/changes` 和协调权转交使用请求模型中的 `expected_revision`，`/shared-storage/consoles` 使用正文中的 `revision`；其余资源 CRUD 使用 HTTP 条件头。
 
 ## 分页与部分结果
 
@@ -120,7 +120,7 @@ curl -fsS --get "$OPSD_API_URL/operations" \
 
 只有存在 `next_cursor` 才继续。后续页保持路径、筛选、页大小和身份不变。游标绑定查询与授权范围；令牌版本或地域范围变化后重新查询。跨节点游标仅推进已返回项目，不可用节点保留位置。部分失败时有效数据与 `read`／`unavailable` 一并返回；没有可用结果且无法完成请求返回 503。读取缓存、离线历史和待同步结果以各响应的状态及时间区分。
 
-规则数组等有业务顺序的完整定义不分页。监控历史继续按时间范围和点数限制：最近七天，`node_ids`、`from`／`to`、`group_by=node` 或 `range=24h|7d`；CouchDB 故障返回 503。当前监控的缺值保留为空，汇总只计算有效读数。
+规则数组等有业务顺序的完整定义不分页。监控历史继续按时间范围和点数限制：最近七天，`node_ids`、`from`／`to`、`group_by=node` 或 `range=24h|7d`；历史存储不可用时返回 503。当前监控的缺值保留为空，汇总只计算有效读数。
 
 ## 幂等、异步操作与未知结果
 

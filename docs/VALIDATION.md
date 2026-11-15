@@ -2,7 +2,17 @@
 
 ## 命令与渠道
 
-本批使用 GitHub Actions CI，从仓库根目录运行：
+本批先在本机独立 WSL 2 发行版 `OPSD-CI` 完成验收，通过后再提交。发行版安装在 `F:\VM\WSL\OPSD-CI`，系统为 Ubuntu 24.04；启用 systemd，安装 Go 1.26.2、Node.js 24.14.1、Docker、Compose、nftables、iptables、firewalld、UFW 与中文字体，`ci` 用户可使用 Docker 和免密 sudo。Go 下载使用 `https://goproxy.cn,direct`，Docker Hub 使用 `https://docker.m.daocloud.io` 镜像。GitHub Actions 的 push、PR 和手动触发保持原值。
+
+从仓库根目录执行：
+
+```powershell
+pwsh -NoProfile -File scripts/check-wsl.ps1
+```
+
+入口同步当前工作区到 WSL 的 `/home/ci/opsd`，在 Linux 文件系统构建，保留依赖缓存；产物和日志复制到本机被忽略的 `artifacts/wsl-ci/`。安装验收会修改独立发行版内的 OPSD 服务与防火墙，每次重建验收节点及执行器数据，脚本校验发行版名称。需要重跑失败阶段时使用 `-Stage build|shared|backend|firewall|themes|api`；成功且输入未变的阶段直接复用。
+
+本地与 GitHub Actions 使用相同的项目构建及验收命令，Linux 手动构建入口为：
 
 ```bash
 npm ci
@@ -14,6 +24,13 @@ OPSD_DOCKER_TEST=1 OPSD_DATABASE_TEST=1 npm test
 构建包含接口生成、前端类型检查与生产构建、Linux amd64／arm64 编译。CI 使用 busybox:1.37.0 验证真实容器启停、重启与 TTY／非 TTY 日志，校对生成类型、严格适配、授权与能力定义、版本和安装脚本语法，在隔离网络空间执行原生互信规则的新连接验收，再安装生产程序，通过 v2 HTTP／WebSocket API 检查任务及 Compose 的 Bearer 授权、任务执行和取消、日志分页、容器更新、Compose 操作及 root 终端释放；结果输出为 `api-check` 工件。
 
 数据库检查启动三成员 MariaDB Galera、两个 ProxySQL、Prometheus 与 Grafana，覆盖业务库、账号、代理实际登录、权限、部分恢复、受管排序、活动事务、故障切换、重启及多写冲突，结果输出为 `database-check` 工件。固定部署模板另覆盖单成员创建、扩为三成员、TLS 全量同步、已有数据保留、首成员重启入群及代理部署，结果为 `database-deployment-result.json`。四逻辑 OPSD 节点在同一 CI 主机运行，其中一台仅管理代理；Docker 缺失安装、已有安装和安装失败使用命令替身；协调节点及执行器恢复使用持久数据库重新打开检查。
+
+共享迁移专项另启动三个运行节点，复用两个本机代理并自动安装第三个代理；新成员单独检查引导节点停止后的接入资料获取。覆盖迁移、共享策略、地址补传、原请求与步骤复用、协调接管、代理恢复和账号撤销，结果输出为 `shared-storage-result.json`。Linux 手动复现从仓库根目录执行：
+
+```bash
+go -C backend test -c -o ../artifacts/shared-storage.test ./internal/control
+(cd backend/internal/control && sudo env OPSD_DATABASE_TEST=1 ../../../artifacts/shared-storage.test -test.run '^TestSharedStorageNativeMigrationAndRecovery$' -test.v -test.timeout=8m)
+```
 
 ```bash
 go -C backend test -c -o ../artifacts/firewall-native.test ./internal/firewall
@@ -34,36 +51,20 @@ go -C backend test ./internal/control -run '^TestConsoleThemeBrowser$' -v -count
 
 ## 最近结果
 
-2026-11-15；源码与四节点生产程序提交：`955f7e5cfe9e650caf2bd4e3901f6ae541391d08`。环境：Windows PowerShell、Go、Python 3、GitHub Actions Ubuntu 24.04，以及 C001／C041／C052／C091 Linux amd64；此前清理、校时、改名与凭据证据继续复用；覆盖项：两种锁入口的错误分类、RPC 应答、节点终止与恢复、四节点更新及 API／数据库／代理读回。
+2026-11-16；源码：基于 `223aef0` 的工作区，验证后通信修复提交为 `79db0cc`。环境：Windows PowerShell、WSL 2.6.3 的独立 `OPSD-CI`、Ubuntu 24.04.5、Go 1.26.2、Node.js 24.14.1、Docker 29.1.3、systemd，Linux amd64。全部检查在本机执行，GitHub CI 触发配置保留。
 
-```powershell
-go -C backend test ./internal/executor ./internal/cluster -count=1
-go -C backend test ./internal/cluster ./internal/executor ./internal/dockerengine ./internal/protocol ./internal/databaseengine ./internal/operations -count=1
-py -B -m unittest discover -s tools/skills/opsd-workflow/scripts -p test_container_names.py -v
-```
+接口生成一致性、前端类型检查与生产构建、Linux amd64／arm64 编译、版本和安装脚本语法通过。公网观测限制修复后只重编译受影响的双架构后端，前端成功结果复用此前结果。完整后端通过，包含双向满载查询、已确认握手的重复连接、二十节点连接总数、三条公网主备观测的加入目录，以及真实 Docker、三成员 Galera、双 ProxySQL、Prometheus／Grafana、单成员创建和扩为三成员、TLS 同步、业务数据保留与代理重启恢复。
 
-本批两包测试及六个后端包回归通过。执行器覆盖 `OperationLock`／`TaskLock` 的直接繁忙、包装繁忙和普通错误，以及 RPC 错误码和消息、未持久化、未启动与任务 ID；节点覆盖 `dependency_unavailable` 保留消息并以 `finished/terminal=1` 终止，后续调度与重新打开数据库保持结果。既有首次繁忙后原 ID 执行一次、传输错误封存、明确拒绝保留原码和恢复用例通过；扫描覆盖运行、停止、移除、已有登记、非容器、错误凭据和扫描后停止拒绝接入。容器命名工具两个用例复用此前结果，覆盖完整 ID、旧名迁移、重复执行、回退、凭据保留、名称冲突和手工接入排除。
+共享迁移专项通过：三个运行节点与一个新加入成员、两个复用代理及一个自动安装代理，覆盖原 ID 与回执、共享策略、地址补传、引导节点停止后的接入资料、协调转交、已受理步骤复用、代理独立恢复、精确库权限及账号撤销。4／10／40 个全新代理节点的每后端连接预算为 24／60／240，管理连接另计，复用代理保留现场限制。
 
-源码提交 `955f7e5` 的 [CI 43709156533](https://github.com/jkfujr/opsd/actions/runs/43709156533) 全部通过：接口生成一致性、前端类型与生产构建、Linux amd64／arm64 编译、完整后端及真实数据库与 Docker、原生互信新连接、主题与内置恢复、CI 环境实际安装及生产 API／root 执行器验收。
+原生网络检查通过 UFW、nftables、iptables 的双栈新连接与互信恢复。React／Vue 整包主题、默认内置及内置恢复三模式交互通过，包含共享库原请求查询、主备入口、代理状态、协调权转交及窄屏；三模式窄屏截图的人工视觉检查复用此前结果，界面源码保持原值。
 
-本次复用该 CI 的 `opsd-linux` 工件（ID `14160221334`），按 C052 → C091 → C041 → C001 更新。每台停服前及停服后确认队列空闲，再替换程序并恢复两个服务；最终八个服务 active，节点及执行器队列均为 0，四节点文件及运行中程序的 SHA-256 均为 `8cdebc26193a8e685831ddc95c954f3d689c7ec40fa94269bdf8c1f79255dab3`。节点配置、实例路径、数据目录及现有容器的完整 ID、名称、状态和挂载保留。C052 首次检查遇到 Docker `Mounts` 数组顺序变化，按挂载目标核对后内容一致，已通过只读读回确认更新结果，程序更新只执行一次。
+实际安装与 API 检查通过：默认父目录 `0755`，节点与执行器私有目录 `0700`；下载和版本失败路径、停止服务后改网络、重复安装保留账号、HTTP／WebSocket、任务幂等与取消、日志、容器更新、Compose 和 root 终端释放。安装阶段重建验收实例后再次通过，下一轮使用新的验收身份和请求回执；结束时停止本地验收服务。
 
-最终 Galera 四成员均 Primary／Ready／Synced、集群大小为 4；管理员登录及 API 读取通过，四节点 connected，四成员的读取状态和两个代理均为 `ready`。C052／C041 本机代理读回均为 `PendingChanges=false`，排序仍以本机为首。证据位于 [deployment-result.json](../artifacts/deploy-lock-errors-20261115/deployment-result.json)，同目录保存 CI 工件来源、逐节点更新与最终读取、代理路由及 `api-final.json`。
+结果位于 `artifacts/wsl-ci/`：`local-ci/` 保存各阶段日志，`shared-storage-result.json`、`database-result.json`、`database-deployment-result.json`、`theme-ui/result.json`、`frontend/gpt2/integration*/` 和 `api/result.json` 保存对应结果与截图。构建产物为同目录的双架构程序和 `install.sh`。
 
-此前程序 `87448c7` 复用此前 [CI 43690361179](https://github.com/jkfujr/opsd/actions/runs/43690361179) 成功结果：接口生成一致性、前端类型与生产构建、Linux amd64／arm64 编译、完整后端、真实数据库与 Docker、原生互信新连接、主题与内置恢复、实际安装及生产 API。真实部署测试覆盖新旧容器名识别、单成员创建、扩为三成员、TLS 同步、业务库保留、首成员重启和代理部署。OpenAPI 与表结构保持原值。
+现有备份审查复用此前结果：C091 小时任务只备份 `Openlist`，每日任务采用全量物理备份；检查时两任务的最近结果均为退出码 1。原始结果保留在 `artifacts/shared-storage-20261116/existing-backup-scope.json` 和 `existing-backup-detail.json`。本批生产切换与线上 `opsd_core` 初始化尚未执行。
 
-复用此前 `87448c7` 部署结果：工件按 C052 → C091 → C041 → C001 原位更新。每台停服前及停服后确认节点、执行器均无未结束操作；启动后核对版本、服务、运行工件及 Galera 同步。最终八个服务 active，四成员均 Primary／Ready／Synced、集群大小为 4，节点及执行器队列均为 0；实例路径、节点配置及数据目录保留。amd64 工件与实际运行文件 SHA-256 均为 `7e51db99764e731af5b7cf324e412635a4adb13ee145edcdda627a5ef3e7f25c`。C091 中断续传后的校验不符在停服前被拒绝，完整重传校验通过后继续部署。
-
-C052 此前清理前核对旧容器 `125109d193b27ceea1555f99e3ba719b02b80b7aafbeaf39b71e3ce60498fed0` 的名称、停止状态及挂载。停服窗口 checkpoint 为 `[0,0,0]`，备份为 `/var/lib/opsd/executor/maintenance/87448c738db456c066b2bba4d5b59283cba888c7/node-before-cleanup.db`；普通 `docker rm` 后 inspect 返回退出码 1、`No such object`。事务删除孤立登记后，启动按该 ID 读回 `managed_database_instances` 与 `managed_database_versions`，计数均为 0；清理前后队列历史均为 5 条，原排序操作仍可通过 API 查询为 `rejected/not_accepted`。现用容器 `09320cd39762e2a1cf86ba390a41d44239e379b633194660a207b8fe702b8b34`、共享数据和配置目录保留。集群引用采用删除后只读核对无引用及扫描 4 成员结果：`2026-11-15T10:17:45.851114+00:00` 查询 `managed_database_clusters.body`、`proxy_routing_state`、`database_workflows`，旧 ID 匹配数均为 0，instances／versions 计数均为 0；匹配条件及复用的扫描结果见 [cleanup-references.json](../artifacts/optimization-20261115/cleanup-references.json)。
-
-复用此前校时结果：C041／C091 安装前 mask chrony／chronyd 阻止自启，移除活动 `makestep` 后启用渐进校时，保留发行版时间源和 Asia/Shanghai。两台均通过 `chronyc waitsync 120 0.1`，tracking System time 分别为 0.000154818／0.000082103 秒。已建立 SSH 通道的三次时间交换取最小往返时间估计，与 C001 的偏差分别为 -0.045972／+0.011731 秒；当时已有可用源，未触发备用源。最后连续三轮健康读取中，四节点服务与读取状态均为 `ready`，来源采集时间持续更新。
-
-复用此前排序和扫描结果：C052 使用原代理路由预览及提交恢复排序，`Enabled/Automatic/Backends` 保留。四个 30 秒周期均为 `ready`、本机第一、`PendingChanges=false`，配置指纹保持一致；顺序为 C052 → C091 → C001 → C041。线上扫描为一集群、四成员、双代理，`unresolved=0`、`problems=0`，旧容器 ID 消失。
-
-复用此前改名结果：节点验证通过后，最后将 C091 自用 CouchDB 改为 `opsd-data-couchdb-e62e7ae0a45b302748c7f16a65b5b623`，完整 ID 仍为 `440bf25ce1ff0462dc155417d7a14b83bb29e6d63d567e6a778a0a70066e2f90`。`couchdb.json` 保存 `storage_id/full_id/old/new`，挂载、启动时间保留。凭据验收采用当前哈希及健康检查：[C091-couchdb.json](../artifacts/optimization-20261115/C091-couchdb.json) 的 `current_verification` 保存 `2026-11-15T10:17:47.883085+00:00` 采集的 credentials／cookie SHA-256、输入编码和 `/_up=ok`；改名前哈希未留存，无法回溯。原 `credentials_preserved` 保留为当时脚本报告。现有手工接入 MariaDB／ProxySQL 保留原名。
-
-结果位于 `artifacts/optimization-20261115/`：`production-result.json` 汇总此前部署结果，`C052-update.json` 保存原清理证据，`cleanup-references.json` 补充删除后只读引用核对，`C091-couchdb.json` 保存实际改名读回及当前凭据哈希；`C041-chrony.log`／`C091-chrony.log`、`clock-comparison.json`、`routing-four-rounds.json`、`scan-final.json` 和 `health-rounds.json` 保存此前对应原始结果。证据文件沿用 artifacts 的本地忽略规则。
-
-已验证：本批两包测试、六包回归及完整 CI（复用此前结果），`955f7e5` 四节点程序与运行文件、服务及队列、配置和容器保留、四成员同步、管理员 API 及两代理状态；此前清理、改名、校时、路由四周期、扫描、连续健康读取和当前凭据哈希复用此前结果。未验证：全新 CouchDB 初始化、生产程序回退演练、arm64 实机及整机重启；本批未公开发布安装包。
+已验证：本地构建、完整后端、真实数据库与共享迁移、原生互信新连接、三模式浏览器、实际安装及 API，重复执行安装验收。未验证：生产切换与真实跨地域故障接续、生产备份恢复、arm64 实机及整机重启；本批未推送新提交、未公开发布安装包。
 
 历史结果见 [变更记录](../CHANGELOG.md)。

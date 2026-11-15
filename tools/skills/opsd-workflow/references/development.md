@@ -59,7 +59,7 @@ UFW 互信只改写 OPSD 所属链与带标记的引用，`INPUT` 首条引用�
 
 同一数据库检查还运行固定部署模板：从单成员起步扩为三个成员，验证 TLS 全量同步、已有业务库保留、启动地址持久化与首成员正常重启入群、ProxySQL 部署，输出 `artifacts/database-deployment-result.json`。Docker 缺失、已有安装及软件包失败由安装入口替身检查；只读扫描、原请求恢复及预览失效使用现有节点与执行器测试。部署失败先查看原操作和容器日志，保留目录与 bootstrap 标记。
 
-本批使用 GitHub Actions，流程见 [验收文档](../../../../docs/VALIDATION.md)。`npm run build` 包含接口生成、前端类型检查、构建与双架构程序编译；同提交成功产物直接用于发布。当前成功结果输入未变就复用。
+本批先使用独立 WSL 发行版完成本地 CI，通过后再提交，入口和分阶段重跑命令见 [验收文档](../../../../docs/VALIDATION.md)；GitHub Actions 触发方式保留。`npm run build` 包含接口生成、前端类型检查、构建与双架构程序编译；当前成功结果输入未变就复用，已授权发布仍按发布流程执行。
 
 本批停止旧前端开发，CI 使用 `OPSD_API_TEST=1 go -C backend test ./internal/control -run '^TestProductionBackendAPI$'` 在实际安装程序上检查 HTTP、终端 WebSocket、任务取消和日志、容器更新与 Compose。结果为 `api-check`；`frontend/gpt2` 为默认业务与内置恢复界面，开发和检查入口见 [前端开发](../../../../frontend/README.md)，其他方案保留在 `frontend/variants`。以下旧界面流程仅在后续明确要求界面工作时使用。
 
@@ -76,4 +76,4 @@ UFW 互信只改写 OPSD 所属链与带标记的引用，`INPUT` 首条引用�
 
 `dockerengine` 负责实际 Compose 标签与目录核对、CLI 和镜像更新；执行和恢复状态留在 `operations`。更新先拉取再停止、保留原配置与卷；已发送步骤应答未知时只读回。Compose 配置编辑继续使用 SSH，不添加另一套编辑状态。
 
-同时拨号选择稳定连接时，原连接先保留已发送请求与应答；空闲后释放，两类连接共同受三十二条上限约束。节点关闭同时释放当前与待释放连接。
+修改同时拨号与连接选择时，按 [架构中的连接回收契约](../../../../docs/ARCHITECTURE.md) 保留完成握手的重复连接及已发送请求，并核对当前与待释放连接的总数。
