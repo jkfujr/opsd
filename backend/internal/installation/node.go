@@ -146,6 +146,12 @@ func InstallNode(ctx context.Context, o NodeInstall) (bool, error) {
 }
 func activateNode(ctx context.Context, f NodeFile, configPath string) error {
 	var e error
+	if filepath.Dir(f.DataDir) == "/var/lib/opsd" {
+		// 代理先准备目录时，父目录可能只有 root 能进入。
+		if e = os.Chmod("/var/lib/opsd", 0755); e != nil {
+			return e
+		}
+	}
 	units := Units(f, configPath)
 	for name, body := range units {
 		if e = os.WriteFile(filepath.Join("/etc/systemd/system", name), []byte(body), 0644); e != nil {

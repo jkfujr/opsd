@@ -60,6 +60,7 @@ jobs:
           OPSD_THEME_UI=1 go -C backend test ./internal/control -run '^TestConsoleThemeBrowser$' -v -count=1 -timeout=8m
       - name: 安装生产程序并准备 API 验收
         run: |
+          trap 'result=$?; sudo journalctl --no-pager -n 80 -u opsd.service -u opsd-executor.service -u opsd-recover.service; exit "$result"' ERR
           chmod +x artifacts/opsd-linux-amd64
           sudo sh scripts/check-installer.sh
           sudo systemctl stop firewalld.service nftables.service || true
@@ -69,7 +70,11 @@ jobs:
           password=$(openssl rand -hex 24)
           echo "::add-mask::$password"
           echo "OPSD_API_PASSWORD=$password" >> "$GITHUB_ENV"
+          sudo chmod 0700 /var/lib/opsd
           sudo env OPSD_PASSWORD="$password" artifacts/opsd-linux-amd64 install --non-interactive --address http://127.0.0.1:8444 -n api-check --username api-check --entrance /signin > artifacts/install-check.log
+          test "$(stat -c %a /var/lib/opsd)" = 755
+          test "$(sudo stat -c %a /var/lib/opsd/node)" = 700
+          test "$(sudo stat -c %a /var/lib/opsd/executor)" = 700
           if sudo /opt/opsd/bin/opsd network --listen 127.0.0.1:8444 > artifacts/network-running.log 2>&1; then exit 1; fi
           grep -q '请先停止 opsd.service' artifacts/network-running.log
           sudo systemctl stop opsd.service opsd-executor.service
