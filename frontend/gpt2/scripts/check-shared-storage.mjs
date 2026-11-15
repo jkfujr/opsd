@@ -33,7 +33,16 @@ export async function checkSharedStorage({ page, go, step, capture, closeDrawers
       }
       return route.fulfill({ json: { local: status(), nodes: [{ node_id: id, name: '本机代理节点', status: status() }] } });
     });
-    const choose = async (label, value) => { await page.getByLabel(label, { exact: true }).click(); await page.getByRole('option', { name: value, exact: true }).click(); };
+    const choose = async (label, value) => {
+      const trigger = page.getByLabel(label, { exact: true });
+      await trigger.click();
+      await page.getByRole('listbox').waitFor();
+      const controls = await trigger.getAttribute('aria-controls');
+      assert(controls);
+      const popup = page.locator(`[id="${controls}"]`);
+      await popup.getByRole('option', { name: value, exact: true }).click();
+      await popup.waitFor({ state: 'hidden' });
+    };
     try {
       await go('/databases');
       await choose('Galera 集群', '业务 Galera');
