@@ -3,6 +3,7 @@ package installation
 import (
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -46,7 +47,7 @@ func TestNodeNameAndRegionKeepExistingConfiguration(t *testing.T) {
 			t.Fatal(err)
 		}
 		after, err := n.Config(t.Context())
-		if err != nil || after != config || n.ID != id {
+		if err != nil || !reflect.DeepEqual(after, config) || n.ID != id {
 			t.Fatal("重新打开覆盖了现有配置或身份", after, err)
 		}
 		n.Close()
