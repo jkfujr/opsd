@@ -4,7 +4,7 @@
 
 先确认用户已授权本次目标实例更新。`npm run build` 依次生成接口、构建 `frontend/gpt2`、写入 `backend/internal/webassets/artifacts/version.txt`、将资源嵌入 Go，并产生 `artifacts/opsd-linux-amd64` 和 `artifacts/opsd-linux-arm64`；使用目标架构的完整工件，不修改二进制中的资源字符串。无需在服务器安装 Node.js 或编译。
 
-从实际实例配置读取 `binary`、`data_dir`、`executor_dir` 等路径，不把默认路径当成现场事实。检查节点队列和 root 操作中 `terminal=0` 的记录；有未结束操作时停止更新。普通用户与 root 服务使用同一程序，停止和恢复两者，不触碰 CouchDB 或其他服务。
+从实际实例配置读取 `binary`、`data_dir`、`executor_dir` 等路径，不把默认路径当成现场事实。检查节点队列和 root 操作中 `terminal=0` 的记录；有未结束操作时停止更新。普通用户与 root 服务使用同一程序，程序更新只停止和恢复两者。已授权的 CouchDB 命名迁移按下节单独执行。
 
 受管代理策略会进入签名目录。逐台更新全部有效成员后，再通过能力接口确认 `proxy_routing_version=1`，最后逐台预览并接管代理。节点程序更新与实际监听修复、防火墙接纳、代理策略应用分别读取结果；C041 使用既有停服 `network` 流程，C071 只从已预览的受管代理路由移除，服务器与数据库保持原值。
 
@@ -25,7 +25,7 @@ py tools/skills/opsd-workflow/scripts/opsd_remote.py upload --host root@服务�
 py tools/skills/opsd-workflow/scripts/opsd_remote.py update --host root@服务器 --identity F:/keys/服务器 --config /etc/opsd/instance.json --candidate /opt/opsd/bin/opsd.next
 ```
 
-upload 先读取候选路径，首次使用 SFTP `put` 创建文件，已有普通文件使用 `reput` 续传，不碰正在运行的程序。只对同一来源工件和已确定归属的候选路径续传；工件变化时使用新的候选路径。传输失败不自动重发，读取错误后再决定是否续传。
+upload 先读取候选路径，首次使用 SFTP `put` 创建文件，已有普通文件使用 `reput` 续传，不碰正在运行的程序。只对同一来源工件和已确定归属的候选路径续传；工件变化时使用新的候选路径。传输失败不自动重发，读取错误后再决定是否续传。中断续传结束后核对完整候选文件与 CI 工件一致；校验不符时保持当前程序，完整重传候选文件。
 
 update 在停服前及停服后检查未结束操作，设置候选文件可执行权限并读取版本，再原位替换程序，最后恢复 `opsd-executor.service` 和 `opsd.service` 并读回运行状态。不重新安装，不覆盖配置、身份、账号或数据库。
 
