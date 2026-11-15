@@ -78,7 +78,7 @@ func (n *Node) databaseCandidates(ctx context.Context) ([]protocol.DatabaseCandi
 			items[index].Name = instance.Name
 			items[index].Connection = connection
 		} else {
-			items = append(items, protocol.DatabaseCandidate{ID: id, Name: instance.Name, Connection: connection, ContainerID: instance.ContainerID, Running: instance.Running})
+			items = append(items, protocol.DatabaseCandidate{ID: id, Name: instance.Name, Connection: connection, ContainerID: instance.ContainerID, Running: instance.Running && instance.ContainerID == ""})
 		}
 	}
 	return items, nil
@@ -100,6 +100,10 @@ func (n *Node) inspectDatabaseCandidate(ctx context.Context, candidate protocol.
 		i.Revision = old.Revision
 	}
 	out := DatabaseScanItem{Instance: i}
+	if i.ContainerID != "" && !i.Running {
+		out.Status = protocol.DatabaseState{State: "unavailable", CheckedAt: n.Now().UTC(), Error: &protocol.Error{Code: "dependency_unavailable", Message: "数据库容器未运行或已移除，请恢复实例后重新扫描"}}
+		return out, c
+	}
 	scope := "health"
 	if c.Kind == "proxysql" {
 		scope = "proxies"

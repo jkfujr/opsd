@@ -14,17 +14,19 @@ import (
 )
 
 type deploymentExecutor struct {
-	mu          sync.Mutex
-	d           protocol.DatabaseDeployment
-	records     map[string]protocol.OperationRecord
-	submits     int
-	seedUpdates int
-	lost        bool
-	failed      bool
-	waiting     bool
-	problems    []string
-	dockerState string
-	unhealthy   bool
+	mu            sync.Mutex
+	d             protocol.DatabaseDeployment
+	records       map[string]protocol.OperationRecord
+	submits       int
+	seedUpdates   int
+	lost          bool
+	failed        bool
+	waiting       bool
+	problems      []string
+	dockerState   string
+	unhealthy     bool
+	candidates    []protocol.DatabaseCandidate
+	databaseReads int
 }
 
 func (*deploymentExecutor) Storage(context.Context, StorageConfig) (Credentials, error) {
@@ -83,12 +85,16 @@ func (e *deploymentExecutor) Call(_ context.Context, p protocol.Payload) (protoc
 		e.records[p.OperationID] = record
 		return &protocol.OperationUpdated{Record: record}, nil
 	case *protocol.DatabaseRead:
+		e.databaseReads++
 		return &protocol.DatabaseReadResult{State: state}, nil
 	case *protocol.DockerRead:
 		return &protocol.DockerReadResult{State: protocol.DockerState{State: "ready", Containers: []protocol.ContainerSummary{{Name: "opsd-galera-" + e.d.ID, ContainerRef: protocol.ContainerRef{EngineID: "engine", ContainerID: strings.Repeat("a", 64)}}}}}, nil
 	case *protocol.DatabaseDeploymentProfileRead:
 		return &protocol.DatabaseDeploymentProfile{Deployment: e.d, State: state, DataBytes: 1 << 20, Problems: []string{}, Managed: e.d.ID != "", ContainerID: strings.Repeat("a", 64)}, nil
 	case *protocol.DatabaseDiscovery:
+		if e.candidates != nil {
+			return &protocol.DatabaseDiscovered{Instances: append([]protocol.DatabaseCandidate{}, e.candidates...)}, nil
+		}
 		return &protocol.DatabaseDiscovered{Instances: []protocol.DatabaseCandidate{{ID: "legacy", Name: "已有 MariaDB", Running: true, Connection: protocol.DatabaseConnection{Kind: "galera", Address: "127.0.0.1:3306", Username: "root", Password: "private-secret"}}}}, nil
 	}
 	return nil, fmt.Errorf("未处理的数据库检查消息：%T", p)
@@ -229,6 +235,38 @@ func TestDatabaseDeploymentDiscoveryIsReadOnlyAndImportIsRepeatable(t *testing.T
 	p, err = n.PreviewDatabaseDeployment(t.Context(), input, n.ID)
 	if err == nil && len(p.Problems) == 0 {
 		t.Fatal("接受了不同 Galera 身份")
+	}
+}
+
+func TestDatabaseDeploymentDiscoveryRejectsStoppedAndMissingContainers(t *testing.T) {
+	n, e := deploymentNode(t)
+	connection := protocol.DatabaseConnection{Kind: "galera", Address: "127.0.0.1:3306", Username: "root", Password: "private-secret"}
+	e.candidates = []protocol.DatabaseCandidate{
+		{ID: "running", Name: "当前实例", ContainerID: strings.Repeat("a", 64), Running: true, Connection: connection},
+		{ID: "stopped", Name: "旧实例", ContainerID: strings.Repeat("b", 64), Connection: connection},
+		{ID: "stopped-proxy", Name: "旧代理", ContainerID: strings.Repeat("c", 64), Connection: protocol.DatabaseConnection{Kind: "proxysql", Address: "127.0.0.1:6032", Username: "admin"}},
+	}
+	for id, container := range map[string]string{"stopped-saved": strings.Repeat("b", 64), "removed": strings.Repeat("d", 64)} {
+		_, err := n.saveDatabaseInstance(t.Context(), DatabaseInstanceInput{DatabaseInstance: DatabaseInstance{ID: id, Name: id, Kind: "galera", Address: connection.Address, Username: connection.Username, ContainerID: container, Running: true}, Password: &connection.Password})
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	scan, err := n.ScanDatabases(t.Context(), DatabaseScanInput{Nodes: []string{n.ID}})
+	if err != nil || len(scan.Groups) != 1 || len(scan.Groups[0].Members) != 1 || len(scan.Groups[0].Proxies) != 0 || len(scan.Unresolved) != 3 || e.databaseReads != 1 {
+		t.Fatal("停止或已移除容器读取了当前实例", scan, e.databaseReads, err)
+	}
+	for _, item := range scan.Unresolved {
+		if item.Instance.Running || item.Status.Error == nil || item.Status.ClusterID != "" {
+			t.Fatal("旧容器被视为可接入实例", item)
+		}
+		if _, err := n.inspectDiscoveredDatabase(t.Context(), DatabaseInstanceInput{DatabaseInstance: item.Instance}, true, "test-galera"); err == nil {
+			t.Fatal("停止或已移除容器允许登记", item.Instance.ID)
+		}
+	}
+	var count int
+	if err := n.DB.QueryRow("SELECT count(*) FROM managed_database_instances").Scan(&count); err != nil || count != 2 || e.databaseReads != 1 {
+		t.Fatal("拒绝接入后仍读取或保存了实例", count, e.databaseReads, err)
 	}
 }
 
