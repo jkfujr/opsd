@@ -334,6 +334,7 @@ func (n *Node) advanceSharedInitialization(ctx context.Context, op *Operation, p
 				if e != nil {
 					return e
 				}
+				access.Ready = true
 				m.Secrets[id] = access
 			}
 			if err = save(); err != nil {

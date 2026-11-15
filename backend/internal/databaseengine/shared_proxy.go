@@ -7,6 +7,7 @@ import (
 	"net"
 	"strconv"
 	"strings"
+	"time"
 )
 
 func (m Manager) ProxySQLAddress(ctx context.Context, c protocol.DatabaseConnection) (string, error) {
@@ -94,6 +95,21 @@ func applySharedProxy(ctx context.Context, a protocol.DatabaseAction, stage stri
 					return fmt.Errorf("代理连接标识无效")
 				}
 				_, err = s.ExecContext(ctx, "KILL CONNECTION "+strconv.FormatUint(id, 10))
+			}
+			if err == nil {
+				waitCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+				defer cancel()
+				for {
+					var remaining int
+					if err = s.QueryRowContext(waitCtx, "SELECT COUNT(*) FROM stats_mysql_processlist WHERE user=?", protocol.SharedUsername(a.Shared.NodeID)).Scan(&remaining); err != nil || remaining == 0 {
+						break
+					}
+					select {
+					case <-waitCtx.Done():
+						return waitCtx.Err()
+					case <-time.After(100 * time.Millisecond):
+					}
+				}
 			}
 		}
 	case "disk":

@@ -62,6 +62,7 @@ type sharedAccess struct {
 	Source       DatabaseRef `json:"source"`
 	PasswordHash string      `json:"password_hash"`
 	MonitorHash  string      `json:"monitor_hash"`
+	Ready        bool        `json:"ready"`
 }
 
 func (n *Node) sealSharedAccess(ctx context.Context, node string, local SharedLocal) (sharedAccess, error) {
@@ -124,6 +125,9 @@ func (n *Node) sharedBootstrap(ctx context.Context, node string) (Secret, error)
 	if err = json.Unmarshal(object.Body, &access); err != nil {
 		return Secret{}, err
 	}
+	if access.Ready {
+		return access.Secret, nil
+	}
 	if access.Source.NodeID == "" {
 		return Secret{}, fmt.Errorf("节点账号缺少原维护目标")
 	}
@@ -134,6 +138,12 @@ func (n *Node) sharedBootstrap(ctx context.Context, node string) (Secret, error)
 	}
 	if !ready {
 		return Secret{}, fault("node_busy", "节点数据库账号正在准备")
+	}
+	access.Ready = true
+	if err = s.Transact(ctx, n.ID, false, func(t *sharedsql.Tx) error {
+		return t.Put(ctx, sharedObject("access", node, object.Revision+1, access), object.Revision)
+	}); err != nil {
+		return Secret{}, err
 	}
 	return access.Secret, nil
 }

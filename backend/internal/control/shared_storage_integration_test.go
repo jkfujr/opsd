@@ -155,6 +155,28 @@ func TestSharedStorageNativeMigrationAndRecovery(t *testing.T) {
 	}
 	nativeSharedSQL(t, f, b)
 	restartA := stopDatabaseEntry(t, a)
+	var existingAccess cluster.Secret
+	if err = b.node.Call(t.Context(), c.node.ID, "shared.bootstrap", nil, &existingAccess); err != nil {
+		t.Fatal("原维护节点停止后已准备账号无法复用", err)
+	}
+	joining := openAPINode(t, "新加入节点", "美国", 1, 1)
+	joinAPINodes(t, b, joining)
+	var joinedAccess cluster.Secret
+	waitDatabase(t, "新成员取得数据库接入资料", time.Minute, func() bool {
+		ctx, cancel := context.WithTimeout(t.Context(), 4*time.Second)
+		defer cancel()
+		err = joining.node.Call(ctx, b.node.ID, "shared.bootstrap", nil, &joinedAccess)
+		return err == nil
+	})
+	var repeatedAccess cluster.Secret
+	if err = joining.node.Call(t.Context(), c.node.ID, "shared.bootstrap", nil, &repeatedAccess); err != nil {
+		t.Fatal("备用成员无法复用新成员账号", err)
+	}
+	firstAccess, _ := json.Marshal(joinedAccess)
+	secondAccess, _ := json.Marshal(repeatedAccess)
+	if string(firstAccess) != string(secondAccess) || joining.node.SharedStatus(t.Context()).Binding == nil {
+		t.Fatal("重复引导改变新成员接入资料或丢失绑定")
+	}
 	current, err := b.node.DatabaseCluster(t.Context(), definition.ID)
 	if err != nil {
 		t.Fatal(err)
@@ -226,7 +248,7 @@ func TestSharedStorageNativeMigrationAndRecovery(t *testing.T) {
 	output := filepath.Join("..", "..", "..", "artifacts")
 	_ = os.MkdirAll(output, 0755)
 	perNode := sharedsql.MaxConnections + sharedsql.MonitorConnections
-	report, _ := json.MarshalIndent(map[string]any{"nodes": 3, "local_proxies": 3, "installed_proxy": 1, "reused_proxies": 2, "migration": true, "original_receipt": true, "coordinator_handoff": true, "accepted_step_reused": true, "proxy_recovery": true, "account_revocation": true, "new_proxy_connections_per_backend": map[int]int{4: 4 * perNode, 10: 10 * perNode, 40: 40 * perNode}}, "", "  ")
+	report, _ := json.MarshalIndent(map[string]any{"nodes": 3, "joining_node": true, "local_proxies": 3, "installed_proxy": 1, "reused_proxies": 2, "migration": true, "original_receipt": true, "coordinator_handoff": true, "accepted_step_reused": true, "proxy_recovery": true, "account_revocation": true, "new_proxy_connections_per_backend": map[int]int{4: 4 * perNode, 10: 10 * perNode, 40: 40 * perNode}}, "", "  ")
 	if err = os.WriteFile(filepath.Join(output, "shared-storage-result.json"), report, 0644); err != nil {
 		t.Fatal(err)
 	}
@@ -253,7 +275,7 @@ func nativeSharedSQL(t *testing.T, f *nativeDatabases, b *apiNode) {
 			}
 			observed, e := manager.Observe(t.Context(), a, stage)
 			if e != nil || !observed.Satisfied {
-				t.Fatal("维护步骤未读回", stage, e)
+				t.Fatal("维护步骤未读回", a.Kind, a.Shared.Mode, stage, e)
 			}
 		}
 	}
