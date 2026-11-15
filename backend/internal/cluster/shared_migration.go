@@ -49,6 +49,12 @@ func (n *Node) StartSharedInitialization(ctx context.Context, input SharedInitia
 	if input.Database == "" {
 		input.Database = protocol.SharedDatabaseName
 	}
+	if input.Database != protocol.SharedDatabaseName || input.ClusterID == "" {
+		return Operation{}, fault("invalid_request", "OPSD 数据库名称或集群无效")
+	}
+	if state := n.sharedState(); state != nil && (state.Binding.ClusterID != input.ClusterID || state.Binding.Database != input.Database) {
+		return Operation{}, fault("conflict", "节点已经绑定其他 OPSD 数据库")
+	}
 	body, _ := json.Marshal(input)
 	r := Request{Kind: "shared_initialize", Key: key, Payload: body, ResourceID: input.ClusterID}
 	if w := requeststate.Current(ctx); w != nil {
@@ -91,7 +97,7 @@ func (n *Node) advanceSharedInitialization(ctx context.Context, op *Operation, p
 		}
 		binding := SharedBinding{ClusterID: c.ID, GaleraID: c.ClusterID, Database: input.Database, Revision: 1, Issuer: n.ID}
 		binding.Signature = ed25519.Sign(n.signing, bindingBytes(binding))
-		migration := &sharedMigration{Stage: "initialize", Nodes: map[string]SharedLocal{}, Cursors: map[string]string{}, Sources: map[string][]string{}}
+		migration := &sharedMigration{Stage: "freeze", Nodes: map[string]SharedLocal{}, Cursors: map[string]string{}, Sources: map[string][]string{}}
 		dataKey, err := age.GenerateX25519Identity()
 		if err != nil {
 			return err
@@ -152,6 +158,16 @@ func (n *Node) advanceSharedInitialization(ctx context.Context, op *Operation, p
 		return n.ensureDatabaseStep(ctx, m.Source, stepID(m.Source.NodeID, "shared-maintenance/"+n.cluster+"/"+state.Binding.Database+"/"+mode+"/"+node), a)
 	}
 	switch m.Stage {
+	case "freeze":
+		for _, id := range ids {
+			if err := n.Call(ctx, id, "shared.prepare", m.Nodes[id], nil); err != nil {
+				return err
+			}
+		}
+		m.Stage = "initialize"
+		if err := save(); err != nil {
+			return err
+		}
 	case "initialize":
 		ready, err := maintenance("initialize", "")
 		if err != nil {

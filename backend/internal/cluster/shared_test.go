@@ -13,6 +13,19 @@ import (
 	"github.com/jkfujr/opsd/internal/protocol"
 )
 
+func TestSharedInitializationRejectsInvalidBindingBeforeAdmission(t *testing.T) {
+	n, _ := openTestNode(t)
+	for _, input := range []SharedInitialize{{ClusterID: "existing", Database: "business"}, {Database: protocol.SharedDatabaseName}} {
+		if _, err := n.StartSharedInitialization(t.Context(), input, "invalid"); err == nil {
+			t.Fatal("无效绑定进入迁移队列")
+		}
+	}
+	var count int
+	if err := n.DB.QueryRow("SELECT COUNT(*) FROM queue").Scan(&count); err != nil || count != 0 || n.sharedEnabled() {
+		t.Fatal("无效初始化改变节点状态", count, err)
+	}
+}
+
 func TestSharedAccessOnlyRecipientCanRecoverCredentials(t *testing.T) {
 	seed, _ := openTestNode(t)
 	joining, _ := openTestNode(t)

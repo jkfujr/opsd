@@ -13,7 +13,11 @@ import (
 )
 
 func databasePrivilegeName(name string) string {
-	return ident(strings.NewReplacer("\\", "\\\\", "_", "\\_", "%", "\\%").Replace(name))
+	return ident(databasePrivilegePattern(name))
+}
+
+func databasePrivilegePattern(name string) string {
+	return strings.NewReplacer("\\", "\\\\", "_", "\\_", "%", "\\%").Replace(name)
 }
 
 func sharedAdmin(ctx context.Context, a protocol.DatabaseAction) (*sql.DB, error) {

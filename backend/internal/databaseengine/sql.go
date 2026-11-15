@@ -265,9 +265,10 @@ func (Manager) Read(ctx context.Context, c protocol.DatabaseConnection, scopes .
 		byUser := map[string][]protocol.DatabaseGrant{}
 		for _, g := range grants {
 			key := g["grantee"]
+			name := strings.NewReplacer("\\_", "_", "\\%", "%", "\\\\", "\\").Replace(g["table_schema"])
 			list := byUser[key]
-			if len(list) == 0 || list[len(list)-1].Database != g["table_schema"] {
-				list = append(list, protocol.DatabaseGrant{Database: g["table_schema"], Privileges: []string{}})
+			if len(list) == 0 || list[len(list)-1].Database != name {
+				list = append(list, protocol.DatabaseGrant{Database: name, Privileges: []string{}})
 			}
 			i := len(list) - 1
 			list[i].Privileges = append(list[i].Privileges, g["privilege_type"])
@@ -605,7 +606,7 @@ func (m Manager) Observe(ctx context.Context, a protocol.DatabaseAction, step st
 	if e != nil {
 		return out, e
 	}
-	g, e := rows(ctx, s, "SELECT PRIVILEGE_TYPE FROM information_schema.SCHEMA_PRIVILEGES WHERE GRANTEE=? AND TABLE_SCHEMA=? ORDER BY PRIVILEGE_TYPE", account(a), a.Database)
+	g, e := rows(ctx, s, "SELECT PRIVILEGE_TYPE FROM information_schema.SCHEMA_PRIVILEGES WHERE GRANTEE=? AND TABLE_SCHEMA=? ORDER BY PRIVILEGE_TYPE", account(a), databasePrivilegePattern(a.Database))
 	if e != nil {
 		return out, e
 	}

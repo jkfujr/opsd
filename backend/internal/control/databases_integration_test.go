@@ -241,6 +241,9 @@ func nativeOperation(t *testing.T, entry *apiNode, raw, id string, wanted protoc
 		if value.State == protocol.Rejected || value.State == protocol.Failed {
 			t.Fatal("数据库操作被拒绝", value.Error)
 		}
+		if value.State == protocol.AttentionRequired && wanted != protocol.AttentionRequired {
+			t.Fatalf("数据库步骤需要处理：%+v；步骤：%+v", value.Error, value.Steps)
+		}
 		return value.State == wanted
 	})
 	return value

@@ -25,9 +25,6 @@ func (n *Node) dispatch(ctx context.Context, origin, method string, body json.Ra
 	if !n.Active(ctx, origin) {
 		return nil, fault("forbidden", "节点未加入或已撤销")
 	}
-	if strings.HasPrefix(method, "shared.") {
-		return n.sharedDispatch(ctx, origin, method, body)
-	}
 	if n.sharedEnabled() && origin != n.ID {
 		m, err := n.Member(ctx, origin)
 		if err != nil {
@@ -36,6 +33,9 @@ func (n *Node) dispatch(ctx context.Context, origin, method string, body json.Ra
 		if m.ManagementVersion < protocol.SharedManagementVersion && method != "ping" && method != "directory" {
 			return nil, fault("unsupported", "节点版本不支持共享管理")
 		}
+	}
+	if strings.HasPrefix(method, "shared.") {
+		return n.sharedDispatch(ctx, origin, method, body)
 	}
 	if strings.HasPrefix(method, "api_token.") {
 		return n.tokenDispatch(ctx, method, body)
