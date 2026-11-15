@@ -51,6 +51,10 @@ func Write(path string, value any, mode os.FileMode) error {
 }
 
 func Lock(path string) (func(), error) {
+	return LockMode(path, false)
+}
+
+func LockMode(path string, shared bool) (func(), error) {
 	if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
 		return nil, err
 	}
@@ -58,7 +62,7 @@ func Lock(path string) (func(), error) {
 	if err != nil {
 		return nil, err
 	}
-	unlock, err := lockFile(file)
+	unlock, err := lockFile(file, shared)
 	if err != nil {
 		file.Close()
 		return nil, err

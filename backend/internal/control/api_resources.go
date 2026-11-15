@@ -12,6 +12,11 @@ import (
 func (s *Server) GetNodeStatus(w http.ResponseWriter, r *http.Request, id string) {
 	value, e := s.findNode(r.Context(), id)
 	if e == nil && value.Connected {
+		var status cluster.SharedStatus
+		if err := s.node.Call(r.Context(), id, "shared.status", nil, &status); err == nil {
+			converted := convertHTTP[httpapi.SharedStorageStatus](status)
+			value.SharedProxy = &converted
+		}
 		var capabilities struct {
 			AuthorizationVersion int `json:"authorization_version"`
 		}
@@ -228,6 +233,8 @@ func receiptResourceURL(value cluster.RequestReceipt) string {
 		return httpapi.APIBasePath + "/enrollment-tokens/" + value.ResourceID
 	case "database":
 		return httpapi.APIBasePath + "/database-clusters/" + value.ResourceID
+	case "consoles":
+		return httpapi.APIBasePath + "/shared-storage/consoles"
 	}
 	return ""
 }

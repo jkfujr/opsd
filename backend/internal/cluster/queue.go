@@ -25,6 +25,18 @@ func (n *Node) dispatch(ctx context.Context, origin, method string, body json.Ra
 	if !n.Active(ctx, origin) {
 		return nil, fault("forbidden", "节点未加入或已撤销")
 	}
+	if strings.HasPrefix(method, "shared.") {
+		return n.sharedDispatch(ctx, origin, method, body)
+	}
+	if n.sharedEnabled() && origin != n.ID {
+		m, err := n.Member(ctx, origin)
+		if err != nil {
+			return nil, err
+		}
+		if m.ManagementVersion < protocol.SharedManagementVersion && method != "ping" && method != "directory" {
+			return nil, fault("unsupported", "节点版本不支持共享管理")
+		}
+	}
 	if strings.HasPrefix(method, "api_token.") {
 		return n.tokenDispatch(ctx, method, body)
 	}
@@ -230,11 +242,23 @@ func (n *Node) executeRead(ctx context.Context, p protocol.Payload) (protocol.Pa
 	return n.Executor.Call(ctx, p)
 }
 func (n *Node) Submit(ctx context.Context, target string, r Request) (Operation, error) {
+	if r.Kind == "database" && n.sharedEnabled() {
+		if err := n.sharedWriteAllowed(ctx); err != nil {
+			return Operation{}, sharedFault(err)
+		}
+		return n.createSharedWorkflow(ctx, r)
+	}
 	var out Operation
 	e := n.Call(ctx, target, "submit", r, &out)
 	return out, e
 }
 func (n *Node) enqueue(ctx context.Context, origin string, r Request) (Operation, error) {
+	if r.Kind == "database" && n.sharedEnabled() {
+		return Operation{}, fault("unsupported", "请通过共享数据库受理流程")
+	}
+	return n.enqueueTx(ctx, origin, r, nil)
+}
+func (n *Node) enqueueTx(ctx context.Context, origin string, r Request, related func(*sql.Tx, Operation) error) (Operation, error) {
 	if strings.HasPrefix(r.Actor, "token:") || strings.HasPrefix(r.Actor, "account:") {
 		origin = r.Actor
 	}
@@ -277,6 +301,14 @@ func (n *Node) enqueue(ctx context.Context, origin string, r Request) (Operation
 	}
 	var targetName string
 	switch r.Kind {
+	case "shared_initialize":
+		var input SharedInitialize
+		if err := json.Unmarshal(r.Payload, &input); err != nil {
+			return Operation{}, err
+		}
+		if input.Database != protocol.SharedDatabaseName {
+			return Operation{}, fault("invalid_request", "OPSD 数据库名称须为 opsd_core")
+		}
 	case "compose_register":
 		var selection ComposeSelection
 		if e := json.Unmarshal(r.Payload, &selection); e != nil {
@@ -367,6 +399,8 @@ func (n *Node) enqueue(ctx context.Context, origin string, r Request) (Operation
 				return Operation{}, fault("conflict", "容器已经变化，请重新读取")
 			}
 			targetName = current.Container.Name
+			action.Project = current.Container.Project
+			action.ProjectKnown = true
 		} else {
 			// 已有读取结果可提供显示名称，不增加一次没有版本条件的系统读取。
 			n.dockerMu.Lock()
@@ -378,12 +412,15 @@ func (n *Node) enqueue(ctx context.Context, origin string, r Request) (Operation
 					for _, container := range result.State.Containers {
 						if container.ContainerRef == action.ContainerRef {
 							targetName = container.Name
+							action.Project = container.Project
+							action.ProjectKnown = true
 						}
 					}
 				}
 			}
 			n.dockerMu.Unlock()
 		}
+		r.Payload, _ = json.Marshal(action)
 	case "firewall":
 		var p protocol.ChangePlan
 		if e := json.Unmarshal(r.Payload, &p); e != nil {
@@ -419,6 +456,9 @@ func (n *Node) enqueue(ctx context.Context, origin string, r Request) (Operation
 		before, err := n.Config(ctx)
 		if err != nil {
 			return Operation{}, err
+		}
+		if n.sharedEnabled() && (c.Storage != before.Storage || c.PreferredStorage != before.PreferredStorage) {
+			return Operation{}, fault("forbidden", "OPSD 数据已绑定共享数据库，历史 CouchDB 配置保持原值")
 		}
 		if c.Listen != before.Listen {
 			return Operation{}, fault("restart_required", "节点通信监听地址需要通过 opsd network 修改后重启节点")
@@ -483,6 +523,12 @@ func (n *Node) enqueue(ctx context.Context, origin string, r Request) (Operation
 		}
 		var op Operation
 		e = json.Unmarshal([]byte(existing), &op)
+		if e == nil && related != nil {
+			e = related(tx, op)
+			if e == nil {
+				e = tx.Commit()
+			}
+		}
 		return op, e
 	}
 	if !errors.Is(e, sql.ErrNoRows) {
@@ -551,6 +597,7 @@ func (n *Node) enqueue(ctx context.Context, origin string, r Request) (Operation
 	if e = n.describeOperation(ctx, tx, r, targetName, &op); e != nil {
 		return Operation{}, e
 	}
+	op.ResourceClaims = requestResources(r)
 	if r.Kind == "compose_register" || r.Kind == "compose" || r.Kind == "task_save" || r.Kind == "task_run" {
 		op.ResourceID = r.ResourceID
 	}
@@ -601,6 +648,11 @@ func (n *Node) enqueue(ctx context.Context, origin string, r Request) (Operation
 	if e = n.appendTx(ctx, tx, "operation", op.ID, op, n.Now()); e != nil {
 		return op, e
 	}
+	if related != nil {
+		if e = related(tx, op); e != nil {
+			return op, e
+		}
+	}
 	if e = tx.Commit(); e != nil {
 		return op, e
 	}
@@ -626,6 +678,11 @@ func (n *Node) operation(ctx context.Context, id string) (Operation, error) {
 	return op, e
 }
 func (n *Node) GetOperation(ctx context.Context, id string) (Operation, error) {
+	if n.sharedActive() {
+		if op, err := n.sharedOperation(ctx, id); err == nil {
+			return op, nil
+		}
+	}
 	target := operationOwner(id)
 	if target == "" {
 		return Operation{}, fault("invalid_request", "操作标识无效")
@@ -714,7 +771,90 @@ func (n *Node) queueLoop() {
 		}
 	}
 }
-func (n *Node) advance() { n.advanceFiltered("kind<>'task_run'") }
+func (n *Node) advance() {
+	n.advanceMu.Lock()
+	defer n.advanceMu.Unlock()
+	rows, err := n.DB.QueryContext(n.ctx, "SELECT id,kind,payload,phase,body FROM queue WHERE terminal=0 AND kind<>'task_run' ORDER BY seq")
+	if err != nil {
+		return
+	}
+	type entry struct {
+		id, kind, payload, phase string
+		op                       Operation
+	}
+	entries := []entry{}
+	for rows.Next() {
+		var v entry
+		var body string
+		if err = rows.Scan(&v.id, &v.kind, &v.payload, &v.phase, &body); err != nil {
+			break
+		}
+		if err = json.Unmarshal([]byte(body), &v.op); err != nil {
+			break
+		}
+		entries = append(entries, v)
+	}
+	if err == nil {
+		err = rows.Err()
+	}
+	rows.Close()
+	if err != nil {
+		return
+	}
+	var prior []entry
+	var wg sync.WaitGroup
+	slots := make(chan struct{}, 8)
+	for _, v := range entries {
+		if len(v.op.ResourceClaims) == 0 {
+			var secret Secret
+			if json.Unmarshal([]byte(v.payload), &secret) != nil {
+				return
+			}
+			plain, e := unseal(secret, n.age)
+			if e != nil {
+				return
+			}
+			v.op.ResourceClaims = requestResources(Request{Kind: v.kind, Payload: plain})
+		}
+		blocker := ""
+		for _, p := range prior {
+			if protocol.ResourcesConflict(v.op.ResourceClaims, p.op.ResourceClaims) {
+				blocker = p.id
+				break
+			}
+		}
+		prior = append(prior, v)
+		if v.phase == "queued" && blocker != "" {
+			if v.op.BlockingOperation != blocker {
+				v.op.BlockingOperation = blocker
+				v.op.WaitingReason = "resource_busy"
+				v.op.Revision++
+				_ = n.saveOperation(n.ctx, &v.op, v.phase)
+			}
+			continue
+		}
+		if v.op.WaitingReason == "resource_busy" {
+			v.op.WaitingReason = ""
+			v.op.BlockingOperation = ""
+			v.op.Revision++
+			if n.saveOperation(n.ctx, &v.op, v.phase) != nil {
+				continue
+			}
+		}
+		wg.Add(1)
+		go func(id string) {
+			defer wg.Done()
+			select {
+			case slots <- struct{}{}:
+			case <-n.ctx.Done():
+				return
+			}
+			defer func() { <-slots }()
+			n.advanceFiltered("id=?", id)
+		}(v.id)
+	}
+	wg.Wait()
+}
 func (n *Node) advanceFiltered(filter string, args ...any) {
 	ctx, cancel := context.WithTimeout(n.ctx, 30*time.Second)
 	defer cancel()
@@ -727,6 +867,26 @@ func (n *Node) advanceFiltered(filter string, args ...any) {
 	if e != nil {
 		return
 	}
+	if op.State == protocol.AttentionRequired && op.Error != nil && op.Error.Code == "restored_state" {
+		return
+	}
+	if phase == "queued" && kind != "shared_initialize" && kind != "database_step" {
+		if n.waitingSharedRecovery(id) {
+			if op.WaitingReason != "shared_recovery" {
+				op.WaitingReason = "shared_recovery"
+				op.Revision++
+				_ = n.saveOperation(ctx, &op, phase)
+			}
+			return
+		}
+		if op.WaitingReason == "shared_recovery" {
+			op.WaitingReason = ""
+			op.Revision++
+			if n.saveOperation(ctx, &op, phase) != nil {
+				return
+			}
+		}
+	}
 	finish := func(state protocol.OperationState, e error) {
 		op.State = state
 		op.Revision++
@@ -735,7 +895,7 @@ func (n *Node) advanceFiltered(filter string, args ...any) {
 		}
 		_ = n.saveOperation(ctx, &op, "finished")
 	}
-	if phase == "queued" && !strings.HasPrefix(origin, "token:") && !strings.HasPrefix(origin, "account:") && !n.Active(ctx, origin) {
+	if phase == "queued" && !strings.HasPrefix(origin, "token:") && !strings.HasPrefix(origin, "account:") && !strings.HasPrefix(origin, "system:") && !n.Active(ctx, origin) {
 		finish(protocol.Rejected, fault("forbidden", "请求来源已撤销"))
 		return
 	}
@@ -763,6 +923,9 @@ func (n *Node) advanceFiltered(filter string, args ...any) {
 		return
 	}
 	if kind == "database" {
+		if n.sharedEnabled() && !n.sharedActive() {
+			return
+		}
 		n.advanceDatabase(ctx, &op, plain)
 		return
 	}
@@ -873,6 +1036,9 @@ func (n *Node) advanceFiltered(filter string, args ...any) {
 	_ = n.saveOperation(ctx, &op, "submitted")
 }
 func (n *Node) applyLocal(ctx context.Context, kind string, plain []byte, op *Operation) error {
+	if kind == "shared_initialize" {
+		return n.advanceSharedInitialization(ctx, op, plain)
+	}
 	if kind == "compose_register" {
 		return n.registerCompose(ctx, plain, op)
 	}
@@ -929,6 +1095,9 @@ func (n *Node) applyLocal(ctx context.Context, kind string, plain []byte, op *Op
 			credentials = &value
 		}
 		c = next
+		if c.Console {
+			c.CoordinatorCandidate = true
+		}
 	case "account":
 		accountChange = &AccountChange{}
 		if e = json.Unmarshal(plain, accountChange); e != nil {
@@ -1070,6 +1239,20 @@ func (n *Node) decide(ctx context.Context, method string, d OperationDecision) (
 	if e != nil {
 		return op, e
 	}
+	if op.Error != nil && op.Error.Code == "restored_state" {
+		if d.ExpectedRevision != op.Revision || method != "operation.resolve" || !d.AcceptCurrent {
+			return op, fault("conflict", "请核对原操作后接受当前状态")
+		}
+		op.State, op.Error = protocol.ResolvedManually, nil
+		op.Revision++
+		return op, n.saveOperation(ctx, &op, "finished")
+	}
+	if op.Subject == "shared_initialize" && method == "operation.recover" {
+		op.State = protocol.Applying
+		op.Error = nil
+		op.Revision++
+		return op, n.saveOperation(ctx, &op, "submitted")
+	}
 	if op.Subject == "database" {
 		return n.decideDatabase(ctx, method, d, op)
 	}
@@ -1191,6 +1374,10 @@ func (n *Node) localOperations(ctx context.Context, q ListQuery) (OperationList,
 	}
 	query := "SELECT body FROM queue WHERE kind<>'database_step'"
 	args := []any{}
+	if n.sharedActive() {
+		query += " AND (kind<>'database' OR COALESCE(json_extract(body,'$.coordinator_epoch'),0)=0 OR json_extract(body,'$.node_id')=?)"
+		args = append(args, n.ID)
+	}
 	if q.Authorization != nil {
 		m, e := n.Member(ctx, n.ID)
 		if e != nil {
@@ -1284,6 +1471,16 @@ func (n *Node) ListOperations(ctx context.Context, target string, q ListQuery) (
 			}
 			if !operationTargetAllowed(*q.Authorization, m, clusters) {
 				return OperationList{}, fault("forbidden", "节点超出操作授权范围")
+			}
+		}
+		if n.sharedActive() {
+			if shared, err := n.archivedSharedOperations(ctx, target, q); err == nil {
+				if target == n.ID {
+					if local, e := n.localOperations(ctx, q); e == nil {
+						shared = mergeOperationLists(local, shared, q.Limit)
+					}
+				}
+				return shared, nil
 			}
 		}
 		var out OperationList

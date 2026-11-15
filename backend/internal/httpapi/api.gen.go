@@ -1266,19 +1266,20 @@ func (e OperationExecutor) Valid() bool {
 
 // Defines values for OperationSubject.
 const (
-	OperationSubjectAccount         OperationSubject = "account"
-	OperationSubjectComponent       OperationSubject = "component"
-	OperationSubjectCompose         OperationSubject = "compose"
-	OperationSubjectComposeRegister OperationSubject = "compose_register"
-	OperationSubjectConfig          OperationSubject = "config"
-	OperationSubjectContainer       OperationSubject = "container"
-	OperationSubjectDatabase        OperationSubject = "database"
-	OperationSubjectDatabaseStep    OperationSubject = "database_step"
-	OperationSubjectFirewall        OperationSubject = "firewall"
-	OperationSubjectFirewallConfig  OperationSubject = "firewall_config"
-	OperationSubjectName            OperationSubject = "name"
-	OperationSubjectTaskRun         OperationSubject = "task_run"
-	OperationSubjectTaskSave        OperationSubject = "task_save"
+	OperationSubjectAccount          OperationSubject = "account"
+	OperationSubjectComponent        OperationSubject = "component"
+	OperationSubjectCompose          OperationSubject = "compose"
+	OperationSubjectComposeRegister  OperationSubject = "compose_register"
+	OperationSubjectConfig           OperationSubject = "config"
+	OperationSubjectContainer        OperationSubject = "container"
+	OperationSubjectDatabase         OperationSubject = "database"
+	OperationSubjectDatabaseStep     OperationSubject = "database_step"
+	OperationSubjectFirewall         OperationSubject = "firewall"
+	OperationSubjectFirewallConfig   OperationSubject = "firewall_config"
+	OperationSubjectName             OperationSubject = "name"
+	OperationSubjectSharedInitialize OperationSubject = "shared_initialize"
+	OperationSubjectTaskRun          OperationSubject = "task_run"
+	OperationSubjectTaskSave         OperationSubject = "task_save"
 )
 
 // Valid indicates whether the value is a known member of the OperationSubject enum.
@@ -1305,6 +1306,8 @@ func (e OperationSubject) Valid() bool {
 	case OperationSubjectFirewallConfig:
 		return true
 	case OperationSubjectName:
+		return true
+	case OperationSubjectSharedInitialize:
 		return true
 	case OperationSubjectTaskRun:
 		return true
@@ -1987,6 +1990,21 @@ func (e SetFirewallEnabledKind) Valid() bool {
 	}
 }
 
+// Defines values for SharedStorageInitializeDatabase.
+const (
+	OpsdCore SharedStorageInitializeDatabase = "opsd_core"
+)
+
+// Valid indicates whether the value is a known member of the SharedStorageInitializeDatabase enum.
+func (e SharedStorageInitializeDatabase) Valid() bool {
+	switch e {
+	case OpsdCore:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for StorageStatusState.
 const (
 	StorageStatusStatePending     StorageStatusState = "pending"
@@ -2214,14 +2232,18 @@ type APIGrantScope string
 
 // APIIdentity defines model for APIIdentity.
 type APIIdentity struct {
-	ApiVersion      string       `json:"api_version"`
-	DocsUrl         string       `json:"docs_url"`
-	FrontendVersion string       `json:"frontend_version"`
-	Grants          []APIGrant   `json:"grants"`
-	NodeId          string       `json:"node_id"`
-	NodeVersion     string       `json:"node_version"`
-	OpenapiUrl      string       `json:"openapi_url"`
-	Principal       APIPrincipal `json:"principal"`
+	ApiVersion              string       `json:"api_version"`
+	Commit                  *string      `json:"commit,omitempty"`
+	DocsUrl                 string       `json:"docs_url"`
+	FrontendVersion         string       `json:"frontend_version"`
+	Grants                  []APIGrant   `json:"grants"`
+	NodeId                  string       `json:"node_id"`
+	NodeVersion             string       `json:"node_version"`
+	OpenapiUrl              string       `json:"openapi_url"`
+	PersistenceVersion      *int64       `json:"persistence_version,omitempty"`
+	Principal               APIPrincipal `json:"principal"`
+	ProtocolVersion         *int64       `json:"protocol_version,omitempty"`
+	SharedManagementVersion *int64       `json:"shared_management_version,omitempty"`
 }
 
 // APIPrincipal defines model for APIPrincipal.
@@ -2675,6 +2697,12 @@ type DatabaseClusterPatch struct {
 	Name         *string        `json:"name,omitempty"`
 	Proxies      *[]DatabaseRef `json:"proxies,omitempty"`
 	WorkbenchUrl *string        `json:"workbench_url,omitempty"`
+}
+
+// DatabaseCoordinatorChange defines model for DatabaseCoordinatorChange.
+type DatabaseCoordinatorChange struct {
+	Coordinator      string `json:"coordinator"`
+	ExpectedRevision int64  `json:"expected_revision"`
 }
 
 // DatabaseDeploymentCommit defines model for DatabaseDeploymentCommit.
@@ -3250,17 +3278,18 @@ type LoginRequest struct {
 
 // ManagedDatabaseCluster defines model for ManagedDatabaseCluster.
 type ManagedDatabaseCluster struct {
-	ClusterId    string              `json:"cluster_id"`
-	Coordinator  string              `json:"coordinator"`
-	Deleted      bool                `json:"deleted"`
-	Id           string              `json:"id"`
-	Members      []DatabaseRef       `json:"members"`
-	Name         string              `json:"name"`
-	Proxies      []DatabaseRef       `json:"proxies"`
-	ProxyRouting *ProxyRoutingPolicy `json:"proxy_routing,omitempty"`
-	Revision     int64               `json:"revision"`
-	UpdatedAt    time.Time           `json:"updated_at"`
-	WorkbenchUrl string              `json:"workbench_url"`
+	ClusterId        string              `json:"cluster_id"`
+	Coordinator      string              `json:"coordinator"`
+	CoordinatorEpoch *int64              `json:"coordinator_epoch,omitempty"`
+	Deleted          bool                `json:"deleted"`
+	Id               string              `json:"id"`
+	Members          []DatabaseRef       `json:"members"`
+	Name             string              `json:"name"`
+	Proxies          []DatabaseRef       `json:"proxies"`
+	ProxyRouting     *ProxyRoutingPolicy `json:"proxy_routing,omitempty"`
+	Revision         int64               `json:"revision"`
+	UpdatedAt        time.Time           `json:"updated_at"`
+	WorkbenchUrl     string              `json:"workbench_url"`
 }
 
 // ManagedDatabaseList defines model for ManagedDatabaseList.
@@ -3494,13 +3523,15 @@ type NetworkError struct {
 
 // Node defines model for Node.
 type Node struct {
-	Address   *string `json:"address,omitempty"`
-	Id        string  `json:"id"`
-	Local     bool    `json:"local"`
-	Name      string  `json:"name"`
-	PublicKey string  `json:"public_key"`
-	Region    *string `json:"region,omitempty"`
-	Revision  int64   `json:"revision"`
+	Address              *string   `json:"address,omitempty"`
+	CoordinatorCandidate *bool     `json:"coordinator_candidate,omitempty"`
+	Endpoints            *[]string `json:"endpoints,omitempty"`
+	Id                   string    `json:"id"`
+	Local                bool      `json:"local"`
+	Name                 string    `json:"name"`
+	PublicKey            string    `json:"public_key"`
+	Region               *string   `json:"region,omitempty"`
+	Revision             int64     `json:"revision"`
 }
 
 // NodeAccount defines model for NodeAccount.
@@ -3537,22 +3568,24 @@ type NodeActionAction string
 
 // NodeConfig defines model for NodeConfig.
 type NodeConfig struct {
-	Address          string                  `json:"address"`
-	AddressMode      *NodeConfigAddressMode  `json:"address_mode,omitempty"`
-	Api              *bool                   `json:"api,omitempty"`
-	Cached           *bool                   `json:"cached,omitempty"`
-	Console          bool                    `json:"console"`
-	ConsoleListen    string                  `json:"console_listen"`
-	IntervalMinutes  int                     `json:"interval_minutes"`
-	LastSyncedAt     *time.Time              `json:"last_synced_at,omitempty"`
-	Listen           string                  `json:"listen"`
-	Name             string                  `json:"name"`
-	NetworkError     *NetworkError           `json:"network_error,omitempty"`
-	PreferredStorage string                  `json:"preferred_storage"`
-	Region           string                  `json:"region"`
-	RetentionDays    NodeConfigRetentionDays `json:"retention_days"`
-	Revision         int64                   `json:"revision"`
-	Storage          StorageConfig           `json:"storage"`
+	Address              string                  `json:"address"`
+	AddressMode          *NodeConfigAddressMode  `json:"address_mode,omitempty"`
+	Api                  *bool                   `json:"api,omitempty"`
+	Cached               *bool                   `json:"cached,omitempty"`
+	Console              bool                    `json:"console"`
+	ConsoleListen        string                  `json:"console_listen"`
+	CoordinatorCandidate *bool                   `json:"coordinator_candidate,omitempty"`
+	Endpoints            *[]string               `json:"endpoints,omitempty"`
+	IntervalMinutes      int                     `json:"interval_minutes"`
+	LastSyncedAt         *time.Time              `json:"last_synced_at,omitempty"`
+	Listen               string                  `json:"listen"`
+	Name                 string                  `json:"name"`
+	NetworkError         *NetworkError           `json:"network_error,omitempty"`
+	PreferredStorage     string                  `json:"preferred_storage"`
+	Region               string                  `json:"region"`
+	RetentionDays        NodeConfigRetentionDays `json:"retention_days"`
+	Revision             int64                   `json:"revision"`
+	Storage              StorageConfig           `json:"storage"`
 }
 
 // NodeConfigAddressMode defines model for NodeConfig.AddressMode.
@@ -3563,18 +3596,20 @@ type NodeConfigRetentionDays int
 
 // NodeConfigurationPatch defines model for NodeConfigurationPatch.
 type NodeConfigurationPatch struct {
-	Address          *string                              `json:"address,omitempty"`
-	AddressMode      *NodeConfigurationPatchAddressMode   `json:"address_mode,omitempty"`
-	Api              *bool                                `json:"api,omitempty"`
-	Console          *bool                                `json:"console,omitempty"`
-	ConsoleListen    *string                              `json:"console_listen,omitempty"`
-	IntervalMinutes  *int                                 `json:"interval_minutes,omitempty"`
-	Listen           *string                              `json:"listen,omitempty"`
-	Name             *string                              `json:"name,omitempty"`
-	PreferredStorage *string                              `json:"preferred_storage,omitempty"`
-	Region           *string                              `json:"region,omitempty"`
-	RetentionDays    *NodeConfigurationPatchRetentionDays `json:"retention_days,omitempty"`
-	Storage          *StorageConfigPatch                  `json:"storage,omitempty"`
+	Address              *string                              `json:"address,omitempty"`
+	AddressMode          *NodeConfigurationPatchAddressMode   `json:"address_mode,omitempty"`
+	Api                  *bool                                `json:"api,omitempty"`
+	Console              *bool                                `json:"console,omitempty"`
+	ConsoleListen        *string                              `json:"console_listen,omitempty"`
+	CoordinatorCandidate *bool                                `json:"coordinator_candidate,omitempty"`
+	Endpoints            *[]string                            `json:"endpoints,omitempty"`
+	IntervalMinutes      *int                                 `json:"interval_minutes,omitempty"`
+	Listen               *string                              `json:"listen,omitempty"`
+	Name                 *string                              `json:"name,omitempty"`
+	PreferredStorage     *string                              `json:"preferred_storage,omitempty"`
+	Region               *string                              `json:"region,omitempty"`
+	RetentionDays        *NodeConfigurationPatchRetentionDays `json:"retention_days,omitempty"`
+	Storage              *StorageConfigPatch                  `json:"storage,omitempty"`
 }
 
 // NodeConfigurationPatchAddressMode defines model for NodeConfigurationPatch.AddressMode.
@@ -3606,20 +3641,23 @@ type NodeStatus struct {
 	Address *string `json:"address,omitempty"`
 
 	// ApiAuthorizationVersion 可达节点声明的 API 授权契约主版本；缺失表示尚未确认能力。
-	ApiAuthorizationVersion *int          `json:"api_authorization_version,omitempty"`
-	Capabilities            *Capabilities `json:"capabilities,omitempty"`
-	Connected               bool          `json:"connected"`
-	ConsoleEnabled          *bool         `json:"console_enabled,omitempty"`
-	Id                      string        `json:"id"`
-	LastSeenAt              *time.Time    `json:"last_seen_at,omitempty"`
-	Local                   bool          `json:"local"`
-	Name                    string        `json:"name"`
-	PublicKey               string        `json:"public_key"`
-	Region                  *string       `json:"region,omitempty"`
-	RevokedAt               *time.Time    `json:"revoked_at,omitempty"`
-	StorageAddress          *string       `json:"storage_address,omitempty"`
-	Writable                bool          `json:"writable"`
-	WriteBlockedReason      *string       `json:"write_blocked_reason,omitempty"`
+	ApiAuthorizationVersion *int                 `json:"api_authorization_version,omitempty"`
+	Capabilities            *Capabilities        `json:"capabilities,omitempty"`
+	Connected               bool                 `json:"connected"`
+	ConsoleEnabled          *bool                `json:"console_enabled,omitempty"`
+	CoordinatorCandidate    *bool                `json:"coordinator_candidate,omitempty"`
+	Endpoints               *[]string            `json:"endpoints,omitempty"`
+	Id                      string               `json:"id"`
+	LastSeenAt              *time.Time           `json:"last_seen_at,omitempty"`
+	Local                   bool                 `json:"local"`
+	Name                    string               `json:"name"`
+	PublicKey               string               `json:"public_key"`
+	Region                  *string              `json:"region,omitempty"`
+	RevokedAt               *time.Time           `json:"revoked_at,omitempty"`
+	SharedProxy             *SharedStorageStatus `json:"shared_proxy,omitempty"`
+	StorageAddress          *string              `json:"storage_address,omitempty"`
+	Writable                bool                 `json:"writable"`
+	WriteBlockedReason      *string              `json:"write_blocked_reason,omitempty"`
 }
 
 // Operation defines model for Operation.
@@ -3627,8 +3665,11 @@ type Operation struct {
 	// Action 受理时保存的具体动作；历史缺值保持未知。
 	Action                       *string           `json:"action,omitempty"`
 	Actor                        *string           `json:"actor,omitempty"`
+	BlockingOperation            *string           `json:"blocking_operation,omitempty"`
 	ConfirmationDeadline         *time.Time        `json:"confirmation_deadline,omitempty"`
 	ConfirmationRemainingSeconds *int64            `json:"confirmation_remaining_seconds,omitempty"`
+	Coordinator                  *string           `json:"coordinator,omitempty"`
+	CoordinatorEpoch             *int64            `json:"coordinator_epoch,omitempty"`
 	CreatedAt                    time.Time         `json:"created_at"`
 	Decision                     OperationDecision `json:"decision"`
 
@@ -3651,8 +3692,9 @@ type Operation struct {
 	SupportsLogs      *bool              `json:"supports_logs,omitempty"`
 
 	// TargetName 受理时的目标名称。
-	TargetName *string   `json:"target_name,omitempty"`
-	UpdatedAt  time.Time `json:"updated_at"`
+	TargetName    *string   `json:"target_name,omitempty"`
+	UpdatedAt     time.Time `json:"updated_at"`
+	WaitingReason *string   `json:"waiting_reason,omitempty"`
 }
 
 // OperationDecision defines model for Operation.Decision.
@@ -4300,6 +4342,58 @@ type SetFirewallEnabled struct {
 // SetFirewallEnabledKind defines model for SetFirewallEnabled.Kind.
 type SetFirewallEnabledKind string
 
+// SharedBinding defines model for SharedBinding.
+type SharedBinding struct {
+	ClusterId string `json:"cluster_id"`
+	Database  string `json:"database"`
+	GaleraId  string `json:"galera_id"`
+	Issuer    string `json:"issuer"`
+	Revision  int64  `json:"revision"`
+}
+
+// SharedConsoles defines model for SharedConsoles.
+type SharedConsoles struct {
+	Backup   string `json:"backup"`
+	Cached   *bool  `json:"cached,omitempty"`
+	Primary  string `json:"primary"`
+	Revision int64  `json:"revision"`
+}
+
+// SharedStorageInitialize defines model for SharedStorageInitialize.
+type SharedStorageInitialize struct {
+	ClusterId string                           `json:"cluster_id"`
+	Database  *SharedStorageInitializeDatabase `json:"database,omitempty"`
+}
+
+// SharedStorageInitializeDatabase defines model for SharedStorageInitialize.Database.
+type SharedStorageInitializeDatabase string
+
+// SharedStorageNode defines model for SharedStorageNode.
+type SharedStorageNode struct {
+	Name   string              `json:"name"`
+	NodeId string              `json:"node_id"`
+	Status SharedStorageStatus `json:"status"`
+}
+
+// SharedStorageOverview defines model for SharedStorageOverview.
+type SharedStorageOverview struct {
+	Local SharedStorageStatus `json:"local"`
+	Nodes []SharedStorageNode `json:"nodes"`
+}
+
+// SharedStorageStatus defines model for SharedStorageStatus.
+type SharedStorageStatus struct {
+	Binding       *SharedBinding `json:"binding,omitempty"`
+	Error         *NetworkError  `json:"error,omitempty"`
+	Pending       *int64         `json:"pending,omitempty"`
+	Phase         string         `json:"phase"`
+	PolicyVersion *string        `json:"policy_version,omitempty"`
+	ProxyId       *string        `json:"proxy_id,omitempty"`
+	ProxyReady    bool           `json:"proxy_ready"`
+	SqlAddress    *string        `json:"sql_address,omitempty"`
+	State         string         `json:"state"`
+}
+
 // StorageConfig defines model for StorageConfig.
 type StorageConfig struct {
 	Address string `json:"address"`
@@ -4602,6 +4696,12 @@ type ChangeDatabaseParams struct {
 	IdempotencyKey string  `json:"Idempotency-Key"`
 }
 
+// ChangeDatabaseCoordinatorParams defines parameters for ChangeDatabaseCoordinator.
+type ChangeDatabaseCoordinatorParams struct {
+	XCSRFToken     *string `json:"X-CSRF-Token,omitempty"`
+	IdempotencyKey string  `json:"Idempotency-Key"`
+}
+
 // AddDatabaseMembersParams defines parameters for AddDatabaseMembers.
 type AddDatabaseMembersParams struct {
 	XCSRFToken     *string `json:"X-CSRF-Token,omitempty"`
@@ -4800,6 +4900,11 @@ type RefreshPublicAddressesParams struct {
 	XCSRFToken *string `json:"X-CSRF-Token,omitempty"`
 }
 
+// RecoverNodeSharedStorageParams defines parameters for RecoverNodeSharedStorage.
+type RecoverNodeSharedStorageParams struct {
+	XCSRFToken *string `json:"X-CSRF-Token,omitempty"`
+}
+
 // SaveScheduledTaskParams defines parameters for SaveScheduledTask.
 type SaveScheduledTaskParams struct {
 	XCSRFToken     *string `json:"X-CSRF-Token,omitempty"`
@@ -4882,6 +4987,18 @@ type UpdateNavigationParams struct {
 	IfMatch    string  `json:"If-Match"`
 }
 
+// SaveSharedConsolesParams defines parameters for SaveSharedConsoles.
+type SaveSharedConsolesParams struct {
+	XCSRFToken     *string `json:"X-CSRF-Token,omitempty"`
+	IdempotencyKey string  `json:"Idempotency-Key"`
+}
+
+// InitializeSharedStorageParams defines parameters for InitializeSharedStorage.
+type InitializeSharedStorageParams struct {
+	XCSRFToken     *string `json:"X-CSRF-Token,omitempty"`
+	IdempotencyKey string  `json:"Idempotency-Key"`
+}
+
 // ListScheduledTasksParams defines parameters for ListScheduledTasks.
 type ListScheduledTasksParams struct {
 	NodeId *string `form:"node_id,omitempty" json:"node_id,omitempty"`
@@ -4915,6 +5032,9 @@ type UpdateDatabaseClusterApplicationMergePatchPlusJSONRequestBody = DatabaseClu
 
 // ChangeDatabaseJSONRequestBody defines body for ChangeDatabase for application/json ContentType.
 type ChangeDatabaseJSONRequestBody = DatabaseChange
+
+// ChangeDatabaseCoordinatorJSONRequestBody defines body for ChangeDatabaseCoordinator for application/json ContentType.
+type ChangeDatabaseCoordinatorJSONRequestBody = DatabaseCoordinatorChange
 
 // AddDatabaseMembersJSONRequestBody defines body for AddDatabaseMembers for application/json ContentType.
 type AddDatabaseMembersJSONRequestBody = DatabaseDeploymentCommit
@@ -4990,6 +5110,12 @@ type ChangeAccountApplicationMergePatchPlusJSONRequestBody = AccountChange
 
 // UpdateNavigationJSONRequestBody defines body for UpdateNavigation for application/json ContentType.
 type UpdateNavigationJSONRequestBody = NavigationInput
+
+// SaveSharedConsolesJSONRequestBody defines body for SaveSharedConsoles for application/json ContentType.
+type SaveSharedConsolesJSONRequestBody = SharedConsoles
+
+// InitializeSharedStorageJSONRequestBody defines body for InitializeSharedStorage for application/json ContentType.
+type InitializeSharedStorageJSONRequestBody = SharedStorageInitialize
 
 // AsEntranceChange returns the union data inside the DeploymentChange as a EntranceChange
 func (t DeploymentChange) AsEntranceChange() (EntranceChange, error) {
@@ -5581,6 +5707,9 @@ type ServerInterface interface {
 	// ChangeDatabase 受理数据库变更
 	// (POST /database-clusters/{id}/changes)
 	ChangeDatabase(w http.ResponseWriter, r *http.Request, id string, params ChangeDatabaseParams)
+	// ChangeDatabaseCoordinator 转交数据库协调权
+	// (POST /database-clusters/{id}/coordinator)
+	ChangeDatabaseCoordinator(w http.ResponseWriter, r *http.Request, id string, params ChangeDatabaseCoordinatorParams)
 	// AddDatabaseMembers 添加数据库成员
 	// (POST /database-clusters/{id}/members/actions)
 	AddDatabaseMembers(w http.ResponseWriter, r *http.Request, id string, params AddDatabaseMembersParams)
@@ -5728,6 +5857,12 @@ type ServerInterface interface {
 	// RefreshPublicAddresses 重新发现公网地址
 	// (POST /nodes/{node_id}/public-addresses/actions)
 	RefreshPublicAddresses(w http.ResponseWriter, r *http.Request, nodeId string, params RefreshPublicAddressesParams)
+	// GetNodeSharedStorage 读取节点自用代理
+	// (GET /nodes/{node_id}/shared-storage)
+	GetNodeSharedStorage(w http.ResponseWriter, r *http.Request, nodeId string)
+	// RecoverNodeSharedStorage 核对节点数据恢复
+	// (POST /nodes/{node_id}/shared-storage/recovery)
+	RecoverNodeSharedStorage(w http.ResponseWriter, r *http.Request, nodeId string, params RecoverNodeSharedStorageParams)
 	// GetNodeStatus 读取节点连接状态
 	// (GET /nodes/{node_id}/status)
 	GetNodeStatus(w http.ResponseWriter, r *http.Request, nodeId string)
@@ -5794,6 +5929,18 @@ type ServerInterface interface {
 	// UpdateNavigation 保存菜单顺序
 	// (PUT /settings/navigation)
 	UpdateNavigation(w http.ResponseWriter, r *http.Request, params UpdateNavigationParams)
+	// GetSharedStorage 读取 OPSD 数据绑定
+	// (GET /shared-storage)
+	GetSharedStorage(w http.ResponseWriter, r *http.Request)
+	// GetSharedConsoles 读取主用与备用管理节点
+	// (GET /shared-storage/consoles)
+	GetSharedConsoles(w http.ResponseWriter, r *http.Request)
+	// SaveSharedConsoles 保存主用与备用管理节点
+	// (PUT /shared-storage/consoles)
+	SaveSharedConsoles(w http.ResponseWriter, r *http.Request, params SaveSharedConsolesParams)
+	// InitializeSharedStorage 初始化 OPSD 数据库
+	// (POST /shared-storage/initialize)
+	InitializeSharedStorage(w http.ResponseWriter, r *http.Request, params InitializeSharedStorageParams)
 	// ListScheduledTasks listScheduledTasks
 	// (GET /tasks)
 	ListScheduledTasks(w http.ResponseWriter, r *http.Request, params ListScheduledTasksParams)
@@ -6866,6 +7013,79 @@ func (siw *ServerInterfaceWrapper) ChangeDatabase(w http.ResponseWriter, r *http
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.ChangeDatabase(w, r, id, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ChangeDatabaseCoordinator operation middleware
+func (siw *ServerInterfaceWrapper) ChangeDatabaseCoordinator(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ChangeDatabaseCoordinatorParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "X-CSRF-Token" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-CSRF-Token")]; found {
+		var XCSRFToken string
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "X-CSRF-Token", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "X-CSRF-Token", valueList[0], &XCSRFToken, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-CSRF-Token", Err: err})
+			return
+		}
+
+		params.XCSRFToken = &XCSRFToken
+
+	}
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey string
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ChangeDatabaseCoordinator(w, r, id, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -9661,6 +9881,82 @@ func (siw *ServerInterfaceWrapper) RefreshPublicAddresses(w http.ResponseWriter,
 	handler.ServeHTTP(w, r)
 }
 
+// GetNodeSharedStorage operation middleware
+func (siw *ServerInterfaceWrapper) GetNodeSharedStorage(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "node_id" -------------
+	var nodeId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "node_id", r.PathValue("node_id"), &nodeId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "node_id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetNodeSharedStorage(w, r, nodeId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// RecoverNodeSharedStorage operation middleware
+func (siw *ServerInterfaceWrapper) RecoverNodeSharedStorage(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "node_id" -------------
+	var nodeId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "node_id", r.PathValue("node_id"), &nodeId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "node_id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params RecoverNodeSharedStorageParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "X-CSRF-Token" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-CSRF-Token")]; found {
+		var XCSRFToken string
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "X-CSRF-Token", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "X-CSRF-Token", valueList[0], &XCSRFToken, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-CSRF-Token", Err: err})
+			return
+		}
+
+		params.XCSRFToken = &XCSRFToken
+
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RecoverNodeSharedStorage(w, r, nodeId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // GetNodeStatus operation middleware
 func (siw *ServerInterfaceWrapper) GetNodeStatus(w http.ResponseWriter, r *http.Request) {
 
@@ -10731,6 +11027,162 @@ func (siw *ServerInterfaceWrapper) UpdateNavigation(w http.ResponseWriter, r *ht
 	handler.ServeHTTP(w, r)
 }
 
+// GetSharedStorage operation middleware
+func (siw *ServerInterfaceWrapper) GetSharedStorage(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetSharedStorage(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetSharedConsoles operation middleware
+func (siw *ServerInterfaceWrapper) GetSharedConsoles(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetSharedConsoles(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// SaveSharedConsoles operation middleware
+func (siw *ServerInterfaceWrapper) SaveSharedConsoles(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params SaveSharedConsolesParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "X-CSRF-Token" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-CSRF-Token")]; found {
+		var XCSRFToken string
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "X-CSRF-Token", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "X-CSRF-Token", valueList[0], &XCSRFToken, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-CSRF-Token", Err: err})
+			return
+		}
+
+		params.XCSRFToken = &XCSRFToken
+
+	}
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey string
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.SaveSharedConsoles(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// InitializeSharedStorage operation middleware
+func (siw *ServerInterfaceWrapper) InitializeSharedStorage(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params InitializeSharedStorageParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "X-CSRF-Token" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-CSRF-Token")]; found {
+		var XCSRFToken string
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "X-CSRF-Token", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "X-CSRF-Token", valueList[0], &XCSRFToken, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-CSRF-Token", Err: err})
+			return
+		}
+
+		params.XCSRFToken = &XCSRFToken
+
+	}
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey string
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.InitializeSharedStorage(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // ListScheduledTasks operation middleware
 func (siw *ServerInterfaceWrapper) ListScheduledTasks(w http.ResponseWriter, r *http.Request) {
 
@@ -10959,6 +11411,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/database-clusters/{id}", wrapper.UpdateDatabaseCluster)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/database-clusters/{id}/backups", wrapper.GetDatabaseBackups)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/database-clusters/{id}/changes", wrapper.ChangeDatabase)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/database-clusters/{id}/coordinator", wrapper.ChangeDatabaseCoordinator)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/database-clusters/{id}/members/actions", wrapper.AddDatabaseMembers)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/database-clusters/{id}/proxies/actions", wrapper.AddDatabaseProxy)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/database-clusters/{id}/proxy-routing", wrapper.GetProxyRouting)
@@ -11008,6 +11461,8 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/nodes/{node_id}/public-addresses", wrapper.GetPublicAddresses)
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/nodes/{node_id}/public-addresses", wrapper.ChangePublicAddresses)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/nodes/{node_id}/public-addresses/actions", wrapper.RefreshPublicAddresses)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/nodes/{node_id}/shared-storage", wrapper.GetNodeSharedStorage)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/nodes/{node_id}/shared-storage/recovery", wrapper.RecoverNodeSharedStorage)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/nodes/{node_id}/status", wrapper.GetNodeStatus)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/nodes/{node_id}/storage", wrapper.GetStorageStatus)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/nodes/{node_id}/tasks/{task_id}", wrapper.GetScheduledTask)
@@ -11030,6 +11485,10 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/settings/account", wrapper.ChangeAccount)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/settings/navigation", wrapper.GetNavigation)
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/settings/navigation", wrapper.UpdateNavigation)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/shared-storage", wrapper.GetSharedStorage)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/shared-storage/consoles", wrapper.GetSharedConsoles)
+	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/shared-storage/consoles", wrapper.SaveSharedConsoles)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/shared-storage/initialize", wrapper.InitializeSharedStorage)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/tasks", wrapper.ListScheduledTasks)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/terminals/{ticket}", wrapper.AttachTerminal)
 
@@ -19142,6 +19601,354 @@ type ChangeDatabase504ApplicationProblemPlusJSONResponse struct {
 }
 
 func (response ChangeDatabase504ApplicationProblemPlusJSONResponse) VisitChangeDatabaseResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(504)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangeDatabaseCoordinatorRequestObject struct {
+	Id     string `json:"id"`
+	Params ChangeDatabaseCoordinatorParams
+	Body   *ChangeDatabaseCoordinatorJSONRequestBody
+}
+
+type ChangeDatabaseCoordinatorResponseObject interface {
+	VisitChangeDatabaseCoordinatorResponse(w http.ResponseWriter) error
+}
+
+type ChangeDatabaseCoordinator200ResponseHeaders struct {
+	XRequestID string
+}
+
+type ChangeDatabaseCoordinator200JSONResponse struct {
+	Body    ManagedDatabaseCluster
+	Headers ChangeDatabaseCoordinator200ResponseHeaders
+}
+
+func (response ChangeDatabaseCoordinator200JSONResponse) VisitChangeDatabaseCoordinatorResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangeDatabaseCoordinator400ApplicationProblemPlusJSONResponse struct {
+	Error400ApplicationProblemPlusJSONResponse
+}
+
+func (response ChangeDatabaseCoordinator400ApplicationProblemPlusJSONResponse) VisitChangeDatabaseCoordinatorResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangeDatabaseCoordinator401ApplicationProblemPlusJSONResponse struct {
+	Error401ApplicationProblemPlusJSONResponse
+}
+
+func (response ChangeDatabaseCoordinator401ApplicationProblemPlusJSONResponse) VisitChangeDatabaseCoordinatorResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangeDatabaseCoordinator403ApplicationProblemPlusJSONResponse struct {
+	Error403ApplicationProblemPlusJSONResponse
+}
+
+func (response ChangeDatabaseCoordinator403ApplicationProblemPlusJSONResponse) VisitChangeDatabaseCoordinatorResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangeDatabaseCoordinator404ApplicationProblemPlusJSONResponse struct {
+	Error404ApplicationProblemPlusJSONResponse
+}
+
+func (response ChangeDatabaseCoordinator404ApplicationProblemPlusJSONResponse) VisitChangeDatabaseCoordinatorResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangeDatabaseCoordinator405ApplicationProblemPlusJSONResponse struct {
+	Error405ApplicationProblemPlusJSONResponse
+}
+
+func (response ChangeDatabaseCoordinator405ApplicationProblemPlusJSONResponse) VisitChangeDatabaseCoordinatorResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.Allow != nil {
+		w.Header().Set("Allow", fmt.Sprint(*response.Headers.Allow))
+	}
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(405)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangeDatabaseCoordinator406ApplicationProblemPlusJSONResponse struct {
+	Error406ApplicationProblemPlusJSONResponse
+}
+
+func (response ChangeDatabaseCoordinator406ApplicationProblemPlusJSONResponse) VisitChangeDatabaseCoordinatorResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(406)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangeDatabaseCoordinator409ApplicationProblemPlusJSONResponse struct {
+	Error409ApplicationProblemPlusJSONResponse
+}
+
+func (response ChangeDatabaseCoordinator409ApplicationProblemPlusJSONResponse) VisitChangeDatabaseCoordinatorResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangeDatabaseCoordinator412ApplicationProblemPlusJSONResponse struct {
+	Error412ApplicationProblemPlusJSONResponse
+}
+
+func (response ChangeDatabaseCoordinator412ApplicationProblemPlusJSONResponse) VisitChangeDatabaseCoordinatorResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(412)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangeDatabaseCoordinator413ApplicationProblemPlusJSONResponse struct {
+	Error413ApplicationProblemPlusJSONResponse
+}
+
+func (response ChangeDatabaseCoordinator413ApplicationProblemPlusJSONResponse) VisitChangeDatabaseCoordinatorResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(413)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangeDatabaseCoordinator415ApplicationProblemPlusJSONResponse struct {
+	Error415ApplicationProblemPlusJSONResponse
+}
+
+func (response ChangeDatabaseCoordinator415ApplicationProblemPlusJSONResponse) VisitChangeDatabaseCoordinatorResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(415)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangeDatabaseCoordinator422ApplicationProblemPlusJSONResponse struct {
+	Error422ApplicationProblemPlusJSONResponse
+}
+
+func (response ChangeDatabaseCoordinator422ApplicationProblemPlusJSONResponse) VisitChangeDatabaseCoordinatorResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangeDatabaseCoordinator428ApplicationProblemPlusJSONResponse struct {
+	Error428ApplicationProblemPlusJSONResponse
+}
+
+func (response ChangeDatabaseCoordinator428ApplicationProblemPlusJSONResponse) VisitChangeDatabaseCoordinatorResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(428)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangeDatabaseCoordinator429ApplicationProblemPlusJSONResponse struct {
+	Error429ApplicationProblemPlusJSONResponse
+}
+
+func (response ChangeDatabaseCoordinator429ApplicationProblemPlusJSONResponse) VisitChangeDatabaseCoordinatorResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.RetryAfter != nil {
+		w.Header().Set("Retry-After", fmt.Sprint(*response.Headers.RetryAfter))
+	}
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(429)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangeDatabaseCoordinator500ApplicationProblemPlusJSONResponse struct {
+	Error500ApplicationProblemPlusJSONResponse
+}
+
+func (response ChangeDatabaseCoordinator500ApplicationProblemPlusJSONResponse) VisitChangeDatabaseCoordinatorResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangeDatabaseCoordinator503ApplicationProblemPlusJSONResponse struct {
+	Error503ApplicationProblemPlusJSONResponse
+}
+
+func (response ChangeDatabaseCoordinator503ApplicationProblemPlusJSONResponse) VisitChangeDatabaseCoordinatorResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(503)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangeDatabaseCoordinator504ApplicationProblemPlusJSONResponse struct {
+	Error504ApplicationProblemPlusJSONResponse
+}
+
+func (response ChangeDatabaseCoordinator504ApplicationProblemPlusJSONResponse) VisitChangeDatabaseCoordinatorResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
@@ -36280,6 +37087,699 @@ func (response RefreshPublicAddresses504ApplicationProblemPlusJSONResponse) Visi
 	return err
 }
 
+type GetNodeSharedStorageRequestObject struct {
+	NodeId string `json:"node_id"`
+}
+
+type GetNodeSharedStorageResponseObject interface {
+	VisitGetNodeSharedStorageResponse(w http.ResponseWriter) error
+}
+
+type GetNodeSharedStorage200ResponseHeaders struct {
+	XRequestID string
+}
+
+type GetNodeSharedStorage200JSONResponse struct {
+	Body    SharedStorageStatus
+	Headers GetNodeSharedStorage200ResponseHeaders
+}
+
+func (response GetNodeSharedStorage200JSONResponse) VisitGetNodeSharedStorageResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetNodeSharedStorage400ApplicationProblemPlusJSONResponse struct {
+	Error400ApplicationProblemPlusJSONResponse
+}
+
+func (response GetNodeSharedStorage400ApplicationProblemPlusJSONResponse) VisitGetNodeSharedStorageResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetNodeSharedStorage401ApplicationProblemPlusJSONResponse struct {
+	Error401ApplicationProblemPlusJSONResponse
+}
+
+func (response GetNodeSharedStorage401ApplicationProblemPlusJSONResponse) VisitGetNodeSharedStorageResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetNodeSharedStorage403ApplicationProblemPlusJSONResponse struct {
+	Error403ApplicationProblemPlusJSONResponse
+}
+
+func (response GetNodeSharedStorage403ApplicationProblemPlusJSONResponse) VisitGetNodeSharedStorageResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetNodeSharedStorage404ApplicationProblemPlusJSONResponse struct {
+	Error404ApplicationProblemPlusJSONResponse
+}
+
+func (response GetNodeSharedStorage404ApplicationProblemPlusJSONResponse) VisitGetNodeSharedStorageResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetNodeSharedStorage405ApplicationProblemPlusJSONResponse struct {
+	Error405ApplicationProblemPlusJSONResponse
+}
+
+func (response GetNodeSharedStorage405ApplicationProblemPlusJSONResponse) VisitGetNodeSharedStorageResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.Allow != nil {
+		w.Header().Set("Allow", fmt.Sprint(*response.Headers.Allow))
+	}
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(405)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetNodeSharedStorage406ApplicationProblemPlusJSONResponse struct {
+	Error406ApplicationProblemPlusJSONResponse
+}
+
+func (response GetNodeSharedStorage406ApplicationProblemPlusJSONResponse) VisitGetNodeSharedStorageResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(406)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetNodeSharedStorage409ApplicationProblemPlusJSONResponse struct {
+	Error409ApplicationProblemPlusJSONResponse
+}
+
+func (response GetNodeSharedStorage409ApplicationProblemPlusJSONResponse) VisitGetNodeSharedStorageResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetNodeSharedStorage412ApplicationProblemPlusJSONResponse struct {
+	Error412ApplicationProblemPlusJSONResponse
+}
+
+func (response GetNodeSharedStorage412ApplicationProblemPlusJSONResponse) VisitGetNodeSharedStorageResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(412)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetNodeSharedStorage413ApplicationProblemPlusJSONResponse struct {
+	Error413ApplicationProblemPlusJSONResponse
+}
+
+func (response GetNodeSharedStorage413ApplicationProblemPlusJSONResponse) VisitGetNodeSharedStorageResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(413)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetNodeSharedStorage415ApplicationProblemPlusJSONResponse struct {
+	Error415ApplicationProblemPlusJSONResponse
+}
+
+func (response GetNodeSharedStorage415ApplicationProblemPlusJSONResponse) VisitGetNodeSharedStorageResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(415)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetNodeSharedStorage422ApplicationProblemPlusJSONResponse struct {
+	Error422ApplicationProblemPlusJSONResponse
+}
+
+func (response GetNodeSharedStorage422ApplicationProblemPlusJSONResponse) VisitGetNodeSharedStorageResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetNodeSharedStorage428ApplicationProblemPlusJSONResponse struct {
+	Error428ApplicationProblemPlusJSONResponse
+}
+
+func (response GetNodeSharedStorage428ApplicationProblemPlusJSONResponse) VisitGetNodeSharedStorageResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(428)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetNodeSharedStorage429ApplicationProblemPlusJSONResponse struct {
+	Error429ApplicationProblemPlusJSONResponse
+}
+
+func (response GetNodeSharedStorage429ApplicationProblemPlusJSONResponse) VisitGetNodeSharedStorageResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.RetryAfter != nil {
+		w.Header().Set("Retry-After", fmt.Sprint(*response.Headers.RetryAfter))
+	}
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(429)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetNodeSharedStorage500ApplicationProblemPlusJSONResponse struct {
+	Error500ApplicationProblemPlusJSONResponse
+}
+
+func (response GetNodeSharedStorage500ApplicationProblemPlusJSONResponse) VisitGetNodeSharedStorageResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetNodeSharedStorage503ApplicationProblemPlusJSONResponse struct {
+	Error503ApplicationProblemPlusJSONResponse
+}
+
+func (response GetNodeSharedStorage503ApplicationProblemPlusJSONResponse) VisitGetNodeSharedStorageResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(503)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetNodeSharedStorage504ApplicationProblemPlusJSONResponse struct {
+	Error504ApplicationProblemPlusJSONResponse
+}
+
+func (response GetNodeSharedStorage504ApplicationProblemPlusJSONResponse) VisitGetNodeSharedStorageResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(504)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RecoverNodeSharedStorageRequestObject struct {
+	NodeId string `json:"node_id"`
+	Params RecoverNodeSharedStorageParams
+}
+
+type RecoverNodeSharedStorageResponseObject interface {
+	VisitRecoverNodeSharedStorageResponse(w http.ResponseWriter) error
+}
+
+type RecoverNodeSharedStorage200ResponseHeaders struct {
+	XRequestID string
+}
+
+type RecoverNodeSharedStorage200JSONResponse struct {
+	Body    SharedStorageStatus
+	Headers RecoverNodeSharedStorage200ResponseHeaders
+}
+
+func (response RecoverNodeSharedStorage200JSONResponse) VisitRecoverNodeSharedStorageResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RecoverNodeSharedStorage400ApplicationProblemPlusJSONResponse struct {
+	Error400ApplicationProblemPlusJSONResponse
+}
+
+func (response RecoverNodeSharedStorage400ApplicationProblemPlusJSONResponse) VisitRecoverNodeSharedStorageResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RecoverNodeSharedStorage401ApplicationProblemPlusJSONResponse struct {
+	Error401ApplicationProblemPlusJSONResponse
+}
+
+func (response RecoverNodeSharedStorage401ApplicationProblemPlusJSONResponse) VisitRecoverNodeSharedStorageResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RecoverNodeSharedStorage403ApplicationProblemPlusJSONResponse struct {
+	Error403ApplicationProblemPlusJSONResponse
+}
+
+func (response RecoverNodeSharedStorage403ApplicationProblemPlusJSONResponse) VisitRecoverNodeSharedStorageResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RecoverNodeSharedStorage404ApplicationProblemPlusJSONResponse struct {
+	Error404ApplicationProblemPlusJSONResponse
+}
+
+func (response RecoverNodeSharedStorage404ApplicationProblemPlusJSONResponse) VisitRecoverNodeSharedStorageResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RecoverNodeSharedStorage405ApplicationProblemPlusJSONResponse struct {
+	Error405ApplicationProblemPlusJSONResponse
+}
+
+func (response RecoverNodeSharedStorage405ApplicationProblemPlusJSONResponse) VisitRecoverNodeSharedStorageResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.Allow != nil {
+		w.Header().Set("Allow", fmt.Sprint(*response.Headers.Allow))
+	}
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(405)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RecoverNodeSharedStorage406ApplicationProblemPlusJSONResponse struct {
+	Error406ApplicationProblemPlusJSONResponse
+}
+
+func (response RecoverNodeSharedStorage406ApplicationProblemPlusJSONResponse) VisitRecoverNodeSharedStorageResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(406)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RecoverNodeSharedStorage409ApplicationProblemPlusJSONResponse struct {
+	Error409ApplicationProblemPlusJSONResponse
+}
+
+func (response RecoverNodeSharedStorage409ApplicationProblemPlusJSONResponse) VisitRecoverNodeSharedStorageResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RecoverNodeSharedStorage412ApplicationProblemPlusJSONResponse struct {
+	Error412ApplicationProblemPlusJSONResponse
+}
+
+func (response RecoverNodeSharedStorage412ApplicationProblemPlusJSONResponse) VisitRecoverNodeSharedStorageResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(412)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RecoverNodeSharedStorage413ApplicationProblemPlusJSONResponse struct {
+	Error413ApplicationProblemPlusJSONResponse
+}
+
+func (response RecoverNodeSharedStorage413ApplicationProblemPlusJSONResponse) VisitRecoverNodeSharedStorageResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(413)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RecoverNodeSharedStorage415ApplicationProblemPlusJSONResponse struct {
+	Error415ApplicationProblemPlusJSONResponse
+}
+
+func (response RecoverNodeSharedStorage415ApplicationProblemPlusJSONResponse) VisitRecoverNodeSharedStorageResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(415)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RecoverNodeSharedStorage422ApplicationProblemPlusJSONResponse struct {
+	Error422ApplicationProblemPlusJSONResponse
+}
+
+func (response RecoverNodeSharedStorage422ApplicationProblemPlusJSONResponse) VisitRecoverNodeSharedStorageResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RecoverNodeSharedStorage428ApplicationProblemPlusJSONResponse struct {
+	Error428ApplicationProblemPlusJSONResponse
+}
+
+func (response RecoverNodeSharedStorage428ApplicationProblemPlusJSONResponse) VisitRecoverNodeSharedStorageResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(428)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RecoverNodeSharedStorage429ApplicationProblemPlusJSONResponse struct {
+	Error429ApplicationProblemPlusJSONResponse
+}
+
+func (response RecoverNodeSharedStorage429ApplicationProblemPlusJSONResponse) VisitRecoverNodeSharedStorageResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.RetryAfter != nil {
+		w.Header().Set("Retry-After", fmt.Sprint(*response.Headers.RetryAfter))
+	}
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(429)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RecoverNodeSharedStorage500ApplicationProblemPlusJSONResponse struct {
+	Error500ApplicationProblemPlusJSONResponse
+}
+
+func (response RecoverNodeSharedStorage500ApplicationProblemPlusJSONResponse) VisitRecoverNodeSharedStorageResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RecoverNodeSharedStorage503ApplicationProblemPlusJSONResponse struct {
+	Error503ApplicationProblemPlusJSONResponse
+}
+
+func (response RecoverNodeSharedStorage503ApplicationProblemPlusJSONResponse) VisitRecoverNodeSharedStorageResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(503)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RecoverNodeSharedStorage504ApplicationProblemPlusJSONResponse struct {
+	Error504ApplicationProblemPlusJSONResponse
+}
+
+func (response RecoverNodeSharedStorage504ApplicationProblemPlusJSONResponse) VisitRecoverNodeSharedStorageResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(504)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type GetNodeStatusRequestObject struct {
 	NodeId string `json:"node_id"`
 }
@@ -43922,6 +45422,1390 @@ func (response UpdateNavigation504ApplicationProblemPlusJSONResponse) VisitUpdat
 	return err
 }
 
+type GetSharedStorageRequestObject struct {
+}
+
+type GetSharedStorageResponseObject interface {
+	VisitGetSharedStorageResponse(w http.ResponseWriter) error
+}
+
+type GetSharedStorage200ResponseHeaders struct {
+	XRequestID string
+}
+
+type GetSharedStorage200JSONResponse struct {
+	Body    SharedStorageOverview
+	Headers GetSharedStorage200ResponseHeaders
+}
+
+func (response GetSharedStorage200JSONResponse) VisitGetSharedStorageResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetSharedStorage400ApplicationProblemPlusJSONResponse struct {
+	Error400ApplicationProblemPlusJSONResponse
+}
+
+func (response GetSharedStorage400ApplicationProblemPlusJSONResponse) VisitGetSharedStorageResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetSharedStorage401ApplicationProblemPlusJSONResponse struct {
+	Error401ApplicationProblemPlusJSONResponse
+}
+
+func (response GetSharedStorage401ApplicationProblemPlusJSONResponse) VisitGetSharedStorageResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetSharedStorage403ApplicationProblemPlusJSONResponse struct {
+	Error403ApplicationProblemPlusJSONResponse
+}
+
+func (response GetSharedStorage403ApplicationProblemPlusJSONResponse) VisitGetSharedStorageResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetSharedStorage404ApplicationProblemPlusJSONResponse struct {
+	Error404ApplicationProblemPlusJSONResponse
+}
+
+func (response GetSharedStorage404ApplicationProblemPlusJSONResponse) VisitGetSharedStorageResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetSharedStorage405ApplicationProblemPlusJSONResponse struct {
+	Error405ApplicationProblemPlusJSONResponse
+}
+
+func (response GetSharedStorage405ApplicationProblemPlusJSONResponse) VisitGetSharedStorageResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.Allow != nil {
+		w.Header().Set("Allow", fmt.Sprint(*response.Headers.Allow))
+	}
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(405)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetSharedStorage406ApplicationProblemPlusJSONResponse struct {
+	Error406ApplicationProblemPlusJSONResponse
+}
+
+func (response GetSharedStorage406ApplicationProblemPlusJSONResponse) VisitGetSharedStorageResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(406)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetSharedStorage409ApplicationProblemPlusJSONResponse struct {
+	Error409ApplicationProblemPlusJSONResponse
+}
+
+func (response GetSharedStorage409ApplicationProblemPlusJSONResponse) VisitGetSharedStorageResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetSharedStorage412ApplicationProblemPlusJSONResponse struct {
+	Error412ApplicationProblemPlusJSONResponse
+}
+
+func (response GetSharedStorage412ApplicationProblemPlusJSONResponse) VisitGetSharedStorageResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(412)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetSharedStorage413ApplicationProblemPlusJSONResponse struct {
+	Error413ApplicationProblemPlusJSONResponse
+}
+
+func (response GetSharedStorage413ApplicationProblemPlusJSONResponse) VisitGetSharedStorageResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(413)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetSharedStorage415ApplicationProblemPlusJSONResponse struct {
+	Error415ApplicationProblemPlusJSONResponse
+}
+
+func (response GetSharedStorage415ApplicationProblemPlusJSONResponse) VisitGetSharedStorageResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(415)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetSharedStorage422ApplicationProblemPlusJSONResponse struct {
+	Error422ApplicationProblemPlusJSONResponse
+}
+
+func (response GetSharedStorage422ApplicationProblemPlusJSONResponse) VisitGetSharedStorageResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetSharedStorage428ApplicationProblemPlusJSONResponse struct {
+	Error428ApplicationProblemPlusJSONResponse
+}
+
+func (response GetSharedStorage428ApplicationProblemPlusJSONResponse) VisitGetSharedStorageResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(428)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetSharedStorage429ApplicationProblemPlusJSONResponse struct {
+	Error429ApplicationProblemPlusJSONResponse
+}
+
+func (response GetSharedStorage429ApplicationProblemPlusJSONResponse) VisitGetSharedStorageResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.RetryAfter != nil {
+		w.Header().Set("Retry-After", fmt.Sprint(*response.Headers.RetryAfter))
+	}
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(429)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetSharedStorage500ApplicationProblemPlusJSONResponse struct {
+	Error500ApplicationProblemPlusJSONResponse
+}
+
+func (response GetSharedStorage500ApplicationProblemPlusJSONResponse) VisitGetSharedStorageResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetSharedStorage503ApplicationProblemPlusJSONResponse struct {
+	Error503ApplicationProblemPlusJSONResponse
+}
+
+func (response GetSharedStorage503ApplicationProblemPlusJSONResponse) VisitGetSharedStorageResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(503)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetSharedStorage504ApplicationProblemPlusJSONResponse struct {
+	Error504ApplicationProblemPlusJSONResponse
+}
+
+func (response GetSharedStorage504ApplicationProblemPlusJSONResponse) VisitGetSharedStorageResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(504)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetSharedConsolesRequestObject struct {
+}
+
+type GetSharedConsolesResponseObject interface {
+	VisitGetSharedConsolesResponse(w http.ResponseWriter) error
+}
+
+type GetSharedConsoles200ResponseHeaders struct {
+	XRequestID string
+}
+
+type GetSharedConsoles200JSONResponse struct {
+	Body    SharedConsoles
+	Headers GetSharedConsoles200ResponseHeaders
+}
+
+func (response GetSharedConsoles200JSONResponse) VisitGetSharedConsolesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetSharedConsoles400ApplicationProblemPlusJSONResponse struct {
+	Error400ApplicationProblemPlusJSONResponse
+}
+
+func (response GetSharedConsoles400ApplicationProblemPlusJSONResponse) VisitGetSharedConsolesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetSharedConsoles401ApplicationProblemPlusJSONResponse struct {
+	Error401ApplicationProblemPlusJSONResponse
+}
+
+func (response GetSharedConsoles401ApplicationProblemPlusJSONResponse) VisitGetSharedConsolesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetSharedConsoles403ApplicationProblemPlusJSONResponse struct {
+	Error403ApplicationProblemPlusJSONResponse
+}
+
+func (response GetSharedConsoles403ApplicationProblemPlusJSONResponse) VisitGetSharedConsolesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetSharedConsoles404ApplicationProblemPlusJSONResponse struct {
+	Error404ApplicationProblemPlusJSONResponse
+}
+
+func (response GetSharedConsoles404ApplicationProblemPlusJSONResponse) VisitGetSharedConsolesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetSharedConsoles405ApplicationProblemPlusJSONResponse struct {
+	Error405ApplicationProblemPlusJSONResponse
+}
+
+func (response GetSharedConsoles405ApplicationProblemPlusJSONResponse) VisitGetSharedConsolesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.Allow != nil {
+		w.Header().Set("Allow", fmt.Sprint(*response.Headers.Allow))
+	}
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(405)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetSharedConsoles406ApplicationProblemPlusJSONResponse struct {
+	Error406ApplicationProblemPlusJSONResponse
+}
+
+func (response GetSharedConsoles406ApplicationProblemPlusJSONResponse) VisitGetSharedConsolesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(406)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetSharedConsoles409ApplicationProblemPlusJSONResponse struct {
+	Error409ApplicationProblemPlusJSONResponse
+}
+
+func (response GetSharedConsoles409ApplicationProblemPlusJSONResponse) VisitGetSharedConsolesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetSharedConsoles412ApplicationProblemPlusJSONResponse struct {
+	Error412ApplicationProblemPlusJSONResponse
+}
+
+func (response GetSharedConsoles412ApplicationProblemPlusJSONResponse) VisitGetSharedConsolesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(412)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetSharedConsoles413ApplicationProblemPlusJSONResponse struct {
+	Error413ApplicationProblemPlusJSONResponse
+}
+
+func (response GetSharedConsoles413ApplicationProblemPlusJSONResponse) VisitGetSharedConsolesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(413)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetSharedConsoles415ApplicationProblemPlusJSONResponse struct {
+	Error415ApplicationProblemPlusJSONResponse
+}
+
+func (response GetSharedConsoles415ApplicationProblemPlusJSONResponse) VisitGetSharedConsolesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(415)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetSharedConsoles422ApplicationProblemPlusJSONResponse struct {
+	Error422ApplicationProblemPlusJSONResponse
+}
+
+func (response GetSharedConsoles422ApplicationProblemPlusJSONResponse) VisitGetSharedConsolesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetSharedConsoles428ApplicationProblemPlusJSONResponse struct {
+	Error428ApplicationProblemPlusJSONResponse
+}
+
+func (response GetSharedConsoles428ApplicationProblemPlusJSONResponse) VisitGetSharedConsolesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(428)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetSharedConsoles429ApplicationProblemPlusJSONResponse struct {
+	Error429ApplicationProblemPlusJSONResponse
+}
+
+func (response GetSharedConsoles429ApplicationProblemPlusJSONResponse) VisitGetSharedConsolesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.RetryAfter != nil {
+		w.Header().Set("Retry-After", fmt.Sprint(*response.Headers.RetryAfter))
+	}
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(429)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetSharedConsoles500ApplicationProblemPlusJSONResponse struct {
+	Error500ApplicationProblemPlusJSONResponse
+}
+
+func (response GetSharedConsoles500ApplicationProblemPlusJSONResponse) VisitGetSharedConsolesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetSharedConsoles503ApplicationProblemPlusJSONResponse struct {
+	Error503ApplicationProblemPlusJSONResponse
+}
+
+func (response GetSharedConsoles503ApplicationProblemPlusJSONResponse) VisitGetSharedConsolesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(503)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetSharedConsoles504ApplicationProblemPlusJSONResponse struct {
+	Error504ApplicationProblemPlusJSONResponse
+}
+
+func (response GetSharedConsoles504ApplicationProblemPlusJSONResponse) VisitGetSharedConsolesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(504)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SaveSharedConsolesRequestObject struct {
+	Params SaveSharedConsolesParams
+	Body   *SaveSharedConsolesJSONRequestBody
+}
+
+type SaveSharedConsolesResponseObject interface {
+	VisitSaveSharedConsolesResponse(w http.ResponseWriter) error
+}
+
+type SaveSharedConsoles200ResponseHeaders struct {
+	XRequestID string
+}
+
+type SaveSharedConsoles200JSONResponse struct {
+	Body    SharedConsoles
+	Headers SaveSharedConsoles200ResponseHeaders
+}
+
+func (response SaveSharedConsoles200JSONResponse) VisitSaveSharedConsolesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SaveSharedConsoles400ApplicationProblemPlusJSONResponse struct {
+	Error400ApplicationProblemPlusJSONResponse
+}
+
+func (response SaveSharedConsoles400ApplicationProblemPlusJSONResponse) VisitSaveSharedConsolesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SaveSharedConsoles401ApplicationProblemPlusJSONResponse struct {
+	Error401ApplicationProblemPlusJSONResponse
+}
+
+func (response SaveSharedConsoles401ApplicationProblemPlusJSONResponse) VisitSaveSharedConsolesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SaveSharedConsoles403ApplicationProblemPlusJSONResponse struct {
+	Error403ApplicationProblemPlusJSONResponse
+}
+
+func (response SaveSharedConsoles403ApplicationProblemPlusJSONResponse) VisitSaveSharedConsolesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SaveSharedConsoles404ApplicationProblemPlusJSONResponse struct {
+	Error404ApplicationProblemPlusJSONResponse
+}
+
+func (response SaveSharedConsoles404ApplicationProblemPlusJSONResponse) VisitSaveSharedConsolesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SaveSharedConsoles405ApplicationProblemPlusJSONResponse struct {
+	Error405ApplicationProblemPlusJSONResponse
+}
+
+func (response SaveSharedConsoles405ApplicationProblemPlusJSONResponse) VisitSaveSharedConsolesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.Allow != nil {
+		w.Header().Set("Allow", fmt.Sprint(*response.Headers.Allow))
+	}
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(405)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SaveSharedConsoles406ApplicationProblemPlusJSONResponse struct {
+	Error406ApplicationProblemPlusJSONResponse
+}
+
+func (response SaveSharedConsoles406ApplicationProblemPlusJSONResponse) VisitSaveSharedConsolesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(406)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SaveSharedConsoles409ApplicationProblemPlusJSONResponse struct {
+	Error409ApplicationProblemPlusJSONResponse
+}
+
+func (response SaveSharedConsoles409ApplicationProblemPlusJSONResponse) VisitSaveSharedConsolesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SaveSharedConsoles412ApplicationProblemPlusJSONResponse struct {
+	Error412ApplicationProblemPlusJSONResponse
+}
+
+func (response SaveSharedConsoles412ApplicationProblemPlusJSONResponse) VisitSaveSharedConsolesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(412)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SaveSharedConsoles413ApplicationProblemPlusJSONResponse struct {
+	Error413ApplicationProblemPlusJSONResponse
+}
+
+func (response SaveSharedConsoles413ApplicationProblemPlusJSONResponse) VisitSaveSharedConsolesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(413)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SaveSharedConsoles415ApplicationProblemPlusJSONResponse struct {
+	Error415ApplicationProblemPlusJSONResponse
+}
+
+func (response SaveSharedConsoles415ApplicationProblemPlusJSONResponse) VisitSaveSharedConsolesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(415)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SaveSharedConsoles422ApplicationProblemPlusJSONResponse struct {
+	Error422ApplicationProblemPlusJSONResponse
+}
+
+func (response SaveSharedConsoles422ApplicationProblemPlusJSONResponse) VisitSaveSharedConsolesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SaveSharedConsoles428ApplicationProblemPlusJSONResponse struct {
+	Error428ApplicationProblemPlusJSONResponse
+}
+
+func (response SaveSharedConsoles428ApplicationProblemPlusJSONResponse) VisitSaveSharedConsolesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(428)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SaveSharedConsoles429ApplicationProblemPlusJSONResponse struct {
+	Error429ApplicationProblemPlusJSONResponse
+}
+
+func (response SaveSharedConsoles429ApplicationProblemPlusJSONResponse) VisitSaveSharedConsolesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.RetryAfter != nil {
+		w.Header().Set("Retry-After", fmt.Sprint(*response.Headers.RetryAfter))
+	}
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(429)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SaveSharedConsoles500ApplicationProblemPlusJSONResponse struct {
+	Error500ApplicationProblemPlusJSONResponse
+}
+
+func (response SaveSharedConsoles500ApplicationProblemPlusJSONResponse) VisitSaveSharedConsolesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SaveSharedConsoles503ApplicationProblemPlusJSONResponse struct {
+	Error503ApplicationProblemPlusJSONResponse
+}
+
+func (response SaveSharedConsoles503ApplicationProblemPlusJSONResponse) VisitSaveSharedConsolesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(503)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SaveSharedConsoles504ApplicationProblemPlusJSONResponse struct {
+	Error504ApplicationProblemPlusJSONResponse
+}
+
+func (response SaveSharedConsoles504ApplicationProblemPlusJSONResponse) VisitSaveSharedConsolesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(504)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type InitializeSharedStorageRequestObject struct {
+	Params InitializeSharedStorageParams
+	Body   *InitializeSharedStorageJSONRequestBody
+}
+
+type InitializeSharedStorageResponseObject interface {
+	VisitInitializeSharedStorageResponse(w http.ResponseWriter) error
+}
+
+type InitializeSharedStorage202ResponseHeaders struct {
+	XRequestID string
+}
+
+type InitializeSharedStorage202JSONResponse struct {
+	Body    Operation
+	Headers InitializeSharedStorage202ResponseHeaders
+}
+
+func (response InitializeSharedStorage202JSONResponse) VisitInitializeSharedStorageResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(202)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type InitializeSharedStorage400ApplicationProblemPlusJSONResponse struct {
+	Error400ApplicationProblemPlusJSONResponse
+}
+
+func (response InitializeSharedStorage400ApplicationProblemPlusJSONResponse) VisitInitializeSharedStorageResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type InitializeSharedStorage401ApplicationProblemPlusJSONResponse struct {
+	Error401ApplicationProblemPlusJSONResponse
+}
+
+func (response InitializeSharedStorage401ApplicationProblemPlusJSONResponse) VisitInitializeSharedStorageResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type InitializeSharedStorage403ApplicationProblemPlusJSONResponse struct {
+	Error403ApplicationProblemPlusJSONResponse
+}
+
+func (response InitializeSharedStorage403ApplicationProblemPlusJSONResponse) VisitInitializeSharedStorageResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type InitializeSharedStorage404ApplicationProblemPlusJSONResponse struct {
+	Error404ApplicationProblemPlusJSONResponse
+}
+
+func (response InitializeSharedStorage404ApplicationProblemPlusJSONResponse) VisitInitializeSharedStorageResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type InitializeSharedStorage405ApplicationProblemPlusJSONResponse struct {
+	Error405ApplicationProblemPlusJSONResponse
+}
+
+func (response InitializeSharedStorage405ApplicationProblemPlusJSONResponse) VisitInitializeSharedStorageResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.Allow != nil {
+		w.Header().Set("Allow", fmt.Sprint(*response.Headers.Allow))
+	}
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(405)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type InitializeSharedStorage406ApplicationProblemPlusJSONResponse struct {
+	Error406ApplicationProblemPlusJSONResponse
+}
+
+func (response InitializeSharedStorage406ApplicationProblemPlusJSONResponse) VisitInitializeSharedStorageResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(406)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type InitializeSharedStorage409ApplicationProblemPlusJSONResponse struct {
+	Error409ApplicationProblemPlusJSONResponse
+}
+
+func (response InitializeSharedStorage409ApplicationProblemPlusJSONResponse) VisitInitializeSharedStorageResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type InitializeSharedStorage412ApplicationProblemPlusJSONResponse struct {
+	Error412ApplicationProblemPlusJSONResponse
+}
+
+func (response InitializeSharedStorage412ApplicationProblemPlusJSONResponse) VisitInitializeSharedStorageResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(412)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type InitializeSharedStorage413ApplicationProblemPlusJSONResponse struct {
+	Error413ApplicationProblemPlusJSONResponse
+}
+
+func (response InitializeSharedStorage413ApplicationProblemPlusJSONResponse) VisitInitializeSharedStorageResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(413)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type InitializeSharedStorage415ApplicationProblemPlusJSONResponse struct {
+	Error415ApplicationProblemPlusJSONResponse
+}
+
+func (response InitializeSharedStorage415ApplicationProblemPlusJSONResponse) VisitInitializeSharedStorageResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(415)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type InitializeSharedStorage422ApplicationProblemPlusJSONResponse struct {
+	Error422ApplicationProblemPlusJSONResponse
+}
+
+func (response InitializeSharedStorage422ApplicationProblemPlusJSONResponse) VisitInitializeSharedStorageResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type InitializeSharedStorage428ApplicationProblemPlusJSONResponse struct {
+	Error428ApplicationProblemPlusJSONResponse
+}
+
+func (response InitializeSharedStorage428ApplicationProblemPlusJSONResponse) VisitInitializeSharedStorageResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(428)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type InitializeSharedStorage429ApplicationProblemPlusJSONResponse struct {
+	Error429ApplicationProblemPlusJSONResponse
+}
+
+func (response InitializeSharedStorage429ApplicationProblemPlusJSONResponse) VisitInitializeSharedStorageResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.RetryAfter != nil {
+		w.Header().Set("Retry-After", fmt.Sprint(*response.Headers.RetryAfter))
+	}
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(429)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type InitializeSharedStorage500ApplicationProblemPlusJSONResponse struct {
+	Error500ApplicationProblemPlusJSONResponse
+}
+
+func (response InitializeSharedStorage500ApplicationProblemPlusJSONResponse) VisitInitializeSharedStorageResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type InitializeSharedStorage503ApplicationProblemPlusJSONResponse struct {
+	Error503ApplicationProblemPlusJSONResponse
+}
+
+func (response InitializeSharedStorage503ApplicationProblemPlusJSONResponse) VisitInitializeSharedStorageResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(503)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type InitializeSharedStorage504ApplicationProblemPlusJSONResponse struct {
+	Error504ApplicationProblemPlusJSONResponse
+}
+
+func (response InitializeSharedStorage504ApplicationProblemPlusJSONResponse) VisitInitializeSharedStorageResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(504)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type ListScheduledTasksRequestObject struct {
 	Params ListScheduledTasksParams
 }
@@ -44671,6 +47555,9 @@ type StrictServerInterface interface {
 	// ChangeDatabase 受理数据库变更
 	// (POST /database-clusters/{id}/changes)
 	ChangeDatabase(ctx context.Context, request ChangeDatabaseRequestObject) (ChangeDatabaseResponseObject, error)
+	// ChangeDatabaseCoordinator 转交数据库协调权
+	// (POST /database-clusters/{id}/coordinator)
+	ChangeDatabaseCoordinator(ctx context.Context, request ChangeDatabaseCoordinatorRequestObject) (ChangeDatabaseCoordinatorResponseObject, error)
 	// AddDatabaseMembers 添加数据库成员
 	// (POST /database-clusters/{id}/members/actions)
 	AddDatabaseMembers(ctx context.Context, request AddDatabaseMembersRequestObject) (AddDatabaseMembersResponseObject, error)
@@ -44818,6 +47705,12 @@ type StrictServerInterface interface {
 	// RefreshPublicAddresses 重新发现公网地址
 	// (POST /nodes/{node_id}/public-addresses/actions)
 	RefreshPublicAddresses(ctx context.Context, request RefreshPublicAddressesRequestObject) (RefreshPublicAddressesResponseObject, error)
+	// GetNodeSharedStorage 读取节点自用代理
+	// (GET /nodes/{node_id}/shared-storage)
+	GetNodeSharedStorage(ctx context.Context, request GetNodeSharedStorageRequestObject) (GetNodeSharedStorageResponseObject, error)
+	// RecoverNodeSharedStorage 核对节点数据恢复
+	// (POST /nodes/{node_id}/shared-storage/recovery)
+	RecoverNodeSharedStorage(ctx context.Context, request RecoverNodeSharedStorageRequestObject) (RecoverNodeSharedStorageResponseObject, error)
 	// GetNodeStatus 读取节点连接状态
 	// (GET /nodes/{node_id}/status)
 	GetNodeStatus(ctx context.Context, request GetNodeStatusRequestObject) (GetNodeStatusResponseObject, error)
@@ -44884,6 +47777,18 @@ type StrictServerInterface interface {
 	// UpdateNavigation 保存菜单顺序
 	// (PUT /settings/navigation)
 	UpdateNavigation(ctx context.Context, request UpdateNavigationRequestObject) (UpdateNavigationResponseObject, error)
+	// GetSharedStorage 读取 OPSD 数据绑定
+	// (GET /shared-storage)
+	GetSharedStorage(ctx context.Context, request GetSharedStorageRequestObject) (GetSharedStorageResponseObject, error)
+	// GetSharedConsoles 读取主用与备用管理节点
+	// (GET /shared-storage/consoles)
+	GetSharedConsoles(ctx context.Context, request GetSharedConsolesRequestObject) (GetSharedConsolesResponseObject, error)
+	// SaveSharedConsoles 保存主用与备用管理节点
+	// (PUT /shared-storage/consoles)
+	SaveSharedConsoles(ctx context.Context, request SaveSharedConsolesRequestObject) (SaveSharedConsolesResponseObject, error)
+	// InitializeSharedStorage 初始化 OPSD 数据库
+	// (POST /shared-storage/initialize)
+	InitializeSharedStorage(ctx context.Context, request InitializeSharedStorageRequestObject) (InitializeSharedStorageResponseObject, error)
 	// ListScheduledTasks listScheduledTasks
 	// (GET /tasks)
 	ListScheduledTasks(ctx context.Context, request ListScheduledTasksRequestObject) (ListScheduledTasksResponseObject, error)
@@ -45587,6 +48492,40 @@ func (sh *strictHandler) ChangeDatabase(w http.ResponseWriter, r *http.Request, 
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(ChangeDatabaseResponseObject); ok {
 		if err := validResponse.VisitChangeDatabaseResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ChangeDatabaseCoordinator operation middleware
+func (sh *strictHandler) ChangeDatabaseCoordinator(w http.ResponseWriter, r *http.Request, id string, params ChangeDatabaseCoordinatorParams) {
+	var request ChangeDatabaseCoordinatorRequestObject
+
+	request.Id = id
+	request.Params = params
+
+	var body ChangeDatabaseCoordinatorJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ChangeDatabaseCoordinator(ctx, request.(ChangeDatabaseCoordinatorRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ChangeDatabaseCoordinator")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ChangeDatabaseCoordinatorResponseObject); ok {
+		if err := validResponse.VisitChangeDatabaseCoordinatorResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -47041,6 +49980,59 @@ func (sh *strictHandler) RefreshPublicAddresses(w http.ResponseWriter, r *http.R
 	}
 }
 
+// GetNodeSharedStorage operation middleware
+func (sh *strictHandler) GetNodeSharedStorage(w http.ResponseWriter, r *http.Request, nodeId string) {
+	var request GetNodeSharedStorageRequestObject
+
+	request.NodeId = nodeId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetNodeSharedStorage(ctx, request.(GetNodeSharedStorageRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetNodeSharedStorage")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetNodeSharedStorageResponseObject); ok {
+		if err := validResponse.VisitGetNodeSharedStorageResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// RecoverNodeSharedStorage operation middleware
+func (sh *strictHandler) RecoverNodeSharedStorage(w http.ResponseWriter, r *http.Request, nodeId string, params RecoverNodeSharedStorageParams) {
+	var request RecoverNodeSharedStorageRequestObject
+
+	request.NodeId = nodeId
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.RecoverNodeSharedStorage(ctx, request.(RecoverNodeSharedStorageRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "RecoverNodeSharedStorage")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(RecoverNodeSharedStorageResponseObject); ok {
+		if err := validResponse.VisitRecoverNodeSharedStorageResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // GetNodeStatus operation middleware
 func (sh *strictHandler) GetNodeStatus(w http.ResponseWriter, r *http.Request, nodeId string) {
 	var request GetNodeStatusRequestObject
@@ -47648,6 +50640,120 @@ func (sh *strictHandler) UpdateNavigation(w http.ResponseWriter, r *http.Request
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(UpdateNavigationResponseObject); ok {
 		if err := validResponse.VisitUpdateNavigationResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetSharedStorage operation middleware
+func (sh *strictHandler) GetSharedStorage(w http.ResponseWriter, r *http.Request) {
+	var request GetSharedStorageRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetSharedStorage(ctx, request.(GetSharedStorageRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetSharedStorage")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetSharedStorageResponseObject); ok {
+		if err := validResponse.VisitGetSharedStorageResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetSharedConsoles operation middleware
+func (sh *strictHandler) GetSharedConsoles(w http.ResponseWriter, r *http.Request) {
+	var request GetSharedConsolesRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetSharedConsoles(ctx, request.(GetSharedConsolesRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetSharedConsoles")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetSharedConsolesResponseObject); ok {
+		if err := validResponse.VisitGetSharedConsolesResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// SaveSharedConsoles operation middleware
+func (sh *strictHandler) SaveSharedConsoles(w http.ResponseWriter, r *http.Request, params SaveSharedConsolesParams) {
+	var request SaveSharedConsolesRequestObject
+
+	request.Params = params
+
+	var body SaveSharedConsolesJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.SaveSharedConsoles(ctx, request.(SaveSharedConsolesRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "SaveSharedConsoles")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(SaveSharedConsolesResponseObject); ok {
+		if err := validResponse.VisitSaveSharedConsolesResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// InitializeSharedStorage operation middleware
+func (sh *strictHandler) InitializeSharedStorage(w http.ResponseWriter, r *http.Request, params InitializeSharedStorageParams) {
+	var request InitializeSharedStorageRequestObject
+
+	request.Params = params
+
+	var body InitializeSharedStorageJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.InitializeSharedStorage(ctx, request.(InitializeSharedStorageRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "InitializeSharedStorage")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(InitializeSharedStorageResponseObject); ok {
+		if err := validResponse.VisitInitializeSharedStorageResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

@@ -2,16 +2,16 @@
 
 ## 实际入口
 
-- `backend/cmd/opsd/main.go` → `backend/internal/cli/node.go`：install、node、network、console、api、account、executor、operation、recover。
+- `backend/cmd/opsd/main.go` → `backend/internal/cli/node.go`：install、node、network、console、api、account、executor、operation、recover、data init/status/recover。
 - `backend/internal/installation/node.go`：安装记录和 systemd 服务；重复安装先读取已有实例，不重新生成身份或账号。`address.go` 在新安装写入前识别加入节点的地址。
-- `backend/internal/cluster`：节点身份、成员目录、Noise 通信、持久队列、配置及账号、签名记录、CouchDB 上传和查询。`node.go` 定义本机配置和默认值，`firewall.go` 连接统一防火墙配置与队列。
+- `backend/internal/cluster`：节点身份、成员目录、Noise 通信、持久队列、配置及账号、签名记录、共享 SQL 上传、查询及迁移。`node.go` 定义本机配置和默认值，`firewall.go` 连接统一防火墙配置与队列。
 - `backend/internal/control`：浏览器会话、HTTP、SSE；`backend/internal/executor`：root Socket 和类型化服务；`backend/internal/operations`：独立执行、读回、确认与恢复；`backend/internal/firewall`：UFW、firewalld、nftables 适配。
 - `backend/internal/monitoring` 与 `frontend/gpt2/src/monitoring.tsx`：本机历史采集、当前读数与趋势。当前缺值显示“—”，不能拿历史补当前数据。
 - `backend/internal/dockerengine`：显式本机 Socket、官方 SDK、容器身份核对和有界日志；容器执行意图保存在执行器 SQLite，恢复入口只核对原操作。列表与日志分别合并五秒及两秒内读取，操作更新后清除缓存。
 - `backend/internal/apiauth` 与 `backend/internal/control/api_authorization.go`：令牌摘要、生命周期、统一模块与资源权限；核验通过 `cluster/api_tokens.go`，受理身份进入原队列。
 - `backend/internal/databaseengine`：本机数据库发现、Galera／ProxySQL 读写及只读备份状态；`cluster/database_workflow.go` 管理协调与远端持久步骤，`operations/database.go` 保存发送意图及恢复记录。
 
-本机 SQLite 保存身份、配置、账号、队列及待上传记录。附近 CouchDB 保存共享数据和历史；其不可用不阻塞本机控制。普通节点不保存其他节点完整历史。
+本机 SQLite 保存身份、配置、账号、目标队列及待上传记录。`sharedsql` 经每节点本机 ProxySQL 连接现有 Galera 的 `opsd_core`，保存共享权限、定义、流程、回执及历史。迁移与故障处理读取 [共享存储契约](../../../../docs/ARCHITECTURE.md#共享存储协调与恢复)，旧 CouchDB 保留导入读取。
 
 节点与执行器数据库统一通过 `storage.Open` 及 `backend/internal/storage/migrations` 迁移。既有节点的首次迁移登记原结构，后续连续编号；不能重新初始化身份或队列。`state_cleanup.go` 分批整理已上传的重复防火墙状态，保留实际变化、每对象最新状态和未上传资料，不删除 CouchDB 签名历史。
 
@@ -19,7 +19,7 @@
 
 `peer.go` 管理拨号、连接复用、常驻提升及空闲回收，`peer_dispatch.go` 维护普通与控制队列；接收循环先分发应答。`transport.Channel` 的协议分片可以交错，协议版本升级不改变持久操作契约。`directory_exchange.go` 按对象摘要生成差异；完整目录仅用于加入或对端缺少摘要。未知写入仍查询原请求，不因连接替换自动重发。
 
-`current_reads.go` 在入口共享当前资源，立即返回已有状态，目标独立刷新并从取得名额起计算期限；无页面请求后停止。`read.state` 区分排队、读取、已有数据、过期、超时、失败与离线。`database_reads.go` 按健康和页签分类，`databaseengine` 只负责本机 SQL 与有界连接池，写入前检查不复用展示缓存。`history.go` 复用请求内选库和公钥，批量分页后归并图表时间桶。采集、上传及 CouchDB 维护分别运行；承载节点采用双向环复制。
+`current_reads.go` 在入口共享当前资源，立即返回已有状态，目标独立刷新并从取得名额起计算期限；无页面请求后停止。`read.state` 区分排队、读取、已有数据、过期、超时、失败与离线。`database_reads.go` 按健康和页签分类，`databaseengine` 只负责本机 SQL 与有界连接池，写入前检查不复用展示缓存。`history.go` 复用请求内选库和公钥，批量分页后归并图表时间桶。采集、上传及共享库／代理维护分别运行。
 
 服务结果、读取故障与来源时间分别保存；操作元信息由 `operation_description.go` 在受理事务写入，历史缺值保持未知。`proxy_routing.go` 管理策略预览与持久工作流，`proxy_ranking.go` 在代理所属节点后台维护本机排序；节点迁移 `006_proxy_routing.sql` 只增加本机状态表。CouchDB 维护复用节点 HTTP Transport、变化唤醒及有上限退避，互信五秒维护保留、事件按实际变化发送。
 

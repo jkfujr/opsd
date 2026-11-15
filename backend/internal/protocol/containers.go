@@ -21,12 +21,17 @@ func (r ContainerRef) Validate() error {
 }
 
 type ContainerAction struct {
+	ProjectKnown bool `json:"project_known,omitempty"`
 	ContainerRef
+	Project          string `json:"project,omitempty"`
 	Action           string `json:"action"`
 	ExpectedRevision string `json:"expected_revision,omitempty"`
 }
 
 func (a ContainerAction) Validate() error {
+	if a.Project != "" && !composeName.MatchString(a.Project) {
+		return fmt.Errorf("容器项目名称无效")
+	}
 	if err := a.ContainerRef.Validate(); err != nil {
 		return err
 	}

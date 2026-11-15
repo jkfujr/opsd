@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/jkfujr/opsd/internal/firewall"
-	"github.com/jkfujr/opsd/internal/operations"
 	"github.com/jkfujr/opsd/internal/protocol"
 	"github.com/jkfujr/opsd/internal/publicaddress"
 )
@@ -95,13 +94,6 @@ func (s *Services) SyncTrust(ctx context.Context) error {
 		return e
 	}
 	defer unlock()
-	ids, e := s.Engine.Store.Pending(ctx)
-	if e != nil {
-		return e
-	}
-	if len(ids) > 0 {
-		return operations.ErrBusy
-	}
 	status.Results = s.Engine.Manager.SyncPeerTrust(ctx, target)
 	status.TargetRevision = target.Revision
 	status.ReceivedRevision = target.Revision

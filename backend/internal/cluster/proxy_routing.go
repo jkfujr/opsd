@@ -123,9 +123,15 @@ func (n *Node) PreviewProxyRouting(ctx context.Context, c ManagedDatabaseCluster
 	}
 	for i, ref := range c.Proxies {
 		if err := n.Call(ctx, ref.NodeID, "database.instance.get", DatabaseRPC{InstanceID: ref.InstanceID}, &instances[i]); err != nil {
+			if n.sharedActive() {
+				continue
+			}
 			return out, err
 		}
 		if err := n.Call(ctx, ref.NodeID, "database.proxy_routing.read", DatabaseRPC{InstanceID: ref.InstanceID, Hostgroups: groups}, &observations[i]); err != nil {
+			if n.sharedActive() {
+				continue
+			}
 			return out, err
 		}
 		if groups == nil {
@@ -141,6 +147,9 @@ func (n *Node) PreviewProxyRouting(ctx context.Context, c ManagedDatabaseCluster
 		if observations[i].SplitRouting {
 			return out, fault("conflict", ref.Name+" 的查询规则包含其他读写主机组，请先调整路由")
 		}
+	}
+	if groups == nil {
+		return out, fault("dependency_unavailable", "尚未取得代理主机组配置")
 	}
 	policy := protocol.ProxyRoutingPolicy{Enabled: input.Enabled, Automatic: input.Automatic, Hostgroups: *groups, Backends: []protocol.ProxyBackend{}, Retired: []protocol.ProxyEndpoint{}, Accounts: []protocol.ProxyAccountBinding{}}
 	if len(input.Backends) > 0 {
@@ -207,6 +216,9 @@ func (n *Node) PreviewProxyRouting(ctx context.Context, c ManagedDatabaseCluster
 	}
 	out.Policy = policy
 	for i, ref := range c.Proxies {
+		if instances[i].Revision == 0 || observations[i].Fingerprint == "" {
+			continue
+		}
 		state, _ := n.readProxyRoutingState(ctx, c.ID, ref)
 		order := initialProxyOrder(ref.NodeID, policy, observations[i], state.Order)
 		if !policy.Automatic && len(state.Order) == len(policy.Backends) {
@@ -289,7 +301,7 @@ func proxyRouteChanges(observation protocol.ProxyRoutingObservation, action prot
 
 func validateRoutingSubmission(input DatabaseSubmission) error {
 	c, d := input.Cluster, input.Change
-	if c.ID == "" || c.Deleted || d.Cluster != c.ID || c.Revision != d.ExpectedRevision || d.Routing == nil || len(d.RoutingTargets) != len(c.Proxies) {
+	if c.ID == "" || c.Deleted || d.Cluster != c.ID || c.Revision != d.ExpectedRevision || d.Routing == nil || (c.CoordinatorEpoch == 0 && len(d.RoutingTargets) != len(c.Proxies) || len(d.RoutingTargets) > len(c.Proxies)) {
 		return fault("invalid_request", "代理路由请求无效")
 	}
 	if err := d.Routing.Validate(); err != nil {

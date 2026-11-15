@@ -8,6 +8,27 @@ import (
 // LocalHandler 由仅本机账号和 root 可访问的 Unix Socket 提供。
 func (n *Node) LocalHandler() http.Handler {
 	mux := http.NewServeMux()
+	mux.HandleFunc("GET /shared", func(w http.ResponseWriter, r *http.Request) { json.NewEncoder(w).Encode(n.SharedStatus(r.Context())) })
+	mux.HandleFunc("POST /shared/initialize", func(w http.ResponseWriter, r *http.Request) {
+		var input SharedInitialize
+		if json.NewDecoder(http.MaxBytesReader(w, r.Body, 8192)).Decode(&input) != nil {
+			http.Error(w, "请求无效", 422)
+			return
+		}
+		op, err := n.StartSharedInitialization(r.Context(), input, "shared-init/"+input.ClusterID+"/"+input.Database)
+		if err != nil {
+			http.Error(w, err.Error(), 409)
+			return
+		}
+		json.NewEncoder(w).Encode(op)
+	})
+	mux.HandleFunc("POST /shared/recover", func(w http.ResponseWriter, r *http.Request) {
+		if err := n.RecoverSharedState(r.Context()); err != nil {
+			http.Error(w, err.Error(), 409)
+			return
+		}
+		json.NewEncoder(w).Encode(n.SharedStatus(r.Context()))
+	})
 	mux.HandleFunc("GET /self", func(w http.ResponseWriter, r *http.Request) { json.NewEncoder(w).Encode(map[string]string{"id": n.ID}) })
 	mux.HandleFunc("GET /operations/{id}", func(w http.ResponseWriter, r *http.Request) {
 		op, e := n.operation(r.Context(), r.PathValue("id"))
@@ -40,6 +61,9 @@ func (n *Node) LocalHandler() http.Handler {
 			}
 			if request.Kind == "console" {
 				c.Console = value.Enabled
+				if value.Enabled {
+					c.CoordinatorCandidate = true
+				}
 			} else {
 				c.API = value.Enabled
 			}

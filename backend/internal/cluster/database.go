@@ -186,9 +186,22 @@ func (n *Node) storageLoop() {
 	defer ticker.Stop()
 	for {
 		ctx, cancel := context.WithTimeout(n.ctx, 20*time.Second)
-		d, e := n.selectDatabase(ctx)
-		if e == nil {
-			e = n.upload(ctx, d)
+		var d *database
+		var e error
+		if n.sharedEnabled() {
+			if n.sharedActive() {
+				var storeErr error
+				store, storeErr := n.sharedStore(ctx)
+				e = storeErr
+				if e == nil {
+					e = n.uploadShared(ctx, store)
+				}
+			}
+		} else {
+			d, e = n.selectDatabase(ctx)
+			if e == nil {
+				e = n.upload(ctx, d)
+			}
 		}
 		if e == nil {
 			e = n.compactFirewallRecords(ctx)
@@ -235,7 +248,7 @@ func (n *Node) maintenanceLoop() {
 	for {
 		ctx, cancel := context.WithTimeout(n.ctx, 25*time.Second)
 		c, e := n.Config(ctx)
-		if e == nil && c.Storage.Enabled {
+		if e == nil && c.Storage.Enabled && !n.sharedEnabled() {
 			var key string
 			key, e = n.maintenanceKey(ctx, c)
 			if e == nil && (key != last || !n.Now().Before(next)) {
@@ -398,6 +411,9 @@ func activeMetricDatabase(name string, now time.Time) bool {
 	return e == nil && !at.Before(today.AddDate(0, 0, -6)) && !at.After(today)
 }
 func (n *Node) latest(ctx context.Context, owner, kind, object string) (Record, error) {
+	if n.sharedEnabled() {
+		return n.latestShared(ctx, owner, kind, object)
+	}
 	d, e := n.selectDatabase(ctx)
 	if e != nil {
 		return Record{}, e
@@ -438,6 +454,9 @@ func (n *Node) latest(ctx context.Context, owner, kind, object string) (Record, 
 	return r, e
 }
 func (n *Node) archivedOperations(ctx context.Context, owner string, q ListQuery) (OperationList, error) {
+	if n.sharedEnabled() {
+		return n.archivedSharedOperations(ctx, owner, q)
+	}
 	d, e := n.selectDatabase(ctx)
 	out := OperationList{Items: []Operation{}}
 	if e != nil {

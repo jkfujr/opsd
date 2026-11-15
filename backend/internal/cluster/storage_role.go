@@ -244,6 +244,16 @@ func (n *Node) manageDatabase(ctx context.Context) error {
 	return nil
 }
 func (n *Node) StorageStatus(ctx context.Context) (StorageStatus, error) {
+	if n.sharedEnabled() {
+		shared := n.SharedStatus(ctx)
+		state := "pending"
+		if shared.State == "ready" {
+			state = "ready"
+		} else if shared.State == "error" || shared.State == "unavailable" {
+			state = "unavailable"
+		}
+		return StorageStatus{Enabled: true, Selected: n.ID, Pending: shared.Pending, State: state, Replications: []ReplicationStatus{}}, nil
+	}
 	c, e := n.Config(ctx)
 	result := StorageStatus{Enabled: c.Storage.Enabled, State: "ready", Replications: []ReplicationStatus{}}
 	if e != nil {

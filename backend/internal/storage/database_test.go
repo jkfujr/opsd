@@ -33,9 +33,9 @@ func TestOpenAndReopen(t *testing.T) {
 						t.Fatal(err)
 					}
 				}
-				expectedVersion := 7
+				expectedVersion := 8
 				if kind == Node {
-					expectedVersion = 6
+					expectedVersion = 7
 				}
 				if count != expectedVersion || version != expectedVersion || sync != 2 || foreign != 1 || mode != "wal" {
 					t.Fatalf("数据库配置或迁移错误：记录=%d 版本=%d 同步=%d 外键=%d 日志=%s", count, version, sync, foreign, mode)

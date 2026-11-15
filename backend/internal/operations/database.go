@@ -45,6 +45,12 @@ func (e *Engine) database(ctx context.Context, l *Local) error {
 			if a.Kind == "proxy_route" && stage == "memory" {
 				name = "更新代理后端路由"
 			}
+			if stage == "shared_database" {
+				name = "维护 OPSD 数据库"
+			}
+			if a.Kind == "shared_proxy_repair" {
+				name = "恢复代理容器"
+			}
 			if stage == "deploy_network" {
 				name = "检查成员连接"
 			}
@@ -88,7 +94,7 @@ func (e *Engine) database(ctx context.Context, l *Local) error {
 					continue
 				}
 			}
-			if state.Attempted {
+			if state.Attempted && a.Kind != "shared_database" {
 				if l.Request != "recover" || l.RequestRevision != l.Record.Revision || observed.Fingerprint != state.Before {
 					return e.attention(ctx, l, fmt.Errorf("原步骤结果待核对，请重新处理或接受现状"))
 				}

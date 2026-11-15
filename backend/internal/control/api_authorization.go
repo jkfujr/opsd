@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"github.com/jkfujr/opsd/internal/apiauth"
 	"github.com/jkfujr/opsd/internal/cluster"
+	"github.com/jkfujr/opsd/internal/protocol"
 	"net/http"
 )
 
@@ -25,21 +26,7 @@ func actor(r *http.Request) string {
 	return ""
 }
 func operationModule(op cluster.Operation) string {
-	switch op.Subject {
-	case "container":
-		return "containers"
-	case "name":
-		return "nodes"
-	case "firewall", "firewall_config", "component":
-		return "firewall"
-	case "database":
-		return "databases"
-	case "task_save", "task_run":
-		return "tasks"
-	case "compose", "compose_register":
-		return "compose"
-	}
-	return ""
+	return protocol.OperationModule(op.Subject)
 }
 func (s *Server) authorizeAPI(r *http.Request, t apiauth.Token) (*http.Request, error) {
 	policy := apiRequestOf(r.Context()).route

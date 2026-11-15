@@ -11281,6 +11281,741 @@
         "x-opsd-idempotent": true,
         "x-opsd-max-body": 4194304
       }
+    },
+    "/shared-storage": {
+      "get": {
+        "operationId": "getSharedStorage",
+        "parameters": [],
+        "responses": {
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "405": {
+            "$ref": "#/components/responses/Error405"
+          },
+          "406": {
+            "$ref": "#/components/responses/Error406"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "412": {
+            "$ref": "#/components/responses/Error412"
+          },
+          "413": {
+            "$ref": "#/components/responses/Error413"
+          },
+          "415": {
+            "$ref": "#/components/responses/Error415"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error422"
+          },
+          "428": {
+            "$ref": "#/components/responses/Error428"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          },
+          "504": {
+            "$ref": "#/components/responses/Error504"
+          },
+          "200": {
+            "description": "请求成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SharedStorageOverview"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-ID": {
+                "schema": {
+                  "type": "string"
+                },
+                "required": true
+              }
+            }
+          }
+        },
+        "x-opsd-access": {
+          "level": "read",
+          "mode": "session"
+        },
+        "security": [
+          {
+            "SessionCookie": []
+          }
+        ],
+        "summary": "读取 OPSD 数据绑定",
+        "tags": [
+          "system"
+        ]
+      }
+    },
+    "/shared-storage/initialize": {
+      "post": {
+        "operationId": "initializeSharedStorage",
+        "summary": "初始化 OPSD 数据库",
+        "tags": [
+          "system"
+        ],
+        "responses": {
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "405": {
+            "$ref": "#/components/responses/Error405"
+          },
+          "406": {
+            "$ref": "#/components/responses/Error406"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "412": {
+            "$ref": "#/components/responses/Error412"
+          },
+          "413": {
+            "$ref": "#/components/responses/Error413"
+          },
+          "415": {
+            "$ref": "#/components/responses/Error415"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error422"
+          },
+          "428": {
+            "$ref": "#/components/responses/Error428"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          },
+          "504": {
+            "$ref": "#/components/responses/Error504"
+          },
+          "202": {
+            "description": "请求成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Operation"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-ID": {
+                "schema": {
+                  "type": "string"
+                },
+                "required": true
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SharedStorageInitialize"
+              }
+            }
+          }
+        },
+        "x-opsd-access": {
+          "level": "manage",
+          "mode": "session"
+        },
+        "security": [
+          {
+            "SessionCookie": []
+          }
+        ],
+        "x-opsd-idempotent": true,
+        "description": " Idempotency-Key 作用于稳定调用身份和所属目标；未知结果先查询原请求，禁止自动换键重做。"
+      }
+    },
+    "/nodes/{node_id}/shared-storage": {
+      "get": {
+        "operationId": "getNodeSharedStorage",
+        "parameters": [
+          {
+            "name": "node_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        ],
+        "responses": {
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "405": {
+            "$ref": "#/components/responses/Error405"
+          },
+          "406": {
+            "$ref": "#/components/responses/Error406"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "412": {
+            "$ref": "#/components/responses/Error412"
+          },
+          "413": {
+            "$ref": "#/components/responses/Error413"
+          },
+          "415": {
+            "$ref": "#/components/responses/Error415"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error422"
+          },
+          "428": {
+            "$ref": "#/components/responses/Error428"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          },
+          "504": {
+            "$ref": "#/components/responses/Error504"
+          },
+          "200": {
+            "description": "请求成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SharedStorageStatus"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-ID": {
+                "schema": {
+                  "type": "string"
+                },
+                "required": true
+              }
+            }
+          }
+        },
+        "x-opsd-access": {
+          "level": "read",
+          "mode": "session"
+        },
+        "security": [
+          {
+            "SessionCookie": []
+          }
+        ],
+        "summary": "读取节点自用代理",
+        "tags": [
+          "system"
+        ]
+      }
+    },
+    "/nodes/{node_id}/shared-storage/recovery": {
+      "post": {
+        "operationId": "recoverNodeSharedStorage",
+        "summary": "核对节点数据恢复",
+        "tags": [
+          "system"
+        ],
+        "responses": {
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "405": {
+            "$ref": "#/components/responses/Error405"
+          },
+          "406": {
+            "$ref": "#/components/responses/Error406"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "412": {
+            "$ref": "#/components/responses/Error412"
+          },
+          "413": {
+            "$ref": "#/components/responses/Error413"
+          },
+          "415": {
+            "$ref": "#/components/responses/Error415"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error422"
+          },
+          "428": {
+            "$ref": "#/components/responses/Error428"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          },
+          "504": {
+            "$ref": "#/components/responses/Error504"
+          },
+          "200": {
+            "description": "请求成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SharedStorageStatus"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-ID": {
+                "schema": {
+                  "type": "string"
+                },
+                "required": true
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "node_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "x-opsd-access": {
+          "level": "manage",
+          "mode": "session"
+        },
+        "security": [
+          {
+            "SessionCookie": []
+          }
+        ],
+        "description": " Idempotency-Key 作用于稳定调用身份和所属目标；未知结果先查询原请求，禁止自动换键重做。"
+      }
+    },
+    "/database-clusters/{id}/coordinator": {
+      "post": {
+        "operationId": "changeDatabaseCoordinator",
+        "summary": "转交数据库协调权",
+        "tags": [
+          "system"
+        ],
+        "responses": {
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "405": {
+            "$ref": "#/components/responses/Error405"
+          },
+          "406": {
+            "$ref": "#/components/responses/Error406"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "412": {
+            "$ref": "#/components/responses/Error412"
+          },
+          "413": {
+            "$ref": "#/components/responses/Error413"
+          },
+          "415": {
+            "$ref": "#/components/responses/Error415"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error422"
+          },
+          "428": {
+            "$ref": "#/components/responses/Error428"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          },
+          "504": {
+            "$ref": "#/components/responses/Error504"
+          },
+          "200": {
+            "description": "请求成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ManagedDatabaseCluster"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-ID": {
+                "schema": {
+                  "type": "string"
+                },
+                "required": true
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DatabaseCoordinatorChange"
+              }
+            }
+          }
+        },
+        "x-opsd-access": {
+          "level": "manage",
+          "mode": "session"
+        },
+        "security": [
+          {
+            "SessionCookie": []
+          }
+        ],
+        "x-opsd-idempotent": true,
+        "description": " Idempotency-Key 作用于稳定调用身份和所属目标；未知结果先查询原请求，禁止自动换键重做。"
+      }
+    },
+    "/shared-storage/consoles": {
+      "get": {
+        "operationId": "getSharedConsoles",
+        "parameters": [],
+        "responses": {
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "405": {
+            "$ref": "#/components/responses/Error405"
+          },
+          "406": {
+            "$ref": "#/components/responses/Error406"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "412": {
+            "$ref": "#/components/responses/Error412"
+          },
+          "413": {
+            "$ref": "#/components/responses/Error413"
+          },
+          "415": {
+            "$ref": "#/components/responses/Error415"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error422"
+          },
+          "428": {
+            "$ref": "#/components/responses/Error428"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          },
+          "504": {
+            "$ref": "#/components/responses/Error504"
+          },
+          "200": {
+            "description": "请求成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SharedConsoles"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-ID": {
+                "schema": {
+                  "type": "string"
+                },
+                "required": true
+              }
+            }
+          }
+        },
+        "x-opsd-access": {
+          "level": "read",
+          "mode": "session"
+        },
+        "security": [
+          {
+            "SessionCookie": []
+          }
+        ],
+        "summary": "读取主用与备用管理节点",
+        "tags": [
+          "system"
+        ]
+      },
+      "put": {
+        "operationId": "saveSharedConsoles",
+        "summary": "保存主用与备用管理节点",
+        "tags": [
+          "system"
+        ],
+        "responses": {
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "405": {
+            "$ref": "#/components/responses/Error405"
+          },
+          "406": {
+            "$ref": "#/components/responses/Error406"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "412": {
+            "$ref": "#/components/responses/Error412"
+          },
+          "413": {
+            "$ref": "#/components/responses/Error413"
+          },
+          "415": {
+            "$ref": "#/components/responses/Error415"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error422"
+          },
+          "428": {
+            "$ref": "#/components/responses/Error428"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          },
+          "504": {
+            "$ref": "#/components/responses/Error504"
+          },
+          "200": {
+            "description": "请求成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SharedConsoles"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-ID": {
+                "schema": {
+                  "type": "string"
+                },
+                "required": true
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SharedConsoles"
+              }
+            }
+          }
+        },
+        "x-opsd-access": {
+          "level": "manage",
+          "mode": "session"
+        },
+        "security": [
+          {
+            "SessionCookie": []
+          }
+        ],
+        "x-opsd-idempotent": true,
+        "description": " Idempotency-Key 作用于稳定调用身份和所属目标；未知结果先查询原请求，禁止自动换键重做。"
+      }
     }
   },
   "components": {
@@ -11869,6 +12604,15 @@
             "minimum": 0
           },
           "local": {
+            "type": "boolean"
+          },
+          "endpoints": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "coordinator_candidate": {
             "type": "boolean"
           }
         },
@@ -13332,7 +14076,8 @@
               "task_save",
               "task_run",
               "compose",
-              "compose_register"
+              "compose_register",
+              "shared_initialize"
             ]
           },
           "state": {
@@ -13415,6 +14160,19 @@
           },
           "supports_logs": {
             "type": "boolean"
+          },
+          "coordinator": {
+            "type": "string"
+          },
+          "waiting_reason": {
+            "type": "string"
+          },
+          "blocking_operation": {
+            "type": "string"
+          },
+          "coordinator_epoch": {
+            "type": "integer",
+            "format": "int64"
           }
         },
         "required": [
@@ -13881,6 +14639,17 @@
           },
           "network_error": {
             "$ref": "#/components/schemas/NetworkError"
+          },
+          "endpoints": {
+            "type": "array",
+            "maxItems": 8,
+            "items": {
+              "type": "string",
+              "format": "uri"
+            }
+          },
+          "coordinator_candidate": {
+            "type": "boolean"
           }
         },
         "required": [
@@ -15646,6 +16415,10 @@
           },
           "proxy_routing": {
             "$ref": "#/components/schemas/ProxyRoutingPolicy"
+          },
+          "coordinator_epoch": {
+            "type": "integer",
+            "format": "int64"
           }
         },
         "required": [
@@ -16773,6 +17546,21 @@
           },
           "docs_url": {
             "type": "string"
+          },
+          "commit": {
+            "type": "string"
+          },
+          "protocol_version": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "persistence_version": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "shared_management_version": {
+            "type": "integer",
+            "format": "int64"
           }
         },
         "required": [
@@ -16906,6 +17694,18 @@
             "type": "integer",
             "minimum": 1,
             "description": "可达节点声明的 API 授权契约主版本；缺失表示尚未确认能力。"
+          },
+          "endpoints": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "coordinator_candidate": {
+            "type": "boolean"
+          },
+          "shared_proxy": {
+            "$ref": "#/components/schemas/SharedStorageStatus"
           }
         },
         "required": [
@@ -17289,6 +18089,17 @@
             ]
           },
           "api": {
+            "type": "boolean"
+          },
+          "endpoints": {
+            "type": "array",
+            "maxItems": 8,
+            "items": {
+              "type": "string",
+              "format": "uri"
+            }
+          },
+          "coordinator_candidate": {
             "type": "boolean"
           }
         },
@@ -18422,6 +19233,180 @@
           "coordinator",
           "token",
           "revision"
+        ]
+      },
+      "SharedBinding": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "cluster_id": {
+            "type": "string"
+          },
+          "galera_id": {
+            "type": "string"
+          },
+          "database": {
+            "type": "string"
+          },
+          "revision": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "issuer": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "cluster_id",
+          "galera_id",
+          "database",
+          "revision",
+          "issuer"
+        ]
+      },
+      "SharedStorageStatus": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "binding": {
+            "$ref": "#/components/schemas/SharedBinding"
+          },
+          "phase": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string"
+          },
+          "proxy_id": {
+            "type": "string"
+          },
+          "proxy_ready": {
+            "type": "boolean"
+          },
+          "sql_address": {
+            "type": "string"
+          },
+          "policy_version": {
+            "type": "string"
+          },
+          "error": {
+            "$ref": "#/components/schemas/NetworkError"
+          },
+          "pending": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "phase",
+          "state",
+          "proxy_ready"
+        ]
+      },
+      "SharedStorageNode": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "node_id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/SharedStorageStatus"
+          }
+        },
+        "required": [
+          "node_id",
+          "name",
+          "status"
+        ]
+      },
+      "SharedStorageOverview": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "local": {
+            "$ref": "#/components/schemas/SharedStorageStatus"
+          },
+          "nodes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SharedStorageNode"
+            }
+          }
+        },
+        "required": [
+          "local",
+          "nodes"
+        ]
+      },
+      "SharedStorageInitialize": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "cluster_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "database": {
+            "type": "string",
+            "pattern": "^[A-Za-z][A-Za-z0-9_]{0,63}$",
+            "default": "opsd_core",
+            "enum": [
+              "opsd_core"
+            ]
+          }
+        },
+        "required": [
+          "cluster_id"
+        ]
+      },
+      "DatabaseCoordinatorChange": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "coordinator": {
+            "type": "string",
+            "minLength": 1
+          },
+          "expected_revision": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          }
+        },
+        "required": [
+          "coordinator",
+          "expected_revision"
+        ]
+      },
+      "SharedConsoles": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "revision": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "primary": {
+            "type": "string"
+          },
+          "backup": {
+            "type": "string"
+          },
+          "cached": {
+            "type": "boolean",
+            "readOnly": true
+          }
+        },
+        "required": [
+          "revision",
+          "primary",
+          "backup"
         ]
       }
     },

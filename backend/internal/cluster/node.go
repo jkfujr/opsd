@@ -19,6 +19,7 @@ import (
 	"github.com/jkfujr/opsd/internal/identity"
 	"github.com/jkfujr/opsd/internal/monitoring"
 	"github.com/jkfujr/opsd/internal/protocol"
+	"github.com/jkfujr/opsd/internal/sharedsql"
 	"github.com/jkfujr/opsd/internal/storage"
 )
 
@@ -29,52 +30,59 @@ type Options struct {
 	Now                          func() time.Time
 }
 type Node struct {
-	DB               *sql.DB
-	ID               string
-	Key              identity.Key
-	signing          ed25519.PrivateKey
-	age              *age.X25519Identity
-	cluster          string
-	Executor         Executor
-	Now              func() time.Time
-	mu               sync.Mutex
-	connections      map[string]*peer
-	retiring         map[*peer]struct{}
-	dialing          map[string]chan struct{}
-	ctx              context.Context
-	cancel           context.CancelFunc
-	wg               sync.WaitGroup
-	wake             chan struct{}
-	taskWake         chan struct{}
-	changed          chan struct{}
-	collector        monitoring.Collector
-	liveMu           sync.Mutex
-	live             *liveRead
-	storageMu        sync.Mutex
-	storage          *database
-	storageError     string
-	maintenanceError string
-	maintenanceWake  chan struct{}
-	databaseHTTP     *http.Client
-	Configure        func(context.Context, Config) (func(bool), error)
-	subscribers      map[chan Change]struct{}
-	readings         map[string]monitoring.Reading
-	pending          map[string][]Operation
-	seen             map[string]time.Time
-	closed           bool
-	started          bool
-	eventSequence    atomic.Uint64
-	addressMu        sync.Mutex
-	networkWake      chan struct{}
-	ObservePublic    func(context.Context, protocol.AddressFamily) []protocol.AddressObservation
-	dockerMu         sync.Mutex
-	dockerReads      map[string]*containerRead
-	databaseMu       sync.Mutex
-	proxyMu          sync.Mutex
-	apiDecisionMu    sync.Mutex
-	databaseReads    map[string]*managedDatabaseReadEntry
-	current          map[string]*currentRead
-	readSlots        chan struct{}
+	DB                   *sql.DB
+	ID                   string
+	Key                  identity.Key
+	signing              ed25519.PrivateKey
+	age                  *age.X25519Identity
+	cluster              string
+	Executor             Executor
+	Now                  func() time.Time
+	mu                   sync.Mutex
+	connections          map[string]*peer
+	retiring             map[*peer]struct{}
+	dialing              map[string]chan struct{}
+	ctx                  context.Context
+	cancel               context.CancelFunc
+	wg                   sync.WaitGroup
+	wake                 chan struct{}
+	taskWake             chan struct{}
+	changed              chan struct{}
+	collector            monitoring.Collector
+	liveMu               sync.Mutex
+	live                 *liveRead
+	storageMu            sync.Mutex
+	storage              *database
+	storageError         string
+	maintenanceError     string
+	maintenanceWake      chan struct{}
+	databaseHTTP         *http.Client
+	Configure            func(context.Context, Config) (func(bool), error)
+	subscribers          map[chan Change]struct{}
+	readings             map[string]monitoring.Reading
+	pending              map[string][]Operation
+	seen                 map[string]time.Time
+	closed               bool
+	started              bool
+	eventSequence        atomic.Uint64
+	addressMu            sync.Mutex
+	networkWake          chan struct{}
+	ObservePublic        func(context.Context, protocol.AddressFamily) []protocol.AddressObservation
+	dockerMu             sync.Mutex
+	dockerReads          map[string]*containerRead
+	databaseMu           sync.Mutex
+	proxyMu              sync.Mutex
+	apiDecisionMu        sync.Mutex
+	advanceMu            sync.Mutex
+	sharedMu             sync.Mutex
+	sharedWorkMu         sync.Mutex
+	shared               *sharedsql.Store
+	sharedLocal          *SharedLocal
+	sharedIssue          string
+	sharedStartupPending map[string]bool
+	databaseReads        map[string]*managedDatabaseReadEntry
+	current              map[string]*currentRead
+	readSlots            chan struct{}
 }
 
 func Defaults(c Config) Config {
@@ -108,6 +116,14 @@ func Defaults(c Config) Config {
 	return c
 }
 func ValidateConfig(c Config) error {
+	if len(c.Endpoints) > 8 {
+		return fault("invalid_request", "通信备选端点过多")
+	}
+	for _, endpoint := range c.Endpoints {
+		if !validAddress(endpoint) {
+			return fault("invalid_request", "通信端点无效")
+		}
+	}
 	if c.Name == "" || len(c.Name) > 255 || !validAddress(c.Address) || c.IntervalMinutes < 1 || c.IntervalMinutes > 1440 || c.RetentionDays != 7 || (c.AddressMode != "" && c.AddressMode != "auto" && c.AddressMode != "manual") {
 		return fault("invalid_request", "名称、地址、采集间隔或保留时间无效")
 	}
@@ -217,6 +233,57 @@ func Open(ctx context.Context, path string, o Options) (*Node, error) {
 	n.networkWake = make(chan struct{}, 1)
 	n.maintenanceWake = make(chan struct{}, 1)
 	n.ctx, n.cancel = context.WithCancel(ctx)
+	if e = n.loadSharedLocal(ctx); e != nil {
+		n.cancel()
+		db.Close()
+		return nil, e
+	}
+	if n.sharedEnabled() {
+		rows, err := db.QueryContext(ctx, "SELECT id FROM queue WHERE terminal=0")
+		if err != nil {
+			n.cancel()
+			db.Close()
+			return nil, err
+		}
+		n.sharedStartupPending = map[string]bool{}
+		for rows.Next() {
+			var id string
+			if err = rows.Scan(&id); err != nil {
+				break
+			}
+			n.sharedStartupPending[id] = true
+		}
+		if err == nil {
+			err = rows.Err()
+		}
+		rows.Close()
+		if err != nil {
+			n.cancel()
+			db.Close()
+			return nil, err
+		}
+	}
+	if m, err := n.Self(ctx); err == nil && m.ManagementVersion < protocol.SharedManagementVersion {
+		actual, err := n.Config(ctx)
+		if err != nil {
+			db.Close()
+			return nil, err
+		}
+		tx, err := db.BeginTx(ctx, nil)
+		if err != nil {
+			db.Close()
+			return nil, err
+		}
+		if err = n.publishMemberTx(ctx, tx, actual); err != nil {
+			tx.Rollback()
+			db.Close()
+			return nil, err
+		}
+		if err = tx.Commit(); err != nil {
+			db.Close()
+			return nil, err
+		}
+	}
 	return n, nil
 }
 func (n *Node) Start() {
@@ -226,7 +293,7 @@ func (n *Node) Start() {
 		return
 	}
 	n.started = true
-	n.wg.Add(10)
+	n.wg.Add(11)
 	n.mu.Unlock()
 	go func() { defer n.wg.Done(); n.discovery() }()
 	go func() { defer n.wg.Done(); n.queueLoop() }()
@@ -238,6 +305,7 @@ func (n *Node) Start() {
 	go func() { defer n.wg.Done(); n.firewallLoop() }()
 	go func() { defer n.wg.Done(); n.networkLoop() }()
 	go func() { defer n.wg.Done(); n.proxyRoutingLoop() }()
+	go func() { defer n.wg.Done(); n.sharedLoop() }()
 }
 func (n *Node) Close() error {
 	n.cancel()
@@ -256,6 +324,11 @@ func (n *Node) Close() error {
 		n.databaseHTTP.CloseIdleConnections()
 	}
 	n.storageMu.Unlock()
+	n.sharedMu.Lock()
+	if n.shared != nil {
+		n.shared.DB.Close()
+	}
+	n.sharedMu.Unlock()
 	return n.DB.Close()
 }
 func (n *Node) Config(ctx context.Context) (Config, error) {
@@ -345,6 +418,10 @@ func (n *Node) Active(ctx context.Context, id string) bool {
 }
 func (n *Node) Directory(ctx context.Context) (Directory, error) {
 	d := Directory{Members: []Member{}, Revocations: []Revocation{}}
+	if state := n.sharedState(); state != nil {
+		binding := state.Binding
+		d.Shared = &binding
+	}
 	grants, grantErr := n.DB.QueryContext(ctx, "SELECT body FROM admissions ORDER BY id")
 	if grantErr != nil {
 		return d, grantErr
@@ -458,6 +535,9 @@ func (n *Node) publishMemberTx(ctx context.Context, tx *sql.Tx, c Config) error 
 		return e
 	}
 	m := Member{ID: n.ID, Cluster: n.cluster, Name: c.Name, Address: c.Address, Region: c.Region, Public: identity.Encode(n.Key.Public), Signing: identity.Encode(n.signing.Public().(ed25519.PublicKey)), Recipient: n.age.Recipient().String(), Version: version, ConfigurationRevision: c.Revision, Issuer: n.ID}
+	m.Endpoints = append([]string{c.Address}, c.Endpoints...)
+	m.ManagementVersion = protocol.SharedManagementVersion
+	m.CoordinatorCandidate = c.CoordinatorCandidate || c.Console
 	if c.Storage.Enabled {
 		m.Storage = storageURL(c.Storage)
 	}

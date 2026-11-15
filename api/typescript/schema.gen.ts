@@ -1391,6 +1391,121 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/shared-storage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 读取 OPSD 数据绑定 */
+        get: operations["getSharedStorage"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/shared-storage/initialize": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * 初始化 OPSD 数据库
+         * @description Idempotency-Key 作用于稳定调用身份和所属目标；未知结果先查询原请求，禁止自动换键重做。
+         */
+        post: operations["initializeSharedStorage"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/nodes/{node_id}/shared-storage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 读取节点自用代理 */
+        get: operations["getNodeSharedStorage"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/nodes/{node_id}/shared-storage/recovery": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * 核对节点数据恢复
+         * @description Idempotency-Key 作用于稳定调用身份和所属目标；未知结果先查询原请求，禁止自动换键重做。
+         */
+        post: operations["recoverNodeSharedStorage"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/database-clusters/{id}/coordinator": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * 转交数据库协调权
+         * @description Idempotency-Key 作用于稳定调用身份和所属目标；未知结果先查询原请求，禁止自动换键重做。
+         */
+        post: operations["changeDatabaseCoordinator"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/shared-storage/consoles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 读取主用与备用管理节点 */
+        get: operations["getSharedConsoles"];
+        /**
+         * 保存主用与备用管理节点
+         * @description Idempotency-Key 作用于稳定调用身份和所属目标；未知结果先查询原请求，禁止自动换键重做。
+         */
+        put: operations["saveSharedConsoles"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1541,6 +1656,8 @@ export interface components {
             /** Format: int64 */
             revision: number;
             local: boolean;
+            endpoints?: string[];
+            coordinator_candidate?: boolean;
         };
         NodeList: {
             items: components["schemas"]["NodeStatus"][];
@@ -1921,7 +2038,7 @@ export interface components {
             /** @enum {string} */
             executor: "node";
             /** @enum {string} */
-            subject: "firewall" | "component" | "config" | "name" | "account" | "firewall_config" | "container" | "database" | "database_step" | "task_save" | "task_run" | "compose" | "compose_register";
+            subject: "firewall" | "component" | "config" | "name" | "account" | "firewall_config" | "container" | "database" | "database_step" | "task_save" | "task_run" | "compose" | "compose_register" | "shared_initialize";
             state: components["schemas"]["OperationState"];
             /** Format: int64 */
             revision: number;
@@ -1952,6 +2069,11 @@ export interface components {
             target_name?: string;
             resource?: components["schemas"]["OperationResource"];
             supports_logs?: boolean;
+            coordinator?: string;
+            waiting_reason?: string;
+            blocking_operation?: string;
+            /** Format: int64 */
+            coordinator_epoch?: number;
         };
         OperationList: {
             items: components["schemas"]["Operation"][];
@@ -2074,6 +2196,8 @@ export interface components {
             address_mode?: "auto" | "manual";
             api?: boolean;
             network_error?: components["schemas"]["NetworkError"];
+            endpoints?: string[];
+            coordinator_candidate?: boolean;
         };
         NodeAccount: {
             username: string;
@@ -2528,6 +2652,8 @@ export interface components {
             /** Format: date-time */
             updated_at: string;
             proxy_routing?: components["schemas"]["ProxyRoutingPolicy"];
+            /** Format: int64 */
+            coordinator_epoch?: number;
         };
         DatabaseClusterInput: {
             name: string;
@@ -2817,6 +2943,13 @@ export interface components {
             grants: components["schemas"]["APIGrant"][];
             openapi_url: string;
             docs_url: string;
+            commit?: string;
+            /** Format: int64 */
+            protocol_version?: number;
+            /** Format: int64 */
+            persistence_version?: number;
+            /** Format: int64 */
+            shared_management_version?: number;
         };
         APIPrincipal: {
             /** @enum {string} */
@@ -2856,6 +2989,9 @@ export interface components {
             storage_address?: string;
             /** @description 可达节点声明的 API 授权契约主版本；缺失表示尚未确认能力。 */
             api_authorization_version?: number;
+            endpoints?: string[];
+            coordinator_candidate?: boolean;
+            shared_proxy?: components["schemas"]["SharedStorageStatus"];
         };
         NodeAction: {
             /** @enum {string} */
@@ -2955,6 +3091,8 @@ export interface components {
             /** @enum {string} */
             address_mode?: "auto" | "manual";
             api?: boolean;
+            endpoints?: string[];
+            coordinator_candidate?: boolean;
         };
         APITokenPatch: {
             name?: string;
@@ -3230,6 +3368,55 @@ export interface components {
             coordinator: string;
             token: string;
             revision: string;
+        };
+        SharedBinding: {
+            cluster_id: string;
+            galera_id: string;
+            database: string;
+            /** Format: int64 */
+            revision: number;
+            issuer: string;
+        };
+        SharedStorageStatus: {
+            binding?: components["schemas"]["SharedBinding"];
+            phase: string;
+            state: string;
+            proxy_id?: string;
+            proxy_ready: boolean;
+            sql_address?: string;
+            policy_version?: string;
+            error?: components["schemas"]["NetworkError"];
+            /** Format: int64 */
+            pending?: number;
+        };
+        SharedStorageNode: {
+            node_id: string;
+            name: string;
+            status: components["schemas"]["SharedStorageStatus"];
+        };
+        SharedStorageOverview: {
+            local: components["schemas"]["SharedStorageStatus"];
+            nodes: components["schemas"]["SharedStorageNode"][];
+        };
+        SharedStorageInitialize: {
+            cluster_id: string;
+            /**
+             * @default opsd_core
+             * @enum {string}
+             */
+            database: "opsd_core";
+        };
+        DatabaseCoordinatorChange: {
+            coordinator: string;
+            /** Format: int64 */
+            expected_revision: number;
+        };
+        SharedConsoles: {
+            /** Format: int64 */
+            revision: number;
+            primary: string;
+            backup: string;
+            readonly cached?: boolean;
         };
     };
     responses: {
@@ -7467,6 +7654,294 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Operation"];
+                };
+            };
+            400: components["responses"]["Error400"];
+            401: components["responses"]["Error401"];
+            403: components["responses"]["Error403"];
+            404: components["responses"]["Error404"];
+            405: components["responses"]["Error405"];
+            406: components["responses"]["Error406"];
+            409: components["responses"]["Error409"];
+            412: components["responses"]["Error412"];
+            413: components["responses"]["Error413"];
+            415: components["responses"]["Error415"];
+            422: components["responses"]["Error422"];
+            428: components["responses"]["Error428"];
+            429: components["responses"]["Error429"];
+            500: components["responses"]["Error500"];
+            503: components["responses"]["Error503"];
+            504: components["responses"]["Error504"];
+        };
+    };
+    getSharedStorage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 请求成功 */
+            200: {
+                headers: {
+                    "X-Request-ID": string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SharedStorageOverview"];
+                };
+            };
+            400: components["responses"]["Error400"];
+            401: components["responses"]["Error401"];
+            403: components["responses"]["Error403"];
+            404: components["responses"]["Error404"];
+            405: components["responses"]["Error405"];
+            406: components["responses"]["Error406"];
+            409: components["responses"]["Error409"];
+            412: components["responses"]["Error412"];
+            413: components["responses"]["Error413"];
+            415: components["responses"]["Error415"];
+            422: components["responses"]["Error422"];
+            428: components["responses"]["Error428"];
+            429: components["responses"]["Error429"];
+            500: components["responses"]["Error500"];
+            503: components["responses"]["Error503"];
+            504: components["responses"]["Error504"];
+        };
+    };
+    initializeSharedStorage: {
+        parameters: {
+            query?: never;
+            header: {
+                "X-CSRF-Token"?: string;
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SharedStorageInitialize"];
+            };
+        };
+        responses: {
+            /** @description 请求成功 */
+            202: {
+                headers: {
+                    "X-Request-ID": string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Operation"];
+                };
+            };
+            400: components["responses"]["Error400"];
+            401: components["responses"]["Error401"];
+            403: components["responses"]["Error403"];
+            404: components["responses"]["Error404"];
+            405: components["responses"]["Error405"];
+            406: components["responses"]["Error406"];
+            409: components["responses"]["Error409"];
+            412: components["responses"]["Error412"];
+            413: components["responses"]["Error413"];
+            415: components["responses"]["Error415"];
+            422: components["responses"]["Error422"];
+            428: components["responses"]["Error428"];
+            429: components["responses"]["Error429"];
+            500: components["responses"]["Error500"];
+            503: components["responses"]["Error503"];
+            504: components["responses"]["Error504"];
+        };
+    };
+    getNodeSharedStorage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                node_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 请求成功 */
+            200: {
+                headers: {
+                    "X-Request-ID": string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SharedStorageStatus"];
+                };
+            };
+            400: components["responses"]["Error400"];
+            401: components["responses"]["Error401"];
+            403: components["responses"]["Error403"];
+            404: components["responses"]["Error404"];
+            405: components["responses"]["Error405"];
+            406: components["responses"]["Error406"];
+            409: components["responses"]["Error409"];
+            412: components["responses"]["Error412"];
+            413: components["responses"]["Error413"];
+            415: components["responses"]["Error415"];
+            422: components["responses"]["Error422"];
+            428: components["responses"]["Error428"];
+            429: components["responses"]["Error429"];
+            500: components["responses"]["Error500"];
+            503: components["responses"]["Error503"];
+            504: components["responses"]["Error504"];
+        };
+    };
+    recoverNodeSharedStorage: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-CSRF-Token"?: string;
+            };
+            path: {
+                node_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 请求成功 */
+            200: {
+                headers: {
+                    "X-Request-ID": string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SharedStorageStatus"];
+                };
+            };
+            400: components["responses"]["Error400"];
+            401: components["responses"]["Error401"];
+            403: components["responses"]["Error403"];
+            404: components["responses"]["Error404"];
+            405: components["responses"]["Error405"];
+            406: components["responses"]["Error406"];
+            409: components["responses"]["Error409"];
+            412: components["responses"]["Error412"];
+            413: components["responses"]["Error413"];
+            415: components["responses"]["Error415"];
+            422: components["responses"]["Error422"];
+            428: components["responses"]["Error428"];
+            429: components["responses"]["Error429"];
+            500: components["responses"]["Error500"];
+            503: components["responses"]["Error503"];
+            504: components["responses"]["Error504"];
+        };
+    };
+    changeDatabaseCoordinator: {
+        parameters: {
+            query?: never;
+            header: {
+                "X-CSRF-Token"?: string;
+                "Idempotency-Key": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DatabaseCoordinatorChange"];
+            };
+        };
+        responses: {
+            /** @description 请求成功 */
+            200: {
+                headers: {
+                    "X-Request-ID": string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ManagedDatabaseCluster"];
+                };
+            };
+            400: components["responses"]["Error400"];
+            401: components["responses"]["Error401"];
+            403: components["responses"]["Error403"];
+            404: components["responses"]["Error404"];
+            405: components["responses"]["Error405"];
+            406: components["responses"]["Error406"];
+            409: components["responses"]["Error409"];
+            412: components["responses"]["Error412"];
+            413: components["responses"]["Error413"];
+            415: components["responses"]["Error415"];
+            422: components["responses"]["Error422"];
+            428: components["responses"]["Error428"];
+            429: components["responses"]["Error429"];
+            500: components["responses"]["Error500"];
+            503: components["responses"]["Error503"];
+            504: components["responses"]["Error504"];
+        };
+    };
+    getSharedConsoles: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 请求成功 */
+            200: {
+                headers: {
+                    "X-Request-ID": string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SharedConsoles"];
+                };
+            };
+            400: components["responses"]["Error400"];
+            401: components["responses"]["Error401"];
+            403: components["responses"]["Error403"];
+            404: components["responses"]["Error404"];
+            405: components["responses"]["Error405"];
+            406: components["responses"]["Error406"];
+            409: components["responses"]["Error409"];
+            412: components["responses"]["Error412"];
+            413: components["responses"]["Error413"];
+            415: components["responses"]["Error415"];
+            422: components["responses"]["Error422"];
+            428: components["responses"]["Error428"];
+            429: components["responses"]["Error429"];
+            500: components["responses"]["Error500"];
+            503: components["responses"]["Error503"];
+            504: components["responses"]["Error504"];
+        };
+    };
+    saveSharedConsoles: {
+        parameters: {
+            query?: never;
+            header: {
+                "X-CSRF-Token"?: string;
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SharedConsoles"];
+            };
+        };
+        responses: {
+            /** @description 请求成功 */
+            200: {
+                headers: {
+                    "X-Request-ID": string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SharedConsoles"];
                 };
             };
             400: components["responses"]["Error400"];

@@ -5,8 +5,12 @@ import (
 	"os"
 )
 
-func lockFile(file *os.File) (func(), error) {
-	if err := unix.Flock(int(file.Fd()), unix.LOCK_EX|unix.LOCK_NB); err != nil {
+func lockFile(file *os.File, shared bool) (func(), error) {
+	mode := unix.LOCK_EX
+	if shared {
+		mode = unix.LOCK_SH
+	}
+	if err := unix.Flock(int(file.Fd()), mode|unix.LOCK_NB); err != nil {
 		if err == unix.EWOULDBLOCK || err == unix.EAGAIN {
 			return nil, ErrBusy
 		}

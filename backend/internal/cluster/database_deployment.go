@@ -399,6 +399,15 @@ func (n *Node) sealDeploymentPreview(plan DatabaseDeploymentPlan, out DatabaseDe
 	return out, nil
 }
 func (n *Node) SubmitDatabaseDeployment(ctx context.Context, input DatabaseDeploymentCommit) (Operation, error) {
+	if n.sharedActive() {
+		prior, err := n.RequestReceipt(ctx, n.ID, requeststate.Write{Actor: input.Actor, Key: input.Key, Digest: input.Digest})
+		if err == nil && prior.Operation != nil {
+			return *prior.Operation, nil
+		}
+		if err != nil && !missingRequest(err) {
+			return Operation{}, err
+		}
+	}
 	var out Operation
 	err := n.Call(ctx, input.Coordinator, "database.deployment.submit", databaseDeploymentRequest{Commit: input}, &out)
 	return out, err
@@ -623,6 +632,10 @@ func (n *Node) finishDeploymentWorkflow(ctx context.Context, op *Operation, flow
 		}
 	}
 	if c.ProxyRouting != nil && c.ProxyRouting.Enabled && len(c.Proxies) > 0 && !flow.RoutingBuilt {
+		if n.sharedActive() {
+			flow.RoutingBuilt = true
+			return nil
+		}
 		preview, err := n.PreviewProxyRouting(ctx, *c, ProxyRoutingPreviewInput{ExpectedRevision: c.Revision, Enabled: true, Automatic: c.ProxyRouting.Automatic})
 		if err != nil {
 			return err

@@ -35,7 +35,7 @@ import (
 
 func Run(args []string) error {
 	if len(args) == 0 {
-		return fmt.Errorf("用法：opsd version | install | node | network | console | api | account | executor | operation | recover")
+		return fmt.Errorf("用法：opsd version | install | node | network | console | api | account | data | executor | operation | recover")
 	}
 	switch args[0] {
 	case "version", "--version":
@@ -51,6 +51,8 @@ func Run(args []string) error {
 		return serveNode(args[1:])
 	case "network":
 		return network(args[1:])
+	case "data":
+		return dataCommand(args[1:])
 	case "executor":
 		return serveExecutor(args[1:])
 	case "operation":
@@ -190,6 +192,7 @@ func serveExecutor(args []string) error {
 	defer db.Close()
 	service := executor.NewServices(db)
 	service.Engine.LogDirectory = filepath.Join(f.ExecutorDir, "logs")
+	service.Engine.NativeLock = operations.NativeLock(f.ExecutorDir)
 	defer service.Terminals.Close()
 	service.TaskLock = func(id string) (func(), error) {
 		if !operations.ValidID(id) {
@@ -198,9 +201,15 @@ func serveExecutor(args []string) error {
 		return localstate.Lock(filepath.Join(f.ExecutorDir, "task-"+id+".lock"))
 	}
 	service.OperationLock = func() (func(), error) { return localstate.Lock(filepath.Join(f.ExecutorDir, "operation.lock")) }
+	service.ResourceLock = func(action protocol.OperationAction) (func(), error) {
+		return operations.LockResources(f.ExecutorDir, action)
+	}
 	trustDone := make(chan struct{})
 	go func() { defer close(trustDone); service.MaintainTrust(ctx) }()
 	defer func() { cancel(); <-trustDone }()
+	operationsDone := make(chan struct{})
+	go func() { defer close(operationsDone); service.MaintainOperations(ctx) }()
+	defer func() { cancel(); <-operationsDone }()
 	l, e := executor.Listen(f.Socket)
 	if e != nil {
 		return e
@@ -259,6 +268,8 @@ func operation(args []string, recoverAll bool) error {
 	service := executor.NewServices(db)
 	service.Engine.LogDirectory = filepath.Join(f.ExecutorDir, "logs")
 	ids := []string{*id}
+	service.Engine.NativeLock = operations.NativeLock(f.ExecutorDir)
+	service.Engine.StartupRecovery = recoverAll
 	if recoverAll {
 		ids, e = service.Engine.Store.Pending(ctx)
 		if e != nil {
@@ -293,15 +304,20 @@ func operation(args []string, recoverAll bool) error {
 		}
 	}
 	for _, value := range ids {
-		lockName := "operation.lock"
 		state, err := service.Engine.Store.Get(ctx, value)
 		if err != nil {
 			return err
 		}
-		if state.Action != nil && state.Action.Shell != nil {
-			lockName = "task-" + state.Action.Shell.TaskID + ".lock"
+		if state.Action == nil {
+			return fmt.Errorf("未决操作缺少动作：%s", value)
 		}
-		unlock, err := localstate.Lock(filepath.Join(f.ExecutorDir, lockName))
+		if recoverAll && state.Action.Firewall == nil && state.Action.FirewallConfig == nil {
+			continue
+		}
+		if recoverAll && state.Record.State == protocol.Prepared {
+			continue
+		}
+		unlock, err := operations.LockResources(f.ExecutorDir, *state.Action)
 		if err != nil {
 			return err
 		}

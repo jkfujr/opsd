@@ -48,18 +48,19 @@ type DatabaseRef struct {
 	Address          string `json:"address"`
 }
 type ManagedDatabaseCluster struct {
-	ProxyRouting *protocol.ProxyRoutingPolicy `json:"proxy_routing,omitempty"`
-	ID           string                       `json:"id"`
-	Name         string                       `json:"name"`
-	Coordinator  string                       `json:"coordinator"`
-	ClusterID    string                       `json:"cluster_id"`
-	Revision     uint64                       `json:"revision"`
-	Members      []DatabaseRef                `json:"members"`
-	Proxies      []DatabaseRef                `json:"proxies"`
-	WorkbenchURL string                       `json:"workbench_url"`
-	Deleted      bool                         `json:"deleted"`
-	UpdatedAt    time.Time                    `json:"updated_at"`
-	Signature    []byte                       `json:"signature,omitempty"`
+	CoordinatorEpoch uint64                       `json:"coordinator_epoch,omitempty"`
+	ProxyRouting     *protocol.ProxyRoutingPolicy `json:"proxy_routing,omitempty"`
+	ID               string                       `json:"id"`
+	Name             string                       `json:"name"`
+	Coordinator      string                       `json:"coordinator"`
+	ClusterID        string                       `json:"cluster_id"`
+	Revision         uint64                       `json:"revision"`
+	Members          []DatabaseRef                `json:"members"`
+	Proxies          []DatabaseRef                `json:"proxies"`
+	WorkbenchURL     string                       `json:"workbench_url"`
+	Deleted          bool                         `json:"deleted"`
+	UpdatedAt        time.Time                    `json:"updated_at"`
+	Signature        []byte                       `json:"signature,omitempty"`
 }
 type ManagedDatabaseMember struct {
 	DatabaseRef
@@ -98,6 +99,25 @@ func (n *Node) DatabaseClusters(ctx context.Context) ([]ManagedDatabaseCluster, 
 	return out, rows.Err()
 }
 func (n *Node) DatabaseCluster(ctx context.Context, id string) (ManagedDatabaseCluster, error) {
+	if n.sharedActive() {
+		s, err := n.sharedStore(ctx)
+		if err == nil {
+			o, e := s.Object(ctx, "database", id)
+			if e == nil {
+				var c ManagedDatabaseCluster
+				if e = json.Unmarshal(o.Body, &c); e != nil {
+					return c, e
+				}
+				if c.Deleted {
+					return c, sql.ErrNoRows
+				}
+				return c, nil
+			}
+			if e == sql.ErrNoRows {
+				return ManagedDatabaseCluster{}, e
+			}
+		}
+	}
 	var b string
 	var c ManagedDatabaseCluster
 	e := n.DB.QueryRowContext(ctx, "SELECT body FROM managed_database_clusters WHERE id=?", id).Scan(&b)
@@ -131,7 +151,7 @@ func (n *Node) saveDatabaseCluster(ctx context.Context, c ManagedDatabaseCluster
 		// 路由策略通过预览和持久操作更新，普通定义编辑保留当前策略。
 		c.ProxyRouting = previous.ProxyRouting
 	}
-	if OperationOwner(c.ID) != n.ID || c.Coordinator != n.ID || c.Name == "" || len(c.Name) > 128 || c.ClusterID == "" || len(c.Members) == 0 || len(c.Members) > 100 || len(c.Proxies) > 100 {
+	if (!n.sharedActive() && OperationOwner(c.ID) != n.ID) || c.Coordinator != n.ID || c.Name == "" || len(c.Name) > 128 || c.ClusterID == "" || len(c.Members) == 0 || len(c.Members) > 100 || len(c.Proxies) > 100 {
 		return c, fault("invalid_request", "数据库集群配置无效")
 	}
 	if c.WorkbenchURL != "" {
@@ -165,8 +185,14 @@ func (n *Node) saveDatabaseCluster(ctx context.Context, c ManagedDatabaseCluster
 	for _, r := range c.Members {
 		local = local || r.NodeID == n.ID
 	}
-	if !local {
+	if !local && !n.sharedActive() {
 		return c, fault("invalid_request", "协调节点须包含本机 Galera 实例")
+	}
+	if n.sharedEnabled() {
+		if err := n.sharedWriteAllowed(ctx); err != nil {
+			return c, err
+		}
+		return n.sharedSaveDatabase(ctx, c)
 	}
 	tx, e := n.DB.BeginTx(ctx, nil)
 	if e != nil {
@@ -266,6 +292,12 @@ func (n *Node) databaseConnection(ctx context.Context, id string, version ...uin
 		e = json.Unmarshal(plain, &c)
 	}
 	c.PoolKey = fmt.Sprintf("%s/%s/%d", n.ID, id, revision)
+	if state := n.sharedState(); state != nil {
+		c.ProtectedDatabases = append(c.ProtectedDatabases, state.Binding.Database)
+	}
+	if instance, err := n.databaseInstance(ctx, id); err == nil {
+		c.ContainerID = instance.ContainerID
+	}
 	return c, e
 }
 func (n *Node) databaseInstance(ctx context.Context, id string) (DatabaseInstance, error) {
@@ -466,18 +498,21 @@ func (n *Node) databaseDispatch(ctx context.Context, origin, method string, body
 		}
 		return n.executeRead(ctx, request.NetworkCheck)
 	case "database.deployment.execute":
+		if err := n.checkSharedStep(ctx, origin, request); err != nil {
+			return nil, err
+		}
+		if request.FlowID != "" {
+			request.Action.FlowID, request.Action.Coordinator, request.Action.CoordinatorEpoch = request.FlowID, origin, request.CoordinatorEpoch
+		}
 		if request.Action.Kind != "deploy_database" && request.Action.Kind != "deployment_seeds" || OperationOwner(request.OperationID) != n.ID {
 			return nil, fault("invalid_request", "数据库部署步骤无效")
 		}
 		if err := request.Action.Validate(); err != nil {
 			return nil, err
 		}
-		if origin != n.ID {
-			data, _ := json.Marshal(request.Action)
-			op, err := n.enqueue(ctx, origin, Request{ID: request.OperationID, Actor: request.Actor, ResourceID: request.ResourceID, Kind: "database_step", Payload: data})
-			return &protocol.OperationUpdated{Record: op.OperationRecord}, err
-		}
-		return n.executeRead(ctx, &protocol.OperationSubmit{OperationID: request.OperationID, ContractVersion: protocol.ContractVersion, Action: protocol.OperationAction{Kind: "database", Database: &request.Action}})
+		data, _ := json.Marshal(request.Action)
+		op, err := n.enqueue(ctx, origin, Request{ID: request.OperationID, Actor: request.Actor, ResourceID: request.ResourceID, Kind: "database_step", Payload: data})
+		return &protocol.OperationUpdated{Record: op.OperationRecord}, err
 	case "database.deployment.register":
 		return n.registerDatabaseDeployment(ctx, request)
 	case "database.discover":
@@ -502,6 +537,9 @@ func (n *Node) databaseDispatch(ctx context.Context, origin, method string, body
 	case "database.proxy_routing.applied":
 		return nil, n.noteProxyRouteApplied(ctx, request.ResourceID, request.InstanceID, request.OperationID, request.Action.Routing)
 	case "database.execute":
+		if err := n.checkSharedStep(ctx, origin, request); err != nil {
+			return nil, err
+		}
 		if OperationOwner(request.OperationID) != n.ID {
 			return nil, fault("invalid_request", "数据库步骤目标无效")
 		}
@@ -514,15 +552,15 @@ func (n *Node) databaseDispatch(ctx context.Context, origin, method string, body
 		}
 		a := request.Action
 		a.Connection = c
+		if request.FlowID != "" {
+			a.FlowID, a.Coordinator, a.CoordinatorEpoch = request.FlowID, origin, request.CoordinatorEpoch
+		}
 		if e = a.Validate(); e != nil {
 			return nil, fault("invalid_request", e.Error())
 		}
-		if origin != n.ID {
-			data, _ := json.Marshal(a)
-			op, e := n.enqueue(ctx, origin, Request{ID: request.OperationID, Actor: request.Actor, ResourceID: request.ResourceID, Kind: "database_step", Payload: data})
-			return &protocol.OperationUpdated{Record: op.OperationRecord}, e
-		}
-		return n.executeRead(ctx, &protocol.OperationSubmit{OperationID: request.OperationID, ContractVersion: protocol.ContractVersion, Action: protocol.OperationAction{Kind: "database", Database: &a}})
+		data, _ := json.Marshal(a)
+		op, e := n.enqueue(ctx, origin, Request{ID: request.OperationID, Actor: request.Actor, ResourceID: request.ResourceID, Kind: "database_step", Payload: data})
+		return &protocol.OperationUpdated{Record: op.OperationRecord}, e
 	case "database.query":
 		if op, e := n.operation(ctx, request.OperationID); e == nil && op.Subject == "database_step" {
 			if op.State == protocol.Succeeded {
@@ -563,6 +601,8 @@ func (n *Node) databaseDispatch(ctx context.Context, origin, method string, body
 }
 
 type DatabaseRPC struct {
+	FlowID            string                         `json:"flow_id,omitempty"`
+	CoordinatorEpoch  uint64                         `json:"coordinator_epoch,omitempty"`
 	NetworkCheck      *protocol.DatabaseNetworkCheck `json:"network_check,omitempty"`
 	Hostgroups        *protocol.ProxyHostgroups      `json:"hostgroups,omitempty"`
 	Write             *requeststate.Write            `json:"write,omitempty"`

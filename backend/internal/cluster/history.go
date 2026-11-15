@@ -15,6 +15,9 @@ import (
 
 // ReadHistory 一次选库、按日批量分页，并复用请求内的来源公钥；调用方可直接归并时间桶。
 func (n *Node) ReadHistory(ctx context.Context, targets []string, q HistoryQuery, visit func(string, protocol.Metrics)) []string {
+	if n.sharedEnabled() {
+		return n.readSharedHistory(ctx, targets, q, visit)
+	}
 	failed := map[string]bool{}
 	remote := []string{}
 	for _, id := range targets {

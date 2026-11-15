@@ -244,13 +244,8 @@ func (n *Node) dial(ctx context.Context, m Member, resident bool, token string) 
 	if e != nil {
 		return nil, e
 	}
-	socket, _, e := websocket.Dial(ctx, m.Address+"/peer", nil)
+	channel, e := n.openPeerChannel(ctx, m, key)
 	if e != nil {
-		return nil, e
-	}
-	channel, e := transport.Handshake(ctx, socket, n.Key, key, true)
-	if e != nil {
-		socket.CloseNow()
 		return nil, e
 	}
 	self, e := n.Self(ctx)
@@ -288,6 +283,9 @@ func (n *Node) dial(ctx context.Context, m Member, resident bool, token string) 
 		var d Directory
 		if e = json.Unmarshal(hello.Directory, &d); e == nil {
 			e = n.joinDirectory(ctx, d)
+		}
+		if e == nil && d.Shared != nil {
+			e = n.acceptSharedBinding(ctx, *d.Shared)
 		}
 		channel.Close()
 		return nil, e

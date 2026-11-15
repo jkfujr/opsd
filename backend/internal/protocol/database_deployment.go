@@ -11,31 +11,32 @@ import (
 
 // DatabaseDeployment 只在认证节点通道及本机执行记录中传递，凭据不进入 HTTP 或共享操作记录。
 type DatabaseDeployment struct {
-	ID              string             `json:"id"`
-	Kind            string             `json:"kind"`
-	Image           string             `json:"image"`
-	Directory       string             `json:"directory"`
-	Address         string             `json:"address"`
-	SQLPort         int                `json:"sql_port"`
-	ReplicationPort int                `json:"replication_port"`
-	ISTPort         int                `json:"ist_port"`
-	SSTPort         int                `json:"sst_port"`
-	AdminPort       int                `json:"admin_port"`
-	ClusterName     string             `json:"cluster_name"`
-	ClusterID       string             `json:"cluster_id"`
-	Seeds           []string           `json:"seeds"`
-	ReachableSeeds  []string           `json:"reachable_seeds,omitempty"`
-	Bootstrap       bool               `json:"bootstrap"`
-	InstallDocker   bool               `json:"install_docker"`
-	Connection      DatabaseConnection `json:"connection"`
-	SSTMethod       string             `json:"sst_method"`
-	SSTUser         string             `json:"sst_user"`
-	SSTPassword     string             `json:"sst_password"`
-	ProviderOptions string             `json:"provider_options,omitempty"`
-	TLS             map[string]string  `json:"tls,omitempty"`
-	Backends        []ProxyEndpoint    `json:"backends"`
-	MonitorUser     string             `json:"monitor_user,omitempty"`
-	MonitorPassword string             `json:"monitor_password,omitempty"`
+	BackendMaxConnections int                `json:"backend_max_connections,omitempty"`
+	ID                    string             `json:"id"`
+	Kind                  string             `json:"kind"`
+	Image                 string             `json:"image"`
+	Directory             string             `json:"directory"`
+	Address               string             `json:"address"`
+	SQLPort               int                `json:"sql_port"`
+	ReplicationPort       int                `json:"replication_port"`
+	ISTPort               int                `json:"ist_port"`
+	SSTPort               int                `json:"sst_port"`
+	AdminPort             int                `json:"admin_port"`
+	ClusterName           string             `json:"cluster_name"`
+	ClusterID             string             `json:"cluster_id"`
+	Seeds                 []string           `json:"seeds"`
+	ReachableSeeds        []string           `json:"reachable_seeds,omitempty"`
+	Bootstrap             bool               `json:"bootstrap"`
+	InstallDocker         bool               `json:"install_docker"`
+	Connection            DatabaseConnection `json:"connection"`
+	SSTMethod             string             `json:"sst_method"`
+	SSTUser               string             `json:"sst_user"`
+	SSTPassword           string             `json:"sst_password"`
+	ProviderOptions       string             `json:"provider_options,omitempty"`
+	TLS                   map[string]string  `json:"tls,omitempty"`
+	Backends              []ProxyEndpoint    `json:"backends"`
+	MonitorUser           string             `json:"monitor_user,omitempty"`
+	MonitorPassword       string             `json:"monitor_password,omitempty"`
 }
 
 var deploymentID = regexp.MustCompile(`^[a-zA-Z0-9_-]{1,100}$`)
@@ -50,7 +51,7 @@ func (d DatabaseDeployment) Validate() error {
 		return fmt.Errorf("请使用独立的数据库绝对目录")
 	}
 	ip, err := netip.ParseAddr(d.Address)
-	if err != nil || ip.IsUnspecified() || ip.IsLoopback() || ip.IsMulticast() {
+	if err != nil || ip.IsUnspecified() || ip.IsLoopback() && d.Kind == "galera" || ip.IsMulticast() {
 		return fmt.Errorf("数据库成员地址无效")
 	}
 	if err = d.Connection.Validate(); err != nil {

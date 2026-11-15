@@ -983,6 +983,50 @@ func (a *strictAPI) ChangeDatabase(ctx context.Context, request httpapi.ChangeDa
 	return nil, fmt.Errorf("ChangeDatabase 返回未声明状态 %d", w.status())
 }
 
+func (a *strictAPI) ChangeDatabaseCoordinator(ctx context.Context, request httpapi.ChangeDatabaseCoordinatorRequestObject) (httpapi.ChangeDatabaseCoordinatorResponseObject, error) {
+	r := strictRequest(ctx)
+	w := newAPIResponse(r)
+	a.server.ChangeDatabaseCoordinator(w, r, request.Id, request.Params)
+	a.server.prepareAPIResponse(w, r)
+	switch w.status() {
+	case 200:
+		return strictResponse[httpapi.ChangeDatabaseCoordinator200JSONResponse](w)
+	case 400:
+		return strictResponse[httpapi.ChangeDatabaseCoordinator400ApplicationProblemPlusJSONResponse](w)
+	case 401:
+		return strictResponse[httpapi.ChangeDatabaseCoordinator401ApplicationProblemPlusJSONResponse](w)
+	case 403:
+		return strictResponse[httpapi.ChangeDatabaseCoordinator403ApplicationProblemPlusJSONResponse](w)
+	case 404:
+		return strictResponse[httpapi.ChangeDatabaseCoordinator404ApplicationProblemPlusJSONResponse](w)
+	case 405:
+		return strictResponse[httpapi.ChangeDatabaseCoordinator405ApplicationProblemPlusJSONResponse](w)
+	case 406:
+		return strictResponse[httpapi.ChangeDatabaseCoordinator406ApplicationProblemPlusJSONResponse](w)
+	case 409:
+		return strictResponse[httpapi.ChangeDatabaseCoordinator409ApplicationProblemPlusJSONResponse](w)
+	case 412:
+		return strictResponse[httpapi.ChangeDatabaseCoordinator412ApplicationProblemPlusJSONResponse](w)
+	case 413:
+		return strictResponse[httpapi.ChangeDatabaseCoordinator413ApplicationProblemPlusJSONResponse](w)
+	case 415:
+		return strictResponse[httpapi.ChangeDatabaseCoordinator415ApplicationProblemPlusJSONResponse](w)
+	case 422:
+		return strictResponse[httpapi.ChangeDatabaseCoordinator422ApplicationProblemPlusJSONResponse](w)
+	case 428:
+		return strictResponse[httpapi.ChangeDatabaseCoordinator428ApplicationProblemPlusJSONResponse](w)
+	case 429:
+		return strictResponse[httpapi.ChangeDatabaseCoordinator429ApplicationProblemPlusJSONResponse](w)
+	case 500:
+		return strictResponse[httpapi.ChangeDatabaseCoordinator500ApplicationProblemPlusJSONResponse](w)
+	case 503:
+		return strictResponse[httpapi.ChangeDatabaseCoordinator503ApplicationProblemPlusJSONResponse](w)
+	case 504:
+		return strictResponse[httpapi.ChangeDatabaseCoordinator504ApplicationProblemPlusJSONResponse](w)
+	}
+	return nil, fmt.Errorf("ChangeDatabaseCoordinator 返回未声明状态 %d", w.status())
+}
+
 func (a *strictAPI) AddDatabaseMembers(ctx context.Context, request httpapi.AddDatabaseMembersRequestObject) (httpapi.AddDatabaseMembersResponseObject, error) {
 	r := strictRequest(ctx)
 	w := newAPIResponse(r)
@@ -3021,6 +3065,94 @@ func (a *strictAPI) RefreshPublicAddresses(ctx context.Context, request httpapi.
 	return nil, fmt.Errorf("RefreshPublicAddresses 返回未声明状态 %d", w.status())
 }
 
+func (a *strictAPI) GetNodeSharedStorage(ctx context.Context, request httpapi.GetNodeSharedStorageRequestObject) (httpapi.GetNodeSharedStorageResponseObject, error) {
+	r := strictRequest(ctx)
+	w := newAPIResponse(r)
+	a.server.GetNodeSharedStorage(w, r, request.NodeId)
+	a.server.prepareAPIResponse(w, r)
+	switch w.status() {
+	case 200:
+		return strictResponse[httpapi.GetNodeSharedStorage200JSONResponse](w)
+	case 400:
+		return strictResponse[httpapi.GetNodeSharedStorage400ApplicationProblemPlusJSONResponse](w)
+	case 401:
+		return strictResponse[httpapi.GetNodeSharedStorage401ApplicationProblemPlusJSONResponse](w)
+	case 403:
+		return strictResponse[httpapi.GetNodeSharedStorage403ApplicationProblemPlusJSONResponse](w)
+	case 404:
+		return strictResponse[httpapi.GetNodeSharedStorage404ApplicationProblemPlusJSONResponse](w)
+	case 405:
+		return strictResponse[httpapi.GetNodeSharedStorage405ApplicationProblemPlusJSONResponse](w)
+	case 406:
+		return strictResponse[httpapi.GetNodeSharedStorage406ApplicationProblemPlusJSONResponse](w)
+	case 409:
+		return strictResponse[httpapi.GetNodeSharedStorage409ApplicationProblemPlusJSONResponse](w)
+	case 412:
+		return strictResponse[httpapi.GetNodeSharedStorage412ApplicationProblemPlusJSONResponse](w)
+	case 413:
+		return strictResponse[httpapi.GetNodeSharedStorage413ApplicationProblemPlusJSONResponse](w)
+	case 415:
+		return strictResponse[httpapi.GetNodeSharedStorage415ApplicationProblemPlusJSONResponse](w)
+	case 422:
+		return strictResponse[httpapi.GetNodeSharedStorage422ApplicationProblemPlusJSONResponse](w)
+	case 428:
+		return strictResponse[httpapi.GetNodeSharedStorage428ApplicationProblemPlusJSONResponse](w)
+	case 429:
+		return strictResponse[httpapi.GetNodeSharedStorage429ApplicationProblemPlusJSONResponse](w)
+	case 500:
+		return strictResponse[httpapi.GetNodeSharedStorage500ApplicationProblemPlusJSONResponse](w)
+	case 503:
+		return strictResponse[httpapi.GetNodeSharedStorage503ApplicationProblemPlusJSONResponse](w)
+	case 504:
+		return strictResponse[httpapi.GetNodeSharedStorage504ApplicationProblemPlusJSONResponse](w)
+	}
+	return nil, fmt.Errorf("GetNodeSharedStorage 返回未声明状态 %d", w.status())
+}
+
+func (a *strictAPI) RecoverNodeSharedStorage(ctx context.Context, request httpapi.RecoverNodeSharedStorageRequestObject) (httpapi.RecoverNodeSharedStorageResponseObject, error) {
+	r := strictRequest(ctx)
+	w := newAPIResponse(r)
+	a.server.RecoverNodeSharedStorage(w, r, request.NodeId, request.Params)
+	a.server.prepareAPIResponse(w, r)
+	switch w.status() {
+	case 200:
+		return strictResponse[httpapi.RecoverNodeSharedStorage200JSONResponse](w)
+	case 400:
+		return strictResponse[httpapi.RecoverNodeSharedStorage400ApplicationProblemPlusJSONResponse](w)
+	case 401:
+		return strictResponse[httpapi.RecoverNodeSharedStorage401ApplicationProblemPlusJSONResponse](w)
+	case 403:
+		return strictResponse[httpapi.RecoverNodeSharedStorage403ApplicationProblemPlusJSONResponse](w)
+	case 404:
+		return strictResponse[httpapi.RecoverNodeSharedStorage404ApplicationProblemPlusJSONResponse](w)
+	case 405:
+		return strictResponse[httpapi.RecoverNodeSharedStorage405ApplicationProblemPlusJSONResponse](w)
+	case 406:
+		return strictResponse[httpapi.RecoverNodeSharedStorage406ApplicationProblemPlusJSONResponse](w)
+	case 409:
+		return strictResponse[httpapi.RecoverNodeSharedStorage409ApplicationProblemPlusJSONResponse](w)
+	case 412:
+		return strictResponse[httpapi.RecoverNodeSharedStorage412ApplicationProblemPlusJSONResponse](w)
+	case 413:
+		return strictResponse[httpapi.RecoverNodeSharedStorage413ApplicationProblemPlusJSONResponse](w)
+	case 415:
+		return strictResponse[httpapi.RecoverNodeSharedStorage415ApplicationProblemPlusJSONResponse](w)
+	case 422:
+		return strictResponse[httpapi.RecoverNodeSharedStorage422ApplicationProblemPlusJSONResponse](w)
+	case 428:
+		return strictResponse[httpapi.RecoverNodeSharedStorage428ApplicationProblemPlusJSONResponse](w)
+	case 429:
+		return strictResponse[httpapi.RecoverNodeSharedStorage429ApplicationProblemPlusJSONResponse](w)
+	case 500:
+		return strictResponse[httpapi.RecoverNodeSharedStorage500ApplicationProblemPlusJSONResponse](w)
+	case 503:
+		return strictResponse[httpapi.RecoverNodeSharedStorage503ApplicationProblemPlusJSONResponse](w)
+	case 504:
+		return strictResponse[httpapi.RecoverNodeSharedStorage504ApplicationProblemPlusJSONResponse](w)
+	}
+	return nil, fmt.Errorf("RecoverNodeSharedStorage 返回未声明状态 %d", w.status())
+}
+
 func (a *strictAPI) GetNodeStatus(ctx context.Context, request httpapi.GetNodeStatusRequestObject) (httpapi.GetNodeStatusResponseObject, error) {
 	r := strictRequest(ctx)
 	w := newAPIResponse(r)
@@ -3947,6 +4079,182 @@ func (a *strictAPI) UpdateNavigation(ctx context.Context, request httpapi.Update
 		return strictResponse[httpapi.UpdateNavigation504ApplicationProblemPlusJSONResponse](w)
 	}
 	return nil, fmt.Errorf("UpdateNavigation 返回未声明状态 %d", w.status())
+}
+
+func (a *strictAPI) GetSharedStorage(ctx context.Context, request httpapi.GetSharedStorageRequestObject) (httpapi.GetSharedStorageResponseObject, error) {
+	r := strictRequest(ctx)
+	w := newAPIResponse(r)
+	a.server.GetSharedStorage(w, r)
+	a.server.prepareAPIResponse(w, r)
+	switch w.status() {
+	case 200:
+		return strictResponse[httpapi.GetSharedStorage200JSONResponse](w)
+	case 400:
+		return strictResponse[httpapi.GetSharedStorage400ApplicationProblemPlusJSONResponse](w)
+	case 401:
+		return strictResponse[httpapi.GetSharedStorage401ApplicationProblemPlusJSONResponse](w)
+	case 403:
+		return strictResponse[httpapi.GetSharedStorage403ApplicationProblemPlusJSONResponse](w)
+	case 404:
+		return strictResponse[httpapi.GetSharedStorage404ApplicationProblemPlusJSONResponse](w)
+	case 405:
+		return strictResponse[httpapi.GetSharedStorage405ApplicationProblemPlusJSONResponse](w)
+	case 406:
+		return strictResponse[httpapi.GetSharedStorage406ApplicationProblemPlusJSONResponse](w)
+	case 409:
+		return strictResponse[httpapi.GetSharedStorage409ApplicationProblemPlusJSONResponse](w)
+	case 412:
+		return strictResponse[httpapi.GetSharedStorage412ApplicationProblemPlusJSONResponse](w)
+	case 413:
+		return strictResponse[httpapi.GetSharedStorage413ApplicationProblemPlusJSONResponse](w)
+	case 415:
+		return strictResponse[httpapi.GetSharedStorage415ApplicationProblemPlusJSONResponse](w)
+	case 422:
+		return strictResponse[httpapi.GetSharedStorage422ApplicationProblemPlusJSONResponse](w)
+	case 428:
+		return strictResponse[httpapi.GetSharedStorage428ApplicationProblemPlusJSONResponse](w)
+	case 429:
+		return strictResponse[httpapi.GetSharedStorage429ApplicationProblemPlusJSONResponse](w)
+	case 500:
+		return strictResponse[httpapi.GetSharedStorage500ApplicationProblemPlusJSONResponse](w)
+	case 503:
+		return strictResponse[httpapi.GetSharedStorage503ApplicationProblemPlusJSONResponse](w)
+	case 504:
+		return strictResponse[httpapi.GetSharedStorage504ApplicationProblemPlusJSONResponse](w)
+	}
+	return nil, fmt.Errorf("GetSharedStorage 返回未声明状态 %d", w.status())
+}
+
+func (a *strictAPI) GetSharedConsoles(ctx context.Context, request httpapi.GetSharedConsolesRequestObject) (httpapi.GetSharedConsolesResponseObject, error) {
+	r := strictRequest(ctx)
+	w := newAPIResponse(r)
+	a.server.GetSharedConsoles(w, r)
+	a.server.prepareAPIResponse(w, r)
+	switch w.status() {
+	case 200:
+		return strictResponse[httpapi.GetSharedConsoles200JSONResponse](w)
+	case 400:
+		return strictResponse[httpapi.GetSharedConsoles400ApplicationProblemPlusJSONResponse](w)
+	case 401:
+		return strictResponse[httpapi.GetSharedConsoles401ApplicationProblemPlusJSONResponse](w)
+	case 403:
+		return strictResponse[httpapi.GetSharedConsoles403ApplicationProblemPlusJSONResponse](w)
+	case 404:
+		return strictResponse[httpapi.GetSharedConsoles404ApplicationProblemPlusJSONResponse](w)
+	case 405:
+		return strictResponse[httpapi.GetSharedConsoles405ApplicationProblemPlusJSONResponse](w)
+	case 406:
+		return strictResponse[httpapi.GetSharedConsoles406ApplicationProblemPlusJSONResponse](w)
+	case 409:
+		return strictResponse[httpapi.GetSharedConsoles409ApplicationProblemPlusJSONResponse](w)
+	case 412:
+		return strictResponse[httpapi.GetSharedConsoles412ApplicationProblemPlusJSONResponse](w)
+	case 413:
+		return strictResponse[httpapi.GetSharedConsoles413ApplicationProblemPlusJSONResponse](w)
+	case 415:
+		return strictResponse[httpapi.GetSharedConsoles415ApplicationProblemPlusJSONResponse](w)
+	case 422:
+		return strictResponse[httpapi.GetSharedConsoles422ApplicationProblemPlusJSONResponse](w)
+	case 428:
+		return strictResponse[httpapi.GetSharedConsoles428ApplicationProblemPlusJSONResponse](w)
+	case 429:
+		return strictResponse[httpapi.GetSharedConsoles429ApplicationProblemPlusJSONResponse](w)
+	case 500:
+		return strictResponse[httpapi.GetSharedConsoles500ApplicationProblemPlusJSONResponse](w)
+	case 503:
+		return strictResponse[httpapi.GetSharedConsoles503ApplicationProblemPlusJSONResponse](w)
+	case 504:
+		return strictResponse[httpapi.GetSharedConsoles504ApplicationProblemPlusJSONResponse](w)
+	}
+	return nil, fmt.Errorf("GetSharedConsoles 返回未声明状态 %d", w.status())
+}
+
+func (a *strictAPI) SaveSharedConsoles(ctx context.Context, request httpapi.SaveSharedConsolesRequestObject) (httpapi.SaveSharedConsolesResponseObject, error) {
+	r := strictRequest(ctx)
+	w := newAPIResponse(r)
+	a.server.SaveSharedConsoles(w, r, request.Params)
+	a.server.prepareAPIResponse(w, r)
+	switch w.status() {
+	case 200:
+		return strictResponse[httpapi.SaveSharedConsoles200JSONResponse](w)
+	case 400:
+		return strictResponse[httpapi.SaveSharedConsoles400ApplicationProblemPlusJSONResponse](w)
+	case 401:
+		return strictResponse[httpapi.SaveSharedConsoles401ApplicationProblemPlusJSONResponse](w)
+	case 403:
+		return strictResponse[httpapi.SaveSharedConsoles403ApplicationProblemPlusJSONResponse](w)
+	case 404:
+		return strictResponse[httpapi.SaveSharedConsoles404ApplicationProblemPlusJSONResponse](w)
+	case 405:
+		return strictResponse[httpapi.SaveSharedConsoles405ApplicationProblemPlusJSONResponse](w)
+	case 406:
+		return strictResponse[httpapi.SaveSharedConsoles406ApplicationProblemPlusJSONResponse](w)
+	case 409:
+		return strictResponse[httpapi.SaveSharedConsoles409ApplicationProblemPlusJSONResponse](w)
+	case 412:
+		return strictResponse[httpapi.SaveSharedConsoles412ApplicationProblemPlusJSONResponse](w)
+	case 413:
+		return strictResponse[httpapi.SaveSharedConsoles413ApplicationProblemPlusJSONResponse](w)
+	case 415:
+		return strictResponse[httpapi.SaveSharedConsoles415ApplicationProblemPlusJSONResponse](w)
+	case 422:
+		return strictResponse[httpapi.SaveSharedConsoles422ApplicationProblemPlusJSONResponse](w)
+	case 428:
+		return strictResponse[httpapi.SaveSharedConsoles428ApplicationProblemPlusJSONResponse](w)
+	case 429:
+		return strictResponse[httpapi.SaveSharedConsoles429ApplicationProblemPlusJSONResponse](w)
+	case 500:
+		return strictResponse[httpapi.SaveSharedConsoles500ApplicationProblemPlusJSONResponse](w)
+	case 503:
+		return strictResponse[httpapi.SaveSharedConsoles503ApplicationProblemPlusJSONResponse](w)
+	case 504:
+		return strictResponse[httpapi.SaveSharedConsoles504ApplicationProblemPlusJSONResponse](w)
+	}
+	return nil, fmt.Errorf("SaveSharedConsoles 返回未声明状态 %d", w.status())
+}
+
+func (a *strictAPI) InitializeSharedStorage(ctx context.Context, request httpapi.InitializeSharedStorageRequestObject) (httpapi.InitializeSharedStorageResponseObject, error) {
+	r := strictRequest(ctx)
+	w := newAPIResponse(r)
+	a.server.InitializeSharedStorage(w, r, request.Params)
+	a.server.prepareAPIResponse(w, r)
+	switch w.status() {
+	case 202:
+		return strictResponse[httpapi.InitializeSharedStorage202JSONResponse](w)
+	case 400:
+		return strictResponse[httpapi.InitializeSharedStorage400ApplicationProblemPlusJSONResponse](w)
+	case 401:
+		return strictResponse[httpapi.InitializeSharedStorage401ApplicationProblemPlusJSONResponse](w)
+	case 403:
+		return strictResponse[httpapi.InitializeSharedStorage403ApplicationProblemPlusJSONResponse](w)
+	case 404:
+		return strictResponse[httpapi.InitializeSharedStorage404ApplicationProblemPlusJSONResponse](w)
+	case 405:
+		return strictResponse[httpapi.InitializeSharedStorage405ApplicationProblemPlusJSONResponse](w)
+	case 406:
+		return strictResponse[httpapi.InitializeSharedStorage406ApplicationProblemPlusJSONResponse](w)
+	case 409:
+		return strictResponse[httpapi.InitializeSharedStorage409ApplicationProblemPlusJSONResponse](w)
+	case 412:
+		return strictResponse[httpapi.InitializeSharedStorage412ApplicationProblemPlusJSONResponse](w)
+	case 413:
+		return strictResponse[httpapi.InitializeSharedStorage413ApplicationProblemPlusJSONResponse](w)
+	case 415:
+		return strictResponse[httpapi.InitializeSharedStorage415ApplicationProblemPlusJSONResponse](w)
+	case 422:
+		return strictResponse[httpapi.InitializeSharedStorage422ApplicationProblemPlusJSONResponse](w)
+	case 428:
+		return strictResponse[httpapi.InitializeSharedStorage428ApplicationProblemPlusJSONResponse](w)
+	case 429:
+		return strictResponse[httpapi.InitializeSharedStorage429ApplicationProblemPlusJSONResponse](w)
+	case 500:
+		return strictResponse[httpapi.InitializeSharedStorage500ApplicationProblemPlusJSONResponse](w)
+	case 503:
+		return strictResponse[httpapi.InitializeSharedStorage503ApplicationProblemPlusJSONResponse](w)
+	case 504:
+		return strictResponse[httpapi.InitializeSharedStorage504ApplicationProblemPlusJSONResponse](w)
+	}
+	return nil, fmt.Errorf("InitializeSharedStorage 返回未声明状态 %d", w.status())
 }
 
 func (a *strictAPI) ListScheduledTasks(ctx context.Context, request httpapi.ListScheduledTasksRequestObject) (httpapi.ListScheduledTasksResponseObject, error) {

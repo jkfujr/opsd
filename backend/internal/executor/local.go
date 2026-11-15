@@ -15,7 +15,6 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/jkfujr/opsd/internal/cluster"
 	"github.com/jkfujr/opsd/internal/dockerengine"
 	"github.com/jkfujr/opsd/internal/firewall"
 	"github.com/jkfujr/opsd/internal/identity"
@@ -98,18 +97,18 @@ func (c *Client) Call(ctx context.Context, p protocol.Payload) (protocol.Payload
 	}
 	return message.Payload, nil
 }
-func (c *Client) Storage(ctx context.Context, s cluster.StorageConfig) (cluster.Credentials, error) {
+func (c *Client) Storage(ctx context.Context, s protocol.StorageConfig) (protocol.Credentials, error) {
 	b, e := json.Marshal(s)
 	if e != nil {
-		return cluster.Credentials{}, e
+		return protocol.Credentials{}, e
 	}
 	reply, e := c.request(ctx, "/storage", b)
 	if e != nil {
-		return cluster.Credentials{}, e
+		return protocol.Credentials{}, e
 	}
 	var result struct {
-		Credentials cluster.Credentials `json:"credentials"`
-		Error       string              `json:"error,omitempty"`
+		Credentials protocol.Credentials `json:"credentials"`
+		Error       string               `json:"error,omitempty"`
 	}
 	if e = json.Unmarshal(reply, &result); e != nil {
 		return result.Credentials, e
@@ -170,7 +169,7 @@ func (s *Server) Handler() http.Handler {
 		w.Write(out)
 	})
 	mux.HandleFunc("POST /storage", func(w http.ResponseWriter, r *http.Request) {
-		var c cluster.StorageConfig
+		var c protocol.StorageConfig
 		decoder := json.NewDecoder(http.MaxBytesReader(w, r.Body, 4096))
 		decoder.DisallowUnknownFields()
 		if decoder.Decode(&c) != nil {

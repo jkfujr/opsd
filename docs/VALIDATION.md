@@ -34,7 +34,7 @@ go -C backend test ./internal/control -run '^TestConsoleThemeBrowser$' -v -count
 
 ## 最近结果
 
-2026-11-15；源码提交：`955f7e5cfe9e650caf2bd4e3901f6ae541391d08`；生产程序仍为 `87448c738db456c066b2bba4d5b59283cba888c7`。环境：Windows PowerShell、Go、Python 3、GitHub Actions Ubuntu 24.04，以及 C052／C091 Linux amd64 的只读结果；四节点维护结果复用此前记录；覆盖项：两种锁入口的错误分类、RPC 应答、节点终止与恢复、删除后引用核对和当前凭据哈希。
+2026-11-15；源码与四节点生产程序提交：`955f7e5cfe9e650caf2bd4e3901f6ae541391d08`。环境：Windows PowerShell、Go、Python 3、GitHub Actions Ubuntu 24.04，以及 C001／C041／C052／C091 Linux amd64；此前清理、校时、改名与凭据证据继续复用；覆盖项：两种锁入口的错误分类、RPC 应答、节点终止与恢复、四节点更新及 API／数据库／代理读回。
 
 ```powershell
 go -C backend test ./internal/executor ./internal/cluster -count=1
@@ -46,7 +46,11 @@ py -B -m unittest discover -s tools/skills/opsd-workflow/scripts -p test_contain
 
 源码提交 `955f7e5` 的 [CI 43709156533](https://github.com/jkfujr/opsd/actions/runs/43709156533) 全部通过：接口生成一致性、前端类型与生产构建、Linux amd64／arm64 编译、完整后端及真实数据库与 Docker、原生互信新连接、主题与内置恢复、CI 环境实际安装及生产 API／root 执行器验收。
 
-生产程序 `87448c7` 复用此前 [CI 43690361179](https://github.com/jkfujr/opsd/actions/runs/43690361179) 成功结果：接口生成一致性、前端类型与生产构建、Linux amd64／arm64 编译、完整后端、真实数据库与 Docker、原生互信新连接、主题与内置恢复、实际安装及生产 API。真实部署测试覆盖新旧容器名识别、单成员创建、扩为三成员、TLS 同步、业务库保留、首成员重启和代理部署。OpenAPI 与表结构保持原值。
+本次复用该 CI 的 `opsd-linux` 工件（ID `14160221334`），按 C052 → C091 → C041 → C001 更新。每台停服前及停服后确认队列空闲，再替换程序并恢复两个服务；最终八个服务 active，节点及执行器队列均为 0，四节点文件及运行中程序的 SHA-256 均为 `8cdebc26193a8e685831ddc95c954f3d689c7ec40fa94269bdf8c1f79255dab3`。节点配置、实例路径、数据目录及现有容器的完整 ID、名称、状态和挂载保留。C052 首次检查遇到 Docker `Mounts` 数组顺序变化，按挂载目标核对后内容一致，已通过只读读回确认更新结果，程序更新只执行一次。
+
+最终 Galera 四成员均 Primary／Ready／Synced、集群大小为 4；管理员登录及 API 读取通过，四节点 connected，四成员的读取状态和两个代理均为 `ready`。C052／C041 本机代理读回均为 `PendingChanges=false`，排序仍以本机为首。证据位于 [deployment-result.json](../artifacts/deploy-lock-errors-20261115/deployment-result.json)，同目录保存 CI 工件来源、逐节点更新与最终读取、代理路由及 `api-final.json`。
+
+此前程序 `87448c7` 复用此前 [CI 43690361179](https://github.com/jkfujr/opsd/actions/runs/43690361179) 成功结果：接口生成一致性、前端类型与生产构建、Linux amd64／arm64 编译、完整后端、真实数据库与 Docker、原生互信新连接、主题与内置恢复、实际安装及生产 API。真实部署测试覆盖新旧容器名识别、单成员创建、扩为三成员、TLS 同步、业务库保留、首成员重启和代理部署。OpenAPI 与表结构保持原值。
 
 复用此前 `87448c7` 部署结果：工件按 C052 → C091 → C041 → C001 原位更新。每台停服前及停服后确认节点、执行器均无未结束操作；启动后核对版本、服务、运行工件及 Galera 同步。最终八个服务 active，四成员均 Primary／Ready／Synced、集群大小为 4，节点及执行器队列均为 0；实例路径、节点配置及数据目录保留。amd64 工件与实际运行文件 SHA-256 均为 `7e51db99764e731af5b7cf324e412635a4adb13ee145edcdda627a5ef3e7f25c`。C091 中断续传后的校验不符在停服前被拒绝，完整重传校验通过后继续部署。
 
@@ -60,6 +64,6 @@ C052 此前清理前核对旧容器 `125109d193b27ceea1555f99e3ba719b02b80b7aafb
 
 结果位于 `artifacts/optimization-20261115/`：`production-result.json` 汇总此前部署结果，`C052-update.json` 保存原清理证据，`cleanup-references.json` 补充删除后只读引用核对，`C091-couchdb.json` 保存实际改名读回及当前凭据哈希；`C041-chrony.log`／`C091-chrony.log`、`clock-comparison.json`、`routing-four-rounds.json`、`scan-final.json` 和 `health-rounds.json` 保存此前对应原始结果。证据文件沿用 artifacts 的本地忽略规则。
 
-已验证：本批两包测试、六包回归、源码提交完整 CI、删除后只读引用核对、当前凭据哈希及健康检查；`87448c7` 的完整 CI、四节点程序与运行文件、清理、改名、校时、路由四周期、扫描和连续健康读取复用此前结果。未验证：修复提交的四节点生产运行、全新 CouchDB 初始化、生产程序回退演练、arm64 实机及整机重启；本批未部署、未公开发布安装包。
+已验证：本批两包测试、六包回归及完整 CI（复用此前结果），`955f7e5` 四节点程序与运行文件、服务及队列、配置和容器保留、四成员同步、管理员 API 及两代理状态；此前清理、改名、校时、路由四周期、扫描、连续健康读取和当前凭据哈希复用此前结果。未验证：全新 CouchDB 初始化、生产程序回退演练、arm64 实机及整机重启；本批未公开发布安装包。
 
 历史结果见 [变更记录](../CHANGELOG.md)。

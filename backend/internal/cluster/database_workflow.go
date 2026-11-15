@@ -54,6 +54,7 @@ type databaseWorkflowStep struct {
 	Import   *DatabaseInstanceInput   `json:"import,omitempty"`
 }
 type databaseWorkflow struct {
+	SharedEpoch  uint64                       `json:"shared_epoch,omitempty"`
 	Built        bool                         `json:"built"`
 	Index        int                          `json:"index"`
 	Steps        []databaseWorkflowStep       `json:"steps"`
@@ -122,15 +123,21 @@ func (n *Node) SubmitDatabaseChange(ctx context.Context, change DatabaseChange, 
 		digest = fingerprint[0]
 	}
 	if digest != "" {
-		prior, e := n.RequestReceipt(ctx, c.Coordinator, requeststate.Write{Actor: actor, Key: key, Digest: digest})
+		target := c.Coordinator
+		if n.sharedActive() {
+			target = n.ID
+		}
+		prior, e := n.RequestReceipt(ctx, target, requeststate.Write{Actor: actor, Key: key, Digest: digest})
 		if e == nil && prior.Operation != nil {
 			return *prior.Operation, nil
 		}
 		if e != nil && !missingRequest(e) {
 			return Operation{}, e
 		}
-		if e = n.RequireAPIAuthorization(ctx, c.Coordinator); e != nil {
-			return Operation{}, e
+		if !n.sharedActive() {
+			if e = n.RequireAPIAuthorization(ctx, c.Coordinator); e != nil {
+				return Operation{}, e
+			}
 		}
 	}
 	if c.Revision != change.ExpectedRevision {
@@ -180,6 +187,15 @@ func (n *Node) buildDatabaseWorkflow(ctx context.Context, id string, input Datab
 		if ref.NodeID == n.ID {
 			source = ref
 			break
+		}
+	}
+	if source.InstanceID == "" && n.sharedActive() {
+		for _, ref := range c.Members {
+			var result protocol.DatabaseReadResult
+			if err := n.Call(ctx, ref.NodeID, "database.read", DatabaseRPC{InstanceID: ref.InstanceID, Scope: "health"}, &result); err == nil && result.State.Primary && result.State.Ready && result.State.Synced {
+				source = ref
+				break
+			}
 		}
 	}
 	if source.InstanceID == "" {
@@ -288,6 +304,11 @@ func (n *Node) persistDatabaseWorkflow(ctx context.Context, op *Operation, flow 
 		}
 	}
 	opBody, _ := json.Marshal(op)
+	if n.sharedActive() && op.CoordinatorEpoch > 0 {
+		if err := n.saveSharedWorkflow(ctx, *op, flow, before); err != nil {
+			return err
+		}
+	}
 	flowBody, _ := json.Marshal(flow)
 	secret, err := seal(flowBody, []string{n.age.Recipient().String()})
 	if err != nil {
@@ -315,7 +336,7 @@ func (n *Node) persistDatabaseWorkflow(ctx context.Context, op *Operation, flow 
 	if e = n.appendTx(ctx, tx, "operation", op.ID, op, n.Now()); e != nil {
 		return e
 	}
-	if op.State == protocol.Succeeded && op.Action == "configure_proxy_routes" {
+	if op.State == protocol.Succeeded && op.Action == "configure_proxy_routes" && !n.sharedActive() {
 		if e = n.finishProxyRoutingPolicy(ctx, tx, op.ID); e != nil {
 			return e
 		}
@@ -336,6 +357,36 @@ func databaseActionName(kind string) string {
 	return map[string]string{"create_database": "创建库", "delete_database": "删除库", "create_user": "创建账号", "password": "修改密码", "delete_user": "删除账号", "grant": "授权", "revoke": "撤权", "proxy_upsert": "同步代理账号", "proxy_disable": "停用代理账号", "proxy_delete": "删除代理账号", "proxy_route": "应用代理路由"}[kind]
 }
 func (n *Node) advanceDatabase(ctx context.Context, op *Operation, plain []byte) {
+	if n.sharedEnabled() {
+		if !n.sharedActive() {
+			return
+		}
+		s, err := n.sharedStore(ctx)
+		if err != nil {
+			return
+		}
+		f, err := s.Flow(ctx, op.ID)
+		if err != nil {
+			return
+		}
+		if f.Terminal || f.Coordinator != n.ID {
+			var p sharedFlowPayload
+			if json.Unmarshal(f.Body, &p) == nil {
+				p.Operation.Coordinator, p.Operation.CoordinatorEpoch = f.Coordinator, f.Epoch
+				body, _ := json.Marshal(p.Operation)
+				_, _ = n.DB.ExecContext(ctx, "UPDATE queue SET terminal=1,phase='finished',body=? WHERE id=?", string(body), op.ID)
+			}
+			return
+		}
+		if s.CheckFlow(ctx, op.ID, n.ID, f.Epoch) != nil {
+			return
+		}
+		restored, err := n.restoreSharedWorkflow(ctx, f)
+		if err != nil {
+			return
+		}
+		*op = restored
+	}
 	flow, e := n.loadDatabaseWorkflow(ctx, op.ID)
 	attention := func(err error) {
 		op.State = protocol.AttentionRequired
@@ -408,6 +459,8 @@ func (n *Node) advanceDatabase(ctx context.Context, op *Operation, plain []byte)
 		return
 	}
 	request := DatabaseRPC{Actor: op.Actor, ResourceID: op.ResourceID, InstanceID: step.Ref.InstanceID, InstanceRevision: step.Ref.InstanceRevision, OperationID: step.ID, Action: step.Action}
+	request.FlowID = op.ID
+	request.CoordinatorEpoch = op.CoordinatorEpoch
 	if step.State == "pending" {
 		step.State = "intent"
 		op.State = protocol.Applying

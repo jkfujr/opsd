@@ -13,14 +13,16 @@ import (
 )
 
 type DatabaseConnection struct {
-	PoolKey        string   `json:"pool_key,omitempty"`
-	Kind           string   `json:"kind"`
-	Address        string   `json:"address"`
-	Socket         string   `json:"socket,omitempty"`
-	Username       string   `json:"username"`
-	Password       string   `json:"password"`
-	ProtectedUsers []string `json:"protected_users"`
-	BackupRoot     string   `json:"backup_root,omitempty"`
+	PoolKey            string   `json:"pool_key,omitempty"`
+	Kind               string   `json:"kind"`
+	Address            string   `json:"address"`
+	Socket             string   `json:"socket,omitempty"`
+	Username           string   `json:"username"`
+	Password           string   `json:"password"`
+	ProtectedUsers     []string `json:"protected_users"`
+	ProtectedDatabases []string `json:"protected_databases,omitempty"`
+	ContainerID        string   `json:"container_id,omitempty"`
+	BackupRoot         string   `json:"backup_root,omitempty"`
 }
 
 func (c DatabaseConnection) Validate() error {
@@ -165,19 +167,24 @@ func (*DatabaseReadResult) Kind() Kind { return "database.read.result" }
 func (*DatabaseReadResult) isPayload() {}
 
 type DatabaseAction struct {
-	Deployment   *DatabaseDeployment `json:"deployment,omitempty"`
-	SeedUpdate   *DatabaseSeedUpdate `json:"seed_update,omitempty"`
-	Routing      *ProxyRouteAction   `json:"routing,omitempty"`
-	Connection   DatabaseConnection  `json:"connection"`
-	ClusterID    string              `json:"cluster_id"`
-	Kind         string              `json:"kind"`
-	Database     string              `json:"database,omitempty"`
-	Charset      string              `json:"charset,omitempty"`
-	User         string              `json:"user,omitempty"`
-	Host         string              `json:"host,omitempty"`
-	PasswordHash string              `json:"password_hash,omitempty"`
-	Privileges   []string            `json:"privileges,omitempty"`
-	Hostgroup    int                 `json:"hostgroup,omitempty"`
+	FlowID           string                `json:"flow_id,omitempty"`
+	Coordinator      string                `json:"coordinator,omitempty"`
+	CoordinatorEpoch uint64                `json:"coordinator_epoch,omitempty"`
+	Repair           *ContainerRef         `json:"repair,omitempty"`
+	Shared           *SharedDatabaseAction `json:"shared,omitempty"`
+	Deployment       *DatabaseDeployment   `json:"deployment,omitempty"`
+	SeedUpdate       *DatabaseSeedUpdate   `json:"seed_update,omitempty"`
+	Routing          *ProxyRouteAction     `json:"routing,omitempty"`
+	Connection       DatabaseConnection    `json:"connection"`
+	ClusterID        string                `json:"cluster_id"`
+	Kind             string                `json:"kind"`
+	Database         string                `json:"database,omitempty"`
+	Charset          string                `json:"charset,omitempty"`
+	User             string                `json:"user,omitempty"`
+	Host             string                `json:"host,omitempty"`
+	PasswordHash     string                `json:"password_hash,omitempty"`
+	Privileges       []string              `json:"privileges,omitempty"`
+	Hostgroup        int                   `json:"hostgroup,omitempty"`
 }
 
 var databaseName = regexp.MustCompile(`^[A-Za-z0-9_][A-Za-z0-9_$-]{0,63}$`)
@@ -186,10 +193,10 @@ var databaseHost = regexp.MustCompile(`^[A-Za-z0-9_.:%/-]{1,255}$`)
 var databasePasswordHash = regexp.MustCompile(`^\*[0-9A-F]{40}$`)
 
 func SystemDatabase(name string) bool {
-	return slices.Contains([]string{"mysql", "information_schema", "performance_schema", "sys"}, strings.ToLower(name))
+	return slices.Contains([]string{"mysql", "information_schema", "performance_schema", "sys", "opsd_core"}, strings.ToLower(name))
 }
 func SystemDatabaseUser(name string, c DatabaseConnection) bool {
-	return name == c.Username || slices.Contains(c.ProtectedUsers, name) || slices.Contains([]string{"root", "mysql", "mariadb.sys", "mysql.sys", "sst", "galera_sst", "galera_backup", "proxysql_monitor", "mysqld_exporter", "mysql_exporter"}, name)
+	return strings.HasPrefix(name, "opsd_node_") || strings.HasPrefix(name, "opsd_mon_") || name == c.Username || slices.Contains(c.ProtectedUsers, name) || slices.Contains([]string{"root", "mysql", "mariadb.sys", "mysql.sys", "sst", "galera_sst", "galera_backup", "proxysql_monitor", "mysqld_exporter", "mysql_exporter"}, name)
 }
 func (a DatabaseAction) Validate() error {
 	if a.Kind == "deployment_seeds" && a.SeedUpdate != nil {
@@ -201,13 +208,22 @@ func (a DatabaseAction) Validate() error {
 	if e := a.Connection.Validate(); e != nil {
 		return e
 	}
+	if a.Kind == "shared_proxy_repair" && a.Connection.Kind == "proxysql" && a.Repair != nil && a.Repair.ContainerID == a.Connection.ContainerID && a.Shared != nil && a.Shared.Mode == "repair" {
+		if err := a.Shared.Validate(); err != nil {
+			return err
+		}
+		return a.Repair.Validate()
+	}
+	if a.Shared != nil && (a.Kind == "shared_database" && a.Connection.Kind == "galera" || a.Kind == "shared_proxy" && a.Connection.Kind == "proxysql") && a.ClusterID != "" {
+		return a.Shared.Validate()
+	}
 	if (a.Connection.Kind == "proxysql") != strings.HasPrefix(a.Kind, "proxy_") {
 		return fmt.Errorf("数据库类型与操作不匹配")
 	}
 	if a.Connection.Kind == "galera" && a.ClusterID == "" {
 		return fmt.Errorf("缺少 Galera 集群身份")
 	}
-	if a.Database != "" && (!databaseName.MatchString(a.Database) || SystemDatabase(a.Database)) {
+	if a.Database != "" && (!databaseName.MatchString(a.Database) || SystemDatabase(a.Database) || slices.Contains(a.Connection.ProtectedDatabases, a.Database)) {
 		return fmt.Errorf("业务库名称无效或属于系统库")
 	}
 	if a.User != "" && (!databaseUser.MatchString(a.User) || !databaseHost.MatchString(a.Host) || SystemDatabaseUser(a.User, a.Connection)) {

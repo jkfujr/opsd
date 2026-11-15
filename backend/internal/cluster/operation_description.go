@@ -9,7 +9,7 @@ import (
 )
 
 // describeOperation 在受理事务内保存动作和原目标，不在读取历史时猜测或补写。
-func (n *Node) describeOperation(ctx context.Context, tx *sql.Tx, r Request, name string, op *Operation) error {
+func (n *Node) describeOperation(ctx context.Context, tx firewallQuerier, r Request, name string, op *Operation) error {
 	logs := r.Kind == "task_run" || r.Kind == "container" || r.Kind == "compose"
 	op.SupportsLogs = &logs
 	op.Action = r.Kind
@@ -27,6 +27,13 @@ func (n *Node) describeOperation(ctx context.Context, tx *sql.Tx, r Request, nam
 		return json.Unmarshal([]byte(body), out)
 	}
 	switch r.Kind {
+	case "shared_initialize":
+		var input SharedInitialize
+		if err := json.Unmarshal(r.Payload, &input); err != nil {
+			return err
+		}
+		op.Action, op.TargetName = "initialize_shared_storage", input.Database
+		op.Resource = &OperationResource{Kind: "database", NodeID: n.ID, ID: input.ClusterID}
 	case "container":
 		var action protocol.ContainerAction
 		if err := json.Unmarshal(r.Payload, &action); err != nil {

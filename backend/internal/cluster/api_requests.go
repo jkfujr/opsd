@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/jkfujr/opsd/internal/requeststate"
+	"github.com/jkfujr/opsd/internal/sharedsql"
 	"time"
 )
 
@@ -80,12 +81,39 @@ type operationDecisionRequest struct {
 
 func (n *Node) CallOperationDecision(ctx context.Context, id, method string, decision OperationDecision, write *requeststate.Write) (Operation, error) {
 	var out Operation
-	e := n.Call(ctx, OperationOwner(id), "api.operation.decision", operationDecisionRequest{Method: method, Decision: decision, Write: *write}, &out)
+	target := OperationOwner(id)
+	if n.sharedActive() {
+		if op, err := n.GetOperation(ctx, id); err == nil && op.CoordinatorEpoch > 0 {
+			target = op.Coordinator
+		}
+	}
+	e := n.Call(ctx, target, "api.operation.decision", operationDecisionRequest{Method: method, Decision: decision, Write: *write}, &out)
 	return out, e
 }
 func (n *Node) apiOperationDecision(ctx context.Context, request operationDecisionRequest) (Operation, error) {
 	n.apiDecisionMu.Lock()
 	defer n.apiDecisionMu.Unlock()
+	local, localErr := n.operation(ctx, request.Decision.ID)
+	if n.sharedActive() && (localErr != nil || local.CoordinatorEpoch > 0) {
+		if _, err := n.sharedOperation(ctx, request.Decision.ID); err == nil {
+			s, err := n.sharedStore(ctx)
+			if err != nil {
+				return Operation{}, err
+			}
+			prior, err := s.Receipt(ctx, sharedsql.Receipt{Actor: request.Write.Actor, Key: request.Write.Key, Digest: request.Write.Digest})
+			if err == nil {
+				var op Operation
+				err = json.Unmarshal(prior.Result, &op)
+				return op, err
+			}
+			if err != sql.ErrNoRows {
+				return Operation{}, sharedFault(err)
+			}
+			return n.sharedWorkflowDecision(requeststate.With(ctx, &request.Write), request.Method, request.Decision)
+		} else if !errors.Is(err, sql.ErrNoRows) {
+			return Operation{}, sharedFault(err)
+		}
+	}
 	prior, e := requeststate.Lookup(ctx, n.DB, request.Write)
 	if e == nil {
 		var op Operation
@@ -127,6 +155,28 @@ func (n *Node) apiOperationDecision(ctx context.Context, request operationDecisi
 	return op, e
 }
 func (n *Node) RequestReceipt(ctx context.Context, target string, request requeststate.Write) (RequestReceipt, error) {
+	if n.sharedActive() {
+		if store, err := n.sharedStore(ctx); err == nil {
+			prior, err := store.Receipt(ctx, sharedsql.Receipt{Actor: request.Actor, Key: request.Key, Digest: request.Digest})
+			if err == nil {
+				out := RequestReceipt{Key: request.Key, Owner: n.ID, Actor: request.Actor, State: "completed", CreatedAt: prior.CreatedAt, Kind: prior.Kind, ResourceID: prior.ResourceID, Secret: prior.Kind == "enrollment"}
+				var op Operation
+				if err = json.Unmarshal(prior.Result, &op); err != nil {
+					return out, err
+				}
+				if op.Subject != "" {
+					if current, e := n.sharedOperation(ctx, op.ID); e == nil {
+						op = current
+					}
+					out.OperationID, out.Operation, out.Kind, out.State = op.ID, &op, "operation", "accepted"
+				}
+				return out, nil
+			}
+			if errors.Is(err, sharedsql.ErrConflict) {
+				return RequestReceipt{}, sharedFault(err)
+			}
+		}
+	}
 	var out RequestReceipt
 	e := n.Call(ctx, target, "api.request", request, &out)
 	return out, e

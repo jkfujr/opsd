@@ -9,7 +9,9 @@ import (
 	"reflect"
 	"strings"
 
+	"github.com/jkfujr/opsd/internal/buildinfo"
 	"github.com/jkfujr/opsd/internal/httpapi"
+	"github.com/jkfujr/opsd/internal/protocol"
 )
 
 type apiContextKey struct{}
@@ -162,7 +164,8 @@ func (s *Server) GetAPIIdentity(w http.ResponseWriter, r *http.Request) {
 		principal.Id = a.Token.Actor()
 		grants = convertHTTP[[]httpapi.APIGrant](a.Token.Grants)
 	}
-	write(w, 200, httpapi.APIIdentity{ApiVersion: httpapi.APIVersion, NodeVersion: s.options.NodeVersion, FrontendVersion: s.options.FrontendVersion, NodeId: s.node.ID, Principal: principal, Grants: grants, OpenapiUrl: httpapi.APIBasePath + "/openapi.json", DocsUrl: httpapi.APIBasePath + "/docs"})
+	version, contract, management := int64(protocol.Version), int64(protocol.ContractVersion), int64(protocol.SharedManagementVersion)
+	write(w, 200, httpapi.APIIdentity{ApiVersion: httpapi.APIVersion, NodeVersion: s.options.NodeVersion, FrontendVersion: s.options.FrontendVersion, NodeId: s.node.ID, Principal: principal, Grants: grants, OpenapiUrl: httpapi.APIBasePath + "/openapi.json", DocsUrl: httpapi.APIBasePath + "/docs", Commit: &buildinfo.Commit, ProtocolVersion: &version, PersistenceVersion: &contract, SharedManagementVersion: &management})
 }
 
 func apiPattern(route httpapi.APIRoute) string {

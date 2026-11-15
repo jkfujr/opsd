@@ -12,6 +12,9 @@ type DirectoryExchange struct {
 }
 
 func directoryItems(d Directory, visit func(string, any)) {
+	if d.Shared != nil {
+		visit("shared", d.Shared)
+	}
 	for _, v := range d.Admissions {
 		visit("admission:"+v.ID, v)
 	}
@@ -51,6 +54,8 @@ func directoryDelta(d Directory, summary map[string]string) Directory {
 			return
 		}
 		switch value := v.(type) {
+		case *SharedBinding:
+			out.Shared = value
 		case Member:
 			if len(k) > 10 && k[:10] == "admission:" {
 				out.Admissions = append(out.Admissions, value)
@@ -71,5 +76,5 @@ func directoryDelta(d Directory, summary map[string]string) Directory {
 }
 
 func emptyDirectory(d Directory) bool {
-	return len(d.Admissions)+len(d.Members)+len(d.Revocations)+len(d.Addresses)+len(d.Databases) == 0 && d.Trust == nil
+	return len(d.Admissions)+len(d.Members)+len(d.Revocations)+len(d.Addresses)+len(d.Databases) == 0 && d.Trust == nil && d.Shared == nil
 }

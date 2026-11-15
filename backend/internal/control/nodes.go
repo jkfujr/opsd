@@ -25,7 +25,11 @@ func (s *Server) GetNode(w http.ResponseWriter, r *http.Request, id string) {
 		return
 	}
 	s.setETag(w, r, member.ConfigurationRevision)
-	s.result(w, r, 200, httpapi.Node{Id: member.ID, Name: member.Name, PublicKey: member.Public, Local: member.ID == s.node.ID, Region: &member.Region, Address: &member.Address, Revision: int64(member.ConfigurationRevision)}, nil)
+	var endpoints *[]string
+	if len(member.Endpoints) > 0 {
+		endpoints = &member.Endpoints
+	}
+	s.result(w, r, 200, httpapi.Node{Id: member.ID, Name: member.Name, PublicKey: member.Public, Local: member.ID == s.node.ID, Region: &member.Region, Address: &member.Address, Endpoints: endpoints, CoordinatorCandidate: &member.CoordinatorCandidate, Revision: int64(member.ConfigurationRevision)}, nil)
 }
 
 func (s *Server) RenameNode(w http.ResponseWriter, r *http.Request, id string, _ httpapi.RenameNodeParams) {

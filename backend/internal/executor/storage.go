@@ -13,7 +13,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/jkfujr/opsd/internal/cluster"
 	"github.com/jkfujr/opsd/internal/firewall"
 	"github.com/jkfujr/opsd/internal/identity"
 	"github.com/jkfujr/opsd/internal/localstate"
@@ -25,23 +24,23 @@ const CouchImage = "couchdb:3.5.0"
 var storageLock sync.Mutex
 
 type storageIdentity struct {
-	StorageID   string                `json:"storage_id,omitempty"`
-	FullID      string                `json:"full_id,omitempty"`
-	Old         string                `json:"old,omitempty"`
-	New         string                `json:"new,omitempty"`
-	Cookie      string                `json:"cookie"`
-	Credentials cluster.Credentials   `json:"credentials"`
-	Config      cluster.StorageConfig `json:"config"`
+	StorageID   string                 `json:"storage_id,omitempty"`
+	FullID      string                 `json:"full_id,omitempty"`
+	Old         string                 `json:"old,omitempty"`
+	New         string                 `json:"new,omitempty"`
+	Cookie      string                 `json:"cookie"`
+	Credentials protocol.Credentials   `json:"credentials"`
+	Config      protocol.StorageConfig `json:"config"`
 }
 
-func (s *Server) storage(ctx context.Context, c cluster.StorageConfig) (cluster.Credentials, error) {
+func (s *Server) storage(ctx context.Context, c protocol.StorageConfig) (protocol.Credentials, error) {
 	storageLock.Lock()
 	defer storageLock.Unlock()
 	if s.Host == nil {
 		s.Host = firewall.NativeHost{}
 	}
 	if c.Enabled && (net.ParseIP(c.Address) == nil || net.ParseIP(c.Address).IsUnspecified() || c.Port < 1 || c.Port > 65535) {
-		return cluster.Credentials{}, fmt.Errorf("数据库地址无效")
+		return protocol.Credentials{}, fmt.Errorf("数据库地址无效")
 	}
 	path := filepath.Join(s.Directory, "couchdb.json")
 	var state storageIdentity
@@ -50,7 +49,7 @@ func (s *Server) storage(ctx context.Context, c cluster.StorageConfig) (cluster.
 		return state.Credentials, e
 	}
 	if os.IsNotExist(e) {
-		state.Credentials = cluster.Credentials{Username: "opsd_admin", Password: identity.Random()}
+		state.Credentials = protocol.Credentials{Username: "opsd_admin", Password: identity.Random()}
 		state.Cookie = identity.Random()
 		if e = localstate.Write(path, state, 0600); e != nil {
 			return state.Credentials, e
@@ -207,7 +206,7 @@ func (s *Server) storage(ctx context.Context, c cluster.StorageConfig) (cluster.
 	}
 	return state.Credentials, e
 }
-func (s *Server) waitStorage(ctx context.Context, c cluster.StorageConfig) error {
+func (s *Server) waitStorage(ctx context.Context, c protocol.StorageConfig) error {
 	if !s.prepare {
 		return waitDatabase(ctx, c)
 	}
@@ -226,7 +225,7 @@ func (s *Server) waitStorage(ctx context.Context, c cluster.StorageConfig) error
 	}
 	return fmt.Errorf("数据库接口未启动")
 }
-func waitDatabase(ctx context.Context, c cluster.StorageConfig) error {
+func waitDatabase(ctx context.Context, c protocol.StorageConfig) error {
 	ctx, cancel := context.WithTimeout(ctx, 20*time.Second)
 	defer cancel()
 	client := &http.Client{Transport: &http.Transport{}, Timeout: time.Second}

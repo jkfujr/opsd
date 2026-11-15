@@ -181,7 +181,16 @@ func (e *Engine) prepareMigration(ctx context.Context, after protocol.FirewallTa
 	if err != nil {
 		return err
 	}
-	status.Results = e.Manager.SyncPeerTrust(ctx, target)
+	if e.NativeLock != nil {
+		unlock, err := e.NativeLock(ctx)
+		if err != nil {
+			return err
+		}
+		status.Results = e.Manager.SyncPeerTrust(ctx, target)
+		unlock()
+	} else {
+		status.Results = e.Manager.SyncPeerTrust(ctx, target)
+	}
 	for _, result := range status.Results {
 		if result.State != "in_sync" && result.State != "inactive" {
 			return firewall.Conflict("互信规则实际检查失败，原 IP 规则保留")

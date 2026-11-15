@@ -106,6 +106,14 @@ func (n *Node) writeFirewall(ctx context.Context, origin string, request Firewal
 		}
 		copy(digest[:], decoded)
 	}
+	var adoption *FirewallAdoption
+	if request.AdoptFingerprint != "" {
+		preview, err := n.previewFirewallAdoption(ctx)
+		if err != nil {
+			return out, err
+		}
+		adoption = &preview
+	}
 	n.mu.Lock()
 	defer n.mu.Unlock()
 	tx, e := n.DB.BeginTx(ctx, nil)
@@ -162,10 +170,7 @@ func (n *Node) writeFirewall(ctx context.Context, origin string, request Firewal
 		if maintenance || request.Change != nil || len(request.Changes) > 0 {
 			return out, fault("invalid_request", "接纳配置不能与规则修改同时执行")
 		}
-		preview, err := n.previewFirewallAdoption(ctx)
-		if err != nil {
-			return out, err
-		}
+		preview := adoption
 		if preview.Fingerprint != request.AdoptFingerprint {
 			return out, fault("conflict", "实际防火墙配置已经变化，请重新预览")
 		}

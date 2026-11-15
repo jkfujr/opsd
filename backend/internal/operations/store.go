@@ -175,17 +175,37 @@ func (s Store) Receive(ctx context.Context, id string, version int, action proto
 	if !errors.Is(e, sql.ErrNoRows) {
 		return l, false, e
 	}
-	var n int
-	query := "SELECT count(*) FROM operations WHERE terminal=0 AND COALESCE(json_extract(action,'$.kind'),'')<>'shell'"
-	var args []any
-	if action.Kind == "shell" {
-		query = "SELECT count(*) FROM operations WHERE terminal=0 AND json_extract(action,'$.kind')='shell' AND json_extract(action,'$.shell.task_id')=?"
-		args = []any{action.Shell.TaskID}
-	}
-	if e = c.QueryRowContext(ctx, query, args...).Scan(&n); e != nil {
+	claims := protocol.ActionResources(action)
+	rows, e := c.QueryContext(ctx, "SELECT action FROM operations WHERE terminal=0 AND action IS NOT NULL")
+	if e != nil {
 		return l, false, e
 	}
-	if n != 0 {
+	shells := 0
+	for rows.Next() {
+		var body string
+		if e = rows.Scan(&body); e != nil {
+			rows.Close()
+			return l, false, e
+		}
+		var prior protocol.OperationAction
+		if e = json.Unmarshal([]byte(body), &prior); e != nil {
+			rows.Close()
+			return l, false, e
+		}
+		if prior.Shell != nil {
+			shells++
+		}
+		if protocol.ResourcesConflict(claims, protocol.ActionResources(prior)) {
+			rows.Close()
+			return l, false, ErrBusy
+		}
+	}
+	e = rows.Err()
+	rows.Close()
+	if e != nil {
+		return l, false, e
+	}
+	if action.Shell != nil && shells >= 8 {
 		return l, false, ErrBusy
 	}
 	if action.FirewallConfig != nil {
@@ -212,7 +232,8 @@ func (s Store) Receive(ctx context.Context, id string, version int, action proto
 	l = Local{Action: &action, BootID: bootID, Record: protocol.OperationRecord{ID: id, State: protocol.Prepared, Revision: 1, Decision: "undecided", Steps: []protocol.OperationStep{}}}
 	a, _ := json.Marshal(action)
 	r, _ := json.Marshal(l.Record)
-	if _, e = c.ExecContext(ctx, "INSERT INTO operations(id,action,contract_version,record,boot_id) VALUES(?,?,?,?,?)", id, string(a), version, string(r), bootID); e != nil {
+	resources, _ := json.Marshal(claims)
+	if _, e = c.ExecContext(ctx, "INSERT INTO operations(id,action,contract_version,record,boot_id,resource_claims) VALUES(?,?,?,?,?,?)", id, string(a), version, string(r), bootID, string(resources)); e != nil {
 		return l, false, e
 	}
 	_, e = c.ExecContext(ctx, "COMMIT")

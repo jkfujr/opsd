@@ -28,6 +28,10 @@ func (s *Server) nodes(ctx context.Context) ([]httpapi.NodeStatus, error) {
 		n.Writable = n.Writable && n.Connected
 		n.Region = &m.Region
 		n.Address = &m.Address
+		if len(m.Endpoints) > 0 {
+			n.Endpoints = &m.Endpoints
+		}
+		n.CoordinatorCandidate = &m.CoordinatorCandidate
 		n.StorageAddress = &m.Storage
 		if revoked[m.ID] {
 			now := s.now()

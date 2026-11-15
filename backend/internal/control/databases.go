@@ -74,7 +74,7 @@ func (s *Server) databaseDefinitions(ctx context.Context) ([]cluster.ManagedData
 	}
 	out := []cluster.ManagedDatabaseCluster{}
 	for _, c := range all {
-		if c.Deleted || !s.node.Active(ctx, c.Coordinator) {
+		if c.Deleted {
 			continue
 		}
 		if a := access(ctx); a != nil && !a.Token.Allows("databases", "read", c.ID, "") {

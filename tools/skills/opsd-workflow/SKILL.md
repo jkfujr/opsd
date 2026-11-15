@@ -24,7 +24,7 @@ UFW 互信在双栈 `INPUT` 首条通过所属跳转优先放行成员 IP 的全
 
 API 与网页独立启停，共用 Web 地址；令牌每次向所属节点核验一次，列表先按模块与资源过滤再分页，写入保持令牌身份、目标及请求键的幂等范围。敏感管理接口保留管理员会话。接入方式见 [API](../../../docs/API.md)。
 
-数据库集群经协调节点管理，连接与凭据留在所属节点。MariaDB／ProxySQL 适配只在 `backend/internal/databaseengine`，执行器继续接受类型化本机步骤；Galera 变更执行一次，代理各步骤保留持久结果。未知结果先查原步骤，显式重新处理才继续；其他待应用代理差异保留现场。系统及登记的服务账号保持只读。“OPSD 数据”管理自用 CouchDB，后续“存储”使用 Silo。
+数据库集群经协调节点管理，连接与凭据留在所属节点。MariaDB／ProxySQL 适配只在 `backend/internal/databaseengine`，执行器继续接受类型化本机步骤；Galera 变更执行一次，代理各步骤保留持久结果。未知结果先查原步骤，显式重新处理才继续；其他待应用代理差异保留现场。系统及登记的服务账号保持只读。“数据库 → OPSD 数据”绑定现有 Galera 的 `opsd_core` 并管理每节点 ProxySQL；初始化、迁移状态与恢复使用 `opsd data init/status/recover`，先读 [共享存储与恢复契约](../../../docs/ARCHITECTURE.md#共享存储协调与恢复)。旧 CouchDB 仅保留迁移读取，后续“存储”使用 Silo。
 
 数据库部署使用只读扫描／预览、确认提交及现有操作抽屉；创建允许单成员，扩容读取实际成员资料，新实例使用空目录。固定镜像模板与 Docker 安装入口分别在 `databaseengine/deployment.go`、`dockerengine/install.go`；状态和恢复契约见 [数据库管理](../../../docs/ARCHITECTURE.md#数据库管理)。原操作持续等待同步，已完成成员保留；失败先读取原任务和容器，再使用原操作的重新处理入口。
 

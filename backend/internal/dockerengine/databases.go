@@ -2,6 +2,7 @@ package dockerengine
 
 import (
 	"context"
+	"fmt"
 	"net"
 	"strconv"
 	"strings"
@@ -9,6 +10,26 @@ import (
 	"github.com/jkfujr/opsd/internal/protocol"
 	"github.com/moby/moby/client"
 )
+
+func (m *Manager) StartDatabaseProxy(ctx context.Context, ref protocol.ContainerRef) error {
+	c, raw, err := m.inspect(ctx, ref)
+	if err != nil {
+		return err
+	}
+	defer c.Close()
+	image := ""
+	if raw.Config != nil {
+		image = raw.Config.Image
+		if raw.Config.Labels[sourceImageLabel] != "" {
+			image = raw.Config.Labels[sourceImageLabel]
+		}
+	}
+	if !strings.Contains(strings.ToLower(image), "proxysql") || raw.State == nil || raw.State.Paused || raw.State.Status == "removing" {
+		return fmt.Errorf("代理容器身份或状态已变化")
+	}
+	_, err = c.ContainerStart(ctx, ref.ContainerID, client.ContainerStartOptions{})
+	return err
+}
 
 func (m *Manager) DatabaseInstances(ctx context.Context) ([]protocol.DatabaseCandidate, error) {
 	c, _, _, e := m.connect(ctx)

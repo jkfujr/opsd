@@ -16,6 +16,9 @@ import (
 
 func Digest(s string) []byte { b := sha256.Sum256([]byte(s)); return b[:] }
 func (n *Node) Token(ctx context.Context) (string, string, time.Time, error) {
+	if n.sharedEnabled() {
+		return n.sharedToken(ctx)
+	}
 	token, id := identity.Random(), identity.Random()
 	expires := n.Now().Add(24 * time.Hour).UTC()
 	tx, e := n.DB.BeginTx(ctx, nil)
@@ -49,6 +52,9 @@ func (n *Node) Token(ctx context.Context) (string, string, time.Time, error) {
 func (n *Node) acceptMember(ctx context.Context, m Member, token string) error {
 	if e := validateMember(m); e != nil {
 		return e
+	}
+	if n.sharedEnabled() {
+		return n.sharedAcceptMember(ctx, m, token)
 	}
 	if n.Revoked(ctx, m.ID) {
 		return fault("forbidden", "节点已撤销")
@@ -96,6 +102,16 @@ func (n *Node) acceptMember(ctx context.Context, m Member, token string) error {
 	return nil
 }
 func (n *Node) merge(ctx context.Context, d Directory, bootstrap bool) error {
+	if d.Shared != nil && !n.sharedEnabled() {
+		if err := n.acceptSharedBinding(ctx, *d.Shared); err != nil {
+			return err
+		}
+	}
+	if n.sharedEnabled() && !bootstrap {
+		d.Admissions = nil
+		d.Databases = nil
+		d.Trust = nil
+	}
 	if len(d.Members) > 1000 || len(d.Revocations) > 1000 {
 		return fault("invalid_request", "目录过大")
 	}
@@ -109,133 +125,13 @@ func (n *Node) merge(ctx context.Context, d Directory, bootstrap bool) error {
 			return nil
 		}
 	}
-	known := map[string]Member{}
-	revoked := map[string]bool{}
-	for _, m := range current.Members {
-		known[m.ID] = m
-	}
-	for _, r := range current.Revocations {
-		revoked[r.ID] = true
-	}
-	changed := false
 	tx, e := n.DB.BeginTx(ctx, nil)
 	if e != nil {
 		return e
 	}
 	defer tx.Rollback()
-	grants := append([]Member(nil), d.Admissions...)
-	for len(grants) > 0 {
-		next := []Member{}
-		progress := false
-		for _, m := range grants {
-			if m.Cluster != n.cluster {
-				return fault("forbidden", "集群身份不匹配")
-			}
-			if e = validateMember(m); e != nil {
-				return e
-			}
-			if old, ok := known[m.ID]; ok {
-				if old.Public != m.Public || old.Signing != m.Signing || old.Recipient != m.Recipient {
-					return fault("forbidden", "成员授权中的公钥发生变化")
-				}
-				continue
-			}
-			issuer, ok := known[m.Issuer]
-			if !ok && !bootstrap {
-				next = append(next, m)
-				continue
-			}
-			if !bootstrap {
-				key, err := identity.Decode(issuer.Signing)
-				if err != nil || revoked[m.Issuer] || !ed25519.Verify(key, memberBytes(m), m.Signature) {
-					return fault("forbidden", "成员授权无效")
-				}
-			}
-			body, _ := json.Marshal(m)
-			if _, e = tx.ExecContext(ctx, "INSERT INTO admissions(id,body) VALUES(?,?) ON CONFLICT(id) DO NOTHING", m.ID, string(body)); e != nil {
-				return e
-			}
-			if _, e = tx.ExecContext(ctx, "INSERT INTO members(id,body,version,issuer) VALUES(?,?,?,?) ON CONFLICT(id) DO NOTHING", m.ID, string(body), m.Version, m.Issuer); e != nil {
-				return e
-			}
-			known[m.ID] = m
-			progress = true
-			changed = true
-		}
-		if len(next) > 0 && !progress {
-			return fault("forbidden", "成员授权链不完整")
-		}
-		grants = next
-	}
-	remaining := append([]Member(nil), d.Members...)
-	for len(remaining) > 0 {
-		next := []Member{}
-		progress := false
-		for _, m := range remaining {
-			if m.Cluster != n.cluster {
-				return fault("forbidden", "集群身份不匹配")
-			}
-			if e = validateMember(m); e != nil {
-				return e
-			}
-			if old, ok := known[m.ID]; ok {
-				if old.Public != m.Public || old.Signing != m.Signing || old.Recipient != m.Recipient {
-					return fault("forbidden", "节点公钥发生变化")
-				}
-				if old.Version >= m.Version {
-					continue
-				}
-			}
-			issuer, ok := known[m.Issuer]
-			if !ok && !bootstrap {
-				next = append(next, m)
-				continue
-			}
-			if !bootstrap {
-				key, err := identity.Decode(issuer.Signing)
-				if err != nil || revoked[m.Issuer] || !ed25519.Verify(key, memberBytes(m), m.Signature) {
-					return fault("forbidden", "成员签名无效")
-				}
-				if _, exists := known[m.ID]; exists && m.Issuer != m.ID {
-					return fault("forbidden", "节点配置只能由其本人更新")
-				}
-			}
-			if revoked[m.ID] {
-				continue
-			}
-			b, _ := json.Marshal(m)
-			if _, e = tx.ExecContext(ctx, "INSERT INTO members(id,body,version,issuer) VALUES(?,?,?,?) ON CONFLICT(id) DO UPDATE SET body=excluded.body,version=excluded.version,issuer=excluded.issuer WHERE members.version<excluded.version", m.ID, string(b), m.Version, m.Issuer); e != nil {
-				return e
-			}
-			known[m.ID] = m
-			progress = true
-			changed = true
-		}
-		if len(next) > 0 && !progress {
-			return fault("forbidden", "成员签发者未知")
-		}
-		remaining = next
-	}
-	for _, r := range d.Revocations {
-		if revoked[r.ID] {
-			continue
-		}
-		issuer, ok := known[r.Issuer]
-		key, err := identity.Decode(issuer.Signing)
-		if !ok || err != nil || revoked[r.Issuer] || r.Cluster != n.cluster || !ed25519.Verify(key, revocationBytes(r), r.Signature) {
-			return fault("forbidden", "撤销签名无效")
-		}
-		b, _ := json.Marshal(r)
-		if _, e = tx.ExecContext(ctx, "INSERT INTO revocations(id,body) VALUES(?,?) ON CONFLICT(id) DO NOTHING", r.ID, string(b)); e != nil {
-			return e
-		}
-		revoked[r.ID] = true
-		changed = true
-	}
-	if e = n.mergeNetworkTx(ctx, tx, d, known, revoked); e != nil {
-		return e
-	}
-	if e = n.mergeDatabaseClusters(ctx, tx, d.Databases, known, revoked); e != nil {
+	changed, revoked, e := n.mergeDirectoryTx(ctx, tx, d, current, bootstrap)
+	if e != nil {
 		return e
 	}
 	if e = tx.Commit(); e != nil {
@@ -261,6 +157,138 @@ func (n *Node) merge(ctx context.Context, d Directory, bootstrap bool) error {
 	}
 	return nil
 }
+func (n *Node) mergeDirectoryTx(ctx context.Context, tx *sql.Tx, d, current Directory, bootstrap bool) (bool, map[string]bool, error) {
+	known := map[string]Member{}
+	revoked := map[string]bool{}
+	changed := false
+	var e error
+	err := func() error {
+		for _, m := range current.Members {
+			known[m.ID] = m
+		}
+		for _, r := range current.Revocations {
+			revoked[r.ID] = true
+		}
+		grants := append([]Member(nil), d.Admissions...)
+		for len(grants) > 0 {
+			next := []Member{}
+			progress := false
+			for _, m := range grants {
+				if m.Cluster != n.cluster {
+					return fault("forbidden", "集群身份不匹配")
+				}
+				if e = validateMember(m); e != nil {
+					return e
+				}
+				if old, ok := known[m.ID]; ok {
+					if old.Public != m.Public || old.Signing != m.Signing || old.Recipient != m.Recipient {
+						return fault("forbidden", "成员授权中的公钥发生变化")
+					}
+					continue
+				}
+				issuer, ok := known[m.Issuer]
+				if !ok && !bootstrap {
+					next = append(next, m)
+					continue
+				}
+				if !bootstrap {
+					key, err := identity.Decode(issuer.Signing)
+					if err != nil || revoked[m.Issuer] || !ed25519.Verify(key, memberBytes(m), m.Signature) {
+						return fault("forbidden", "成员授权无效")
+					}
+				}
+				body, _ := json.Marshal(m)
+				if _, e = tx.ExecContext(ctx, "INSERT INTO admissions(id,body) VALUES(?,?) ON CONFLICT(id) DO NOTHING", m.ID, string(body)); e != nil {
+					return e
+				}
+				if _, e = tx.ExecContext(ctx, "INSERT INTO members(id,body,version,issuer) VALUES(?,?,?,?) ON CONFLICT(id) DO NOTHING", m.ID, string(body), m.Version, m.Issuer); e != nil {
+					return e
+				}
+				known[m.ID] = m
+				progress = true
+				changed = true
+			}
+			if len(next) > 0 && !progress {
+				return fault("forbidden", "成员授权链不完整")
+			}
+			grants = next
+		}
+		remaining := append([]Member(nil), d.Members...)
+		for len(remaining) > 0 {
+			next := []Member{}
+			progress := false
+			for _, m := range remaining {
+				if m.Cluster != n.cluster {
+					return fault("forbidden", "集群身份不匹配")
+				}
+				if e = validateMember(m); e != nil {
+					return e
+				}
+				if old, ok := known[m.ID]; ok {
+					if old.Public != m.Public || old.Signing != m.Signing || old.Recipient != m.Recipient {
+						return fault("forbidden", "节点公钥发生变化")
+					}
+					if old.Version >= m.Version {
+						continue
+					}
+				}
+				issuer, ok := known[m.Issuer]
+				if !ok && !bootstrap {
+					next = append(next, m)
+					continue
+				}
+				if !bootstrap {
+					key, err := identity.Decode(issuer.Signing)
+					if err != nil || revoked[m.Issuer] || !ed25519.Verify(key, memberBytes(m), m.Signature) {
+						return fault("forbidden", "成员签名无效")
+					}
+					if _, exists := known[m.ID]; exists && m.Issuer != m.ID {
+						return fault("forbidden", "节点配置只能由其本人更新")
+					}
+				}
+				if revoked[m.ID] {
+					continue
+				}
+				b, _ := json.Marshal(m)
+				if _, e = tx.ExecContext(ctx, "INSERT INTO members(id,body,version,issuer) VALUES(?,?,?,?) ON CONFLICT(id) DO UPDATE SET body=excluded.body,version=excluded.version,issuer=excluded.issuer WHERE members.version<excluded.version", m.ID, string(b), m.Version, m.Issuer); e != nil {
+					return e
+				}
+				known[m.ID] = m
+				progress = true
+				changed = true
+			}
+			if len(next) > 0 && !progress {
+				return fault("forbidden", "成员签发者未知")
+			}
+			remaining = next
+		}
+		for _, r := range d.Revocations {
+			if revoked[r.ID] {
+				continue
+			}
+			issuer, ok := known[r.Issuer]
+			key, err := identity.Decode(issuer.Signing)
+			if !ok || err != nil || revoked[r.Issuer] || r.Cluster != n.cluster || !ed25519.Verify(key, revocationBytes(r), r.Signature) {
+				return fault("forbidden", "撤销签名无效")
+			}
+			b, _ := json.Marshal(r)
+			if _, e = tx.ExecContext(ctx, "INSERT INTO revocations(id,body) VALUES(?,?) ON CONFLICT(id) DO NOTHING", r.ID, string(b)); e != nil {
+				return e
+			}
+			revoked[r.ID] = true
+			changed = true
+		}
+		if e = n.mergeNetworkTx(ctx, tx, d, known, revoked); e != nil {
+			return e
+		}
+		if e = n.mergeDatabaseClusters(ctx, tx, d.Databases, known, revoked); e != nil {
+			return e
+		}
+
+		return nil
+	}()
+	return changed, revoked, err
+}
 func (n *Node) Revoke(ctx context.Context, id string) error {
 	return n.revokeRevision(ctx, id, nil)
 }
@@ -268,6 +296,9 @@ func (n *Node) RevokeRevision(ctx context.Context, id string, expected uint64) e
 	return n.revokeRevision(ctx, id, &expected)
 }
 func (n *Node) revokeRevision(ctx context.Context, id string, expected *uint64) error {
+	if n.sharedEnabled() {
+		return n.sharedRevoke(ctx, id, expected)
+	}
 	if id == n.ID {
 		return fault("invalid_request", "不能撤销当前节点")
 	}
@@ -346,6 +377,29 @@ func (n *Node) joinDirectory(ctx context.Context, d Directory) error {
 	if own == nil {
 		return fmt.Errorf("接入尚未受理")
 	}
+	var shared *SharedLocal
+	var sharedSecret []byte
+	if d.Shared != nil {
+		var issuer Member
+		for _, member := range d.Members {
+			if member.ID == d.Shared.Issuer {
+				issuer = member
+			}
+		}
+		key, err := identity.Decode(issuer.Signing)
+		if err != nil || len(key) != ed25519.PublicKeySize || d.Shared.Revision == 0 || !ed25519.Verify(key, bindingBytes(*d.Shared), d.Shared.Signature) {
+			return fault("forbidden", "OPSD 数据库绑定签名无效")
+		}
+		shared = &SharedLocal{Binding: *d.Shared, Phase: "joining"}
+		plain, _ := json.Marshal(shared)
+		secret, err := seal(plain, []string{n.age.Recipient().String()})
+		if err != nil {
+			return err
+		}
+		sharedSecret, _ = json.Marshal(secret)
+		// 共享数据库定义从本机代理读取，加入目录只提供已签名的绑定。
+		d.Databases = nil
+	}
 	var count int
 	if e := n.DB.QueryRowContext(ctx, "SELECT count(*) FROM queue").Scan(&count); e != nil {
 		return e
@@ -353,12 +407,16 @@ func (n *Node) joinDirectory(ctx context.Context, d Directory) error {
 	if count != 0 {
 		return fault("conflict", "已有操作的独立节点不能直接加入其他集群")
 	}
+	c, e := n.Config(ctx)
+	if e != nil {
+		return e
+	}
 	tx, e := n.DB.BeginTx(ctx, nil)
 	if e != nil {
 		return e
 	}
 	defer tx.Rollback()
-	for _, q := range []string{"DELETE FROM records", "DELETE FROM members", "DELETE FROM revocations", "DELETE FROM admissions", "DELETE FROM public_addresses", "DELETE FROM peer_trust_policy", "DELETE FROM peer_trust_target", "DELETE FROM peer_trust_status"} {
+	for _, q := range []string{"DELETE FROM records", "DELETE FROM members", "DELETE FROM revocations", "DELETE FROM admissions", "DELETE FROM public_addresses", "DELETE FROM peer_trust_policy", "DELETE FROM peer_trust_target", "DELETE FROM peer_trust_status", "DELETE FROM managed_database_clusters"} {
 		if _, e = tx.ExecContext(ctx, q); e != nil {
 			return e
 		}
@@ -366,33 +424,37 @@ func (n *Node) joinDirectory(ctx context.Context, d Directory) error {
 	if _, e = tx.ExecContext(ctx, "UPDATE node_identity SET cluster=?,sequence=MAX(sequence,?) WHERE id=1", cluster, own.Version); e != nil {
 		return e
 	}
+	joined := &Node{ID: n.ID, DB: n.DB, Key: n.Key, signing: n.signing, age: n.age, cluster: cluster, Now: n.Now}
+	if _, _, e = joined.mergeDirectoryTx(ctx, tx, d, Directory{}, true); e != nil {
+		return e
+	}
+	if e = joined.publishMemberTx(ctx, tx, c); e != nil {
+		return e
+	}
+	if e = joined.publishAccountTx(ctx, tx); e != nil {
+		return e
+	}
+	if e = joined.appendTx(ctx, tx, "config", n.ID, c, n.Now()); e != nil {
+		return e
+	}
+	if shared != nil {
+		if _, e = tx.ExecContext(ctx, "INSERT INTO shared_local(id,secret) VALUES(1,?) ON CONFLICT(id) DO UPDATE SET secret=excluded.secret", string(sharedSecret)); e != nil {
+			return e
+		}
+	}
 	if e = tx.Commit(); e != nil {
 		return e
 	}
 	n.cluster = cluster
-	if e = n.merge(ctx, d, true); e != nil {
-		return e
+	if shared != nil {
+		n.sharedMu.Lock()
+		n.sharedLocal = shared
+		n.sharedMu.Unlock()
 	}
-	c, e := n.Config(ctx)
-	if e != nil {
-		return e
-	}
-	tx, e = n.DB.BeginTx(ctx, nil)
-	if e != nil {
-		return e
-	}
-	defer tx.Rollback()
-	if e = n.publishMemberTx(ctx, tx, c); e != nil {
-		return e
-	}
-	if e = n.publishAccountTx(ctx, tx); e != nil {
-		return e
-	}
-	if e = n.appendTx(ctx, tx, "config", n.ID, c, n.Now()); e != nil {
-		return e
-	}
-	return tx.Commit()
+	n.notify()
+	return nil
 }
+
 func (n *Node) Rewrap(ctx context.Context) error {
 	var secretJSON string
 	var revision uint64

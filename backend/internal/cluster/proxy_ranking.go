@@ -257,7 +257,7 @@ func (n *Node) proxyRoutingLoop() {
 		clusters, err := n.DatabaseClusters(n.ctx)
 		if err == nil {
 			for _, c := range clusters {
-				if c.Deleted || c.ProxyRouting == nil || n.Revoked(n.ctx, c.Coordinator) {
+				if c.Deleted || c.ProxyRouting == nil || !n.sharedEnabled() && n.Revoked(n.ctx, c.Coordinator) {
 					continue
 				}
 				for _, ref := range c.Proxies {
@@ -300,7 +300,11 @@ func (n *Node) reconcileProxyRouting(ctx context.Context, c ManagedDatabaseClust
 		fail("conflict", "数据库成员已变化，请重新预览代理路由")
 		return
 	}
-	if state.PolicyVersion != routingVersion(*c.ProxyRouting) {
+	if state.PolicyVersion != routingVersion(*c.ProxyRouting) && state.PendingAction == nil {
+		if n.sharedActive() {
+			n.queueSharedProxyPolicy(ctx, c, ref, &state)
+			return
+		}
 		state.State = "pending"
 		save()
 		return
@@ -360,14 +364,6 @@ func (n *Node) reconcileProxyRouting(ctx context.Context, c ManagedDatabaseClust
 		save()
 		return
 	}
-	var busy int
-	if err = n.DB.QueryRowContext(ctx, "SELECT count(*) FROM queue WHERE terminal=0").Scan(&busy); err != nil {
-		return
-	}
-	if busy > 0 {
-		save()
-		return
-	}
 	action := proxyRouteAction(*c.ProxyRouting, observation, order)
 	connection, err := n.databaseConnection(ctx, ref.InstanceID)
 	if err != nil {
@@ -377,11 +373,15 @@ func (n *Node) reconcileProxyRouting(ctx context.Context, c ManagedDatabaseClust
 	payload, _ := json.Marshal(protocol.DatabaseAction{Connection: connection, Kind: "proxy_route", Routing: &action})
 	sum := sha256.Sum256([]byte(c.ID + "/" + ref.InstanceID + "/" + state.OperationID + "/" + action.PolicyVersion + "/" + fmt.Sprint(order) + "/" + observation.Fingerprint))
 	key := "proxy-routing-" + hex.EncodeToString(sum[:])
-	op, err := n.enqueue(ctx, n.ID, Request{Key: key, Kind: "database_step", ResourceID: c.ID, Payload: payload})
+	_, err = n.enqueueTx(ctx, n.ID, Request{Key: key, Kind: "database_step", ResourceID: c.ID, Payload: payload}, func(tx *sql.Tx, op Operation) error {
+		state.OperationID, state.PendingAction, state.State = op.ID, &action, "applying"
+		body, _ := json.Marshal(state)
+		_, err := tx.ExecContext(ctx, "INSERT INTO proxy_routing_state(cluster_id,instance_id,body) VALUES(?,?,?) ON CONFLICT(cluster_id,instance_id) DO UPDATE SET body=excluded.body", c.ID, state.InstanceID, string(body))
+		return err
+	})
 	if err != nil {
 		fail("error", "自动排序请求未受理")
 		return
 	}
-	state.OperationID, state.PendingAction, state.State = op.ID, &action, "applying"
-	save()
+	n.notifyChange(Change{Resource: "databases", NodeID: n.ID})
 }

@@ -27,6 +27,7 @@ type Services struct {
 	Restart       func(context.Context, string) error
 	TaskLock      func(string) (func(), error)
 	OperationLock func() (func(), error)
+	ResourceLock  func(protocol.OperationAction) (func(), error)
 	localMu       sync.Mutex
 	trustMu       sync.Mutex
 }
@@ -155,9 +156,27 @@ func (s *Services) Handle(ctx context.Context, payload protocol.Payload) (protoc
 		p, e := s.Engine.Manager.Preview(ctx, body.Change)
 		return &protocol.FirewallPreviewResult{Plan: p}, e
 	case *protocol.OperationSubmit:
+		if action := body.Action.Container; action != nil && (action.ProjectKnown || action.Project != "") {
+			if _, err := s.Engine.Store.Get(ctx, body.OperationID); errors.Is(err, sql.ErrNoRows) {
+				if s.Docker == nil {
+					return nil, fmt.Errorf("Docker 读取入口不可用")
+				}
+				current, err := s.Docker.Inspect(ctx, action.ContainerRef)
+				if err != nil {
+					return nil, err
+				}
+				if current.Project != action.Project {
+					return nil, firewall.Conflict("容器所属项目已经变化")
+				}
+			} else if err != nil {
+				return nil, err
+			}
+		}
 		var unlock func()
 		var lockErr error
-		if body.Action.Shell != nil && s.TaskLock != nil {
+		if s.ResourceLock != nil {
+			unlock, lockErr = s.ResourceLock(body.Action)
+		} else if body.Action.Shell != nil && s.TaskLock != nil {
 			unlock, lockErr = s.TaskLock(body.Action.Shell.TaskID)
 		} else {
 			unlock, lockErr = s.lock()
@@ -173,7 +192,7 @@ func (s *Services) Handle(ctx context.Context, payload protocol.Payload) (protoc
 			unlock()
 			return nil, e
 		}
-		l, created, e := s.Engine.Store.Receive(ctx, body.OperationID, body.ContractVersion, body.Action, boot)
+		_, created, e := s.Engine.Store.Receive(ctx, body.OperationID, body.ContractVersion, body.Action, boot)
 		unlock()
 		if errors.Is(e, operations.ErrBusy) {
 			return nil, &firewall.Fault{Code: "not_accepted_busy", Message: e.Error()}
@@ -182,9 +201,7 @@ func (s *Services) Handle(ctx context.Context, payload protocol.Payload) (protoc
 			return nil, e
 		}
 		if created {
-			if e = s.Start(context.WithoutCancel(ctx), body.OperationID); e != nil {
-				return &protocol.OperationUpdated{Record: l.Record}, nil
-			}
+			_ = s.startOperation(context.WithoutCancel(ctx), body.OperationID)
 		}
 		r, e := s.Engine.Record(ctx, body.OperationID)
 		return &protocol.OperationUpdated{Record: r}, e
@@ -195,6 +212,13 @@ func (s *Services) Handle(ctx context.Context, payload protocol.Payload) (protoc
 		}
 		if e != nil {
 			return nil, e
+		}
+		var startError string
+		if e = s.Engine.Store.DB.QueryRowContext(ctx, "SELECT start_error FROM operations WHERE id=?", body.OperationID).Scan(&startError); e != nil {
+			return nil, e
+		}
+		if startError != "" {
+			r.Error = &protocol.Error{Code: "operation_start_failed", Message: startError}
 		}
 		return &protocol.OperationQueryResult{OperationID: body.OperationID, Found: true, Record: &r}, nil
 	case *protocol.OperationReconcile:
@@ -262,10 +286,34 @@ func (s *Services) Recover(ctx context.Context) error {
 	if e != nil {
 		return e
 	}
+	var failures []error
 	for _, id := range ids {
-		if e = s.Start(ctx, id); e != nil {
-			return fmt.Errorf("恢复操作 %s：%w", id, e)
+		if e = s.startOperation(ctx, id); e != nil {
+			failures = append(failures, fmt.Errorf("恢复操作 %s：%w", id, e))
 		}
 	}
-	return nil
+	return errors.Join(failures...)
+}
+
+func (s *Services) startOperation(ctx context.Context, id string) error {
+	err := s.Start(ctx, id)
+	message := ""
+	if err != nil {
+		message = err.Error()
+	}
+	_, saveErr := s.Engine.Store.DB.ExecContext(ctx, "UPDATE operations SET start_error=? WHERE id=? AND terminal=0", message, id)
+	return errors.Join(err, saveErr)
+}
+
+func (s *Services) MaintainOperations(ctx context.Context) {
+	ticker := time.NewTicker(5 * time.Second)
+	defer ticker.Stop()
+	for {
+		_ = s.Recover(ctx)
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+		}
+	}
 }

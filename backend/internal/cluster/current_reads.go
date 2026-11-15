@@ -11,10 +11,11 @@ import (
 type ReadStatus = protocol.ReadStatus
 
 type currentRead struct {
-	value   json.RawMessage
-	status  ReadStatus
-	used    time.Time
-	running bool
+	value     json.RawMessage
+	status    ReadStatus
+	used      time.Time
+	completed time.Time
+	running   bool
 }
 
 // CurrentRead 返回已有结果；活动页面共享刷新，各目标的期限从取得读取名额后开始。
@@ -44,7 +45,7 @@ func (n *Node) CurrentRead(ctx context.Context, target, method string, body, out
 	}
 	entry.used = n.Now()
 	status, value := entry.status, entry.value
-	if status.State == "ready" && status.DataAt != nil && n.Now().Sub(*status.DataAt) > interval*2 {
+	if status.State == "ready" && !entry.completed.IsZero() && n.Now().Sub(entry.completed) > interval*2 {
 		status.State = "stale"
 	}
 	if !entry.running && !n.closed && n.ctx.Err() == nil {
@@ -83,6 +84,7 @@ func (n *Node) refreshCurrent(entry *currentRead, target, method string, body js
 		<-n.readSlots
 		n.mu.Lock()
 		if err == nil {
+			entry.completed = n.Now()
 			completed := currentDataTime(result, n.Now().UTC())
 			entry.value = result
 			entry.status = ReadStatus{State: "ready", DataAt: &completed, AttemptedAt: &at}

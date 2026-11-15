@@ -261,8 +261,12 @@ func deploymentFiles(d protocol.DatabaseDeployment) (map[string]string, error) {
 	if d.Kind == "proxysql" {
 		quote := strconv.Quote
 		var servers strings.Builder
+		connections := 50
+		if d.BackendMaxConnections > 0 {
+			connections = d.BackendMaxConnections
+		}
 		for _, backend := range d.Backends {
-			fmt.Fprintf(&servers, "{address=%s;port=%d;hostgroup=10;max_connections=50;},", quote(backend.Host), backend.Port)
+			fmt.Fprintf(&servers, "{address=%s;port=%d;hostgroup=10;max_connections=%d;},", quote(backend.Host), backend.Port, connections)
 		}
 		files["database.cnf"] = fmt.Sprintf("datadir=\"/var/lib/proxysql\"\nadmin_variables={admin_credentials=%s;mysql_ifaces=%s;}\nmysql_variables={threads=2;max_connections=128;interfaces=%s;monitor_enabled=true;monitor_username=%s;monitor_password=%s;}\nmysql_servers=(%s)\nmysql_galera_hostgroups=({writer_hostgroup=10;backup_writer_hostgroup=20;reader_hostgroup=30;offline_hostgroup=40;active=1;max_writers=1;writer_is_also_reader=0;max_transactions_behind=100;})\n", quote(d.Connection.Username+":"+d.Connection.Password), quote(net.JoinHostPort("127.0.0.1", strconv.Itoa(d.AdminPort))), quote(net.JoinHostPort("127.0.0.1", strconv.Itoa(d.SQLPort))), quote(d.MonitorUser), quote(d.MonitorPassword), servers.String())
 		return files, nil

@@ -242,7 +242,7 @@ func (Manager) Read(ctx context.Context, c protocol.DatabaseConnection, scopes .
 			return out, e
 		}
 		for _, d := range dbs {
-			out.Databases = append(out.Databases, protocol.DatabaseSchema{Name: d["schema_name"], Charset: d["default_character_set_name"], Collation: d["default_collation_name"], Bytes: uint64(number(d["bytes"])), Protected: protocol.SystemDatabase(d["schema_name"])})
+			out.Databases = append(out.Databases, protocol.DatabaseSchema{Name: d["schema_name"], Charset: d["default_character_set_name"], Collation: d["default_collation_name"], Bytes: uint64(number(d["bytes"])), Protected: protocol.SystemDatabase(d["schema_name"]) || slices.Contains(c.ProtectedDatabases, d["schema_name"])})
 		}
 	}
 	if scope == "all" || scope == "users" {
@@ -406,6 +406,24 @@ func (Manager) PasswordHash(ctx context.Context, c protocol.DatabaseConnection, 
 	return r[0]["authentication_string"], nil
 }
 func (m Manager) Prepare(ctx context.Context, a protocol.DatabaseAction) ([]string, error) {
+	if a.Kind == "shared_proxy_repair" {
+		if err := a.Validate(); err != nil {
+			return nil, err
+		}
+		if m.Docker == nil {
+			return nil, fmt.Errorf("Docker 读取入口不可用")
+		}
+		return []string{"start"}, nil
+	}
+	if a.Kind == "shared_proxy" {
+		return prepareSharedProxy(ctx, a)
+	}
+	if a.Kind == "shared_database" {
+		if err := a.Validate(); err != nil {
+			return nil, err
+		}
+		return []string{"shared_database"}, nil
+	}
 	if a.Kind == "deployment_seeds" {
 		if err := a.Validate(); err != nil {
 			return nil, err
@@ -483,6 +501,38 @@ func (m Manager) Prepare(ctx context.Context, a protocol.DatabaseAction) ([]stri
 	return []string{"database"}, nil
 }
 func (m Manager) Observe(ctx context.Context, a protocol.DatabaseAction, step string) (Observation, error) {
+	if a.Kind == "shared_proxy_repair" {
+		if m.Docker == nil || a.Repair == nil {
+			return Observation{}, fmt.Errorf("缺少代理容器信息")
+		}
+		state, err := m.Docker.Inspect(ctx, *a.Repair)
+		return Observation{CheckedAt: time.Now().UTC(), Satisfied: state.State == "running" || state.State == "restarting", Fingerprint: protocol.ContainerRevision(state.ContainerSummary)}, err
+	}
+	if a.Kind == "shared_proxy" {
+		mapped := a
+		mapped.Kind = "proxy_upsert"
+		mapped.User = protocol.SharedUsername(a.Shared.NodeID)
+		mapped.PasswordHash = a.Shared.PasswordHash
+		if a.Shared.Mode == "revoke" {
+			mapped.Kind = "proxy_delete"
+		}
+		observed, err := m.Observe(ctx, mapped, step)
+		if err != nil || !observed.Satisfied || a.Shared.Mode != "revoke" || step != "runtime" {
+			return observed, err
+		}
+		s, err := connect(ctx, a.Connection)
+		if err != nil {
+			return observed, err
+		}
+		defer s.Close()
+		var sessions int
+		err = s.QueryRowContext(ctx, "SELECT COUNT(*) FROM stats_mysql_processlist WHERE user=?", mapped.User).Scan(&sessions)
+		observed.Satisfied = err == nil && sessions == 0
+		return observed, clean(err)
+	}
+	if a.Kind == "shared_database" {
+		return observeSharedDatabase(ctx, a)
+	}
 	if a.Kind == "deployment_seeds" {
 		return m.observeDeploymentSeeds(ctx, *a.SeedUpdate)
 	}
@@ -580,6 +630,18 @@ func (m Manager) Observe(ctx context.Context, a protocol.DatabaseAction, step st
 	return out, nil
 }
 func (m Manager) Apply(ctx context.Context, a protocol.DatabaseAction, step string) error {
+	if a.Kind == "shared_proxy_repair" {
+		if m.Docker == nil || a.Repair == nil {
+			return fmt.Errorf("缺少代理容器信息")
+		}
+		return m.Docker.StartDatabaseProxy(ctx, *a.Repair)
+	}
+	if a.Kind == "shared_proxy" {
+		return applySharedProxy(ctx, a, step)
+	}
+	if a.Kind == "shared_database" {
+		return applySharedDatabase(ctx, a)
+	}
 	if a.Kind == "deployment_seeds" {
 		return m.applyDeploymentSeeds(ctx, *a.SeedUpdate)
 	}
@@ -644,9 +706,9 @@ func (m Manager) Apply(ctx context.Context, a protocol.DatabaseAction, step stri
 		case "delete_user":
 			query = "DROP USER " + account(a)
 		case "grant":
-			query = "GRANT " + strings.Join(a.Privileges, ",") + " ON " + ident(a.Database) + ".* TO " + account(a)
+			query = "GRANT " + strings.Join(a.Privileges, ",") + " ON " + databasePrivilegeName(a.Database) + ".* TO " + account(a)
 		case "revoke":
-			query = "REVOKE " + strings.Join(a.Privileges, ",") + " ON " + ident(a.Database) + ".* FROM " + account(a)
+			query = "REVOKE " + strings.Join(a.Privileges, ",") + " ON " + databasePrivilegeName(a.Database) + ".* FROM " + account(a)
 		}
 	}
 	if query == "" {

@@ -16,19 +16,22 @@ import (
 )
 
 type Member struct {
-	ID                    string `json:"id"`
-	Cluster               string `json:"cluster"`
-	Name                  string `json:"name"`
-	Address               string `json:"address"`
-	Region                string `json:"region"`
-	Public                string `json:"public"`
-	Signing               string `json:"signing"`
-	Recipient             string `json:"recipient"`
-	Version               uint64 `json:"version"`
-	ConfigurationRevision uint64 `json:"configuration_revision,omitempty"`
-	Issuer                string `json:"issuer"`
-	Signature             []byte `json:"signature"`
-	Storage               string `json:"storage,omitempty"`
+	CoordinatorCandidate  bool     `json:"coordinator_candidate,omitempty"`
+	Endpoints             []string `json:"endpoints,omitempty"`
+	ManagementVersion     int      `json:"management_version,omitempty"`
+	ID                    string   `json:"id"`
+	Cluster               string   `json:"cluster"`
+	Name                  string   `json:"name"`
+	Address               string   `json:"address"`
+	Region                string   `json:"region"`
+	Public                string   `json:"public"`
+	Signing               string   `json:"signing"`
+	Recipient             string   `json:"recipient"`
+	Version               uint64   `json:"version"`
+	ConfigurationRevision uint64   `json:"configuration_revision,omitempty"`
+	Issuer                string   `json:"issuer"`
+	Signature             []byte   `json:"signature"`
+	Storage               string   `json:"storage,omitempty"`
 }
 type Revocation struct {
 	ID        string `json:"id"`
@@ -37,6 +40,7 @@ type Revocation struct {
 	Signature []byte `json:"signature"`
 }
 type Directory struct {
+	Shared      *SharedBinding           `json:"shared,omitempty"`
 	Databases   []ManagedDatabaseCluster `json:"databases,omitempty"`
 	Admissions  []Member                 `json:"admissions"`
 	Members     []Member                 `json:"members"`
@@ -45,33 +49,28 @@ type Directory struct {
 	Trust       *TrustPolicy             `json:"trust,omitempty"`
 }
 type Config struct {
-	NetworkError     *protocol.Error `json:"network_error,omitempty"`
-	Cached           bool            `json:"cached,omitempty"`
-	LastSyncedAt     *time.Time      `json:"last_synced_at,omitempty"`
-	Revision         uint64          `json:"revision"`
-	Name             string          `json:"name"`
-	Address          string          `json:"address"`
-	AddressMode      string          `json:"address_mode,omitempty"`
-	Region           string          `json:"region"`
-	Listen           string          `json:"listen"`
-	Console          bool            `json:"console"`
-	API              bool            `json:"api"`
-	ConsoleListen    string          `json:"console_listen"`
-	PreferredStorage string          `json:"preferred_storage"`
-	IntervalMinutes  int             `json:"interval_minutes"`
-	RetentionDays    int             `json:"retention_days"`
-	Storage          StorageConfig   `json:"storage"`
+	Endpoints            []string        `json:"endpoints,omitempty"`
+	CoordinatorCandidate bool            `json:"coordinator_candidate,omitempty"`
+	NetworkError         *protocol.Error `json:"network_error,omitempty"`
+	Cached               bool            `json:"cached,omitempty"`
+	LastSyncedAt         *time.Time      `json:"last_synced_at,omitempty"`
+	Revision             uint64          `json:"revision"`
+	Name                 string          `json:"name"`
+	Address              string          `json:"address"`
+	AddressMode          string          `json:"address_mode,omitempty"`
+	Region               string          `json:"region"`
+	Listen               string          `json:"listen"`
+	Console              bool            `json:"console"`
+	API                  bool            `json:"api"`
+	ConsoleListen        string          `json:"console_listen"`
+	PreferredStorage     string          `json:"preferred_storage"`
+	IntervalMinutes      int             `json:"interval_minutes"`
+	RetentionDays        int             `json:"retention_days"`
+	Storage              StorageConfig   `json:"storage"`
 }
-type StorageConfig struct {
-	NativeCluster bool   `json:"native_cluster"`
-	Enabled       bool   `json:"enabled"`
-	Address       string `json:"address"`
-	Port          int    `json:"port"`
-}
-type Credentials struct {
-	Username string `json:"username"`
-	Password string `json:"password"`
-}
+type StorageConfig = protocol.StorageConfig
+type Credentials = protocol.Credentials
+
 type Account struct {
 	Cached       bool       `json:"cached,omitempty"`
 	LastSyncedAt *time.Time `json:"last_synced_at,omitempty"`
@@ -114,12 +113,17 @@ type Request struct {
 	Key              string          `json:"key,omitempty"`
 }
 type Operation struct {
-	ResourceID   string             `json:"resource_id,omitempty"`
-	Action       string             `json:"action,omitempty"`
-	TargetName   string             `json:"target_name,omitempty"`
-	Resource     *OperationResource `json:"resource,omitempty"`
-	SupportsLogs *bool              `json:"supports_logs,omitempty"`
-	Key          string             `json:"idempotency_key,omitempty"`
+	Coordinator       string                   `json:"coordinator,omitempty"`
+	CoordinatorEpoch  uint64                   `json:"coordinator_epoch,omitempty"`
+	ResourceClaims    []protocol.ResourceClaim `json:"resource_claims,omitempty"`
+	WaitingReason     string                   `json:"waiting_reason,omitempty"`
+	BlockingOperation string                   `json:"blocking_operation,omitempty"`
+	ResourceID        string                   `json:"resource_id,omitempty"`
+	Action            string                   `json:"action,omitempty"`
+	TargetName        string                   `json:"target_name,omitempty"`
+	Resource          *OperationResource       `json:"resource,omitempty"`
+	SupportsLogs      *bool                    `json:"supports_logs,omitempty"`
+	Key               string                   `json:"idempotency_key,omitempty"`
 	protocol.OperationRecord
 	NodeID            string    `json:"node_id"`
 	Sequence          uint64    `json:"queue_sequence"`
@@ -167,6 +171,14 @@ func memberBytes(m Member) []byte         { m.Signature = nil; b, _ := json.Mars
 func revocationBytes(r Revocation) []byte { r.Signature = nil; b, _ := json.Marshal(r); return b }
 func recordBytes(r Record) []byte         { r.Signature = nil; b, _ := json.Marshal(r); return b }
 func validateMember(m Member) error {
+	if len(m.Endpoints) > 8 {
+		return fmt.Errorf("节点通信端点过多")
+	}
+	for _, endpoint := range m.Endpoints {
+		if !validAddress(endpoint) {
+			return fmt.Errorf("节点通信端点无效")
+		}
+	}
 	p, e := identity.Decode(m.Public)
 	signing, e2 := identity.Decode(m.Signing)
 	if e != nil || e2 != nil || nodeID(p) != m.ID || len(signing) != ed25519.PublicKeySize || m.Cluster == "" || m.Version == 0 || m.Name == "" || len(m.Name) > 255 || !validAddress(m.Address) {

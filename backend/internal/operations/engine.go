@@ -12,13 +12,15 @@ import (
 )
 
 type Engine struct {
-	LogDirectory string
-	Store        Store
-	Manager      *firewall.Manager
-	Clock        func() (string, int64, error)
-	Install      func(context.Context, *Local, func() error) error
-	Containers   ContainerRuntime
-	Databases    DatabaseRuntime
+	StartupRecovery bool
+	NativeLock      func(context.Context) (func(), error)
+	LogDirectory    string
+	Store           Store
+	Manager         *firewall.Manager
+	Clock           func() (string, int64, error)
+	Install         func(context.Context, *Local, func() error) error
+	Containers      ContainerRuntime
+	Databases       DatabaseRuntime
 }
 
 func (e *Engine) clock() (string, int64, error) {
@@ -114,6 +116,9 @@ func (e *Engine) Run(ctx context.Context, id string) error {
 	a, err := e.Manager.Adapter(p.Backend)
 	if err != nil {
 		return e.attention(ctx, &l, err)
+	}
+	if e.NativeLock != nil {
+		a = lockedFirewall{Adapter: a, lock: e.NativeLock}
 	}
 	if l.Record.State == protocol.AttentionRequired {
 		if l.RequestRevision != l.Record.Revision {
@@ -327,6 +332,9 @@ func (e *Engine) Run(ctx context.Context, id string) error {
 			return err
 		} else if expired {
 			return e.revert(ctx, a, &l, fmt.Errorf("未在期限内确认，开始撤销"))
+		}
+		if e.StartupRecovery {
+			return nil
 		}
 		latest, err := e.Store.Get(ctx, id)
 		if err != nil {

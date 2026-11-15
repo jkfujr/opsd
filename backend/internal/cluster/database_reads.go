@@ -77,7 +77,7 @@ func operationTargetAllowed(t apiauth.Token, m Member, databases []ManagedDataba
 		}
 	}
 	for _, c := range databases {
-		if !c.Deleted && c.Coordinator == m.ID && t.Allows("databases", "read", c.ID, "") {
+		if !c.Deleted && t.Allows("databases", "read", c.ID, "") {
 			return true
 		}
 	}

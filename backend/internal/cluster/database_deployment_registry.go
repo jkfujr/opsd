@@ -8,6 +8,7 @@ import (
 	"reflect"
 
 	"github.com/jkfujr/opsd/internal/protocol"
+	"github.com/jkfujr/opsd/internal/sharedsql"
 )
 
 func (n *Node) registerDatabaseDeployment(ctx context.Context, request DatabaseRPC) (DatabaseScanItem, error) {
@@ -82,6 +83,35 @@ func (n *Node) saveDeploymentCluster(ctx context.Context, c ManagedDatabaseClust
 }
 
 func (n *Node) finishDeploymentRouting(ctx context.Context, c ManagedDatabaseCluster, policy protocol.ProxyRoutingPolicy) error {
+	if n.sharedActive() {
+		store, err := n.sharedStore(ctx)
+		if err != nil {
+			return err
+		}
+		return store.Transact(ctx, n.ID, false, func(t *sharedsql.Tx) error {
+			object, err := t.Object(ctx, "database", c.ID)
+			if err != nil {
+				return err
+			}
+			var current ManagedDatabaseCluster
+			if err = json.Unmarshal(object.Body, &current); err != nil {
+				return err
+			}
+			if reflect.DeepEqual(current.ProxyRouting, &policy) {
+				return nil
+			}
+			if current.Revision != c.Revision {
+				return sharedsql.ErrConflict
+			}
+			current.ProxyRouting = &policy
+			current.Revision++
+			current.UpdatedAt = n.Now().UTC()
+			current.Signature = ed25519.Sign(n.signing, databaseClusterBytes(current))
+			next := sharedObject("database", current.ID, current.Revision, current)
+			next.Identity = current.ClusterID
+			return t.Put(ctx, next, object.Revision)
+		})
+	}
 	tx, err := n.DB.BeginTx(ctx, nil)
 	if err != nil {
 		return err
