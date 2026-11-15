@@ -36,6 +36,11 @@ jobs:
           git diff --exit-code -- api/openapi.json backend/internal/httpapi/api.gen.go backend/internal/httpapi/policy.gen.go backend/internal/control/strict.gen.go backend/internal/cluster/api_contract.gen.go backend/internal/consoletheme/api_version.gen.go api/typescript/schema.gen.ts
           test "$(artifacts/opsd-linux-amd64 version --plain)" = "$(node -p 'require("./package.json").version')"
           sh -n artifacts/install.sh
+      - name: 共享数据库迁移与节点代理恢复
+        working-directory: backend/internal/control
+        run: |
+          go test -c -o ../../../artifacts/shared-storage.test .
+          sudo env OPSD_DATABASE_TEST=1 ../../../artifacts/shared-storage.test -test.run '^TestSharedStorageNativeMigrationAndRecovery$' -test.v -test.timeout=8m
       - name: 后端测试
         run: |
           docker pull busybox:1.37.0
@@ -47,11 +52,6 @@ jobs:
           sudo apt-get -o Acquire::Retries=1 -o Acquire::http::Timeout=20 -o Acquire::https::Timeout=20 install -y -q nftables iptables firewalld ufw fonts-noto-cjk
           go -C backend test -c -o ../artifacts/firewall-native.test ./internal/firewall
           sudo env OPSD_NATIVE_TRUST=1 artifacts/firewall-native.test -test.run '^TestPeerTrustNativeNetwork$' -test.v
-      - name: 共享数据库迁移与节点代理恢复
-        working-directory: backend/internal/control
-        run: |
-          go test -c -o ../../../artifacts/shared-storage.test .
-          sudo env OPSD_DATABASE_TEST=1 ../../../artifacts/shared-storage.test -test.run '^TestSharedStorageNativeMigrationAndRecovery$' -test.v -test.timeout=8m
       - name: 整套主题与内置恢复界面
         run: |
           npm install --prefix artifacts/theme-ui/vue-runtime --no-save --package-lock=false vue@3.5.45

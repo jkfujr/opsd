@@ -113,10 +113,24 @@ func TestSharedStorageNativeMigrationAndRecovery(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	lastProgress := ""
 	waitDatabase(t, "共享数据迁移", 3*time.Minute, func() bool {
 		current, e := b.node.GetOperation(t.Context(), op.ID)
 		if e != nil {
 			t.Fatal(e)
+		}
+		statuses := make([]cluster.SharedStatus, len(nodes))
+		for i, node := range nodes {
+			statuses[i] = node.node.SharedStatus(t.Context())
+		}
+		progress, _ := json.Marshal(struct {
+			State   protocol.OperationState `json:"state"`
+			Waiting string                  `json:"waiting"`
+			Nodes   []cluster.SharedStatus  `json:"nodes"`
+		}{current.State, current.WaitingReason, statuses})
+		if string(progress) != lastProgress {
+			t.Logf("共享迁移进度：%s", progress)
+			lastProgress = string(progress)
 		}
 		if current.State == protocol.AttentionRequired || current.State == protocol.Rejected || current.State == protocol.Failed {
 			t.Fatalf("共享迁移停止：%+v", current.Error)
