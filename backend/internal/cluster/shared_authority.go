@@ -63,6 +63,17 @@ func (n *Node) syncSharedDirectory(ctx context.Context, s *sharedsql.Store) erro
 		}
 	}
 	for _, o := range groups["trust"] {
+		var policy TrustPolicy
+		if err = json.Unmarshal(o.Body, &policy); err != nil {
+			return err
+		}
+		current, e := readPolicy(ctx, tx)
+		if e != nil {
+			return e
+		}
+		if current.Version.Counter > policy.Version.Counter {
+			continue
+		}
 		if _, err = tx.ExecContext(ctx, "INSERT INTO peer_trust_policy(id,body) VALUES(1,?) ON CONFLICT(id) DO UPDATE SET body=excluded.body", string(o.Body)); err != nil {
 			return err
 		}
@@ -94,6 +105,73 @@ func (n *Node) publishSharedMember(ctx context.Context, s *sharedsql.Store) erro
 	}
 	return s.Transact(ctx, n.ID, false, func(t *sharedsql.Tx) error { return t.Import(ctx, sharedObject("member", n.ID, m.Version, m)) })
 }
+
+func (n *Node) publishSharedAddress(ctx context.Context, s *sharedsql.Store) error {
+	address, err := readPublic(ctx, n.DB, n.ID)
+	if err != nil || address.Revision == 0 {
+		return err
+	}
+	old, err := s.Object(ctx, "address", n.ID)
+	if err == nil && old.Revision >= address.Revision {
+		return nil
+	}
+	if err != nil && err != sql.ErrNoRows {
+		return err
+	}
+	return s.Transact(ctx, n.ID, false, func(t *sharedsql.Tx) error {
+		return t.Import(ctx, sharedObject("address", n.ID, address.Revision, address))
+	})
+}
+
+func (n *Node) sharedChangeTrust(ctx context.Context, request TrustPolicyPatch) (TrustPolicyState, error) {
+	s, err := n.sharedStore(ctx)
+	if err != nil {
+		return TrustPolicyState{}, err
+	}
+	var policy TrustPolicy
+	changed := false
+	err = s.Transact(ctx, n.ID, false, func(t *sharedsql.Tx) error {
+		policy = TrustPolicy{}
+		changed = false
+		old, e := t.Object(ctx, "trust", "policy")
+		if e != nil && e != sql.ErrNoRows {
+			return e
+		}
+		if e == nil {
+			if e = json.Unmarshal(old.Body, &policy); e != nil {
+				return e
+			}
+		}
+		if policy.Version != request.ExpectedVersion {
+			return fault("precondition_failed", "互信设置已经改变，请刷新")
+		}
+		if policy.Enabled == request.Enabled {
+			return nil
+		}
+		policy = TrustPolicy{Cluster: n.cluster, TrustPolicyState: TrustPolicyState{Version: TrustVersion{Counter: policy.Version.Counter + 1, NodeID: n.ID}, Enabled: request.Enabled}}
+		policy.Signature = ed25519.Sign(n.signing, trustBytes(policy))
+		changed = true
+		return t.Put(ctx, sharedObject("trust", "policy", policy.Version.Counter, policy), old.Revision)
+	})
+	if err == nil && changed {
+		var tx *sql.Tx
+		tx, err = n.DB.BeginTx(ctx, nil)
+		if err == nil {
+			err = n.appendTx(ctx, tx, "peer_trust", n.ID, policy, n.Now())
+			if err == nil {
+				err = tx.Commit()
+			}
+			tx.Rollback()
+		}
+	}
+	if err == nil {
+		err = n.syncSharedDirectory(ctx, s)
+		n.signalNetwork()
+		n.notifyChange(Change{Resource: "peer_trust"})
+	}
+	return policy.TrustPolicyState, sharedFault(err)
+}
+
 func (n *Node) syncSharedCandidate(ctx context.Context, s *sharedsql.Store) error {
 	c, err := n.Config(ctx)
 	if err != nil {

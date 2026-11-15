@@ -128,6 +128,9 @@ func (n *Node) saveSharedLocal(ctx context.Context, state SharedLocal) error {
 	return nil
 }
 func (n *Node) sharedStore(ctx context.Context) (*sharedsql.Store, error) {
+	if n.Revoked(ctx, n.ID) {
+		return nil, fault("forbidden", "节点已撤销")
+	}
 	n.sharedMu.Lock()
 	store := n.shared
 	state := n.sharedLocal
@@ -168,7 +171,7 @@ func (n *Node) SharedStatus(ctx context.Context) SharedStatus {
 	if issue != "" {
 		out.State = "error"
 		out.Error = &protocol.Error{Code: "dependency_unavailable", Message: issue}
-	} else if s.Phase == "active" {
+	} else if s.Phase == "active" && s.ProxyReady {
 		out.State = "ready"
 	}
 	return out
@@ -211,18 +214,18 @@ func (n *Node) reconcileShared(ctx context.Context) error {
 	if s == nil {
 		return nil
 	}
-	if !n.Active(ctx, n.ID) {
-		if s.ProxyID != "" {
-			if err := n.reconcileSharedRevocations(ctx, s); err != nil {
-				return err
-			}
-		}
+	if n.Revoked(ctx, n.ID) {
 		n.sharedMu.Lock()
 		if n.shared != nil {
 			n.shared.DB.Close()
 			n.shared = nil
 		}
 		n.sharedMu.Unlock()
+		if s.ProxyID != "" {
+			if err := n.reconcileSharedRevocations(ctx, s); err != nil {
+				return err
+			}
+		}
 		return fault("forbidden", "节点已撤销")
 	}
 	if s.Access.Username == "" {
@@ -325,7 +328,7 @@ func (n *Node) reconcileShared(ctx context.Context) error {
 	if err = n.publishSharedMember(ctx, store); err != nil {
 		return err
 	}
-	return nil
+	return n.publishSharedAddress(ctx, store)
 }
 func stepID(node, key string) string {
 	sum := sha256.Sum256([]byte(key))

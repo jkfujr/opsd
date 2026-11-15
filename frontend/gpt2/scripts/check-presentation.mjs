@@ -56,7 +56,8 @@ check('旧响应后到不覆盖较新成员，新读取错误保留较新数值'
   assert.equal(mergeDatabaseHealth(mismatch, value([fresh])).cluster.revision, 2);
 });
 check('操作摘要涵盖全部类型，旧记录缺失名称保持未知', () => {
-  assert.equal(Object.keys(operationSubjectNames).length, 13);
+  assert.equal(Object.keys(operationSubjectNames).length, 14);
+  assert.equal(operationTitle({ subject: 'shared_initialize' }), '初始化 OPSD 数据');
   const operation = { subject: 'task_run', node_id: 'node', resource_id: 'recording-move' };
   assert.equal(operationTarget(operation), undefined);
   assert.equal(operationTarget({ ...operation, target_name: '受理时任务名称' }), '受理时任务名称');

@@ -153,6 +153,43 @@ func TestSharedStorageNativeMigrationAndRecovery(t *testing.T) {
 	if code := apiCall(t, admin, b.web.URL, "PUT", "/api/v2/shared-storage/consoles", "", "console-nodes", csrf, map[string]any{"revision": 0, "primary": b.node.ID, "backup": c.node.ID}, nil); code != 200 {
 		t.Fatal("主用与备用管理节点未保存", code)
 	}
+	policy, err := b.node.ChangeTrust(t.Context(), cluster.TrustPolicyPatch{Enabled: true})
+	if err != nil {
+		t.Fatal("共享互信策略未保存", err)
+	}
+	waitDatabase(t, "其他入口读取共享互信策略", 15*time.Second, func() bool {
+		current, e := c.node.TrustPolicy(t.Context())
+		return e == nil && current == policy
+	})
+	policy, err = c.node.ChangeTrust(t.Context(), cluster.TrustPolicyPatch{ExpectedVersion: policy.Version, Enabled: false})
+	if err != nil {
+		t.Fatal("备用入口未更新共享互信策略", err)
+	}
+	if _, err = b.node.ChangeTrust(t.Context(), cluster.TrustPolicyPatch{Enabled: true}); err == nil {
+		t.Fatal("旧版本覆盖共享互信策略")
+	}
+	sharedDB := nativeSQL(t, f.galera[0])
+	defer sharedDB.Close()
+	var storedPolicy []byte
+	if err = sharedDB.QueryRow("SELECT body FROM opsd_core.shared_objects WHERE kind='trust' AND id='policy'").Scan(&storedPolicy); err != nil {
+		t.Fatal(err)
+	}
+	var savedPolicy cluster.TrustPolicy
+	if err = json.Unmarshal(storedPolicy, &savedPolicy); err != nil || savedPolicy.TrustPolicyState != policy {
+		t.Fatal("共享库未保留最新互信策略", err)
+	}
+	public, err := b.node.PublicAddresses(t.Context(), b.node.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	public, err = b.node.PatchPublic(t.Context(), cluster.PublicAddressesPatch{ExpectedRevision: public.Revision, IPv4: &cluster.PublicFamilyPatch{Mode: "manual", Addresses: []string{"8.8.4.4"}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	waitDatabase(t, "本机公网配置补入共享库", 15*time.Second, func() bool {
+		var revision uint64
+		return sharedDB.QueryRow("SELECT revision FROM opsd_core.shared_objects WHERE kind='address' AND id=?", b.node.ID).Scan(&revision) == nil && revision == public.Revision
+	})
 	nativeSharedSQL(t, f, b)
 	restartA := stopDatabaseEntry(t, a)
 	var existingAccess cluster.Secret
@@ -248,7 +285,7 @@ func TestSharedStorageNativeMigrationAndRecovery(t *testing.T) {
 	output := filepath.Join("..", "..", "..", "artifacts")
 	_ = os.MkdirAll(output, 0755)
 	perNode := sharedsql.MaxConnections + sharedsql.MonitorConnections
-	report, _ := json.MarshalIndent(map[string]any{"nodes": 3, "joining_node": true, "local_proxies": 3, "installed_proxy": 1, "reused_proxies": 2, "migration": true, "original_receipt": true, "coordinator_handoff": true, "accepted_step_reused": true, "proxy_recovery": true, "account_revocation": true, "new_proxy_connections_per_backend": map[int]int{4: 4 * perNode, 10: 10 * perNode, 40: 40 * perNode}}, "", "  ")
+	report, _ := json.MarshalIndent(map[string]any{"nodes": 3, "joining_node": true, "local_proxies": 3, "installed_proxy": 1, "reused_proxies": 2, "migration": true, "original_receipt": true, "shared_policy": true, "address_upload": true, "coordinator_handoff": true, "accepted_step_reused": true, "proxy_recovery": true, "account_revocation": true, "new_proxy_connections_per_backend": map[int]int{4: 4 * perNode, 10: 10 * perNode, 40: 40 * perNode}}, "", "  ")
 	if err = os.WriteFile(filepath.Join(output, "shared-storage-result.json"), report, 0644); err != nil {
 		t.Fatal(err)
 	}

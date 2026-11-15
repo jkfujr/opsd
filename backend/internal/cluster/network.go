@@ -151,8 +151,11 @@ func policyWins(a, b TrustPolicy) bool {
 	return a.Version.NodeID > b.Version.NodeID
 }
 func (n *Node) ChangeTrust(ctx context.Context, request TrustPolicyPatch) (TrustPolicyState, error) {
-	if !n.Active(ctx, n.ID) {
+	if n.Revoked(ctx, n.ID) {
 		return TrustPolicyState{}, fault("forbidden", "当前节点已撤销")
+	}
+	if n.sharedEnabled() {
+		return n.sharedChangeTrust(ctx, request)
 	}
 	tx, e := n.DB.BeginTx(ctx, nil)
 	if e != nil {

@@ -14,6 +14,42 @@ import (
 	"github.com/jkfujr/opsd/internal/protocol"
 )
 
+func TestSharedStatusWaitsForLocalProxy(t *testing.T) {
+	n, _ := openTestNode(t)
+	for _, ready := range []bool{false, true} {
+		if err := n.saveSharedLocal(t.Context(), SharedLocal{Phase: "active", ProxyReady: ready}); err != nil {
+			t.Fatal(err)
+		}
+		status := n.SharedStatus(t.Context())
+		if (status.State == "ready") != ready {
+			t.Fatal("共享连接状态与本机代理状态不符", status.State, ready)
+		}
+	}
+}
+
+func TestSharedRevocationKeepsLocalRecoveryAndStopsSQL(t *testing.T) {
+	n, _ := openTestNode(t)
+	if err := n.saveSharedLocal(t.Context(), SharedLocal{Phase: "active"}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := n.DB.Exec("INSERT INTO revocations(id,body) VALUES(?,'{}')", n.ID); err != nil {
+		t.Fatal(err)
+	}
+	if err := n.Call(t.Context(), n.ID, "ping", nil, nil); err != nil {
+		t.Fatal("本机恢复入口不可用", err)
+	}
+	if err := n.reconcileShared(t.Context()); err == nil {
+		t.Fatal("已撤销节点继续维护共享连接")
+	} else if value, ok := err.(*Fault); !ok || value.Code != "forbidden" {
+		t.Fatal("撤销状态丢失", err)
+	}
+	if _, err := n.sharedStore(t.Context()); err == nil {
+		t.Fatal("已撤销节点重新打开共享连接")
+	} else if value, ok := err.(*Fault); !ok || value.Code != "forbidden" {
+		t.Fatal("撤销后未拒绝共享连接", err)
+	}
+}
+
 func TestSharedMigrationWaitDoesNotAppendUnchangedState(t *testing.T) {
 	n, worker := deploymentNode(t)
 	id := stepID(n.ID, "shared-maintenance/"+n.cluster+"/"+protocol.SharedDatabaseName+"/initialize/")
