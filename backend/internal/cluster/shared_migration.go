@@ -25,12 +25,12 @@ type SharedInitialize struct {
 	Database  string `json:"database"`
 }
 type sharedMigration struct {
-	Stage   string                 `json:"stage"`
-	Nodes   map[string]SharedLocal `json:"nodes"`
-	Cursors map[string]string      `json:"cursors"`
-	Sources map[string][]string    `json:"sources"`
-	Source  DatabaseRef            `json:"source"`
-	Secrets map[string]Secret      `json:"secrets,omitempty"`
+	Stage   string                  `json:"stage"`
+	Nodes   map[string]SharedLocal  `json:"nodes"`
+	Cursors map[string]string       `json:"cursors"`
+	Sources map[string][]string     `json:"sources"`
+	Source  DatabaseRef             `json:"source"`
+	Secrets map[string]sharedAccess `json:"secrets,omitempty"`
 }
 type sharedExportRequest struct {
 	Source string `json:"source"`
@@ -308,19 +308,13 @@ func (n *Node) advanceSharedInitialization(ctx context.Context, op *Operation, p
 			return err
 		}
 		if m.Secrets == nil {
-			recipients, e := n.sharedRecipients(ctx)
-			if e != nil {
-				return e
-			}
-			m.Secrets = map[string]Secret{}
+			m.Secrets = map[string]sharedAccess{}
 			for _, id := range ids {
-				c := m.Nodes[id]
-				body, _ := json.Marshal(c)
-				secret, e := seal(body, recipients)
+				access, e := n.sealSharedAccess(ctx, id, m.Nodes[id])
 				if e != nil {
 					return e
 				}
-				m.Secrets[id] = secret
+				m.Secrets[id] = access
 			}
 			if err = save(); err != nil {
 				return err
@@ -339,6 +333,8 @@ func (n *Node) advanceSharedInitialization(ctx context.Context, op *Operation, p
 		}
 		state.Phase = "active"
 		m.Stage = "complete"
+		m.Nodes = nil
+		m.Secrets = nil
 		if err = save(); err != nil {
 			return err
 		}

@@ -157,15 +157,8 @@ func TestDatabaseDeploymentSingleNodeExpansionAndLostReply(t *testing.T) {
 		t.Fatal("重复提交生成了新操作")
 	}
 	op = advanceDeploymentTest(t, a, op.ID, a, b)
-	if op.State != protocol.AttentionRequired || x.submits != 1 {
-		t.Fatal("未知应答未保留原步骤", op.State, x.submits)
-	}
-	if _, err = a.decideDatabase(t.Context(), "operation.recover", OperationDecision{ID: op.ID, ExpectedRevision: op.Revision}, op); err != nil {
-		t.Fatal(err)
-	}
-	op = advanceDeploymentTest(t, a, op.ID, a, b)
 	if op.State != protocol.Succeeded || x.submits != 1 {
-		t.Fatal("恢复重复部署", op.State, op.Error, x.submits)
+		t.Fatal("查询原目标结果后重复部署", op.State, op.Error, x.submits)
 	}
 	c, err := a.DatabaseCluster(t.Context(), p.ClusterID)
 	if err != nil || len(c.Members) != 1 || c.ClusterID != "test-galera" {
@@ -387,6 +380,7 @@ func TestDatabaseDeploymentCoordinatorReopenAndQueuedCancel(t *testing.T) {
 		t.Fatal("已取消操作仍然部署")
 	}
 	executor.lost = true
+	executor.failed = true
 	op := commitDeployment(t, n, preview, "restart", "create_or_import")
 	op = advanceDeploymentTest(t, n, op.ID, n)
 	if op.State != protocol.AttentionRequired {

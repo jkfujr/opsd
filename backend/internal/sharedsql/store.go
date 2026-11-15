@@ -396,3 +396,18 @@ func (s *Store) Latest(ctx context.Context, owner, kind, object string) (json.Ra
 	err := s.DB.QueryRowContext(ctx, "SELECT body FROM shared_records WHERE owner=? AND kind=? AND object_id=? ORDER BY sequence DESC LIMIT 1", owner, kind, object).Scan(&body)
 	return body, err
 }
+
+func (s *Store) PruneMetrics(ctx context.Context) error {
+	var expired int
+	err := s.DB.QueryRowContext(ctx, "SELECT 1 FROM shared_records WHERE kind='metrics' AND created_at<UTC_DATE()-INTERVAL 7 DAY LIMIT 1").Scan(&expired)
+	if err == sql.ErrNoRows {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	return s.Transact(ctx, "", false, func(t *Tx) error {
+		_, err := t.ExecContext(ctx, "DELETE FROM shared_records WHERE kind='metrics' AND created_at<UTC_DATE()-INTERVAL 7 DAY LIMIT 200")
+		return err
+	})
+}

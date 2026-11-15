@@ -79,6 +79,7 @@ type Node struct {
 	shared               *sharedsql.Store
 	sharedLocal          *SharedLocal
 	sharedIssue          string
+	sharedRecovered      bool
 	sharedStartupPending map[string]bool
 	databaseReads        map[string]*managedDatabaseReadEntry
 	current              map[string]*currentRead

@@ -346,6 +346,12 @@ func (n *Node) checkSharedRecovery(ctx context.Context, s *sharedsql.Store) erro
 	return nil
 }
 func (n *Node) uploadShared(ctx context.Context, s *sharedsql.Store) error {
+	n.sharedMu.Lock()
+	waiting := n.sharedLocal != nil && n.sharedLocal.Phase == "active" && !n.sharedRecovered
+	n.sharedMu.Unlock()
+	if waiting {
+		return fault("dependency_unavailable", "正在核对共享版本与原操作结果")
+	}
 	if n.Revoked(ctx, n.ID) {
 		return fault("forbidden", "节点已撤销")
 	}
@@ -380,6 +386,9 @@ func (n *Node) uploadShared(ctx context.Context, s *sharedsql.Store) error {
 		if _, err = n.DB.ExecContext(ctx, "UPDATE records SET uploaded=1 WHERE id=?", r.ID); err != nil {
 			return err
 		}
+	}
+	if n.sharedActive() {
+		return s.PruneMetrics(ctx)
 	}
 	return nil
 }

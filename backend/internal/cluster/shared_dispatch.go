@@ -56,45 +56,57 @@ func (n *Node) sharedDispatch(ctx context.Context, origin, method string, body j
 	}
 	return nil, fault("invalid_request", "未知共享数据操作")
 }
-func (n *Node) sharedBootstrap(ctx context.Context, node string) (SharedLocal, error) {
+
+type sharedAccess struct {
+	Secret       Secret      `json:"secret"`
+	Source       DatabaseRef `json:"source"`
+	PasswordHash string      `json:"password_hash"`
+	MonitorHash  string      `json:"monitor_hash"`
+}
+
+func (n *Node) sealSharedAccess(ctx context.Context, node string, local SharedLocal) (sharedAccess, error) {
+	member, err := n.Member(ctx, node)
+	if err != nil {
+		return sharedAccess{}, err
+	}
+	data, _ := json.Marshal(local)
+	secret, err := seal(data, []string{member.Recipient})
+	return sharedAccess{Secret: secret, Source: local.AccountSource, PasswordHash: databaseengine.NativePassword(local.Access.Password), MonitorHash: databaseengine.NativePassword(local.Monitor.Password)}, err
+}
+
+func (n *Node) sharedBootstrap(ctx context.Context, node string) (Secret, error) {
 	state := n.sharedState()
 	if state == nil || state.Phase != "active" {
-		return SharedLocal{}, sharedsql.ErrUnavailable
+		return Secret{}, sharedsql.ErrUnavailable
 	}
 	s, err := n.sharedStore(ctx)
 	if err != nil {
-		return SharedLocal{}, err
+		return Secret{}, err
 	}
-	var access SharedLocal
 	object, err := s.Object(ctx, "access", node)
 	if err == sql.ErrNoRows {
-		access = SharedLocal{DataKey: state.DataKey, Binding: state.Binding, Cluster: state.Cluster, Phase: "active", Access: Credentials{Username: protocol.SharedUsername(node), Password: identity.Random()}, Monitor: Credentials{Username: protocol.SharedMonitorUser(node), Password: identity.Random()}}
 		current, e := n.DatabaseCluster(ctx, state.Binding.ClusterID)
 		if e != nil {
-			return access, e
+			return Secret{}, e
 		}
 		if e = n.checkSharedConnections(ctx, current); e != nil {
-			return access, e
+			return Secret{}, e
 		}
+		local := SharedLocal{DataKey: state.DataKey, Binding: state.Binding, Cluster: current, Phase: "active", Access: Credentials{Username: protocol.SharedUsername(node), Password: identity.Random()}, Monitor: Credentials{Username: protocol.SharedMonitorUser(node), Password: identity.Random()}}
 		for _, ref := range current.Members {
-			if err := n.Call(ctx, ref.NodeID, "ping", nil, nil); err == nil {
-				access.AccountSource = ref
+			if e := n.Call(ctx, ref.NodeID, "ping", nil, nil); e == nil {
+				local.AccountSource = ref
 				break
 			}
 		}
-		if access.AccountSource.NodeID == "" {
-			return access, fault("dependency_unavailable", "数据库成员的维护入口暂不可用")
+		if local.AccountSource.NodeID == "" {
+			return Secret{}, fault("dependency_unavailable", "数据库成员的维护入口暂不可用")
 		}
-		recipients, e := n.sharedRecipients(ctx)
+		access, e := n.sealSharedAccess(ctx, node, local)
 		if e != nil {
-			return access, e
+			return Secret{}, e
 		}
-		data, _ := json.Marshal(access)
-		secret, e := seal(data, recipients)
-		if e != nil {
-			return access, e
-		}
-		object = sharedObject("access", node, 1, secret)
+		object = sharedObject("access", node, 1, access)
 		if e = s.Transact(ctx, n.ID, false, func(t *sharedsql.Tx) error {
 			if _, e := t.Object(ctx, "revocation", node); e == nil {
 				return fault("forbidden", "节点已撤销")
@@ -103,47 +115,27 @@ func (n *Node) sharedBootstrap(ctx context.Context, node string) (SharedLocal, e
 			}
 			return t.Put(ctx, object, 0)
 		}); e != nil {
-			return access, e
+			return Secret{}, e
 		}
 	} else if err != nil {
-		return access, err
+		return Secret{}, err
 	}
-	var secret Secret
-	if err = json.Unmarshal(object.Body, &secret); err != nil {
-		return access, err
+	var access sharedAccess
+	if err = json.Unmarshal(object.Body, &access); err != nil {
+		return Secret{}, err
 	}
-	key, err := n.sharedIdentity()
+	if access.Source.NodeID == "" {
+		return Secret{}, fmt.Errorf("节点账号缺少原维护目标")
+	}
+	action := protocol.DatabaseAction{Kind: "shared_database", ClusterID: state.Binding.GaleraID, Shared: &protocol.SharedDatabaseAction{Mode: "provision", Cluster: n.cluster, Database: state.Binding.Database, NodeID: node, PasswordHash: access.PasswordHash, MonitorHash: access.MonitorHash}}
+	ready, err := n.ensureDatabaseStep(ctx, access.Source, stepID(access.Source.NodeID, "shared-maintenance/"+n.cluster+"/"+state.Binding.Database+"/provision/"+node), action)
 	if err != nil {
-		return access, err
-	}
-	data, err := unseal(secret, key)
-	if err != nil {
-		return access, err
-	}
-	if err = json.Unmarshal(data, &access); err != nil {
-		return access, err
-	}
-	c, err := n.DatabaseCluster(ctx, state.Binding.ClusterID)
-	if err != nil {
-		return access, err
-	}
-	access.Cluster = c
-	if len(c.Members) == 0 {
-		return access, fmt.Errorf("数据库集群没有成员")
-	}
-	ref := access.AccountSource
-	if ref.NodeID == "" {
-		return access, fault("dependency_unavailable", "节点账号缺少原维护目标")
-	}
-	a := protocol.DatabaseAction{Kind: "shared_database", ClusterID: state.Binding.GaleraID, Shared: &protocol.SharedDatabaseAction{Mode: "provision", Cluster: n.cluster, Database: state.Binding.Database, NodeID: node, PasswordHash: databaseengine.NativePassword(access.Access.Password), MonitorHash: databaseengine.NativePassword(access.Monitor.Password)}}
-	ready, err := n.ensureDatabaseStep(ctx, ref, stepID(ref.NodeID, "shared-maintenance/"+n.cluster+"/"+state.Binding.Database+"/provision/"+node), a)
-	if err != nil {
-		return access, err
+		return Secret{}, err
 	}
 	if !ready {
-		return access, fault("node_busy", "节点数据库账号正在准备")
+		return Secret{}, fault("node_busy", "节点数据库账号正在准备")
 	}
-	return access, nil
+	return access.Secret, nil
 }
 func (n *Node) RecoverSharedState(ctx context.Context) error {
 	state := n.sharedState()

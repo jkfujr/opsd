@@ -359,10 +359,6 @@ func TestDatabaseNativeClusterAPIAndDashboard(t *testing.T) {
 	services[0].lose.Store(true)
 	op := nativeSubmit(t, c, raw, registered.ID, "create-db", change)
 	restartEntry := stopDatabaseEntry(t, c)
-	unknown := nativeOperation(t, b, raw, op.ID, protocol.AttentionRequired)
-	if code := apiCall(t, http.DefaultClient, b.web.URL, "POST", "/api/v2/operations/"+op.ID+"/actions", raw, "", "", map[string]any{"action": "recover", "expected_revision": unknown.Revision}, nil); code != 200 {
-		t.Fatal("查询未知应答后的原操作失败", code)
-	}
 	nativeOperation(t, b, raw, op.ID, protocol.Succeeded)
 	restartEntry(services[2])
 	same := nativeSubmit(t, b, raw, registered.ID, "create-db", change)

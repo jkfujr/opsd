@@ -13,6 +13,38 @@ import (
 	"github.com/jkfujr/opsd/internal/protocol"
 )
 
+func TestSharedAccessOnlyRecipientCanRecoverCredentials(t *testing.T) {
+	seed, _ := openTestNode(t)
+	joining, _ := openTestNode(t)
+	joinTest(t, joining, seed)
+	local := SharedLocal{Access: Credentials{Username: protocol.SharedUsername(joining.ID), Password: "private-node-password"}, Monitor: Credentials{Username: protocol.SharedMonitorUser(joining.ID), Password: "private-monitor-password"}}
+	access, err := seed.sealSharedAccess(t.Context(), joining.ID, local)
+	if err != nil {
+		t.Fatal(err)
+	}
+	plain, err := unseal(access.Secret, joining.age)
+	if err != nil {
+		t.Fatal("所属节点无法恢复凭据", err)
+	}
+	var recovered SharedLocal
+	if err = json.Unmarshal(plain, &recovered); err != nil || recovered.Access != local.Access {
+		t.Fatal("所属节点凭据变化", err)
+	}
+	if _, err = unseal(access.Secret, seed.age); err == nil {
+		t.Fatal("其他节点能够读取数据库服务密码")
+	}
+}
+
+func TestSharedUploadWaitsForStartupRecovery(t *testing.T) {
+	n, _ := openTestNode(t)
+	if err := n.saveSharedLocal(t.Context(), SharedLocal{Phase: "active"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := n.uploadShared(t.Context(), nil); err == nil {
+		t.Fatal("旧节点资料在核对共享版本前开始上传")
+	}
+}
+
 func TestSharedConnectionBudgetKeepsExistingLimitAndDeduplicatesHostgroups(t *testing.T) {
 	endpoint := protocol.ProxyEndpoint{Host: "10.0.0.1", Port: 3306}
 	observed := protocol.ProxyRoutingObservation{Servers: []protocol.ProxyRouteServer{

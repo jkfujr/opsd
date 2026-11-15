@@ -17,7 +17,7 @@ export function SharedStorage({ clusters }: { clusters: Cluster[] }) {
   const [cluster, setCluster] = useState(''), [uncertain, setUncertain] = useState(false);
   const key = useRef(newRequestKey());
   const operations = useOperations();
-  const finished = (op: components['schemas']['Operation']) => { setUncertain(false); invalidateOperations(); void query.refetch(); operations.show(op.id); };
+  const finished = (op: components['schemas']['Operation']) => { setUncertain(false); initialize.reset(); invalidateOperations(); void query.refetch(); operations.show(op.id); };
   const initialize = useMutation({ mutationFn: async () => unwrap(await api.POST('/shared-storage/initialize', { params: { header: { 'Idempotency-Key': key.current } }, body: { cluster_id: cluster, database: 'opsd_core' } })), onSuccess: finished, onError: error => setUncertain(unknownResult(error)) });
   const locate = useMutation({ mutationFn: async () => { const session = queryClient.getQueryData<components['schemas']['CurrentSession']>(['session']) ?? unwrap(await api.GET('/auth/sessions/current')); return findOperation(session.local_node_id, key.current); }, onSuccess: op => { if (op) finished(op); } });
   const recover = useMutation({ mutationFn: async (id: string) => unwrap(await api.POST('/nodes/{node_id}/shared-storage/recovery', { params: { path: { node_id: id } } })), onSuccess: () => { void query.refetch(); invalidateOperations(); } });

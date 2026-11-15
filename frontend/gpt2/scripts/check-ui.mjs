@@ -6,6 +6,7 @@ import { chromium, request } from 'playwright';
 import { checkLayout } from './check-layout.mjs';
 import { checkBackendContract } from './check-backend-contract.mjs';
 import { checkDatabaseDeployment } from './check-database-deployment.mjs';
+import { checkSharedStorage } from './check-shared-storage.mjs';
 const root = fileURLToPath(new URL('../', import.meta.url));
 const artifacts = join(root, '../../artifacts/frontend/gpt2');
 const base = process.env.OPSD_GPT2_URL ?? 'http://127.0.0.1:5183';
@@ -18,7 +19,7 @@ const resultDirectory = mode === 'theme' ? 'integration' : `integration-${mode}`
 const { version } = JSON.parse(await readFile(join(root, '../../package.json'), 'utf8'));
 const forced = (process.argv.find(arg => arg.startsWith('--rerun='))?.slice(8) ?? '').split('|');
 const backendContract = process.argv.includes('--backend-contract');
-const contractSteps = ['数据库创建接入扩容、原请求查询与窄屏', '资源历史节点集合、节点配置草稿和支持的写入', '数据库六页签、保护账号与受支持变更', '防火墙能力、规则写入、服务端确认期限和操作跨页保留', '独立日志页、日志错误、ANSI、字节分页、搜索复制与返回筛选', '受管代理预览、未知应答恢复、连接预算与窄屏', '防火墙接纳当前配置及原请求查询', '操作历史保存原名称、动作和完整目标'];
+const contractSteps = ['共享库原请求恢复、代理状态、主备入口与协调转交', '数据库创建接入扩容、原请求查询与窄屏', '资源历史节点集合、节点配置草稿和支持的写入', '数据库六页签、保护账号与受支持变更', '防火墙能力、规则写入、服务端确认期限和操作跨页保留', '独立日志页、日志错误、ANSI、字节分页、搜索复制与返回筛选', '受管代理预览、未知应答恢复、连接预算与窄屏', '防火墙接纳当前配置及原请求查询', '操作历史保存原名称、动作和完整目标'];
 const resume = process.argv.includes('--resume'), replace = process.argv.includes('--replace'), resourceState = process.argv.includes('--resource-state');
 let previous = { results: [] }; if (resume) { try { previous = JSON.parse(await readFile(join(artifacts, resultDirectory, 'result.json'), 'utf8')); } catch {} }
 const rerunVisuals = forced.some(value => value && '深浅模式、320/768/1440px、200% 等效视口与键盘焦点'.includes(value));
@@ -383,6 +384,7 @@ try {
       await go('/containers?view=logs&node_id='+id+'&engine_id=docker&container_id='+containerID);await page.locator('.log-document pre').waitFor();await page.getByRole('button',{name:'返回容器详情',exact:true}).click();await page.getByRole('dialog').waitFor();await page.getByRole('button',{name:'关闭弹窗',exact:true}).click();
     } finally { await page.unroute(containerPath);await page.setViewportSize({width:1440,height:1000}); }
   });
+  await checkSharedStorage({ page, go, step, capture, closeDrawers, id, op, fixtures: { get nodes() { return nodeList; }, set nodes(value) { nodeList = value; }, get database() { return databaseValue; }, set database(value) { databaseValue = value; }, receipts } });
   await checkDatabaseDeployment({ page, go, step, capture, closeDrawers, id, op, fixtures: { get nodes() { return nodeList; }, set nodes(value) { nodeList = value; }, receipts } });
   await checkBackendContract({ page, go, step, capture, closeDrawers, id, checked, rev, op, actions, counts, fixtures: { get database() { return databaseValue; }, set database(value) { databaseValue = value; }, get firewall() { return firewall; }, set firewall(value) { firewall = value; }, set routingManaged(value) { routingManaged = value; }, set routingUnknown(value) { routingUnknown = value; }, set adoptionUnknown(value) { adoptionUnknown = value; } } });
   await step('终端字节、输入尺寸、深层别名、跨页输出、重连及票据错误', async () => {

@@ -54,6 +54,9 @@ func (n *Node) syncSharedFlowCoordinator(ctx context.Context, s *sharedsql.Store
 	})
 }
 func (n *Node) registerSharedProxy(ctx context.Context, s *sharedsql.Store, state *SharedLocal) error {
+	if err := n.publishSharedCapacity(ctx, s, state); err != nil {
+		return err
+	}
 	instance, err := n.databaseInstance(ctx, state.ProxyID)
 	if err != nil {
 		return err

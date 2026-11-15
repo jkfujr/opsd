@@ -234,8 +234,16 @@ func (n *Node) reconcileShared(ctx context.Context) error {
 			if m.ID == n.ID || !n.Active(ctx, m.ID) {
 				continue
 			}
-			var value SharedLocal
-			if err = n.Call(ctx, m.ID, "shared.bootstrap", n.ID, &value); err == nil {
+			var secret Secret
+			if err = n.Call(ctx, m.ID, "shared.bootstrap", nil, &secret); err == nil {
+				plain, e := unseal(secret, n.age)
+				if e != nil {
+					return e
+				}
+				var value SharedLocal
+				if e = json.Unmarshal(plain, &value); e != nil {
+					return e
+				}
 				if err = n.saveSharedLocal(ctx, value); err != nil {
 					return err
 				}
@@ -303,6 +311,7 @@ func (n *Node) reconcileShared(ctx context.Context) error {
 	}
 	n.sharedMu.Lock()
 	n.sharedStartupPending = nil
+	n.sharedRecovered = true
 	n.sharedMu.Unlock()
 	if err = n.syncSharedCandidate(ctx, store); err != nil {
 		return err
@@ -314,9 +323,6 @@ func (n *Node) reconcileShared(ctx context.Context) error {
 		}
 	}
 	if err = n.publishSharedMember(ctx, store); err != nil {
-		return err
-	}
-	if err = n.uploadShared(ctx, store); err != nil {
 		return err
 	}
 	return nil

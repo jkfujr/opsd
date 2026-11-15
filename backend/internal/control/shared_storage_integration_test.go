@@ -4,6 +4,7 @@ package control
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -267,6 +268,21 @@ func nativeSharedSQL(t *testing.T, f *nativeDatabases, b *apiNode) {
 		}
 		defer store.DB.Close()
 		stores = append(stores, store)
+	}
+	old := time.Now().UTC().AddDate(0, 0, -9)
+	for sequence, kind := range []string{"metrics", "operation"} {
+		if err = stores[0].PutRecord(t.Context(), "retention-"+kind, nodeID, kind, "retention", uint64(sequence+1), old, []byte(`{}`)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err = stores[0].PruneMetrics(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = stores[0].Latest(t.Context(), nodeID, "metrics", "retention"); err != sql.ErrNoRows {
+		t.Fatal("过期监控仍占用共享库", err)
+	}
+	if _, err = stores[0].Latest(t.Context(), nodeID, "operation", "retention"); err != nil {
+		t.Fatal("监控清理影响操作历史", err)
 	}
 	var wg sync.WaitGroup
 	errors := make(chan error, 2)
