@@ -1,9 +1,13 @@
 package executor
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"path/filepath"
 	"testing"
 
@@ -21,19 +25,70 @@ func TestSubmitBusyDoesNotPersistOperation(t *testing.T) {
 	}
 	defer db.Close()
 	store := operations.Store{DB: db}
-	s := &Services{Engine: &operations.Engine{Store: store, Clock: func() (string, int64, error) { return "boot", 0, nil }}, Start: func(context.Context, string) error { return nil }}
 	a := protocol.OperationAction{Kind: "component", Component: &protocol.ComponentAction{Component: "firewall", Action: "install", Backend: "ufw"}}
 	request := &protocol.OperationSubmit{OperationID: "busy", ContractVersion: protocol.ContractVersion, Action: a}
-	for _, lockErr := range []error{localstate.ErrBusy, errors.New("锁文件不可读")} {
-		s.OperationLock = func() (func(), error) { return nil, lockErr }
-		if _, err = s.Handle(t.Context(), request); firewall.Code(err) != "not_accepted_busy" {
-			t.Fatal("锁失败未返回未受理", err)
-		}
-		if _, err = store.Get(t.Context(), request.OperationID); !errors.Is(err, sql.ErrNoRows) {
-			t.Fatal("未受理操作被保存", err)
+	for _, action := range []struct {
+		name  string
+		value protocol.OperationAction
+	}{
+		{"operation_lock", a},
+		{"task_lock", protocol.OperationAction{Kind: "shell", Shell: &protocol.ShellAction{TaskID: "locked-task", Name: "锁测试", Script: "true", Directory: "/tmp"}}},
+	} {
+		for _, test := range []struct {
+			name, code string
+			err        error
+		}{
+			{"busy", "not_accepted_busy", localstate.ErrBusy},
+			{"wrapped_busy", "not_accepted_busy", fmt.Errorf("读取操作锁：%w", localstate.ErrBusy)},
+			{"lock_error", "dependency_unavailable", errors.New("锁文件不可读")},
+		} {
+			t.Run(action.name+"/"+test.name, func(t *testing.T) {
+				starts := 0
+				taskID := ""
+				s := &Services{Engine: &operations.Engine{Store: store, Clock: func() (string, int64, error) { return "boot", 0, nil }}, Start: func(context.Context, string) error {
+					starts++
+					return nil
+				}, OperationLock: func() (func(), error) { return nil, test.err }, TaskLock: func(id string) (func(), error) {
+					taskID = id
+					return nil, test.err
+				}}
+				request := &protocol.OperationSubmit{OperationID: action.name + "-" + test.name, ContractVersion: protocol.ContractVersion, Action: action.value}
+				if _, err := s.Handle(t.Context(), request); firewall.Code(err) != test.code || (test.code == "dependency_unavailable" && err != test.err) {
+					t.Fatal("锁错误分类或原错误发生变化", err)
+				}
+				if _, err := store.Get(t.Context(), request.OperationID); !errors.Is(err, sql.ErrNoRows) {
+					t.Fatal("锁失败的操作被保存", err)
+				}
+				body, err := protocol.Encode(protocol.Message{RequestID: "lock-request", Payload: request})
+				if err != nil {
+					t.Fatal(err)
+				}
+				reply := httptest.NewRecorder()
+				(&Server{Services: s}).Handler().ServeHTTP(reply, httptest.NewRequest(http.MethodPost, "/rpc", bytes.NewReader(body)))
+				if reply.Code != http.StatusOK {
+					t.Fatal("锁错误 RPC 应答失败", reply.Code, reply.Body.String())
+				}
+				message, err := protocol.Decode(reply.Body.Bytes())
+				if err != nil {
+					t.Fatal(err)
+				}
+				failure, ok := message.Payload.(*protocol.RequestFailed)
+				if !ok || failure.Error.Code != test.code || failure.Error.Message != test.err.Error() {
+					t.Fatal("锁错误 RPC 分类或消息发生变化", message.Payload)
+				}
+				if _, err := store.Get(t.Context(), request.OperationID); !errors.Is(err, sql.ErrNoRows) {
+					t.Fatal("锁失败的 RPC 操作被保存", err)
+				}
+				if starts != 0 || (action.value.Shell != nil && taskID != action.value.Shell.TaskID) {
+					t.Fatal("锁失败后启动操作或任务锁标识不符", starts, taskID)
+				}
+			})
 		}
 	}
-	s.OperationLock = func() (func(), error) { return func() {}, nil }
+	s := &Services{Engine: &operations.Engine{Store: store, Clock: func() (string, int64, error) { return "boot", 0, nil }}, Start: func(context.Context, string) error {
+		t.Fatal("繁忙操作被启动")
+		return nil
+	}, OperationLock: func() (func(), error) { return func() {}, nil }}
 	if _, _, err = store.Receive(t.Context(), "other", protocol.ContractVersion, a, "boot"); err != nil {
 		t.Fatal(err)
 	}

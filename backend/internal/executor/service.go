@@ -162,8 +162,11 @@ func (s *Services) Handle(ctx context.Context, payload protocol.Payload) (protoc
 		} else {
 			unlock, lockErr = s.lock()
 		}
-		if lockErr != nil {
+		if errors.Is(lockErr, localstate.ErrBusy) {
 			return nil, &firewall.Fault{Code: "not_accepted_busy", Message: lockErr.Error()}
+		}
+		if lockErr != nil {
+			return nil, lockErr
 		}
 		boot, _, e := s.clock()
 		if e != nil {

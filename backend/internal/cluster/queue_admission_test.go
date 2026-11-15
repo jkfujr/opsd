@@ -41,6 +41,7 @@ func TestQueueAdmissionBusyFaultAndUnknownReply(t *testing.T) {
 	}{
 		{"busy", "queued", "", &firewall.Fault{Code: "not_accepted_busy", Message: "繁忙"}},
 		{"invalid", "finished", "invalid_request", &firewall.Fault{Code: "invalid_request", Message: "参数无效"}},
+		{"dependency", "finished", "dependency_unavailable", &firewall.Fault{Code: "dependency_unavailable", Message: "锁文件不可读"}},
 		{"transport", "dispatching", "not_accepted", errors.New("传输失败")},
 	} {
 		for _, reopen := range []bool{false, true} {
@@ -54,8 +55,9 @@ func TestQueueAdmissionBusyFaultAndUnknownReply(t *testing.T) {
 				}
 				n.advance()
 				var phase, path string
-				if err = n.DB.QueryRow("SELECT phase FROM queue WHERE id=?", op.ID).Scan(&phase); err != nil || phase != test.phase {
-					t.Fatal("受理结果未保存正确阶段", phase, err)
+				var terminal bool
+				if err = n.DB.QueryRow("SELECT phase,terminal FROM queue WHERE id=?", op.ID).Scan(&phase, &terminal); err != nil || phase != test.phase || terminal != (test.phase == "finished") {
+					t.Fatal("受理结果未保存正确阶段", phase, terminal, err)
 				}
 				if reopen {
 					if err = n.DB.QueryRow("SELECT file FROM pragma_database_list WHERE name='main'").Scan(&path); err != nil {
@@ -69,6 +71,7 @@ func TestQueueAdmissionBusyFaultAndUnknownReply(t *testing.T) {
 					n = second
 				}
 				n.advance()
+				n.advance()
 				got, err := n.GetOperation(t.Context(), op.ID)
 				if err != nil {
 					t.Fatal(err)
@@ -79,6 +82,12 @@ func TestQueueAdmissionBusyFaultAndUnknownReply(t *testing.T) {
 					}
 				} else if got.State != protocol.Rejected || got.Error == nil || got.Error.Code != test.code || len(x.ids) != 1 || x.executions != 0 || x.reconciles != map[string]int{"invalid": 0, "transport": 1}[test.name] {
 					t.Fatal("明确拒绝或未知结果处理错误", got, x)
+				}
+				if test.phase == "finished" && got.Error.Message != test.err.Error() {
+					t.Fatal("明确拒绝未保留错误消息", got.Error)
+				}
+				if err = n.DB.QueryRow("SELECT phase,terminal FROM queue WHERE id=?", op.ID).Scan(&phase, &terminal); err != nil || !terminal || (test.phase == "finished" && phase != "finished") {
+					t.Fatal("操作结束后队列仍可调度", phase, terminal, err)
 				}
 			})
 		}
