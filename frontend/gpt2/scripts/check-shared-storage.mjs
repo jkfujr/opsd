@@ -67,7 +67,7 @@ export async function checkSharedStorage({ page, go, step, capture, closeDrawers
       await capture('shared-storage-narrow');
       await go('/databases/ui-db');
       await page.getByRole('tab', { name: '库', exact: true }).click();
-      assert(await page.getByRole('button', { name: '创建库', exact: true }).isEnabled());
+      await page.getByRole('button', { name: '创建库', exact: true }).click({ trial: true });
       await page.getByRole('button', { name: '转交协调权', exact: true }).click();
       await choose('协调节点', originalNodes.items[0].name);
       await page.getByRole('button', { name: '转交', exact: true }).click();
