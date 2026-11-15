@@ -23,6 +23,31 @@ func TestMissingIPv6IsNotDiscoveryFailure(t *testing.T) {
 	}
 }
 
+func TestJoiningKeepsPublicFallbackObservations(t *testing.T) {
+	seed, _ := openTestNode(t)
+	seed.ObservePublic = func(_ context.Context, family protocol.AddressFamily) []protocol.AddressObservation {
+		address := "8.8.8.8"
+		if family == protocol.IPv6 {
+			address = "2606:4700::1111"
+		}
+		now := time.Now().UTC()
+		return []protocol.AddressObservation{
+			{Source: "peer", Address: address, ObservedAt: now},
+			{Source: "ipify", ObservedAt: now, Error: &protocol.Error{Code: "dependency_unavailable", Message: "连接超时"}},
+			{Source: "icanhazip", Address: address, ObservedAt: now},
+		}
+	}
+	if _, err := seed.RefreshPublic(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	joining, _ := openTestNode(t)
+	joinTest(t, joining, seed)
+	public, err := joining.PublicAddresses(t.Context(), seed.ID)
+	if err != nil || len(public.IPv4.Observations) != 3 || len(public.IPv6.Observations) != 3 {
+		t.Fatal("加入时丢失备用来源观测", public, err)
+	}
+}
+
 func TestSingleNodeTrustIncludesItsAddressesAndPendingState(t *testing.T) {
 	n, _ := openTestNode(t)
 	if _, err := n.ChangeTrust(t.Context(), TrustPolicyPatch{Enabled: true}); err != nil {

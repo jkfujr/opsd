@@ -132,19 +132,21 @@ func (n *Node) attach(p *peer) bool {
 	}
 	if old := n.connections[p.id]; old != nil {
 		preferred := p.outbound == (n.ID < p.id)
-		if !preferred || old.outbound == p.outbound {
-			return false
-		}
-		p.resident = p.resident || old.resident
 		if len(n.connections)+len(n.retiring) >= 32 {
 			return false
 		}
 		if n.retiring == nil {
 			n.retiring = map[*peer]struct{}{}
 		}
-		old.retiredAt = n.Now()
-		n.retiring[old] = struct{}{}
-		n.connections[p.id] = p
+		// 握手已确认的重复连接保留已发送请求，空闲后统一回收。
+		retired := p
+		if preferred && old.outbound != p.outbound {
+			p.resident = p.resident || old.resident
+			n.connections[p.id] = p
+			retired = old
+		}
+		retired.retiredAt = n.Now()
+		n.retiring[retired] = struct{}{}
 		n.wg.Add(1)
 		return true
 	}

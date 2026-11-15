@@ -91,6 +91,50 @@ func TestBidirectionalSaturatedReadsKeepOperationQueriesAvailable(t *testing.T) 
 	wg.Wait()
 }
 
+func TestAcknowledgedDuplicateConnectionReturnsReply(t *testing.T) {
+	a, _ := openTestNode(t)
+	b, _ := openTestNode(t)
+	if a.ID > b.ID {
+		a, b = b, a
+	}
+	joinTest(t, b, a)
+	ctx, cancel := context.WithTimeout(t.Context(), 3*time.Second)
+	defer cancel()
+	if _, err := a.connection(ctx, b.ID, false); err != nil {
+		t.Fatal(err)
+	}
+	member, err := a.Self(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	self, err := b.Self(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	channel, err := b.openPeerChannel(ctx, member, a.Key.Public)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer channel.Close()
+	if err = channel.Send(ctx, protocol.Message{RequestID: "duplicate-hello", Payload: &protocol.PeerHello{Member: payload(self)}}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = channel.Receive(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if err = channel.Send(ctx, protocol.Message{RequestID: "duplicate-read", Payload: &protocol.PeerCall{Method: "config.read", Body: payload(nil)}}); err != nil {
+		t.Fatal(err)
+	}
+	message, err := channel.Receive(ctx)
+	if err != nil {
+		t.Fatal("已确认握手的连接丢失应答", err)
+	}
+	reply, ok := message.Payload.(*protocol.PeerReply)
+	if !ok || message.ReplyTo != "duplicate-read" || reply.Error != nil {
+		t.Fatal("重复连接读取失败", message)
+	}
+}
+
 func TestSharedCurrentReadsReturnQueuedAndReuseActiveRefresh(t *testing.T) {
 	n, _ := openTestNode(t)
 	x := &blockedReadExecutor{release: make(chan struct{})}

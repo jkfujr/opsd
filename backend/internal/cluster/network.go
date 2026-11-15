@@ -645,7 +645,7 @@ func (n *Node) mergeNetworkTx(ctx context.Context, tx *sql.Tx, d Directory, know
 			f    PublicFamily
 			ipv6 bool
 		}{{v.IPv4, false}, {v.IPv6, true}} {
-			if len(item.f.Addresses) > 16 || len(item.f.Observations) > 2 || (item.f.Mode != "auto" && item.f.Mode != "manual") {
+			if len(item.f.Addresses) > 16 || len(item.f.Observations) > 3 || (item.f.Mode != "auto" && item.f.Mode != "manual") {
 				return fault("invalid_request", "公网地址记录无效")
 			}
 			for _, text := range item.f.Addresses {

@@ -527,7 +527,7 @@ func TestBoundedConnectionsWithTwentyPeers(t *testing.T) {
 		}
 	}
 	first.mu.Lock()
-	resident, total := 0, len(first.connections)
+	resident, total := 0, len(first.connections)+len(first.retiring)
 	for _, p := range first.connections {
 		if p.resident {
 			resident++
