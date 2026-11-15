@@ -143,8 +143,12 @@ func (n *Node) advanceSharedInitialization(ctx context.Context, op *Operation, p
 	sort.Strings(ids)
 	save := func() error { return n.saveSharedLocal(ctx, *state) }
 	wait := func(message string) error {
+		if op.State == protocol.Applying && op.WaitingReason == message && op.Error == nil {
+			return nil
+		}
 		op.State = protocol.Applying
 		op.WaitingReason = message
+		op.Error = nil
 		op.Revision++
 		return n.saveOperation(ctx, op, "submitted")
 	}

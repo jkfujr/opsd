@@ -70,7 +70,15 @@ func applySharedProxy(ctx context.Context, a protocol.DatabaseAction, stage stri
 		if a.Shared.Mode == "revoke" {
 			_, err = s.ExecContext(ctx, "DELETE FROM mysql_users WHERE username=?", user)
 		} else {
-			_, err = s.ExecContext(ctx, "INSERT INTO mysql_users(username,password,active,default_hostgroup,transaction_persistent,max_connections) VALUES(?,?,1,?,1,2) ON CONFLICT(username) DO UPDATE SET password=excluded.password,active=1,default_hostgroup=excluded.default_hostgroup,transaction_persistent=1", user, a.Shared.PasswordHash, a.Hostgroup)
+			existing, e := rows(ctx, s, "SELECT username FROM mysql_users WHERE username=?", user)
+			if e != nil {
+				return e
+			}
+			if len(existing) > 0 {
+				_, err = s.ExecContext(ctx, "UPDATE mysql_users SET password=?,active=1,default_hostgroup=?,transaction_persistent=1,max_connections=2 WHERE username=?", a.Shared.PasswordHash, a.Hostgroup, user)
+			} else {
+				_, err = s.ExecContext(ctx, "INSERT INTO mysql_users(username,password,active,default_hostgroup,transaction_persistent,max_connections) VALUES(?,?,1,?,1,2)", user, a.Shared.PasswordHash, a.Hostgroup)
+			}
 		}
 	case "runtime":
 		_, err = s.ExecContext(ctx, "LOAD MYSQL USERS TO RUNTIME")

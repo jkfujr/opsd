@@ -14,6 +14,30 @@ import (
 	"github.com/jkfujr/opsd/internal/protocol"
 )
 
+func TestSharedMigrationWaitDoesNotAppendUnchangedState(t *testing.T) {
+	n, worker := deploymentNode(t)
+	id := stepID(n.ID, "shared-maintenance/"+n.cluster+"/"+protocol.SharedDatabaseName+"/initialize/")
+	worker.records[id] = protocol.OperationRecord{ID: id, Revision: 1, State: protocol.Applying}
+	state := SharedLocal{Binding: SharedBinding{ClusterID: "database", GaleraID: "galera", Database: protocol.SharedDatabaseName}, Phase: "preparing", Migration: &sharedMigration{Stage: "initialize", Source: DatabaseRef{NodeID: n.ID, InstanceID: "instance"}}}
+	if err := n.saveSharedLocal(t.Context(), state); err != nil {
+		t.Fatal(err)
+	}
+	op, err := n.StartSharedInitialization(t.Context(), SharedInitialize{ClusterID: state.Binding.ClusterID}, "waiting-migration")
+	if err != nil {
+		t.Fatal(err)
+	}
+	n.advance()
+	first, err := n.operation(t.Context(), op.ID)
+	if err != nil || first.WaitingReason != "initialize_database" {
+		t.Fatal(first, err)
+	}
+	n.advance()
+	second, err := n.operation(t.Context(), op.ID)
+	if err != nil || second.Revision != first.Revision {
+		t.Fatal("等待状态重复写入历史并唤醒队列", second.Revision, first.Revision, err)
+	}
+}
+
 func TestSharedBackendUsesConfirmedPortAndStandardAddress(t *testing.T) {
 	ref := DatabaseRef{NodeID: "node", InstanceID: "database", Address: "172.30.91.11"}
 	c := ManagedDatabaseCluster{}
