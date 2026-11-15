@@ -418,15 +418,11 @@ func (n *Node) ensureSharedProxy(ctx context.Context, s *SharedLocal) (bool, err
 			id := "opsd_sql_" + n.ID
 			d := protocol.DatabaseDeployment{ID: id, Kind: "proxysql", Image: databaseengine.ProxyImage, Directory: "/var/lib/opsd/databases/" + id, Address: "127.0.0.1", SQLPort: 6033, AdminPort: 6032, InstallDocker: true, Connection: protocol.DatabaseConnection{Kind: "proxysql", Address: "127.0.0.1:6032", Username: "opsdadmin", Password: identity.Random(), ProtectedUsers: []string{"opsdadmin"}}, MonitorUser: s.Monitor.Username, MonitorPassword: s.Monitor.Password, BackendMaxConnections: 2}
 			for _, ref := range s.Cluster.Members {
-				host, port, err := net.SplitHostPort(ref.Address)
+				endpoint, err := sharedBackendEndpoint(s.Cluster, ref)
 				if err != nil {
 					return false, err
 				}
-				number, err := strconv.Atoi(port)
-				if err != nil {
-					return false, err
-				}
-				d.Backends = append(d.Backends, protocol.ProxyEndpoint{Host: host, Port: number})
+				d.Backends = append(d.Backends, endpoint)
 			}
 			if err := d.Validate(); err != nil {
 				return false, err

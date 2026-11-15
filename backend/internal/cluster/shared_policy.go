@@ -5,14 +5,23 @@ import (
 	"crypto/ed25519"
 	"database/sql"
 	"encoding/json"
-	"net"
 	"reflect"
 	"slices"
-	"strconv"
 
 	"github.com/jkfujr/opsd/internal/protocol"
 	"github.com/jkfujr/opsd/internal/sharedsql"
 )
+
+func sharedBackendEndpoint(c ManagedDatabaseCluster, ref DatabaseRef) (protocol.ProxyEndpoint, error) {
+	if c.ProxyRouting != nil {
+		for _, backend := range c.ProxyRouting.Backends {
+			if backend.NodeID == ref.NodeID && backend.InstanceID == ref.InstanceID {
+				return backend.ProxyEndpoint, backend.ProxyEndpoint.Validate()
+			}
+		}
+	}
+	return proxyEndpoint(ref.Address)
+}
 
 func (n *Node) syncSharedFlowCoordinator(ctx context.Context, s *sharedsql.Store, f sharedsql.Flow) error {
 	o, err := s.Object(ctx, "database", f.ResourceID)
@@ -115,15 +124,11 @@ func sharedMemberPolicy(c *ManagedDatabaseCluster) {
 			policy.Backends = append(policy.Backends, old.Backends[i])
 			continue
 		}
-		host, port, err := net.SplitHostPort(ref.Address)
+		endpoint, err := proxyEndpoint(ref.Address)
 		if err != nil {
 			continue
 		}
-		number, err := strconv.Atoi(port)
-		if err != nil {
-			continue
-		}
-		policy.Backends = append(policy.Backends, protocol.ProxyBackend{ProxyEndpoint: protocol.ProxyEndpoint{Host: host, Port: number}, NodeID: ref.NodeID, InstanceID: ref.InstanceID})
+		policy.Backends = append(policy.Backends, protocol.ProxyBackend{ProxyEndpoint: endpoint, NodeID: ref.NodeID, InstanceID: ref.InstanceID})
 	}
 	for _, b := range old.Backends {
 		if !slices.ContainsFunc(policy.Backends, func(current protocol.ProxyBackend) bool { return current.ProxyEndpoint == b.ProxyEndpoint }) {

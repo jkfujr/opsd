@@ -51,6 +51,19 @@ type ProxyRoutingStatus struct {
 	Proxies []ProxyRoutingState          `json:"proxies"`
 }
 
+func proxyEndpoint(address string) (protocol.ProxyEndpoint, error) {
+	host, port, err := net.SplitHostPort(address)
+	if err != nil {
+		host, port = address, "3306"
+	}
+	number, err := strconv.Atoi(port)
+	if err != nil {
+		return protocol.ProxyEndpoint{}, err
+	}
+	endpoint := protocol.ProxyEndpoint{Host: host, Port: number}
+	return endpoint, endpoint.Validate()
+}
+
 func routingVersion(policy protocol.ProxyRoutingPolicy) string {
 	b, _ := json.Marshal(policy)
 	sum := sha256.Sum256(b)
@@ -172,15 +185,11 @@ func (n *Node) PreviewProxyRouting(ctx context.Context, c ManagedDatabaseCluster
 			if result.State.ClusterID != c.ClusterID {
 				return out, fault("conflict", "数据库成员与实际 Galera 集群关联不一致")
 			}
-			host, port, err := net.SplitHostPort(result.State.MemberAddress)
+			endpoint, err := proxyEndpoint(result.State.MemberAddress)
 			if err != nil {
-				host, port = result.State.MemberAddress, "3306"
-			}
-			number, err := strconv.Atoi(port)
-			if err != nil || host == "" {
 				return out, fault("invalid_request", "请为 "+ref.Name+" 设置代理可达 SQL 地址")
 			}
-			policy.Backends = append(policy.Backends, protocol.ProxyBackend{ProxyEndpoint: protocol.ProxyEndpoint{Host: host, Port: number}, NodeID: ref.NodeID, InstanceID: ref.InstanceID})
+			policy.Backends = append(policy.Backends, protocol.ProxyBackend{ProxyEndpoint: endpoint, NodeID: ref.NodeID, InstanceID: ref.InstanceID})
 		}
 	}
 	sort.Slice(policy.Backends, func(i, j int) bool {

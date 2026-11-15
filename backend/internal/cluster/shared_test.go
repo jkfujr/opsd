@@ -14,6 +14,50 @@ import (
 	"github.com/jkfujr/opsd/internal/protocol"
 )
 
+func TestSharedBackendUsesConfirmedPortAndStandardAddress(t *testing.T) {
+	ref := DatabaseRef{NodeID: "node", InstanceID: "database", Address: "172.30.91.11"}
+	c := ManagedDatabaseCluster{}
+	endpoint, err := sharedBackendEndpoint(c, ref)
+	if err != nil || endpoint.Host != ref.Address || endpoint.Port != 3306 {
+		t.Fatal("裸地址没有沿用 SQL 默认端口", endpoint, err)
+	}
+	c.ProxyRouting = &protocol.ProxyRoutingPolicy{Backends: []protocol.ProxyBackend{{NodeID: ref.NodeID, InstanceID: ref.InstanceID, ProxyEndpoint: protocol.ProxyEndpoint{Host: "10.0.0.1", Port: 3307}}}}
+	endpoint, err = sharedBackendEndpoint(c, ref)
+	if err != nil || endpoint.Host != "10.0.0.1" || endpoint.Port != 3307 {
+		t.Fatal("已确认代理地址被默认端口替换", endpoint, err)
+	}
+}
+
+func TestSharedMigrationFailureRetainsOriginalRecovery(t *testing.T) {
+	n, _ := openTestNode(t)
+	binding := SharedBinding{ClusterID: "database", GaleraID: "galera", Database: protocol.SharedDatabaseName}
+	state := SharedLocal{Binding: binding, Phase: "preparing", Migration: &sharedMigration{Stage: "initialize", Source: DatabaseRef{NodeID: n.ID, InstanceID: "instance"}}}
+	if err := n.saveSharedLocal(t.Context(), state); err != nil {
+		t.Fatal(err)
+	}
+	op, err := n.StartSharedInitialization(t.Context(), SharedInitialize{ClusterID: binding.ClusterID}, "original-migration")
+	if err != nil {
+		t.Fatal(err)
+	}
+	n.advance()
+	failed, err := n.operation(t.Context(), op.ID)
+	if err != nil || failed.State != protocol.AttentionRequired {
+		t.Fatal("迁移错误丢失恢复入口", failed.State, err)
+	}
+	n.advance()
+	unchanged, err := n.operation(t.Context(), op.ID)
+	if err != nil || unchanged.Revision != failed.Revision {
+		t.Fatal("同输入迁移错误自动重试", unchanged.Revision, err)
+	}
+	if err = n.RecoverSharedState(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	recovered, err := n.operation(t.Context(), op.ID)
+	if err != nil || recovered.ID != op.ID || recovered.State != protocol.Applying || recovered.Revision <= failed.Revision {
+		t.Fatal("迁移恢复改变原操作", recovered, err)
+	}
+}
+
 func TestDatabaseConnectionVersionKeepsOriginalContainer(t *testing.T) {
 	n, _ := openTestNode(t)
 	input := DatabaseInstanceInput{DatabaseInstance: DatabaseInstance{ID: "database", Name: "数据库", Kind: "galera", Address: "127.0.0.1:3306", Username: "root", ContainerID: strings.Repeat("a", 64)}}

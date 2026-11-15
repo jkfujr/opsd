@@ -870,6 +870,9 @@ func (n *Node) advanceFiltered(filter string, args ...any) {
 	if op.State == protocol.AttentionRequired && op.Error != nil && op.Error.Code == "restored_state" {
 		return
 	}
+	if kind == "shared_initialize" && op.State == protocol.AttentionRequired {
+		return
+	}
 	if phase == "queued" && kind != "shared_initialize" && kind != "database_step" {
 		if n.waitingSharedRecovery(id) {
 			if op.WaitingReason != "shared_recovery" {
@@ -932,7 +935,14 @@ func (n *Node) advanceFiltered(filter string, args ...any) {
 	if kind != "firewall" && kind != "component" && kind != "firewall_config" && kind != "container" && kind != "database_step" && kind != "task_run" && kind != "compose" {
 		e = n.applyLocal(ctx, kind, plain, &op)
 		if e != nil {
-			finish(protocol.Rejected, e)
+			if kind == "shared_initialize" && n.sharedEnabled() {
+				op.State = protocol.AttentionRequired
+				op.Error = &protocol.Error{Code: "dependency_unavailable", Message: e.Error()}
+				op.Revision++
+				_ = n.saveOperation(ctx, &op, "submitted")
+			} else {
+				finish(protocol.Rejected, e)
+			}
 		}
 		return
 	}
@@ -1248,6 +1258,9 @@ func (n *Node) decide(ctx context.Context, method string, d OperationDecision) (
 		return op, n.saveOperation(ctx, &op, "finished")
 	}
 	if op.Subject == "shared_initialize" && method == "operation.recover" {
+		if d.ExpectedRevision != op.Revision || op.State != protocol.AttentionRequired {
+			return op, fault("conflict", "共享迁移阶段已经变化")
+		}
 		op.State = protocol.Applying
 		op.Error = nil
 		op.Revision++

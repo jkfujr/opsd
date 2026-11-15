@@ -5,8 +5,6 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"net"
-	"strconv"
 	"time"
 
 	"github.com/jkfujr/opsd/internal/protocol"
@@ -141,15 +139,10 @@ func (n *Node) checkSharedConnections(ctx context.Context, c ManagedDatabaseClus
 		}
 	}
 	for _, ref := range c.Members {
-		host, port, e := net.SplitHostPort(ref.Address)
+		endpoint, e := sharedBackendEndpoint(c, ref)
 		if e != nil {
 			return e
 		}
-		number, e := strconv.Atoi(port)
-		if e != nil {
-			return e
-		}
-		endpoint := protocol.ProxyEndpoint{Host: host, Port: number}
 		var observed protocol.DatabaseReadResult
 		if store != nil {
 			if cached, e := store.Object(ctx, "database_capacity", ref.NodeID+"/"+ref.InstanceID); e == nil {

@@ -142,9 +142,6 @@ func (n *Node) RecoverSharedState(ctx context.Context) error {
 	if state == nil {
 		return fault("conflict", "节点尚未绑定 OPSD 数据库")
 	}
-	if err := n.recoverSharedSteps(ctx); err != nil {
-		return err
-	}
 	if state.Migration != nil && state.Migration.Stage != "complete" {
 		for id := range state.Migration.Nodes {
 			if id != n.ID {
@@ -153,7 +150,10 @@ func (n *Node) RecoverSharedState(ctx context.Context) error {
 				}
 			}
 		}
-		return nil
+		return n.recoverSharedSteps(ctx)
+	}
+	if err := n.recoverSharedSteps(ctx); err != nil {
+		return err
 	}
 	s, err := n.sharedStore(ctx)
 	if err != nil {
@@ -236,7 +236,7 @@ func (n *Node) RecoverSharedState(ctx context.Context) error {
 func (n *Node) recoverSharedSteps(ctx context.Context) error {
 	n.advanceMu.Lock()
 	defer n.advanceMu.Unlock()
-	rows, err := n.DB.QueryContext(ctx, "SELECT body FROM queue WHERE terminal=0 AND kind IN ('database_step','shared_initialize')")
+	rows, err := n.DB.QueryContext(ctx, "SELECT body FROM queue WHERE terminal=0 AND kind IN ('database_step','shared_initialize') ORDER BY CASE kind WHEN 'database_step' THEN 0 ELSE 1 END,seq")
 	if err != nil {
 		return err
 	}
