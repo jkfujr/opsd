@@ -42,6 +42,8 @@ func (e *deploymentExecutor) Call(_ context.Context, p protocol.Payload) (protoc
 		return &protocol.DatabaseDeploymentEnvironment{DockerState: e.dockerState, FreeBytes: 10 << 30, Fingerprint: "initial", Problems: append([]string{}, e.problems...)}, nil
 	case *protocol.DatabaseNetworkCheck:
 		return &protocol.DatabaseNetworkChecked{Checked: true}, nil
+	case *protocol.DatabaseDeploymentStateRead:
+		return &protocol.DatabaseDeploymentState{ContainerID: strings.Repeat("a", 64), State: "running"}, nil
 	case *protocol.OperationSubmit:
 		if record, ok := e.records[p.OperationID]; ok {
 			return &protocol.OperationUpdated{Record: record}, nil
@@ -86,9 +88,12 @@ func (e *deploymentExecutor) Call(_ context.Context, p protocol.Payload) (protoc
 		return &protocol.OperationUpdated{Record: record}, nil
 	case *protocol.DatabaseRead:
 		e.databaseReads++
+		if p.Connection.Password == "wrong" {
+			return nil, errors.New("管理凭据错误")
+		}
 		return &protocol.DatabaseReadResult{State: state}, nil
 	case *protocol.DockerRead:
-		return &protocol.DockerReadResult{State: protocol.DockerState{State: "ready", Containers: []protocol.ContainerSummary{{Name: "opsd-galera-" + e.d.ID, ContainerRef: protocol.ContainerRef{EngineID: "engine", ContainerID: strings.Repeat("a", 64)}}}}}, nil
+		return &protocol.DockerReadResult{State: protocol.DockerState{State: "ready", Containers: []protocol.ContainerSummary{{Name: e.d.ContainerName(), ContainerRef: protocol.ContainerRef{EngineID: "engine", ContainerID: strings.Repeat("a", 64)}}}}}, nil
 	case *protocol.DatabaseDeploymentProfileRead:
 		return &protocol.DatabaseDeploymentProfile{Deployment: e.d, State: state, DataBytes: 1 << 20, Problems: []string{}, Managed: e.d.ID != "", ContainerID: strings.Repeat("a", 64)}, nil
 	case *protocol.DatabaseDiscovery:
@@ -253,20 +258,52 @@ func TestDatabaseDeploymentDiscoveryRejectsStoppedAndMissingContainers(t *testin
 		}
 	}
 	scan, err := n.ScanDatabases(t.Context(), DatabaseScanInput{Nodes: []string{n.ID}})
-	if err != nil || len(scan.Groups) != 1 || len(scan.Groups[0].Members) != 1 || len(scan.Groups[0].Proxies) != 0 || len(scan.Unresolved) != 3 || e.databaseReads != 1 {
+	if err != nil || len(scan.Groups) != 1 || len(scan.Groups[0].Members) != 1 || len(scan.Groups[0].Proxies) != 0 || len(scan.Unresolved) != 0 || e.databaseReads != 1 {
 		t.Fatal("停止或已移除容器读取了当前实例", scan, e.databaseReads, err)
 	}
-	for _, item := range scan.Unresolved {
-		if item.Instance.Running || item.Status.Error == nil || item.Status.ClusterID != "" {
-			t.Fatal("旧容器被视为可接入实例", item)
-		}
-		if _, err := n.inspectDiscoveredDatabase(t.Context(), DatabaseInstanceInput{DatabaseInstance: item.Instance}, true, "test-galera"); err == nil {
-			t.Fatal("停止或已移除容器允许登记", item.Instance.ID)
+	for _, id := range []string{"stopped-saved", "removed", "stopped-proxy", "missing"} {
+		if _, err := n.inspectDiscoveredDatabase(t.Context(), DatabaseInstanceInput{DatabaseInstance: DatabaseInstance{ID: id}}, true, "test-galera"); err == nil {
+			t.Fatal("停止或已移除容器允许登记", id)
 		}
 	}
 	var count int
 	if err := n.DB.QueryRow("SELECT count(*) FROM managed_database_instances").Scan(&count); err != nil || count != 2 || e.databaseReads != 1 {
 		t.Fatal("拒绝接入后仍读取或保存了实例", count, e.databaseReads, err)
+	}
+}
+
+func TestDatabaseDiscoveryRunningCredentialsAndStoppedAfterScan(t *testing.T) {
+	for _, kind := range []string{"container", "native", "wrong-password"} {
+		t.Run(kind, func(t *testing.T) {
+			n, e := deploymentNode(t)
+			candidate := protocol.DatabaseCandidate{ID: "instance", Name: "实例", Running: true, Connection: protocol.DatabaseConnection{Kind: "galera", Address: "127.0.0.1:3306", Username: "root", Password: "private-secret"}}
+			if kind != "native" {
+				candidate.ContainerID = strings.Repeat("a", 64)
+			}
+			if kind == "wrong-password" {
+				candidate.Connection.Password = "wrong"
+			}
+			e.candidates = []protocol.DatabaseCandidate{candidate}
+			scan, err := n.ScanDatabases(t.Context(), DatabaseScanInput{Nodes: []string{n.ID}})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if kind == "wrong-password" {
+				if len(scan.Unresolved) != 1 || scan.Unresolved[0].Status.Error == nil {
+					t.Fatal("运行实例凭据错误未保留补填入口", scan)
+				}
+				return
+			}
+			if len(scan.Groups) != 1 || len(scan.Groups[0].Members) != 1 || len(scan.Unresolved) != 0 {
+				t.Fatal("可连接实例未发现", scan)
+			}
+			if kind == "container" {
+				e.candidates[0].Running = false
+				if _, err := n.inspectDiscoveredDatabase(t.Context(), DatabaseInstanceInput{DatabaseInstance: scan.Groups[0].Members[0].Instance}, true, "test-galera"); err == nil || e.databaseReads != 1 {
+					t.Fatal("扫描后停止的容器仍可接入", e.databaseReads, err)
+				}
+			}
+		})
 	}
 }
 

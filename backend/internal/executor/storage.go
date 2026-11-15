@@ -17,6 +17,7 @@ import (
 	"github.com/jkfujr/opsd/internal/firewall"
 	"github.com/jkfujr/opsd/internal/identity"
 	"github.com/jkfujr/opsd/internal/localstate"
+	"github.com/jkfujr/opsd/internal/protocol"
 )
 
 const CouchImage = "couchdb:3.5.0"
@@ -24,6 +25,10 @@ const CouchImage = "couchdb:3.5.0"
 var storageLock sync.Mutex
 
 type storageIdentity struct {
+	StorageID   string                `json:"storage_id,omitempty"`
+	FullID      string                `json:"full_id,omitempty"`
+	Old         string                `json:"old,omitempty"`
+	New         string                `json:"new,omitempty"`
 	Cookie      string                `json:"cookie"`
 	Credentials cluster.Credentials   `json:"credentials"`
 	Config      cluster.StorageConfig `json:"config"`
@@ -51,18 +56,34 @@ func (s *Server) storage(ctx context.Context, c cluster.StorageConfig) (cluster.
 			return state.Credentials, e
 		}
 	}
+	if state.StorageID == "" {
+		state.StorageID = identity.Random()
+		if e = localstate.Write(path, state, 0600); e != nil {
+			return state.Credentials, e
+		}
+	}
+	name := protocol.ManagedContainerName("data", "couchdb", state.StorageID)
 	// 先读取容器身份；未知的 inspect 结果不能当作不存在并重新创建。
-	list, e := s.Host.Run(ctx, "docker", "container", "ls", "-aq", "--filter", "name=^opsd-couchdb$")
+	list, e := s.Host.Run(ctx, "docker", "container", "ls", "-aq", "--no-trunc", "--filter", "label=opsd.storage="+s.Directory)
 	if e != nil {
 		return state.Credentials, e
 	}
-	exists := strings.TrimSpace(string(list)) != ""
+	ids := strings.Fields(string(list))
+	if len(ids) > 1 {
+		return state.Credentials, fmt.Errorf("当前节点存在多个数据库容器，请核对原实例")
+	}
+	exists := len(ids) == 1
+	if !exists && state.FullID != "" {
+		return state.Credentials, fmt.Errorf("原数据库容器已不存在，请核对保存的完整 ID")
+	}
 	if exists {
-		raw, err := s.Host.Run(ctx, "docker", "inspect", "opsd-couchdb")
+		raw, err := s.Host.Run(ctx, "docker", "inspect", ids[0])
 		if err != nil {
 			return state.Credentials, err
 		}
 		var containers []struct {
+			ID     string `json:"Id"`
+			Name   string `json:"Name"`
 			Config struct {
 				Image  string            `json:"Image"`
 				Labels map[string]string `json:"Labels"`
@@ -74,20 +95,34 @@ func (s *Server) storage(ctx context.Context, c cluster.StorageConfig) (cluster.
 		if json.Unmarshal(raw, &containers) != nil || len(containers) != 1 || containers[0].Config.Labels["opsd.storage"] != s.Directory {
 			return state.Credentials, fmt.Errorf("同名容器不属于当前节点")
 		}
+		current := containers[0]
+		if len(current.ID) != 64 || state.FullID != "" && state.FullID != current.ID || current.Name != "/"+name && current.Name != "/opsd-couchdb" {
+			return state.Credentials, fmt.Errorf("数据库容器身份或名称已经变化")
+		}
+		if state.FullID != current.ID {
+			state.FullID = current.ID
+			if e = localstate.Write(path, state, 0600); e != nil {
+				return state.Credentials, e
+			}
+		}
 		if !c.Enabled {
-			_, e = s.Host.Run(ctx, "docker", "stop", "opsd-couchdb")
+			_, e = s.Host.Run(ctx, "docker", "stop", current.ID)
 			return state.Credentials, e
 		}
 		if state.Config != c {
 			if containers[0].State.Running {
 				return state.Credentials, fmt.Errorf("数据库地址已部署，修改前须先停用")
 			}
-			if _, e = s.Host.Run(ctx, "docker", "rm", "opsd-couchdb"); e != nil {
+			if _, e = s.Host.Run(ctx, "docker", "rm", current.ID); e != nil {
+				return state.Credentials, e
+			}
+			state.FullID, state.Old, state.New = "", "", ""
+			if e = localstate.Write(path, state, 0600); e != nil {
 				return state.Credentials, e
 			}
 		} else {
 			if !containers[0].State.Running {
-				if _, e = s.Host.Run(ctx, "docker", "start", "opsd-couchdb"); e != nil {
+				if _, e = s.Host.Run(ctx, "docker", "start", current.ID); e != nil {
 					return state.Credentials, e
 				}
 			}
@@ -159,9 +194,16 @@ func (s *Server) storage(ctx context.Context, c cluster.StorageConfig) (cluster.
 	if closeErr != nil {
 		return state.Credentials, closeErr
 	}
-	_, e = s.Host.Run(ctx, "docker", "run", "-d", "--name", "opsd-couchdb", "--label", "opsd.storage="+s.Directory, "--restart", "unless-stopped", "--network", "host", "--env-file", envPath, "--mount", "type=bind,src="+filepath.Join(dir, "data")+",dst=/opt/couchdb/data", "--mount", "type=bind,src="+configDir+",dst=/opt/couchdb/etc/local.d", CouchImage)
+	created, e := s.Host.Run(ctx, "docker", "run", "-d", "--name", name, "--label", "opsd.storage="+s.Directory, "--restart", "unless-stopped", "--network", "host", "--env-file", envPath, "--mount", "type=bind,src="+filepath.Join(dir, "data")+",dst=/opt/couchdb/data", "--mount", "type=bind,src="+configDir+",dst=/opt/couchdb/etc/local.d", CouchImage)
 	if e == nil {
-		e = s.waitStorage(ctx, c)
+		state.FullID = strings.TrimSpace(string(created))
+		if len(state.FullID) != 64 {
+			return state.Credentials, fmt.Errorf("数据库容器创建结果缺少完整 ID，请核对原容器")
+		}
+		e = localstate.Write(path, state, 0600)
+		if e == nil {
+			e = s.waitStorage(ctx, c)
+		}
 	}
 	return state.Credentials, e
 }

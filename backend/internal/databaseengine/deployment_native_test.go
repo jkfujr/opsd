@@ -82,7 +82,7 @@ func TestDatabaseDeploymentNative(t *testing.T) {
 			t.Fatal(err)
 		}
 		t.Cleanup(func() {
-			name := "opsd-" + d.Kind + "-" + d.ID
+			name := d.ContainerName()
 			if t.Failed() {
 				data, _ := exec.Command("docker", "logs", "--tail", "180", name).CombinedOutput()
 				message := strings.ReplaceAll(string(data), d.Connection.Password, "[已隐藏]")
@@ -202,7 +202,19 @@ func TestDatabaseDeploymentNative(t *testing.T) {
 		}
 	}
 	first := members[0]
-	if output, err := exec.CommandContext(ctx, "docker", "restart", "opsd-galera-"+first.ID).CombinedOutput(); err != nil {
+	originalID, _, err := m.Docker.DeploymentState(ctx, first)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{first.LegacyContainerName(), first.ContainerName()} {
+		if output, err := exec.CommandContext(ctx, "docker", "rename", originalID, name).CombinedOutput(); err != nil {
+			t.Fatal(err, string(output))
+		}
+		if id, state, err := m.Docker.DeploymentState(ctx, first); err != nil || id != originalID || state != "running" {
+			t.Fatal("新旧名识别改变了部署身份", id, state, err)
+		}
+	}
+	if output, err := exec.CommandContext(ctx, "docker", "restart", first.ContainerName()).CombinedOutput(); err != nil {
 		t.Fatal(err, string(output))
 	}
 	wait(first, 3)

@@ -10,12 +10,22 @@ import (
 	"github.com/moby/moby/api/types/network"
 	"github.com/moby/moby/client"
 	"io"
+	"regexp"
 	"strings"
 	"time"
 )
 
 const sourceImageLabel = "com.opsd.source-image"
 const updateOperationLabel = "com.opsd.update-operation"
+
+var containerProgramCharacters = regexp.MustCompile(`[^a-z0-9-]+`)
+
+func containerProgram(image string) string {
+	parts := strings.Split(image, "/")
+	program, _, _ := strings.Cut(parts[len(parts)-1], "@")
+	program, _, _ = strings.Cut(program, ":")
+	return strings.Trim(containerProgramCharacters.ReplaceAllString(strings.ToLower(program), "-"), "-")
+}
 
 // UpdateState 只保存在目标执行器，配置中的环境变量不进入共享操作记录。
 type UpdateState struct {
@@ -59,7 +69,8 @@ func prepareUpdate(ref protocol.ContainerRef, raw container.InspectResponse, id 
 	if strings.HasPrefix(image, "sha256:") {
 		return UpdateState{}, failure("conflict", "镜像使用固定 ID，请先通过 SSH 修改镜像引用", "")
 	}
-	state := UpdateState{OperationID: id, OldID: raw.ID, Name: strings.TrimPrefix(raw.Name, "/"), TempName: "opsd-new-" + id, RetiredName: "opsd-old-" + id, Image: image, OldImageID: raw.Image, WasRunning: raw.State.Running, Stage: "prepared", Mounts: current.Mounts}
+	program := containerProgram(image)
+	state := UpdateState{OperationID: id, OldID: raw.ID, Name: strings.TrimPrefix(raw.Name, "/"), TempName: protocol.ManagedContainerName("update-new", program, id), RetiredName: protocol.ManagedContainerName("update-old", program, id), Image: image, OldImageID: raw.Image, WasRunning: raw.State.Running, Stage: "prepared", Mounts: current.Mounts}
 	clone := func(from, to any) error {
 		b, e := json.Marshal(from)
 		if e != nil {

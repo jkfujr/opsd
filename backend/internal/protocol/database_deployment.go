@@ -110,6 +110,21 @@ type DatabaseDeploymentCheck struct {
 func (*DatabaseDeploymentCheck) Kind() Kind { return "database.deployment.check" }
 func (*DatabaseDeploymentCheck) isPayload() {}
 
+type DatabaseDeploymentStateRead struct {
+	Deployment DatabaseDeployment `json:"deployment"`
+}
+
+func (*DatabaseDeploymentStateRead) Kind() Kind { return "database.deployment.state.read" }
+func (*DatabaseDeploymentStateRead) isPayload() {}
+
+type DatabaseDeploymentState struct {
+	ContainerID string `json:"container_id"`
+	State       string `json:"state"`
+}
+
+func (*DatabaseDeploymentState) Kind() Kind { return "database.deployment.state" }
+func (*DatabaseDeploymentState) isPayload() {}
+
 type DatabaseDeploymentEnvironment struct {
 	DockerState  string   `json:"docker_state"`
 	EngineID     string   `json:"engine_id"`

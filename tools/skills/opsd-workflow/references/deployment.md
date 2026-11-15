@@ -31,6 +31,29 @@ update 在停服前及停服后检查未结束操作，设置候选文件可执�
 
 SSH 中断或应答丢失后先运行 inspect，核对程序版本、服务 PID／启动时间与操作状态；不能因没看到成功文字就再次 update。失败时脚本非零退出，必须按实际结果处理，不声称已回滚。需要还原时另行使用明确已知的旧工件，不自动新建备份或清理历史工件。
 
+## 自建容器命名与迁移
+
+自建容器使用 `opsd-{function}-{program}-{id}`：CouchDB 为 `opsd-data-couchdb-{storage_id}`，Galera 为 `opsd-database-mariadb-{deployment_id}`，代理为 `opsd-database-proxysql-{deployment_id}`。镜像更新临时名称使用 `opsd-update-new-{program}-{operation_id}` 和 `opsd-update-old-{program}-{operation_id}`，结束后恢复业务名称。ID 完整保留原字符和大小写，重试及重启复用原 ID。
+
+所属执行器使用本机记录、归属标签及完整容器 ID 核对身份；数据库部署同时识别新旧名称并核对部署指纹。手工接入数据库保持原名。已有镜像更新继续使用持久记录中的临时名称。
+
+迁移工具 `scripts/container_names.py` 在目标实例的两个服务停止、节点及执行器队列均空闲时运行。先迁移自建数据库，完成节点版本、服务、Galera 同步和队列检查后，最后以 `--couchdb` 迁移自用 CouchDB。脚本先检查所有候选的归属和名称冲突，再按完整 ID rename 并读回名称、运行状态及挂载；应答未知时先 inspect 原 ID。数据库迁移记录在执行器目录的 `container-names.json`，CouchDB 的 `couchdb.json` 保存 `storage_id/full_id/old/new`。这些文件保留原凭据并使用 0600 权限。
+
+在已授权范围内，把脚本放入目标临时维护目录后，从仓库根目录通过既有 SSH 入口执行：
+
+```powershell
+ssh -i F:/keys/服务器 root@服务器 python3 /临时维护目录/container_names.py --config /etc/opsd/instance.json
+ssh -i F:/keys/服务器 root@服务器 python3 /临时维护目录/container_names.py --config /etc/opsd/instance.json --couchdb
+```
+
+回退旧程序前，保持 OPSD 停服，分别使用 `--couchdb --rollback` 和 `--rollback` 恢复已有迁移记录中的旧名称并读回，再恢复旧工件及两个服务。迁移失败时保留记录和实际容器；冲突候选保持原状态。
+
+明确返回 `not_accepted_busy` 的提交在持久受理前结束，节点原子恢复 `queue.phase=queued`，按原 ID 和顺序等待下一次 500ms 调度。超时或断连保持发送意图，下一轮只查询；查不到再封存原 ID。历史封存记录保持原结果，恢复代理排序使用现有预览及新的提交。
+
+定向清理已确认的孤立登记时，在停服窗口确认无集群引用及未结束操作，执行 SQLite checkpoint 并备份 node.db，再以事务删除同一实例的 `managed_database_instances` 和 `managed_database_versions`。容器使用完整 ID 普通删除；共享挂载和旧操作历史保留。启动后读回两表计数、扫描结果、现用容器和目录。
+
+缺少时间同步服务的节点安装 chrony 前先阻止软件包自启；保留发行版时间源，删除 `makestep` 后采用渐进校时，时区保持原值。60 秒仍无可用源时添加 `cn.pool.ntp.org`，以 `chronyc waitsync 120 0.1`、tracking 和已同步节点的时间差分别检查。
+
 普通 SSH／SFTP 确实失败并已定位为传输问题时，可在上述命令增加 `--small-packets`。此模式通过随附 Node.js TCP 代理分块发送，需本机 Node.js；不作为默认连接方式。不要用长文本补丁规避完整构建，也不要把 Windows 换行直接送给远端 shell。
 
 成功后复用任务要求的实际入口／功能检查，区分程序与服务状态、登录和页面交互、规则修改与恢复结果。辅助脚本本身的验证使用临时文件和替代命令，不为验证 skill 操作线上服务。

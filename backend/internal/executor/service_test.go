@@ -2,6 +2,7 @@ package executor
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"path/filepath"
 	"testing"
@@ -12,6 +13,37 @@ import (
 	"github.com/jkfujr/opsd/internal/protocol"
 	"github.com/jkfujr/opsd/internal/storage"
 )
+
+func TestSubmitBusyDoesNotPersistOperation(t *testing.T) {
+	db, err := storage.Open(t.Context(), filepath.Join(t.TempDir(), "executor.db"), storage.Executor)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	store := operations.Store{DB: db}
+	s := &Services{Engine: &operations.Engine{Store: store, Clock: func() (string, int64, error) { return "boot", 0, nil }}, Start: func(context.Context, string) error { return nil }}
+	a := protocol.OperationAction{Kind: "component", Component: &protocol.ComponentAction{Component: "firewall", Action: "install", Backend: "ufw"}}
+	request := &protocol.OperationSubmit{OperationID: "busy", ContractVersion: protocol.ContractVersion, Action: a}
+	for _, lockErr := range []error{localstate.ErrBusy, errors.New("锁文件不可读")} {
+		s.OperationLock = func() (func(), error) { return nil, lockErr }
+		if _, err = s.Handle(t.Context(), request); firewall.Code(err) != "not_accepted_busy" {
+			t.Fatal("锁失败未返回未受理", err)
+		}
+		if _, err = store.Get(t.Context(), request.OperationID); !errors.Is(err, sql.ErrNoRows) {
+			t.Fatal("未受理操作被保存", err)
+		}
+	}
+	s.OperationLock = func() (func(), error) { return func() {}, nil }
+	if _, _, err = store.Receive(t.Context(), "other", protocol.ContractVersion, a, "boot"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = s.Handle(t.Context(), request); firewall.Code(err) != "not_accepted_busy" {
+		t.Fatal("已有写操作未返回未受理", err)
+	}
+	if _, err = store.Get(t.Context(), request.OperationID); !errors.Is(err, sql.ErrNoRows) {
+		t.Fatal("繁忙操作被保存", err)
+	}
+}
 
 func TestFirewallInspectionWaitsForBusyLockAndKeepsOtherErrors(t *testing.T) {
 	attempts := 0

@@ -153,6 +153,9 @@ func (n *Node) scanLocalDatabases(ctx context.Context, input DatabaseScanInput) 
 	}
 	out := []DatabaseScanItem{}
 	for _, item := range items {
+		if item.ContainerID != "" && !item.Running {
+			continue
+		}
 		var override DatabaseInstanceInput
 		for _, value := range input.Credentials {
 			if value.NodeID == n.ID && value.ID == item.ID {

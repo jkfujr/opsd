@@ -10,6 +10,10 @@ func newPayload(kind Kind) (Payload, error) {
 		return &DatabaseNetworkChecked{}, nil
 	case "database.deployment.check":
 		return &DatabaseDeploymentCheck{}, nil
+	case "database.deployment.state.read":
+		return &DatabaseDeploymentStateRead{}, nil
+	case "database.deployment.state":
+		return &DatabaseDeploymentState{}, nil
 	case "database.deployment.environment":
 		return &DatabaseDeploymentEnvironment{}, nil
 	case "database.deployment.profile.read":

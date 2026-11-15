@@ -93,6 +93,8 @@ func validatePayload(payload Payload) error {
 	switch body := payload.(type) {
 	case *DatabaseDeploymentCheck:
 		return body.Deployment.Validate()
+	case *DatabaseDeploymentStateRead:
+		return body.Deployment.Validate()
 	case *DatabaseDeploymentProfileRead:
 		return body.Connection.Validate()
 	case *ProxyRoutingRead:

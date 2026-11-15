@@ -38,22 +38,16 @@ func (n *Node) registerDatabaseDeployment(ctx context.Context, request DatabaseR
 	if d.Kind == "proxysql" && read.State.State != "ready" {
 		return out, fault("conflict", "代理尚未就绪")
 	}
-	docker, err := n.executeRead(ctx, &protocol.DockerRead{})
+	docker, err := n.executeRead(ctx, &protocol.DatabaseDeploymentStateRead{Deployment: *d})
 	if err != nil {
 		return out, err
 	}
-	listed, ok := docker.(*protocol.DockerReadResult)
+	actual, ok := docker.(*protocol.DatabaseDeploymentState)
 	if !ok {
 		return out, fault("dependency_unavailable", "容器读取应答无效")
 	}
-	id := ""
-	for _, container := range listed.State.Containers {
-		if container.Name == "opsd-"+d.Kind+"-"+d.ID {
-			id = container.ContainerID
-			break
-		}
-	}
-	if id == "" {
+	id := actual.ContainerID
+	if id == "" || actual.State != "running" {
 		return out, fault("conflict", "原部署容器已不存在")
 	}
 	i := DatabaseInstance{ID: request.InstanceID, NodeID: n.ID, Name: request.Instance.Name, Kind: d.Kind, Address: d.Connection.Address, Username: d.Connection.Username, ContainerID: id, Running: true}

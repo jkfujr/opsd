@@ -117,7 +117,7 @@ func (m Manager) CheckDeployment(ctx context.Context, d protocol.DatabaseDeploym
 		out.Problems = append(out.Problems, "数据库目录不可读")
 	}
 	for _, c := range state.Containers {
-		if c.Name == "opsd-"+d.Kind+"-"+d.ID {
+		if c.Name == d.ContainerName() || c.Name == d.LegacyContainerName() {
 			out.Problems = append(out.Problems, "目标容器已经存在")
 		}
 	}

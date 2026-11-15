@@ -825,6 +825,22 @@ func (n *Node) advanceFiltered(filter string, args ...any) {
 			return
 		}
 		result, e = n.Executor.Call(ctx, &protocol.OperationSubmit{OperationID: id, ContractVersion: protocol.ContractVersion, Action: action})
+		var rejected *firewall.Fault
+		if errors.As(e, &rejected) {
+			if rejected.Code == "not_accepted_busy" {
+				reset, err := n.DB.ExecContext(ctx, "UPDATE queue SET phase='queued' WHERE id=? AND phase='dispatching' AND terminal=0", id)
+				if err != nil {
+					return
+				}
+				if count, err := reset.RowsAffected(); err != nil || count != 1 {
+					return
+				}
+				return
+			}
+			op.Error = &protocol.Error{Code: rejected.Code, Message: rejected.Message}
+			finish(protocol.Rejected, nil)
+			return
+		}
 	} else {
 		result, e = n.Executor.Call(ctx, &protocol.OperationQuery{OperationID: id})
 		if e == nil {

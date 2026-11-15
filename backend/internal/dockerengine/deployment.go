@@ -18,8 +18,6 @@ import (
 const deploymentLabel = "com.opsd.database-deployment"
 const deploymentSpecLabel = "com.opsd.database-spec"
 
-func deploymentName(d protocol.DatabaseDeployment) string { return "opsd-" + d.Kind + "-" + d.ID }
-
 func deploymentFingerprint(d protocol.DatabaseDeployment) string {
 	// 集群身份在首次启动后取得，不改变已经批准的容器定义。
 	d.ClusterID = ""
@@ -34,21 +32,25 @@ func (m *Manager) DeploymentState(ctx context.Context, d protocol.DatabaseDeploy
 		return "", "", err
 	}
 	defer c.Close()
-	result, err := c.ContainerInspect(ctx, deploymentName(d), client.ContainerInspectOptions{})
-	if errdefs.IsNotFound(err) {
-		return "", "absent", nil
+	state = "absent"
+	for _, name := range []string{d.ContainerName(), d.LegacyContainerName()} {
+		result, e := c.ContainerInspect(ctx, name, client.ContainerInspectOptions{})
+		if errdefs.IsNotFound(e) {
+			continue
+		}
+		if e != nil {
+			return "", "", e
+		}
+		raw := result.Container
+		if raw.Config == nil || raw.Config.Labels[deploymentLabel] != d.ID || raw.Config.Labels[deploymentSpecLabel] != deploymentFingerprint(d) {
+			return "", "", fmt.Errorf("同名容器已存在或部署配置已经变化")
+		}
+		if id != "" || raw.State == nil {
+			return "", "", fmt.Errorf("部署容器重复或状态缺失")
+		}
+		id, state = raw.ID, string(raw.State.Status)
 	}
-	if err != nil {
-		return "", "", err
-	}
-	raw := result.Container
-	if raw.Config == nil || raw.Config.Labels[deploymentLabel] != d.ID || raw.Config.Labels[deploymentSpecLabel] != deploymentFingerprint(d) {
-		return "", "", fmt.Errorf("同名容器已存在或部署配置已经变化")
-	}
-	if raw.State == nil {
-		return "", "", fmt.Errorf("容器状态缺失")
-	}
-	return raw.ID, string(raw.State.Status), nil
+	return id, state, nil
 }
 
 func (m *Manager) DeploymentImageReady(ctx context.Context, image string) (bool, error) {
@@ -134,7 +136,7 @@ func (m *Manager) CreateDeployment(ctx context.Context, d protocol.DatabaseDeplo
 		config.Entrypoint = []string{"/usr/bin/proxysql"}
 		config.Cmd = []string{"-f", "-c", "/etc/proxysql.cnf"}
 	}
-	_, err = c.ContainerCreate(ctx, client.ContainerCreateOptions{Name: deploymentName(d), Config: config, HostConfig: host})
+	_, err = c.ContainerCreate(ctx, client.ContainerCreateOptions{Name: d.ContainerName(), Config: config, HostConfig: host})
 	return err
 }
 

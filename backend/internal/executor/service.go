@@ -75,6 +75,12 @@ func (s *Services) Handle(ctx context.Context, payload protocol.Payload) (protoc
 	case *protocol.DatabaseDeploymentCheck:
 		value, err := (databaseengine.Manager{Docker: s.Docker}).CheckDeployment(ctx, body.Deployment)
 		return &value, err
+	case *protocol.DatabaseDeploymentStateRead:
+		if s.Docker == nil {
+			return nil, fmt.Errorf("Docker 读取入口不可用")
+		}
+		id, state, err := s.Docker.DeploymentState(ctx, body.Deployment)
+		return &protocol.DatabaseDeploymentState{ContainerID: id, State: state}, err
 	case *protocol.DatabaseNetworkCheck:
 		err := databaseengine.CheckDeploymentNetwork(ctx, *body)
 		return &protocol.DatabaseNetworkChecked{Checked: err == nil}, err
@@ -157,7 +163,7 @@ func (s *Services) Handle(ctx context.Context, payload protocol.Payload) (protoc
 			unlock, lockErr = s.lock()
 		}
 		if lockErr != nil {
-			return nil, lockErr
+			return nil, &firewall.Fault{Code: "not_accepted_busy", Message: lockErr.Error()}
 		}
 		boot, _, e := s.clock()
 		if e != nil {
@@ -166,6 +172,9 @@ func (s *Services) Handle(ctx context.Context, payload protocol.Payload) (protoc
 		}
 		l, created, e := s.Engine.Store.Receive(ctx, body.OperationID, body.ContractVersion, body.Action, boot)
 		unlock()
+		if errors.Is(e, operations.ErrBusy) {
+			return nil, &firewall.Fault{Code: "not_accepted_busy", Message: e.Error()}
+		}
 		if e != nil {
 			return nil, e
 		}

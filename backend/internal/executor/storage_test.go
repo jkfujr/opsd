@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"runtime"
+	"strings"
 	"testing"
 )
 
@@ -29,8 +30,11 @@ func TestManagedCouchDBContainer(t *testing.T) {
 		t.Fatal(e)
 	}
 	defer func() {
-		_ = exec.Command("docker", "stop", "opsd-couchdb").Run()
-		_ = exec.Command("docker", "rm", "-v", "opsd-couchdb").Run()
+		out, _ := exec.Command("docker", "ps", "-aq", "--filter", "label=opsd.storage="+s.Directory).Output()
+		for _, id := range strings.Fields(string(out)) {
+			_ = exec.Command("docker", "stop", id).Run()
+			_ = exec.Command("docker", "rm", id).Run()
+		}
 	}()
 	if credentials.Username == "" || credentials.Password == "" {
 		t.Fatal("没有生成独立数据库凭据")
