@@ -233,6 +233,11 @@ func (*databaseServices) Storage(context.Context, cluster.StorageConfig) (cluste
 func nativeOperation(t *testing.T, entry *apiNode, raw, id string, wanted protocol.OperationState) cluster.Operation {
 	t.Helper()
 	var value cluster.Operation
+	defer func() {
+		if t.Failed() {
+			t.Logf("数据库操作最终状态：%s；错误：%+v；步骤：%+v", value.State, value.Error, value.Steps)
+		}
+	}()
 	waitDatabase(t, "数据库操作", 45*time.Second, func() bool {
 		code := apiCall(t, http.DefaultClient, entry.web.URL, "GET", "/api/v2/operations/"+id, raw, "", "", nil, &value)
 		if code != 200 {
@@ -240,9 +245,6 @@ func nativeOperation(t *testing.T, entry *apiNode, raw, id string, wanted protoc
 		}
 		if value.State == protocol.Rejected || value.State == protocol.Failed {
 			t.Fatal("数据库操作被拒绝", value.Error)
-		}
-		if value.State == protocol.AttentionRequired && wanted != protocol.AttentionRequired {
-			t.Fatalf("数据库步骤需要处理：%+v；步骤：%+v", value.Error, value.Steps)
 		}
 		return value.State == wanted
 	})

@@ -67,7 +67,7 @@ func Open(ctx context.Context, address, user, password, database, cluster string
 	c.ReadTimeout = 5 * time.Second
 	c.WriteTimeout = 5 * time.Second
 	c.RejectReadOnly = true
-	c.Params = map[string]string{"wsrep_sync_wait": "1"}
+	c.Params = map[string]string{"wsrep_sync_wait": "1", "time_zone": "'+00:00'"}
 	connector, err := mysql.NewConnector(c)
 	if err != nil {
 		return nil, err

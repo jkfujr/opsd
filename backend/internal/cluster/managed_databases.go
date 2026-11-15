@@ -295,7 +295,7 @@ func (n *Node) databaseConnection(ctx context.Context, id string, version ...uin
 	if state := n.sharedState(); state != nil {
 		c.ProtectedDatabases = append(c.ProtectedDatabases, state.Binding.Database)
 	}
-	if instance, err := n.databaseInstance(ctx, id); err == nil {
+	if instance, err := n.databaseInstance(ctx, id); err == nil && c.ContainerID == "" && instance.Revision == revision {
 		c.ContainerID = instance.ContainerID
 	}
 	return c, e
@@ -328,7 +328,7 @@ func (n *Node) saveDatabaseInstance(ctx context.Context, input DatabaseInstanceI
 	if len(i.ID) > 128 || i.Name == "" || len(i.Name) > 255 {
 		return i, fault("invalid_request", "数据库实例无效")
 	}
-	c := protocol.DatabaseConnection{Kind: i.Kind, Address: i.Address, Socket: i.Socket, Username: i.Username, ProtectedUsers: input.ProtectedUsers, BackupRoot: input.BackupRoot}
+	c := protocol.DatabaseConnection{Kind: i.Kind, Address: i.Address, Socket: i.Socket, Username: i.Username, ProtectedUsers: input.ProtectedUsers, ContainerID: i.ContainerID, BackupRoot: input.BackupRoot}
 	if input.Password != nil {
 		c.Password = *input.Password
 	} else if old, e := n.databaseConnection(ctx, i.ID); e == nil {
@@ -380,6 +380,7 @@ func (n *Node) saveDatabaseInstance(ctx context.Context, input DatabaseInstanceI
 }
 func sameDatabaseConnection(a, b protocol.DatabaseConnection) bool {
 	a.PoolKey, b.PoolKey = "", ""
+	a.ProtectedDatabases, b.ProtectedDatabases = nil, nil
 	first, _ := json.Marshal(a)
 	second, _ := json.Marshal(b)
 	return string(first) == string(second)

@@ -6,12 +6,37 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"strings"
 	"testing"
 	"time"
 
 	"filippo.io/age"
 	"github.com/jkfujr/opsd/internal/protocol"
 )
+
+func TestDatabaseConnectionVersionKeepsOriginalContainer(t *testing.T) {
+	n, _ := openTestNode(t)
+	input := DatabaseInstanceInput{DatabaseInstance: DatabaseInstance{ID: "database", Name: "数据库", Kind: "galera", Address: "127.0.0.1:3306", Username: "root", ContainerID: strings.Repeat("a", 64)}}
+	first, err := n.saveDatabaseInstance(t.Context(), input)
+	if err != nil {
+		t.Fatal(err)
+	}
+	input.ContainerID = strings.Repeat("b", 64)
+	second, err := n.saveDatabaseInstance(t.Context(), input)
+	if err != nil || second.Revision <= first.Revision {
+		t.Fatal("容器替换没有产生连接版本", second.Revision, err)
+	}
+	connection, err := n.databaseConnection(t.Context(), first.ID, first.Revision)
+	if err != nil || connection.ContainerID != strings.Repeat("a", 64) {
+		t.Fatal("历史连接改用新容器", connection.ContainerID, err)
+	}
+	derived := connection
+	derived.PoolKey = "derived"
+	derived.ProtectedDatabases = []string{protocol.SharedDatabaseName}
+	if !sameDatabaseConnection(connection, derived) {
+		t.Fatal("派生保护信息改变持久连接版本")
+	}
+}
 
 func TestSharedInitializationRejectsInvalidBindingBeforeAdmission(t *testing.T) {
 	n, _ := openTestNode(t)
