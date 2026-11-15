@@ -38,6 +38,7 @@ export async function checkSharedStorage({ page, go, step, capture, closeDrawers
       await go('/databases');
       await choose('Galera 集群', '业务 Galera');
       await page.getByRole('button', { name: '初始化 opsd_core', exact: true }).click();
+      await page.getByText('opsd_core', { exact: true }).waitFor();
       await page.getByRole('button', { name: '查询原操作', exact: true }).click();
       await page.locator('.operation-detail').waitFor();
       assert.equal(initializations, 1);

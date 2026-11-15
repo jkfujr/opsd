@@ -206,9 +206,11 @@ func TestSharedStorageNativeMigrationAndRecovery(t *testing.T) {
 		return err == nil
 	})
 	var repeatedAccess cluster.Secret
-	if err = joining.node.Call(t.Context(), c.node.ID, "shared.bootstrap", nil, &repeatedAccess); err != nil {
-		t.Fatal("备用成员无法复用新成员账号", err)
-	}
+	waitDatabase(t, "备用成员取得新成员资料并复用账号", 15*time.Second, func() bool {
+		ctx, cancel := context.WithTimeout(t.Context(), 4*time.Second)
+		defer cancel()
+		return joining.node.Call(ctx, c.node.ID, "shared.bootstrap", nil, &repeatedAccess) == nil
+	})
 	firstAccess, _ := json.Marshal(joinedAccess)
 	secondAccess, _ := json.Marshal(repeatedAccess)
 	if string(firstAccess) != string(secondAccess) || joining.node.SharedStatus(t.Context()).Binding == nil {
