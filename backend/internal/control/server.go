@@ -225,7 +225,7 @@ func (s *Server) page(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if path != entrance && !hadTheme {
-		if path != "/" && path != "/containers" && path != "/databases" && !strings.HasPrefix(path, "/databases/") && path != "/storage" && path != "/firewall" && path != "/firewall/settings" && path != "/nodes" && !strings.HasPrefix(path, "/nodes/") && path != "/settings" && !strings.HasPrefix(path, "/settings/") && path != "/tools" && path != "/tools/tasks" && path != "/tools/terminal" && path != "/terminal" {
+		if path != "/" && path != "/containers" && path != "/databases" && !strings.HasPrefix(path, "/databases/") && path != "/storage" && path != "/monitoring" && path != "/firewall" && path != "/firewall/settings" && path != "/nodes" && !strings.HasPrefix(path, "/nodes/") && path != "/settings" && !strings.HasPrefix(path, "/settings/") && path != "/tools" && path != "/tools/tasks" && path != "/tools/terminal" && path != "/terminal" {
 			http.NotFound(w, r)
 			return
 		}

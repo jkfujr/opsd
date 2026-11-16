@@ -68,7 +68,7 @@ func (n *Node) accept(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	joining := hello.Token != ""
-	if hello.Stream != "" && (hello.Stream != "terminal" || joining || hello.ProbeFamily != "") {
+	if hello.Stream != "" && (hello.Stream != "terminal" && hello.Stream != "monitoring" || joining || hello.ProbeFamily != "") {
 		return
 	}
 	if hello.ProbeFamily != "" {
@@ -116,6 +116,10 @@ func (n *Node) accept(w http.ResponseWriter, r *http.Request) {
 	}
 	if hello.Stream == "terminal" {
 		n.serveTerminal(r.Context(), m.ID, transport.TerminalChannel{Channel: channel})
+		return
+	}
+	if hello.Stream == "monitoring" {
+		n.serveArchive(r.Context(), m.ID, channel)
 		return
 	}
 	p := &peer{channel: channel, calls: transport.NewCalls(), id: m.ID, resident: hello.Resident, done: make(chan struct{}), last: n.Now()}

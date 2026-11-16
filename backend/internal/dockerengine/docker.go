@@ -126,6 +126,9 @@ func health(status string) string {
 	return "none"
 }
 func readOnly(labels map[string]string) string {
+	if labels[monitoringLabel] != "" {
+		return "通过集中监控配置管理"
+	}
 	if labels["opsd.storage"] != "" {
 		return "通过 OPSD 数据设置管理"
 	}

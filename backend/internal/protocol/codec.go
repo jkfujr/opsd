@@ -91,6 +91,22 @@ func decodeJSON(data []byte, target any) error {
 func validatePayload(payload Payload) error {
 	var operationID string
 	switch body := payload.(type) {
+	case *MonitoringStateRead:
+		d := body.Deployment
+		d.Enabled = false
+		return d.Validate()
+	case *ResourceMetricsRead:
+		if len(body.Connections) > 100 {
+			return fmt.Errorf("数据库指标资源过多")
+		}
+		for id, c := range body.Connections {
+			if id == "" || len(id) > 128 {
+				return fmt.Errorf("数据库指标标识无效")
+			}
+			if err := c.Validate(); err != nil {
+				return err
+			}
+		}
 	case *DatabaseDeploymentCheck:
 		return body.Deployment.Validate()
 	case *DatabaseDeploymentStateRead:
@@ -228,6 +244,9 @@ func validatePayload(payload Payload) error {
 
 func (action OperationAction) validate() error {
 	count := 0
+	if action.Monitoring != nil {
+		count++
+	}
 	if action.Compose != nil {
 		count++
 	}
@@ -256,6 +275,11 @@ func (action OperationAction) validate() error {
 		return fmt.Errorf("操作必须包含且只包含一种业务载荷")
 	}
 	switch action.Kind {
+	case "monitoring_deploy":
+		if action.Monitoring == nil {
+			return fmt.Errorf("监控部署缺少参数")
+		}
+		return action.Monitoring.Validate()
 	case "compose":
 		if action.Compose == nil {
 			return fmt.Errorf("Compose 操作缺少参数")

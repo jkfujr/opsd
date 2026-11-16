@@ -61,6 +61,14 @@ func (n *Node) requestReceipt(ctx context.Context, request requeststate.Write) (
 		return out, e
 	}
 	out.Kind, out.ResourceID, out.State, out.Secret, out.CreatedAt = r.Kind, r.ResourceID, "completed", r.Secret, r.CreatedAt
+	if r.Kind == "storage_check" {
+		var check struct {
+			State string `json:"state"`
+		}
+		if json.Unmarshal(r.Result, &check) == nil && check.State == "checking" {
+			out.State = "unknown"
+		}
+	}
 	if r.Kind == "operation" {
 		out.OperationID = r.ResourceID
 		if len(r.Result) == 0 || string(r.Result) == "{}" {

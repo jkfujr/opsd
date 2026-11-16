@@ -34,6 +34,10 @@ func (s *Services) readDatabase(ctx context.Context, r protocol.DatabaseRead) (p
 		return out, e
 	}
 	var e error
-	out.State, e = manager.Read(ctx, r.Connection, r.Scope)
+	mode := ""
+	if r.UseMetrics {
+		mode = "sampled"
+	}
+	out.State, e = manager.Read(ctx, r.Connection, r.Scope, mode)
 	return out, e
 }

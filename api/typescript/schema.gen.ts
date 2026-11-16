@@ -1506,6 +1506,110 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/storage/targets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 读取 S3 存储目标 */
+        get: operations["listStorageTargets"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/storage/targets/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 读取 S3 存储目标 */
+        get: operations["getStorageTarget"];
+        /** 保存 S3 存储目标 */
+        put: operations["saveStorageTarget"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/storage/targets/{id}/check": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 检查 S3 连接与监控目录权限 */
+        post: operations["checkStorageTarget"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/monitoring/config": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 读取集中监控配置 */
+        get: operations["getMonitoringConfig"];
+        /** 部署或停用集中监控 */
+        put: operations["saveMonitoringConfig"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/monitoring/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 读取采集与归档状态 */
+        get: operations["getMonitoringArchiveStatus"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/monitoring/series": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 查询秒级监控历史 */
+        get: operations["getMonitoringSeries"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -3417,6 +3521,177 @@ export interface components {
             primary: string;
             backup: string;
             readonly cached?: boolean;
+        };
+        S3Credential: {
+            access_key: string;
+            secret_key: string;
+            session_token?: string;
+        };
+        S3Credentials: {
+            receive: components["schemas"]["S3Credential"];
+            store: components["schemas"]["S3Credential"];
+            compact: components["schemas"]["S3Credential"];
+        };
+        StorageCheck: {
+            prefix: string;
+            object_key?: string;
+            state: string;
+            error?: string;
+            /** Format: date-time */
+            checked_at: string;
+            /** Format: int64 */
+            target_revision: number;
+            prefix_restricted: boolean;
+            lifecycle_checked: boolean;
+        };
+        StorageTarget: {
+            endpoint: string;
+            bucket: string;
+            region: string;
+            /** @enum {string} */
+            access_style: "path" | "virtual_host";
+            dedicated_bucket: boolean;
+            id: string;
+            /** Format: int64 */
+            revision: number;
+            node_id: string;
+            name: string;
+            enabled: boolean;
+            credentials_available: boolean;
+            credential_ref?: string;
+            check?: components["schemas"]["StorageCheck"];
+        };
+        StorageTargetInput: {
+            endpoint: string;
+            bucket: string;
+            region: string;
+            /** @enum {string} */
+            access_style: "path" | "virtual_host";
+            dedicated_bucket: boolean;
+            node_id: string;
+            name: string;
+            enabled: boolean;
+            credentials?: components["schemas"]["S3Credentials"];
+        };
+        StorageTargetList: {
+            items: components["schemas"]["StorageTarget"][];
+        };
+        StorageCheckInput: {
+            prefix: string;
+        };
+        MonitoringArchiveConfig: {
+            /** Format: int64 */
+            revision: number;
+            enabled: boolean;
+            node_id: string;
+            storage_target_id: string;
+            prefix: string;
+            directory: string;
+            /** Format: int64 */
+            disk_budget_bytes: number;
+            /** @enum {integer} */
+            local_days: 30;
+            /** @enum {integer} */
+            archive_days: 365;
+            operation_id?: string;
+            state: string;
+        };
+        MonitoringArchiveInput: {
+            enabled: boolean;
+            node_id: string;
+            storage_target_id: string;
+            prefix: string;
+            directory: string;
+            /** Format: int64 */
+            disk_budget_bytes: number;
+            /** @enum {integer} */
+            local_days: 30;
+            /** @enum {integer} */
+            archive_days: 365;
+        };
+        MonitoringGap: {
+            node_id: string;
+            /** Format: int64 */
+            from: number;
+            /** Format: int64 */
+            to: number;
+            reason: string;
+            batch_id?: string;
+        };
+        MonitoringBuffer: {
+            /** Format: int64 */
+            batches: number;
+            /** Format: int64 */
+            bytes: number;
+            /** Format: int64 */
+            oldest: number;
+            /** Format: int64 */
+            latest: number;
+            gaps: components["schemas"]["MonitoringGap"][];
+        };
+        MonitoringComponent: {
+            name: string;
+            state: string;
+            ready: boolean;
+            error?: string;
+        };
+        MonitoringDeploymentState: {
+            state: string;
+            components: components["schemas"]["MonitoringComponent"][];
+            /** Format: int64 */
+            disk_used_bytes: number;
+            /** Format: int64 */
+            disk_available_bytes: number;
+            archive_pending_blocks: number;
+            /** Format: date-time */
+            oldest_unshipped_at?: string;
+            /** Format: date-time */
+            checked_at: string;
+        };
+        MonitoringArchiveStatus: {
+            node_id: string;
+            config: components["schemas"]["MonitoringArchiveConfig"];
+            buffer: components["schemas"]["MonitoringBuffer"];
+            /** Format: date-time */
+            last_sample?: string;
+            /** Format: date-time */
+            last_upload?: string;
+            /** Format: date-time */
+            last_receive?: string;
+            sampling_error?: string;
+            upload_error?: string;
+            receive_error?: string;
+            paused: boolean;
+            streams: number;
+            deployment: components["schemas"]["MonitoringDeploymentState"];
+        };
+        MonitoringArchiveStatusList: {
+            items: components["schemas"]["MonitoringArchiveStatus"][];
+            unavailable: components["schemas"]["UnavailableNode"][];
+        };
+        MonitoringSeriesPoint: {
+            /** Format: date-time */
+            at: string;
+            value: number | null;
+        };
+        MonitoringSeries: {
+            node_id: string;
+            resource_id?: string;
+            backend?: string;
+            points: components["schemas"]["MonitoringSeriesPoint"][];
+        };
+        MonitoringSeriesResult: {
+            metric: string;
+            /** Format: date-time */
+            from: string;
+            /** Format: date-time */
+            to: string;
+            step_seconds: number;
+            source_resolution_seconds: number;
+            items: components["schemas"]["MonitoringSeries"][];
+            warnings: string[];
+            partial: boolean;
+            missing: components["schemas"]["MonitoringGap"][];
         };
     };
     responses: {
@@ -7942,6 +8217,348 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SharedConsoles"];
+                };
+            };
+            400: components["responses"]["Error400"];
+            401: components["responses"]["Error401"];
+            403: components["responses"]["Error403"];
+            404: components["responses"]["Error404"];
+            405: components["responses"]["Error405"];
+            406: components["responses"]["Error406"];
+            409: components["responses"]["Error409"];
+            412: components["responses"]["Error412"];
+            413: components["responses"]["Error413"];
+            415: components["responses"]["Error415"];
+            422: components["responses"]["Error422"];
+            428: components["responses"]["Error428"];
+            429: components["responses"]["Error429"];
+            500: components["responses"]["Error500"];
+            503: components["responses"]["Error503"];
+            504: components["responses"]["Error504"];
+        };
+    };
+    listStorageTargets: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 请求成功 */
+            200: {
+                headers: {
+                    "X-Request-ID": string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StorageTargetList"];
+                };
+            };
+            400: components["responses"]["Error400"];
+            401: components["responses"]["Error401"];
+            403: components["responses"]["Error403"];
+            404: components["responses"]["Error404"];
+            405: components["responses"]["Error405"];
+            406: components["responses"]["Error406"];
+            409: components["responses"]["Error409"];
+            412: components["responses"]["Error412"];
+            413: components["responses"]["Error413"];
+            415: components["responses"]["Error415"];
+            422: components["responses"]["Error422"];
+            428: components["responses"]["Error428"];
+            429: components["responses"]["Error429"];
+            500: components["responses"]["Error500"];
+            503: components["responses"]["Error503"];
+            504: components["responses"]["Error504"];
+        };
+    };
+    getStorageTarget: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 请求成功 */
+            200: {
+                headers: {
+                    "X-Request-ID": string;
+                    ETag: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StorageTarget"];
+                };
+            };
+            400: components["responses"]["Error400"];
+            401: components["responses"]["Error401"];
+            403: components["responses"]["Error403"];
+            404: components["responses"]["Error404"];
+            405: components["responses"]["Error405"];
+            406: components["responses"]["Error406"];
+            409: components["responses"]["Error409"];
+            412: components["responses"]["Error412"];
+            413: components["responses"]["Error413"];
+            415: components["responses"]["Error415"];
+            422: components["responses"]["Error422"];
+            428: components["responses"]["Error428"];
+            429: components["responses"]["Error429"];
+            500: components["responses"]["Error500"];
+            503: components["responses"]["Error503"];
+            504: components["responses"]["Error504"];
+        };
+    };
+    saveStorageTarget: {
+        parameters: {
+            query?: never;
+            header: {
+                "If-Match"?: string;
+                "If-None-Match"?: string;
+                "X-CSRF-Token"?: string;
+                "Idempotency-Key": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StorageTargetInput"];
+            };
+        };
+        responses: {
+            /** @description 请求成功 */
+            200: {
+                headers: {
+                    "X-Request-ID": string;
+                    ETag: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StorageTarget"];
+                };
+            };
+            400: components["responses"]["Error400"];
+            401: components["responses"]["Error401"];
+            403: components["responses"]["Error403"];
+            404: components["responses"]["Error404"];
+            405: components["responses"]["Error405"];
+            406: components["responses"]["Error406"];
+            409: components["responses"]["Error409"];
+            412: components["responses"]["Error412"];
+            413: components["responses"]["Error413"];
+            415: components["responses"]["Error415"];
+            422: components["responses"]["Error422"];
+            428: components["responses"]["Error428"];
+            429: components["responses"]["Error429"];
+            500: components["responses"]["Error500"];
+            503: components["responses"]["Error503"];
+            504: components["responses"]["Error504"];
+        };
+    };
+    checkStorageTarget: {
+        parameters: {
+            query?: never;
+            header: {
+                "If-Match": string;
+                "X-CSRF-Token"?: string;
+                "Idempotency-Key": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StorageCheckInput"];
+            };
+        };
+        responses: {
+            /** @description 请求成功 */
+            200: {
+                headers: {
+                    "X-Request-ID": string;
+                    ETag: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StorageCheck"];
+                };
+            };
+            400: components["responses"]["Error400"];
+            401: components["responses"]["Error401"];
+            403: components["responses"]["Error403"];
+            404: components["responses"]["Error404"];
+            405: components["responses"]["Error405"];
+            406: components["responses"]["Error406"];
+            409: components["responses"]["Error409"];
+            412: components["responses"]["Error412"];
+            413: components["responses"]["Error413"];
+            415: components["responses"]["Error415"];
+            422: components["responses"]["Error422"];
+            428: components["responses"]["Error428"];
+            429: components["responses"]["Error429"];
+            500: components["responses"]["Error500"];
+            503: components["responses"]["Error503"];
+            504: components["responses"]["Error504"];
+        };
+    };
+    getMonitoringConfig: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 请求成功 */
+            200: {
+                headers: {
+                    "X-Request-ID": string;
+                    ETag: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MonitoringArchiveConfig"];
+                };
+            };
+            400: components["responses"]["Error400"];
+            401: components["responses"]["Error401"];
+            403: components["responses"]["Error403"];
+            404: components["responses"]["Error404"];
+            405: components["responses"]["Error405"];
+            406: components["responses"]["Error406"];
+            409: components["responses"]["Error409"];
+            412: components["responses"]["Error412"];
+            413: components["responses"]["Error413"];
+            415: components["responses"]["Error415"];
+            422: components["responses"]["Error422"];
+            428: components["responses"]["Error428"];
+            429: components["responses"]["Error429"];
+            500: components["responses"]["Error500"];
+            503: components["responses"]["Error503"];
+            504: components["responses"]["Error504"];
+        };
+    };
+    saveMonitoringConfig: {
+        parameters: {
+            query?: never;
+            header: {
+                "If-Match": string;
+                "X-CSRF-Token"?: string;
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MonitoringArchiveInput"];
+            };
+        };
+        responses: {
+            /** @description 请求成功 */
+            202: {
+                headers: {
+                    "X-Request-ID": string;
+                    ETag: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Operation"];
+                };
+            };
+            400: components["responses"]["Error400"];
+            401: components["responses"]["Error401"];
+            403: components["responses"]["Error403"];
+            404: components["responses"]["Error404"];
+            405: components["responses"]["Error405"];
+            406: components["responses"]["Error406"];
+            409: components["responses"]["Error409"];
+            412: components["responses"]["Error412"];
+            413: components["responses"]["Error413"];
+            415: components["responses"]["Error415"];
+            422: components["responses"]["Error422"];
+            428: components["responses"]["Error428"];
+            429: components["responses"]["Error429"];
+            500: components["responses"]["Error500"];
+            503: components["responses"]["Error503"];
+            504: components["responses"]["Error504"];
+        };
+    };
+    getMonitoringArchiveStatus: {
+        parameters: {
+            query?: {
+                node_id?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 请求成功 */
+            200: {
+                headers: {
+                    "X-Request-ID": string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MonitoringArchiveStatusList"];
+                };
+            };
+            400: components["responses"]["Error400"];
+            401: components["responses"]["Error401"];
+            403: components["responses"]["Error403"];
+            404: components["responses"]["Error404"];
+            405: components["responses"]["Error405"];
+            406: components["responses"]["Error406"];
+            409: components["responses"]["Error409"];
+            412: components["responses"]["Error412"];
+            413: components["responses"]["Error413"];
+            415: components["responses"]["Error415"];
+            422: components["responses"]["Error422"];
+            428: components["responses"]["Error428"];
+            429: components["responses"]["Error429"];
+            500: components["responses"]["Error500"];
+            503: components["responses"]["Error503"];
+            504: components["responses"]["Error504"];
+        };
+    };
+    getMonitoringSeries: {
+        parameters: {
+            query: {
+                metric: string;
+                node_id?: string;
+                resource_id?: string;
+                from?: string;
+                to?: string;
+                step_seconds?: number;
+                aggregate?: "sum" | "avg";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 请求成功 */
+            200: {
+                headers: {
+                    "X-Request-ID": string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MonitoringSeriesResult"];
                 };
             };
             400: components["responses"]["Error400"];

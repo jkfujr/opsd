@@ -4,6 +4,14 @@ import "fmt"
 
 func newPayload(kind Kind) (Payload, error) {
 	switch kind {
+	case "monitoring.deployment.read":
+		return &MonitoringStateRead{}, nil
+	case "monitoring.deployment.state":
+		return &MonitoringState{}, nil
+	case "monitoring.resources.read":
+		return &ResourceMetricsRead{}, nil
+	case "monitoring.resources.result":
+		return &ResourceMetrics{}, nil
 	case "database.network.check":
 		return &DatabaseNetworkCheck{}, nil
 	case "database.network.checked":

@@ -12,7 +12,7 @@ import (
 
 func TestOpenAndReopen(t *testing.T) {
 	ctx := context.Background()
-	for _, kind := range []Kind{Executor, Node} {
+	for _, kind := range []Kind{Executor, Node, Metrics} {
 		t.Run(string(kind), func(t *testing.T) {
 			path := filepath.Join(t.TempDir(), "含 空格.db")
 			for range 2 {
@@ -34,8 +34,8 @@ func TestOpenAndReopen(t *testing.T) {
 					}
 				}
 				expectedVersion := 8
-				if kind == Node {
-					expectedVersion = 7
+				if kind == Metrics {
+					expectedVersion = 1
 				}
 				if count != expectedVersion || version != expectedVersion || sync != 2 || foreign != 1 || mode != "wal" {
 					t.Fatalf("数据库配置或迁移错误：记录=%d 版本=%d 同步=%d 外键=%d 日志=%s", count, version, sync, foreign, mode)

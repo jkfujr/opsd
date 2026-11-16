@@ -11287,6 +11287,24 @@
         "operationId": "getSharedStorage",
         "parameters": [],
         "responses": {
+          "200": {
+            "description": "请求成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SharedStorageOverview"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-ID": {
+                "schema": {
+                  "type": "string"
+                },
+                "required": true
+              }
+            }
+          },
           "400": {
             "$ref": "#/components/responses/Error400"
           },
@@ -11334,24 +11352,6 @@
           },
           "504": {
             "$ref": "#/components/responses/Error504"
-          },
-          "200": {
-            "description": "请求成功",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/SharedStorageOverview"
-                }
-              }
-            },
-            "headers": {
-              "X-Request-ID": {
-                "schema": {
-                  "type": "string"
-                },
-                "required": true
-              }
-            }
           }
         },
         "x-opsd-access": {
@@ -11377,6 +11377,24 @@
           "system"
         ],
         "responses": {
+          "202": {
+            "description": "请求成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Operation"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-ID": {
+                "schema": {
+                  "type": "string"
+                },
+                "required": true
+              }
+            }
+          },
           "400": {
             "$ref": "#/components/responses/Error400"
           },
@@ -11424,24 +11442,6 @@
           },
           "504": {
             "$ref": "#/components/responses/Error504"
-          },
-          "202": {
-            "description": "请求成功",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Operation"
-                }
-              }
-            },
-            "headers": {
-              "X-Request-ID": {
-                "schema": {
-                  "type": "string"
-                },
-                "required": true
-              }
-            }
           }
         },
         "parameters": [
@@ -11501,6 +11501,24 @@
           }
         ],
         "responses": {
+          "200": {
+            "description": "请求成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SharedStorageStatus"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-ID": {
+                "schema": {
+                  "type": "string"
+                },
+                "required": true
+              }
+            }
+          },
           "400": {
             "$ref": "#/components/responses/Error400"
           },
@@ -11548,24 +11566,6 @@
           },
           "504": {
             "$ref": "#/components/responses/Error504"
-          },
-          "200": {
-            "description": "请求成功",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/SharedStorageStatus"
-                }
-              }
-            },
-            "headers": {
-              "X-Request-ID": {
-                "schema": {
-                  "type": "string"
-                },
-                "required": true
-              }
-            }
           }
         },
         "x-opsd-access": {
@@ -11591,6 +11591,24 @@
           "system"
         ],
         "responses": {
+          "200": {
+            "description": "请求成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SharedStorageStatus"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-ID": {
+                "schema": {
+                  "type": "string"
+                },
+                "required": true
+              }
+            }
+          },
           "400": {
             "$ref": "#/components/responses/Error400"
           },
@@ -11638,24 +11656,6 @@
           },
           "504": {
             "$ref": "#/components/responses/Error504"
-          },
-          "200": {
-            "description": "请求成功",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/SharedStorageStatus"
-                }
-              }
-            },
-            "headers": {
-              "X-Request-ID": {
-                "schema": {
-                  "type": "string"
-                },
-                "required": true
-              }
-            }
           }
         },
         "parameters": [
@@ -11697,6 +11697,24 @@
           "system"
         ],
         "responses": {
+          "200": {
+            "description": "请求成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ManagedDatabaseCluster"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-ID": {
+                "schema": {
+                  "type": "string"
+                },
+                "required": true
+              }
+            }
+          },
           "400": {
             "$ref": "#/components/responses/Error400"
           },
@@ -11744,24 +11762,6 @@
           },
           "504": {
             "$ref": "#/components/responses/Error504"
-          },
-          "200": {
-            "description": "请求成功",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ManagedDatabaseCluster"
-                }
-              }
-            },
-            "headers": {
-              "X-Request-ID": {
-                "schema": {
-                  "type": "string"
-                },
-                "required": true
-              }
-            }
           }
         },
         "parameters": [
@@ -11820,6 +11820,24 @@
         "operationId": "getSharedConsoles",
         "parameters": [],
         "responses": {
+          "200": {
+            "description": "请求成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SharedConsoles"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-ID": {
+                "schema": {
+                  "type": "string"
+                },
+                "required": true
+              }
+            }
+          },
           "400": {
             "$ref": "#/components/responses/Error400"
           },
@@ -11867,24 +11885,6 @@
           },
           "504": {
             "$ref": "#/components/responses/Error504"
-          },
-          "200": {
-            "description": "请求成功",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/SharedConsoles"
-                }
-              }
-            },
-            "headers": {
-              "X-Request-ID": {
-                "schema": {
-                  "type": "string"
-                },
-                "required": true
-              }
-            }
           }
         },
         "x-opsd-access": {
@@ -11908,6 +11908,24 @@
           "system"
         ],
         "responses": {
+          "200": {
+            "description": "请求成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SharedConsoles"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-ID": {
+                "schema": {
+                  "type": "string"
+                },
+                "required": true
+              }
+            }
+          },
           "400": {
             "$ref": "#/components/responses/Error400"
           },
@@ -11955,24 +11973,6 @@
           },
           "504": {
             "$ref": "#/components/responses/Error504"
-          },
-          "200": {
-            "description": "请求成功",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/SharedConsoles"
-                }
-              }
-            },
-            "headers": {
-              "X-Request-ID": {
-                "schema": {
-                  "type": "string"
-                },
-                "required": true
-              }
-            }
           }
         },
         "parameters": [
@@ -12015,6 +12015,963 @@
         ],
         "x-opsd-idempotent": true,
         "description": " Idempotency-Key 作用于稳定调用身份和所属目标；未知结果先查询原请求，禁止自动换键重做。"
+      }
+    },
+    "/storage/targets": {
+      "get": {
+        "operationId": "listStorageTargets",
+        "summary": "读取 S3 存储目标",
+        "tags": [
+          "storage"
+        ],
+        "security": [
+          {
+            "SessionCookie": []
+          }
+        ],
+        "x-opsd-access": {
+          "mode": "session",
+          "level": "read"
+        },
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "请求成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StorageTargetList"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-ID": {
+                "schema": {
+                  "type": "string"
+                },
+                "required": true
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "405": {
+            "$ref": "#/components/responses/Error405"
+          },
+          "406": {
+            "$ref": "#/components/responses/Error406"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "412": {
+            "$ref": "#/components/responses/Error412"
+          },
+          "413": {
+            "$ref": "#/components/responses/Error413"
+          },
+          "415": {
+            "$ref": "#/components/responses/Error415"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error422"
+          },
+          "428": {
+            "$ref": "#/components/responses/Error428"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          },
+          "504": {
+            "$ref": "#/components/responses/Error504"
+          }
+        }
+      }
+    },
+    "/storage/targets/{id}": {
+      "get": {
+        "operationId": "getStorageTarget",
+        "summary": "读取 S3 存储目标",
+        "tags": [
+          "storage"
+        ],
+        "security": [
+          {
+            "SessionCookie": []
+          }
+        ],
+        "x-opsd-access": {
+          "mode": "session",
+          "level": "read"
+        },
+        "x-opsd-version": "storage-target",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "请求成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StorageTarget"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-ID": {
+                "schema": {
+                  "type": "string"
+                },
+                "required": true
+              },
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                },
+                "required": true
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "405": {
+            "$ref": "#/components/responses/Error405"
+          },
+          "406": {
+            "$ref": "#/components/responses/Error406"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "412": {
+            "$ref": "#/components/responses/Error412"
+          },
+          "413": {
+            "$ref": "#/components/responses/Error413"
+          },
+          "415": {
+            "$ref": "#/components/responses/Error415"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error422"
+          },
+          "428": {
+            "$ref": "#/components/responses/Error428"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          },
+          "504": {
+            "$ref": "#/components/responses/Error504"
+          }
+        }
+      },
+      "put": {
+        "operationId": "saveStorageTarget",
+        "summary": "保存 S3 存储目标",
+        "tags": [
+          "storage"
+        ],
+        "security": [
+          {
+            "SessionCookie": []
+          }
+        ],
+        "x-opsd-access": {
+          "mode": "session",
+          "level": "manage"
+        },
+        "x-opsd-version": "storage-target",
+        "x-opsd-condition": "create-or-match",
+        "x-opsd-idempotent": true,
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "If-None-Match",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StorageTargetInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "请求成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StorageTarget"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-ID": {
+                "schema": {
+                  "type": "string"
+                },
+                "required": true
+              },
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                },
+                "required": true
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "405": {
+            "$ref": "#/components/responses/Error405"
+          },
+          "406": {
+            "$ref": "#/components/responses/Error406"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "412": {
+            "$ref": "#/components/responses/Error412"
+          },
+          "413": {
+            "$ref": "#/components/responses/Error413"
+          },
+          "415": {
+            "$ref": "#/components/responses/Error415"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error422"
+          },
+          "428": {
+            "$ref": "#/components/responses/Error428"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          },
+          "504": {
+            "$ref": "#/components/responses/Error504"
+          }
+        }
+      }
+    },
+    "/storage/targets/{id}/check": {
+      "post": {
+        "operationId": "checkStorageTarget",
+        "summary": "检查 S3 连接与监控目录权限",
+        "tags": [
+          "storage"
+        ],
+        "security": [
+          {
+            "SessionCookie": []
+          }
+        ],
+        "x-opsd-access": {
+          "mode": "session",
+          "level": "manage"
+        },
+        "x-opsd-version": "storage-target",
+        "x-opsd-condition": "match",
+        "x-opsd-idempotent": true,
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StorageCheckInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "请求成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StorageCheck"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-ID": {
+                "schema": {
+                  "type": "string"
+                },
+                "required": true
+              },
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                },
+                "required": true
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "405": {
+            "$ref": "#/components/responses/Error405"
+          },
+          "406": {
+            "$ref": "#/components/responses/Error406"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "412": {
+            "$ref": "#/components/responses/Error412"
+          },
+          "413": {
+            "$ref": "#/components/responses/Error413"
+          },
+          "415": {
+            "$ref": "#/components/responses/Error415"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error422"
+          },
+          "428": {
+            "$ref": "#/components/responses/Error428"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          },
+          "504": {
+            "$ref": "#/components/responses/Error504"
+          }
+        }
+      }
+    },
+    "/monitoring/config": {
+      "get": {
+        "operationId": "getMonitoringConfig",
+        "summary": "读取集中监控配置",
+        "tags": [
+          "monitoring"
+        ],
+        "security": [
+          {
+            "SessionCookie": []
+          }
+        ],
+        "x-opsd-access": {
+          "mode": "session",
+          "level": "read"
+        },
+        "x-opsd-version": "monitoring-archive",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "请求成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MonitoringArchiveConfig"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-ID": {
+                "schema": {
+                  "type": "string"
+                },
+                "required": true
+              },
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                },
+                "required": true
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "405": {
+            "$ref": "#/components/responses/Error405"
+          },
+          "406": {
+            "$ref": "#/components/responses/Error406"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "412": {
+            "$ref": "#/components/responses/Error412"
+          },
+          "413": {
+            "$ref": "#/components/responses/Error413"
+          },
+          "415": {
+            "$ref": "#/components/responses/Error415"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error422"
+          },
+          "428": {
+            "$ref": "#/components/responses/Error428"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          },
+          "504": {
+            "$ref": "#/components/responses/Error504"
+          }
+        }
+      },
+      "put": {
+        "operationId": "saveMonitoringConfig",
+        "summary": "部署或停用集中监控",
+        "tags": [
+          "monitoring"
+        ],
+        "security": [
+          {
+            "SessionCookie": []
+          }
+        ],
+        "x-opsd-access": {
+          "mode": "session",
+          "level": "manage"
+        },
+        "x-opsd-version": "monitoring-archive",
+        "x-opsd-condition": "match",
+        "x-opsd-idempotent": true,
+        "parameters": [
+          {
+            "name": "If-Match",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MonitoringArchiveInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "请求成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Operation"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-ID": {
+                "schema": {
+                  "type": "string"
+                },
+                "required": true
+              },
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                },
+                "required": true
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "405": {
+            "$ref": "#/components/responses/Error405"
+          },
+          "406": {
+            "$ref": "#/components/responses/Error406"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "412": {
+            "$ref": "#/components/responses/Error412"
+          },
+          "413": {
+            "$ref": "#/components/responses/Error413"
+          },
+          "415": {
+            "$ref": "#/components/responses/Error415"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error422"
+          },
+          "428": {
+            "$ref": "#/components/responses/Error428"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          },
+          "504": {
+            "$ref": "#/components/responses/Error504"
+          }
+        }
+      }
+    },
+    "/monitoring/status": {
+      "get": {
+        "operationId": "getMonitoringArchiveStatus",
+        "summary": "读取采集与归档状态",
+        "tags": [
+          "monitoring"
+        ],
+        "security": [
+          {
+            "SessionCookie": []
+          },
+          {
+            "BearerToken": []
+          }
+        ],
+        "x-opsd-access": {
+          "mode": "either",
+          "module": "monitoring",
+          "level": "read",
+          "scope": "list"
+        },
+        "parameters": [
+          {
+            "name": "node_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "请求成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MonitoringArchiveStatusList"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-ID": {
+                "schema": {
+                  "type": "string"
+                },
+                "required": true
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "405": {
+            "$ref": "#/components/responses/Error405"
+          },
+          "406": {
+            "$ref": "#/components/responses/Error406"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "412": {
+            "$ref": "#/components/responses/Error412"
+          },
+          "413": {
+            "$ref": "#/components/responses/Error413"
+          },
+          "415": {
+            "$ref": "#/components/responses/Error415"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error422"
+          },
+          "428": {
+            "$ref": "#/components/responses/Error428"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          },
+          "504": {
+            "$ref": "#/components/responses/Error504"
+          }
+        }
+      }
+    },
+    "/monitoring/series": {
+      "get": {
+        "operationId": "getMonitoringSeries",
+        "summary": "查询秒级监控历史",
+        "tags": [
+          "monitoring"
+        ],
+        "security": [
+          {
+            "SessionCookie": []
+          },
+          {
+            "BearerToken": []
+          }
+        ],
+        "x-opsd-access": {
+          "mode": "either",
+          "level": "read",
+          "scope": "metrics"
+        },
+        "parameters": [
+          {
+            "name": "metric",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "node_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "resource_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "step_seconds",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 86400
+            }
+          },
+          {
+            "name": "aggregate",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "sum",
+                "avg"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "请求成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MonitoringSeriesResult"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-ID": {
+                "schema": {
+                  "type": "string"
+                },
+                "required": true
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "405": {
+            "$ref": "#/components/responses/Error405"
+          },
+          "406": {
+            "$ref": "#/components/responses/Error406"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "412": {
+            "$ref": "#/components/responses/Error412"
+          },
+          "413": {
+            "$ref": "#/components/responses/Error413"
+          },
+          "415": {
+            "$ref": "#/components/responses/Error415"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error422"
+          },
+          "428": {
+            "$ref": "#/components/responses/Error428"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          },
+          "504": {
+            "$ref": "#/components/responses/Error504"
+          }
+        }
       }
     }
   },
@@ -19407,6 +20364,632 @@
           "revision",
           "primary",
           "backup"
+        ]
+      },
+      "S3Credential": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "access_key": {
+            "type": "string"
+          },
+          "secret_key": {
+            "type": "string",
+            "writeOnly": true
+          },
+          "session_token": {
+            "type": "string",
+            "writeOnly": true
+          }
+        },
+        "required": [
+          "access_key",
+          "secret_key"
+        ]
+      },
+      "S3Credentials": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "receive": {
+            "$ref": "#/components/schemas/S3Credential"
+          },
+          "store": {
+            "$ref": "#/components/schemas/S3Credential"
+          },
+          "compact": {
+            "$ref": "#/components/schemas/S3Credential"
+          }
+        },
+        "required": [
+          "receive",
+          "store",
+          "compact"
+        ]
+      },
+      "StorageCheck": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "prefix": {
+            "type": "string"
+          },
+          "object_key": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string"
+          },
+          "error": {
+            "type": "string"
+          },
+          "checked_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "target_revision": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "prefix_restricted": {
+            "type": "boolean"
+          },
+          "lifecycle_checked": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "prefix",
+          "state",
+          "checked_at",
+          "target_revision",
+          "prefix_restricted",
+          "lifecycle_checked"
+        ]
+      },
+      "StorageTarget": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "endpoint": {
+            "type": "string"
+          },
+          "bucket": {
+            "type": "string"
+          },
+          "region": {
+            "type": "string"
+          },
+          "access_style": {
+            "type": "string",
+            "enum": [
+              "path",
+              "virtual_host"
+            ]
+          },
+          "dedicated_bucket": {
+            "type": "boolean"
+          },
+          "id": {
+            "type": "string"
+          },
+          "revision": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "node_id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "credentials_available": {
+            "type": "boolean"
+          },
+          "credential_ref": {
+            "type": "string"
+          },
+          "check": {
+            "$ref": "#/components/schemas/StorageCheck"
+          }
+        },
+        "required": [
+          "endpoint",
+          "bucket",
+          "region",
+          "access_style",
+          "dedicated_bucket",
+          "id",
+          "revision",
+          "node_id",
+          "name",
+          "enabled",
+          "credentials_available"
+        ]
+      },
+      "StorageTargetInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "endpoint": {
+            "type": "string"
+          },
+          "bucket": {
+            "type": "string"
+          },
+          "region": {
+            "type": "string"
+          },
+          "access_style": {
+            "type": "string",
+            "enum": [
+              "path",
+              "virtual_host"
+            ]
+          },
+          "dedicated_bucket": {
+            "type": "boolean"
+          },
+          "node_id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "credentials": {
+            "$ref": "#/components/schemas/S3Credentials"
+          }
+        },
+        "required": [
+          "endpoint",
+          "bucket",
+          "region",
+          "access_style",
+          "dedicated_bucket",
+          "node_id",
+          "name",
+          "enabled"
+        ]
+      },
+      "StorageTargetList": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StorageTarget"
+            }
+          }
+        },
+        "required": [
+          "items"
+        ]
+      },
+      "StorageCheckInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "prefix": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "prefix"
+        ]
+      },
+      "MonitoringArchiveConfig": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "revision": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "node_id": {
+            "type": "string"
+          },
+          "storage_target_id": {
+            "type": "string"
+          },
+          "prefix": {
+            "type": "string"
+          },
+          "directory": {
+            "type": "string"
+          },
+          "disk_budget_bytes": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "local_days": {
+            "type": "integer",
+            "enum": [
+              30
+            ]
+          },
+          "archive_days": {
+            "type": "integer",
+            "enum": [
+              365
+            ]
+          },
+          "operation_id": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "revision",
+          "enabled",
+          "node_id",
+          "storage_target_id",
+          "prefix",
+          "directory",
+          "disk_budget_bytes",
+          "local_days",
+          "archive_days",
+          "state"
+        ]
+      },
+      "MonitoringArchiveInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "node_id": {
+            "type": "string"
+          },
+          "storage_target_id": {
+            "type": "string"
+          },
+          "prefix": {
+            "type": "string"
+          },
+          "directory": {
+            "type": "string"
+          },
+          "disk_budget_bytes": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "local_days": {
+            "type": "integer",
+            "enum": [
+              30
+            ]
+          },
+          "archive_days": {
+            "type": "integer",
+            "enum": [
+              365
+            ]
+          }
+        },
+        "required": [
+          "enabled",
+          "node_id",
+          "storage_target_id",
+          "prefix",
+          "directory",
+          "disk_budget_bytes",
+          "local_days",
+          "archive_days"
+        ]
+      },
+      "MonitoringGap": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "node_id": {
+            "type": "string"
+          },
+          "from": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "to": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "batch_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "node_id",
+          "from",
+          "to",
+          "reason"
+        ]
+      },
+      "MonitoringBuffer": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "batches": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "bytes": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "oldest": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "latest": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "gaps": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MonitoringGap"
+            }
+          }
+        },
+        "required": [
+          "batches",
+          "bytes",
+          "oldest",
+          "latest",
+          "gaps"
+        ]
+      },
+      "MonitoringComponent": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string"
+          },
+          "ready": {
+            "type": "boolean"
+          },
+          "error": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "state",
+          "ready"
+        ]
+      },
+      "MonitoringDeploymentState": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "state": {
+            "type": "string"
+          },
+          "components": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MonitoringComponent"
+            }
+          },
+          "disk_used_bytes": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "disk_available_bytes": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "archive_pending_blocks": {
+            "type": "integer"
+          },
+          "oldest_unshipped_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "checked_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "state",
+          "components",
+          "disk_used_bytes",
+          "disk_available_bytes",
+          "archive_pending_blocks",
+          "checked_at"
+        ]
+      },
+      "MonitoringArchiveStatus": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "node_id": {
+            "type": "string"
+          },
+          "config": {
+            "$ref": "#/components/schemas/MonitoringArchiveConfig"
+          },
+          "buffer": {
+            "$ref": "#/components/schemas/MonitoringBuffer"
+          },
+          "last_sample": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "last_upload": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "last_receive": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "sampling_error": {
+            "type": "string"
+          },
+          "upload_error": {
+            "type": "string"
+          },
+          "receive_error": {
+            "type": "string"
+          },
+          "paused": {
+            "type": "boolean"
+          },
+          "streams": {
+            "type": "integer"
+          },
+          "deployment": {
+            "$ref": "#/components/schemas/MonitoringDeploymentState"
+          }
+        },
+        "required": [
+          "node_id",
+          "config",
+          "buffer",
+          "paused",
+          "streams",
+          "deployment"
+        ]
+      },
+      "MonitoringArchiveStatusList": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MonitoringArchiveStatus"
+            }
+          },
+          "unavailable": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UnavailableNode"
+            }
+          }
+        },
+        "required": [
+          "items",
+          "unavailable"
+        ]
+      },
+      "MonitoringSeriesPoint": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "value": {
+            "type": "number",
+            "nullable": true
+          }
+        },
+        "required": [
+          "at",
+          "value"
+        ]
+      },
+      "MonitoringSeries": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "node_id": {
+            "type": "string"
+          },
+          "resource_id": {
+            "type": "string"
+          },
+          "backend": {
+            "type": "string"
+          },
+          "points": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MonitoringSeriesPoint"
+            }
+          }
+        },
+        "required": [
+          "node_id",
+          "points"
+        ]
+      },
+      "MonitoringSeriesResult": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "metric": {
+            "type": "string"
+          },
+          "from": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "to": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "step_seconds": {
+            "type": "integer"
+          },
+          "source_resolution_seconds": {
+            "type": "integer"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MonitoringSeries"
+            }
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "partial": {
+            "type": "boolean"
+          },
+          "missing": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MonitoringGap"
+            }
+          }
+        },
+        "required": [
+          "metric",
+          "from",
+          "to",
+          "step_seconds",
+          "source_resolution_seconds",
+          "items",
+          "warnings",
+          "partial",
+          "missing"
         ]
       }
     },

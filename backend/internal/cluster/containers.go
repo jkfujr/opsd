@@ -17,6 +17,11 @@ type containerRead struct {
 }
 
 func (n *Node) readContainer(ctx context.Context, payload protocol.Payload, ttl time.Duration) (protocol.Payload, error) {
+	if _, ok := payload.(*protocol.DockerRead); ok {
+		if cached := n.telemetry.CurrentDocker(); cached != nil {
+			return &protocol.DockerReadResult{State: *cached}, nil
+		}
+	}
 	b, _ := json.Marshal(payload)
 	key := string(payload.Kind()) + string(b)
 	n.dockerMu.Lock()

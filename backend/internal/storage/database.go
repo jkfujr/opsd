@@ -20,6 +20,7 @@ type Kind string
 const (
 	Executor Kind = "executor"
 	Node     Kind = "node"
+	Metrics  Kind = "metrics"
 )
 
 //go:embed migrations/*/*.sql
@@ -27,7 +28,7 @@ var migrations embed.FS
 
 // Open 打开指定子系统的数据库，迁移成功后才交给调用者使用。
 func Open(ctx context.Context, path string, kind Kind) (*sql.DB, error) {
-	if kind != Executor && kind != Node {
+	if kind != Executor && kind != Node && kind != Metrics {
 		return nil, fmt.Errorf("未知数据库类型：%s", kind)
 	}
 	source, err := fs.Sub(migrations, "migrations/"+string(kind))

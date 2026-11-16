@@ -12,5 +12,5 @@ export function loginDestination() {
 }
 
 export function isConsolePage(path: string) {
-  return path === '/' || /^\/(nodes|containers|databases|storage|firewall|tools|settings|terminal|__opsd)(\/|$)/.test(path);
+  return path === '/' || /^\/(nodes|containers|databases|storage|monitoring|firewall|tools|settings|terminal|__opsd)(\/|$)/.test(path);
 }

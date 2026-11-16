@@ -37,6 +37,12 @@ func (n *Node) dispatch(ctx context.Context, origin, method string, body json.Ra
 	if strings.HasPrefix(method, "shared.") {
 		return n.sharedDispatch(ctx, origin, method, body)
 	}
+	if method == "storage.save" || method == "storage.get" || method == "storage.check" {
+		return n.storageDispatch(ctx, method, body)
+	}
+	if strings.HasPrefix(method, "archive.") {
+		return n.archiveDispatch(ctx, origin, method, body)
+	}
 	if strings.HasPrefix(method, "api_token.") {
 		return n.tokenDispatch(ctx, method, body)
 	}
@@ -301,6 +307,25 @@ func (n *Node) enqueueTx(ctx context.Context, origin string, r Request, related 
 	}
 	var targetName string
 	switch r.Kind {
+	case "monitoring_config":
+		if e := n.validateArchiveRequest(ctx, r.Payload); e != nil {
+			return Operation{}, e
+		}
+		// 共享配置的版本在工作流事务中再次核验。
+		r.ExpectedRevision = nil
+		r.ResourceID = "monitoring"
+	case "monitoring_deploy":
+		var d protocol.MonitoringDeployment
+		if e := json.Unmarshal(r.Payload, &d); e != nil {
+			return Operation{}, e
+		}
+		if e := d.Validate(); e != nil {
+			return Operation{}, fault("invalid_request", e.Error())
+		}
+		if d.NodeID != n.ID || d.ClusterID != n.cluster {
+			return Operation{}, fault("forbidden", "监控部署身份不匹配")
+		}
+		r.ResourceID = "monitoring"
 	case "shared_initialize":
 		var input SharedInitialize
 		if err := json.Unmarshal(r.Payload, &input); err != nil {
@@ -932,7 +957,7 @@ func (n *Node) advanceFiltered(filter string, args ...any) {
 		n.advanceDatabase(ctx, &op, plain)
 		return
 	}
-	if kind != "firewall" && kind != "component" && kind != "firewall_config" && kind != "container" && kind != "database_step" && kind != "task_run" && kind != "compose" {
+	if kind != "firewall" && kind != "component" && kind != "firewall_config" && kind != "container" && kind != "database_step" && kind != "task_run" && kind != "compose" && kind != "monitoring_deploy" {
 		e = n.applyLocal(ctx, kind, plain, &op)
 		if e != nil {
 			if kind == "shared_initialize" && n.sharedEnabled() {
@@ -953,7 +978,10 @@ func (n *Node) advanceFiltered(filter string, args ...any) {
 	if claimed {
 		// 先记下发送意图。进程中断后只查询/封存同一 ID，不重新发送未知结果的动作。
 		action := protocol.OperationAction{Kind: kind}
-		if kind == "compose" {
+		if kind == "monitoring_deploy" {
+			action.Monitoring = &protocol.MonitoringDeployment{}
+			e = json.Unmarshal(plain, action.Monitoring)
+		} else if kind == "compose" {
 			action.Compose = &protocol.ComposeAction{}
 			e = json.Unmarshal(plain, action.Compose)
 		} else if kind == "task_run" {
@@ -1046,6 +1074,9 @@ func (n *Node) advanceFiltered(filter string, args ...any) {
 	_ = n.saveOperation(ctx, &op, "submitted")
 }
 func (n *Node) applyLocal(ctx context.Context, kind string, plain []byte, op *Operation) error {
+	if kind == "monitoring_config" {
+		return n.advanceArchive(ctx, op, plain)
+	}
 	if kind == "shared_initialize" {
 		return n.advanceSharedInitialization(ctx, op, plain)
 	}
@@ -1269,13 +1300,16 @@ func (n *Node) decide(ctx context.Context, method string, d OperationDecision) (
 	if op.Subject == "database" {
 		return n.decideDatabase(ctx, method, d, op)
 	}
+	if op.Subject == "monitoring_config" {
+		return n.decideArchive(ctx, method, d, op)
+	}
 	var p protocol.Payload
 	switch method {
 	case "operation.confirm":
 		p = &protocol.OperationConfirm{OperationID: d.ID, ExpectedRevision: d.ExpectedRevision - 1}
 	case "operation.recover":
 		p = &protocol.OperationRecover{OperationID: d.ID, ExpectedRevision: d.ExpectedRevision}
-		if op.Subject == "container" || op.Subject == "database_step" {
+		if op.Subject == "container" || op.Subject == "database_step" || op.Subject == "monitoring_deploy" {
 			p = &protocol.OperationRecover{OperationID: d.ID, ExpectedRevision: d.ExpectedRevision - 1}
 		}
 	case "operation.resolve":

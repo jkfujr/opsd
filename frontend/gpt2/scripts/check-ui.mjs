@@ -7,6 +7,7 @@ import { checkLayout } from './check-layout.mjs';
 import { checkBackendContract } from './check-backend-contract.mjs';
 import { checkDatabaseDeployment } from './check-database-deployment.mjs';
 import { checkSharedStorage } from './check-shared-storage.mjs';
+import { checkMonitoring } from './check-monitoring.mjs';
 const root = fileURLToPath(new URL('../', import.meta.url));
 const artifacts = join(root, '../../artifacts/frontend/gpt2');
 const base = process.env.OPSD_GPT2_URL ?? 'http://127.0.0.1:5183';
@@ -15,11 +16,13 @@ const password = process.env.OPSD_GPT2_PASSWORD ?? 'test-password';
 const mode = process.argv.includes('--recovery') ? 'recovery' : process.argv.includes('--builtin') ? 'builtin' : 'theme';
 const prefix = mode === 'recovery' ? '/__opsd/builtin' : '';
 const entry = process.env.OPSD_GPT2_ENTRANCE ?? '/signin';
-const resultDirectory = mode === 'theme' ? 'integration' : `integration-${mode}`;
+const resultDirectory = (mode === 'theme' ? 'integration' : `integration-${mode}`) + (process.argv.some(arg => arg.startsWith('--only=')) ? '-focused' : '');
 const { version } = JSON.parse(await readFile(join(root, '../../package.json'), 'utf8'));
 const forced = (process.argv.find(arg => arg.startsWith('--rerun='))?.slice(8) ?? '').split('|');
 const backendContract = process.argv.includes('--backend-contract');
+const only = process.argv.find(arg => arg.startsWith('--only='))?.slice(7);
 const contractSteps = ['共享库原请求恢复、代理状态、主备入口与协调转交', '数据库创建接入扩容、原请求查询与窄屏', '资源历史节点集合、节点配置草稿和支持的写入', '数据库六页签、保护账号与受支持变更', '防火墙能力、规则写入、服务端确认期限和操作跨页保留', '独立日志页、日志错误、ANSI、字节分页、搜索复制与返回筛选', '受管代理预览、未知应答恢复、连接预算与窄屏', '防火墙接纳当前配置及原请求查询', '操作历史保存原名称、动作和完整目标'];
+contractSteps.push('S3 凭据、监控配置、秒级缩放、缺口与故障状态');
 const resume = process.argv.includes('--resume'), replace = process.argv.includes('--replace'), resourceState = process.argv.includes('--resource-state');
 let previous = { results: [] }; if (resume) { try { previous = JSON.parse(await readFile(join(artifacts, resultDirectory, 'result.json'), 'utf8')); } catch {} }
 const rerunVisuals = forced.some(value => value && '深浅模式、320/768/1440px、200% 等效视口与键盘焦点'.includes(value));
@@ -32,7 +35,7 @@ let session, id, installation, context, page;
 const checked = new Date().toISOString(), rev = 'a'.repeat(64), containerID = 'b'.repeat(64);
 const ready = { state: 'ready', data_at: checked, attempted_at: checked };
 async function api(path, method = 'GET', data, extra = {}) { const response = await apiContext.fetch('/api/v2' + path, { method, data, headers: { Origin: base, ...(session ? { 'X-CSRF-Token': session.csrf_token } : {}), ...extra } }); const body = response.status() === 204 ? null : await response.json(); assert(response.ok(), `${method} ${path}: ${response.status()} ${body?.detail ?? ''}`); return { body, response }; }
-async function step(name, action) { if (backendContract && name !== '真实主题 ZIP 安装、启用与主题登录' && !contractSteps.includes(name)) return; if (resume && name !== '真实主题 ZIP 安装、启用与主题登录' && previous.results.some(item => item.name === name && item.passed) && !forced.some(value => value && name.includes(value)) && !(resourceState && name === '任务元数据、定义编辑启停、执行、取消与分页 UTF-8 日志')) { results.push({ name, passed: true, reused: true }); console.log(`复用此前结果：${name}`); return; } try { await action(); results.push({ name, passed: true }); console.log(`通过：${name}`); } catch (error) { results.push({ name, passed: false, error: String(error) }); throw error; } }
+async function step(name, action) { if (only && name !== '真实主题 ZIP 安装、启用与主题登录' && !name.includes(only)) return; if (backendContract && name !== '真实主题 ZIP 安装、启用与主题登录' && !contractSteps.includes(name)) return; if (resume && name !== '真实主题 ZIP 安装、启用与主题登录' && previous.results.some(item => item.name === name && item.passed) && !forced.some(value => value && name.includes(value)) && !(resourceState && name === '任务元数据、定义编辑启停、执行、取消与分页 UTF-8 日志')) { results.push({ name, passed: true, reused: true }); console.log(`复用此前结果：${name}`); return; } try { await action(); results.push({ name, passed: true }); console.log(`通过：${name}`); } catch (error) { results.push({ name, passed: false, error: String(error) }); throw error; } }
 async function login(p) { await p.goto(base + entry + (mode === 'recovery' ? '?builtin=1' : '')); await p.getByLabel('账号', { exact: true }).fill('admin'); await p.getByLabel('密码', { exact: true }).fill(password); await p.getByRole('button', { name: '登录', exact: true }).click(); await p.waitForURL(base + prefix + '/'); await p.getByRole('heading', { name: '概览', exact: true }).waitFor(); }
 async function go(path) { await page.goto(base + prefix + path); await page.locator('.page-content h1, .terminal-identity h1').first().waitFor(); }
 async function wait(check, message) { for (let n = 0; n < 100; n++) { if (await check()) return; await page.waitForTimeout(100); } throw Error(message); }
@@ -417,6 +420,7 @@ try {
       failed=false;await page.getByRole('button',{name:'重新加载',exact:true}).click();await wait(()=>page.getByText('已连接',{exact:true}).isVisible(),'终端脚本失败后未恢复连接');assert(requests>=2,'未重新请求失败脚本');
     } finally {await page.unroute(modules);}
   });
+  await checkMonitoring({ page, go, step, capture, closeDrawers, id, checked, op });
   if (!backendContract) await checkLayout({ page, go, step, capture, wait, metrics: layoutMetrics, id, containerID, op, tickets: () => tickets, fixtures: { get database() { return databaseValue; }, set database(value) { databaseValue = value; }, get nodes() { return nodeList; }, set nodes(value) { nodeList = value; } } });
   await step('深浅模式、320/768/1440px、200% 等效视口与键盘焦点', async () => {
     const routes = [['overview','/'], ['nodes','/nodes'], ['node',`/nodes/${id}`], ['containers','/containers'], ['compose','/containers?tab=compose'], ['databases','/databases'], ['database','/databases/ui-db'], ['node-settings',`/nodes/${id}?tab=configuration`], ['node-addresses',`/nodes/${id}?tab=addresses`], ['firewall-settings',`/firewall/settings?node=${id}`], ['account','/settings/account'], ['version','/settings/version'], ['storage','/storage'], ['firewall',`/firewall?node=${id}`], ['tasks','/tools/tasks'], ['appearance','/settings/appearance'], ['sessions','/settings/sessions'], ['api','/settings/api']];

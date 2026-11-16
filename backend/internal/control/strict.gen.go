@@ -1479,6 +1479,94 @@ func (a *strictAPI) GetMetrics(ctx context.Context, request httpapi.GetMetricsRe
 	return nil, fmt.Errorf("流式接口由专用处理器执行")
 }
 
+func (a *strictAPI) GetMonitoringConfig(ctx context.Context, request httpapi.GetMonitoringConfigRequestObject) (httpapi.GetMonitoringConfigResponseObject, error) {
+	r := strictRequest(ctx)
+	w := newAPIResponse(r)
+	a.server.GetMonitoringConfig(w, r)
+	a.server.prepareAPIResponse(w, r)
+	switch w.status() {
+	case 200:
+		return strictResponse[httpapi.GetMonitoringConfig200JSONResponse](w)
+	case 400:
+		return strictResponse[httpapi.GetMonitoringConfig400ApplicationProblemPlusJSONResponse](w)
+	case 401:
+		return strictResponse[httpapi.GetMonitoringConfig401ApplicationProblemPlusJSONResponse](w)
+	case 403:
+		return strictResponse[httpapi.GetMonitoringConfig403ApplicationProblemPlusJSONResponse](w)
+	case 404:
+		return strictResponse[httpapi.GetMonitoringConfig404ApplicationProblemPlusJSONResponse](w)
+	case 405:
+		return strictResponse[httpapi.GetMonitoringConfig405ApplicationProblemPlusJSONResponse](w)
+	case 406:
+		return strictResponse[httpapi.GetMonitoringConfig406ApplicationProblemPlusJSONResponse](w)
+	case 409:
+		return strictResponse[httpapi.GetMonitoringConfig409ApplicationProblemPlusJSONResponse](w)
+	case 412:
+		return strictResponse[httpapi.GetMonitoringConfig412ApplicationProblemPlusJSONResponse](w)
+	case 413:
+		return strictResponse[httpapi.GetMonitoringConfig413ApplicationProblemPlusJSONResponse](w)
+	case 415:
+		return strictResponse[httpapi.GetMonitoringConfig415ApplicationProblemPlusJSONResponse](w)
+	case 422:
+		return strictResponse[httpapi.GetMonitoringConfig422ApplicationProblemPlusJSONResponse](w)
+	case 428:
+		return strictResponse[httpapi.GetMonitoringConfig428ApplicationProblemPlusJSONResponse](w)
+	case 429:
+		return strictResponse[httpapi.GetMonitoringConfig429ApplicationProblemPlusJSONResponse](w)
+	case 500:
+		return strictResponse[httpapi.GetMonitoringConfig500ApplicationProblemPlusJSONResponse](w)
+	case 503:
+		return strictResponse[httpapi.GetMonitoringConfig503ApplicationProblemPlusJSONResponse](w)
+	case 504:
+		return strictResponse[httpapi.GetMonitoringConfig504ApplicationProblemPlusJSONResponse](w)
+	}
+	return nil, fmt.Errorf("GetMonitoringConfig 返回未声明状态 %d", w.status())
+}
+
+func (a *strictAPI) SaveMonitoringConfig(ctx context.Context, request httpapi.SaveMonitoringConfigRequestObject) (httpapi.SaveMonitoringConfigResponseObject, error) {
+	r := strictRequest(ctx)
+	w := newAPIResponse(r)
+	a.server.SaveMonitoringConfig(w, r, request.Params)
+	a.server.prepareAPIResponse(w, r)
+	switch w.status() {
+	case 202:
+		return strictResponse[httpapi.SaveMonitoringConfig202JSONResponse](w)
+	case 400:
+		return strictResponse[httpapi.SaveMonitoringConfig400ApplicationProblemPlusJSONResponse](w)
+	case 401:
+		return strictResponse[httpapi.SaveMonitoringConfig401ApplicationProblemPlusJSONResponse](w)
+	case 403:
+		return strictResponse[httpapi.SaveMonitoringConfig403ApplicationProblemPlusJSONResponse](w)
+	case 404:
+		return strictResponse[httpapi.SaveMonitoringConfig404ApplicationProblemPlusJSONResponse](w)
+	case 405:
+		return strictResponse[httpapi.SaveMonitoringConfig405ApplicationProblemPlusJSONResponse](w)
+	case 406:
+		return strictResponse[httpapi.SaveMonitoringConfig406ApplicationProblemPlusJSONResponse](w)
+	case 409:
+		return strictResponse[httpapi.SaveMonitoringConfig409ApplicationProblemPlusJSONResponse](w)
+	case 412:
+		return strictResponse[httpapi.SaveMonitoringConfig412ApplicationProblemPlusJSONResponse](w)
+	case 413:
+		return strictResponse[httpapi.SaveMonitoringConfig413ApplicationProblemPlusJSONResponse](w)
+	case 415:
+		return strictResponse[httpapi.SaveMonitoringConfig415ApplicationProblemPlusJSONResponse](w)
+	case 422:
+		return strictResponse[httpapi.SaveMonitoringConfig422ApplicationProblemPlusJSONResponse](w)
+	case 428:
+		return strictResponse[httpapi.SaveMonitoringConfig428ApplicationProblemPlusJSONResponse](w)
+	case 429:
+		return strictResponse[httpapi.SaveMonitoringConfig429ApplicationProblemPlusJSONResponse](w)
+	case 500:
+		return strictResponse[httpapi.SaveMonitoringConfig500ApplicationProblemPlusJSONResponse](w)
+	case 503:
+		return strictResponse[httpapi.SaveMonitoringConfig503ApplicationProblemPlusJSONResponse](w)
+	case 504:
+		return strictResponse[httpapi.SaveMonitoringConfig504ApplicationProblemPlusJSONResponse](w)
+	}
+	return nil, fmt.Errorf("SaveMonitoringConfig 返回未声明状态 %d", w.status())
+}
+
 func (a *strictAPI) GetMonitoringCurrent(ctx context.Context, request httpapi.GetMonitoringCurrentRequestObject) (httpapi.GetMonitoringCurrentResponseObject, error) {
 	r := strictRequest(ctx)
 	w := newAPIResponse(r)
@@ -1565,6 +1653,94 @@ func (a *strictAPI) GetMonitoringHistory(ctx context.Context, request httpapi.Ge
 		return strictResponse[httpapi.GetMonitoringHistory504ApplicationProblemPlusJSONResponse](w)
 	}
 	return nil, fmt.Errorf("GetMonitoringHistory 返回未声明状态 %d", w.status())
+}
+
+func (a *strictAPI) GetMonitoringSeries(ctx context.Context, request httpapi.GetMonitoringSeriesRequestObject) (httpapi.GetMonitoringSeriesResponseObject, error) {
+	r := strictRequest(ctx)
+	w := newAPIResponse(r)
+	a.server.GetMonitoringSeries(w, r, request.Params)
+	a.server.prepareAPIResponse(w, r)
+	switch w.status() {
+	case 200:
+		return strictResponse[httpapi.GetMonitoringSeries200JSONResponse](w)
+	case 400:
+		return strictResponse[httpapi.GetMonitoringSeries400ApplicationProblemPlusJSONResponse](w)
+	case 401:
+		return strictResponse[httpapi.GetMonitoringSeries401ApplicationProblemPlusJSONResponse](w)
+	case 403:
+		return strictResponse[httpapi.GetMonitoringSeries403ApplicationProblemPlusJSONResponse](w)
+	case 404:
+		return strictResponse[httpapi.GetMonitoringSeries404ApplicationProblemPlusJSONResponse](w)
+	case 405:
+		return strictResponse[httpapi.GetMonitoringSeries405ApplicationProblemPlusJSONResponse](w)
+	case 406:
+		return strictResponse[httpapi.GetMonitoringSeries406ApplicationProblemPlusJSONResponse](w)
+	case 409:
+		return strictResponse[httpapi.GetMonitoringSeries409ApplicationProblemPlusJSONResponse](w)
+	case 412:
+		return strictResponse[httpapi.GetMonitoringSeries412ApplicationProblemPlusJSONResponse](w)
+	case 413:
+		return strictResponse[httpapi.GetMonitoringSeries413ApplicationProblemPlusJSONResponse](w)
+	case 415:
+		return strictResponse[httpapi.GetMonitoringSeries415ApplicationProblemPlusJSONResponse](w)
+	case 422:
+		return strictResponse[httpapi.GetMonitoringSeries422ApplicationProblemPlusJSONResponse](w)
+	case 428:
+		return strictResponse[httpapi.GetMonitoringSeries428ApplicationProblemPlusJSONResponse](w)
+	case 429:
+		return strictResponse[httpapi.GetMonitoringSeries429ApplicationProblemPlusJSONResponse](w)
+	case 500:
+		return strictResponse[httpapi.GetMonitoringSeries500ApplicationProblemPlusJSONResponse](w)
+	case 503:
+		return strictResponse[httpapi.GetMonitoringSeries503ApplicationProblemPlusJSONResponse](w)
+	case 504:
+		return strictResponse[httpapi.GetMonitoringSeries504ApplicationProblemPlusJSONResponse](w)
+	}
+	return nil, fmt.Errorf("GetMonitoringSeries 返回未声明状态 %d", w.status())
+}
+
+func (a *strictAPI) GetMonitoringArchiveStatus(ctx context.Context, request httpapi.GetMonitoringArchiveStatusRequestObject) (httpapi.GetMonitoringArchiveStatusResponseObject, error) {
+	r := strictRequest(ctx)
+	w := newAPIResponse(r)
+	a.server.GetMonitoringArchiveStatus(w, r, request.Params)
+	a.server.prepareAPIResponse(w, r)
+	switch w.status() {
+	case 200:
+		return strictResponse[httpapi.GetMonitoringArchiveStatus200JSONResponse](w)
+	case 400:
+		return strictResponse[httpapi.GetMonitoringArchiveStatus400ApplicationProblemPlusJSONResponse](w)
+	case 401:
+		return strictResponse[httpapi.GetMonitoringArchiveStatus401ApplicationProblemPlusJSONResponse](w)
+	case 403:
+		return strictResponse[httpapi.GetMonitoringArchiveStatus403ApplicationProblemPlusJSONResponse](w)
+	case 404:
+		return strictResponse[httpapi.GetMonitoringArchiveStatus404ApplicationProblemPlusJSONResponse](w)
+	case 405:
+		return strictResponse[httpapi.GetMonitoringArchiveStatus405ApplicationProblemPlusJSONResponse](w)
+	case 406:
+		return strictResponse[httpapi.GetMonitoringArchiveStatus406ApplicationProblemPlusJSONResponse](w)
+	case 409:
+		return strictResponse[httpapi.GetMonitoringArchiveStatus409ApplicationProblemPlusJSONResponse](w)
+	case 412:
+		return strictResponse[httpapi.GetMonitoringArchiveStatus412ApplicationProblemPlusJSONResponse](w)
+	case 413:
+		return strictResponse[httpapi.GetMonitoringArchiveStatus413ApplicationProblemPlusJSONResponse](w)
+	case 415:
+		return strictResponse[httpapi.GetMonitoringArchiveStatus415ApplicationProblemPlusJSONResponse](w)
+	case 422:
+		return strictResponse[httpapi.GetMonitoringArchiveStatus422ApplicationProblemPlusJSONResponse](w)
+	case 428:
+		return strictResponse[httpapi.GetMonitoringArchiveStatus428ApplicationProblemPlusJSONResponse](w)
+	case 429:
+		return strictResponse[httpapi.GetMonitoringArchiveStatus429ApplicationProblemPlusJSONResponse](w)
+	case 500:
+		return strictResponse[httpapi.GetMonitoringArchiveStatus500ApplicationProblemPlusJSONResponse](w)
+	case 503:
+		return strictResponse[httpapi.GetMonitoringArchiveStatus503ApplicationProblemPlusJSONResponse](w)
+	case 504:
+		return strictResponse[httpapi.GetMonitoringArchiveStatus504ApplicationProblemPlusJSONResponse](w)
+	}
+	return nil, fmt.Errorf("GetMonitoringArchiveStatus 返回未声明状态 %d", w.status())
 }
 
 func (a *strictAPI) ListNodes(ctx context.Context, request httpapi.ListNodesRequestObject) (httpapi.ListNodesResponseObject, error) {
@@ -4255,6 +4431,182 @@ func (a *strictAPI) InitializeSharedStorage(ctx context.Context, request httpapi
 		return strictResponse[httpapi.InitializeSharedStorage504ApplicationProblemPlusJSONResponse](w)
 	}
 	return nil, fmt.Errorf("InitializeSharedStorage 返回未声明状态 %d", w.status())
+}
+
+func (a *strictAPI) ListStorageTargets(ctx context.Context, request httpapi.ListStorageTargetsRequestObject) (httpapi.ListStorageTargetsResponseObject, error) {
+	r := strictRequest(ctx)
+	w := newAPIResponse(r)
+	a.server.ListStorageTargets(w, r)
+	a.server.prepareAPIResponse(w, r)
+	switch w.status() {
+	case 200:
+		return strictResponse[httpapi.ListStorageTargets200JSONResponse](w)
+	case 400:
+		return strictResponse[httpapi.ListStorageTargets400ApplicationProblemPlusJSONResponse](w)
+	case 401:
+		return strictResponse[httpapi.ListStorageTargets401ApplicationProblemPlusJSONResponse](w)
+	case 403:
+		return strictResponse[httpapi.ListStorageTargets403ApplicationProblemPlusJSONResponse](w)
+	case 404:
+		return strictResponse[httpapi.ListStorageTargets404ApplicationProblemPlusJSONResponse](w)
+	case 405:
+		return strictResponse[httpapi.ListStorageTargets405ApplicationProblemPlusJSONResponse](w)
+	case 406:
+		return strictResponse[httpapi.ListStorageTargets406ApplicationProblemPlusJSONResponse](w)
+	case 409:
+		return strictResponse[httpapi.ListStorageTargets409ApplicationProblemPlusJSONResponse](w)
+	case 412:
+		return strictResponse[httpapi.ListStorageTargets412ApplicationProblemPlusJSONResponse](w)
+	case 413:
+		return strictResponse[httpapi.ListStorageTargets413ApplicationProblemPlusJSONResponse](w)
+	case 415:
+		return strictResponse[httpapi.ListStorageTargets415ApplicationProblemPlusJSONResponse](w)
+	case 422:
+		return strictResponse[httpapi.ListStorageTargets422ApplicationProblemPlusJSONResponse](w)
+	case 428:
+		return strictResponse[httpapi.ListStorageTargets428ApplicationProblemPlusJSONResponse](w)
+	case 429:
+		return strictResponse[httpapi.ListStorageTargets429ApplicationProblemPlusJSONResponse](w)
+	case 500:
+		return strictResponse[httpapi.ListStorageTargets500ApplicationProblemPlusJSONResponse](w)
+	case 503:
+		return strictResponse[httpapi.ListStorageTargets503ApplicationProblemPlusJSONResponse](w)
+	case 504:
+		return strictResponse[httpapi.ListStorageTargets504ApplicationProblemPlusJSONResponse](w)
+	}
+	return nil, fmt.Errorf("ListStorageTargets 返回未声明状态 %d", w.status())
+}
+
+func (a *strictAPI) GetStorageTarget(ctx context.Context, request httpapi.GetStorageTargetRequestObject) (httpapi.GetStorageTargetResponseObject, error) {
+	r := strictRequest(ctx)
+	w := newAPIResponse(r)
+	a.server.GetStorageTarget(w, r, request.Id)
+	a.server.prepareAPIResponse(w, r)
+	switch w.status() {
+	case 200:
+		return strictResponse[httpapi.GetStorageTarget200JSONResponse](w)
+	case 400:
+		return strictResponse[httpapi.GetStorageTarget400ApplicationProblemPlusJSONResponse](w)
+	case 401:
+		return strictResponse[httpapi.GetStorageTarget401ApplicationProblemPlusJSONResponse](w)
+	case 403:
+		return strictResponse[httpapi.GetStorageTarget403ApplicationProblemPlusJSONResponse](w)
+	case 404:
+		return strictResponse[httpapi.GetStorageTarget404ApplicationProblemPlusJSONResponse](w)
+	case 405:
+		return strictResponse[httpapi.GetStorageTarget405ApplicationProblemPlusJSONResponse](w)
+	case 406:
+		return strictResponse[httpapi.GetStorageTarget406ApplicationProblemPlusJSONResponse](w)
+	case 409:
+		return strictResponse[httpapi.GetStorageTarget409ApplicationProblemPlusJSONResponse](w)
+	case 412:
+		return strictResponse[httpapi.GetStorageTarget412ApplicationProblemPlusJSONResponse](w)
+	case 413:
+		return strictResponse[httpapi.GetStorageTarget413ApplicationProblemPlusJSONResponse](w)
+	case 415:
+		return strictResponse[httpapi.GetStorageTarget415ApplicationProblemPlusJSONResponse](w)
+	case 422:
+		return strictResponse[httpapi.GetStorageTarget422ApplicationProblemPlusJSONResponse](w)
+	case 428:
+		return strictResponse[httpapi.GetStorageTarget428ApplicationProblemPlusJSONResponse](w)
+	case 429:
+		return strictResponse[httpapi.GetStorageTarget429ApplicationProblemPlusJSONResponse](w)
+	case 500:
+		return strictResponse[httpapi.GetStorageTarget500ApplicationProblemPlusJSONResponse](w)
+	case 503:
+		return strictResponse[httpapi.GetStorageTarget503ApplicationProblemPlusJSONResponse](w)
+	case 504:
+		return strictResponse[httpapi.GetStorageTarget504ApplicationProblemPlusJSONResponse](w)
+	}
+	return nil, fmt.Errorf("GetStorageTarget 返回未声明状态 %d", w.status())
+}
+
+func (a *strictAPI) SaveStorageTarget(ctx context.Context, request httpapi.SaveStorageTargetRequestObject) (httpapi.SaveStorageTargetResponseObject, error) {
+	r := strictRequest(ctx)
+	w := newAPIResponse(r)
+	a.server.SaveStorageTarget(w, r, request.Id, request.Params)
+	a.server.prepareAPIResponse(w, r)
+	switch w.status() {
+	case 200:
+		return strictResponse[httpapi.SaveStorageTarget200JSONResponse](w)
+	case 400:
+		return strictResponse[httpapi.SaveStorageTarget400ApplicationProblemPlusJSONResponse](w)
+	case 401:
+		return strictResponse[httpapi.SaveStorageTarget401ApplicationProblemPlusJSONResponse](w)
+	case 403:
+		return strictResponse[httpapi.SaveStorageTarget403ApplicationProblemPlusJSONResponse](w)
+	case 404:
+		return strictResponse[httpapi.SaveStorageTarget404ApplicationProblemPlusJSONResponse](w)
+	case 405:
+		return strictResponse[httpapi.SaveStorageTarget405ApplicationProblemPlusJSONResponse](w)
+	case 406:
+		return strictResponse[httpapi.SaveStorageTarget406ApplicationProblemPlusJSONResponse](w)
+	case 409:
+		return strictResponse[httpapi.SaveStorageTarget409ApplicationProblemPlusJSONResponse](w)
+	case 412:
+		return strictResponse[httpapi.SaveStorageTarget412ApplicationProblemPlusJSONResponse](w)
+	case 413:
+		return strictResponse[httpapi.SaveStorageTarget413ApplicationProblemPlusJSONResponse](w)
+	case 415:
+		return strictResponse[httpapi.SaveStorageTarget415ApplicationProblemPlusJSONResponse](w)
+	case 422:
+		return strictResponse[httpapi.SaveStorageTarget422ApplicationProblemPlusJSONResponse](w)
+	case 428:
+		return strictResponse[httpapi.SaveStorageTarget428ApplicationProblemPlusJSONResponse](w)
+	case 429:
+		return strictResponse[httpapi.SaveStorageTarget429ApplicationProblemPlusJSONResponse](w)
+	case 500:
+		return strictResponse[httpapi.SaveStorageTarget500ApplicationProblemPlusJSONResponse](w)
+	case 503:
+		return strictResponse[httpapi.SaveStorageTarget503ApplicationProblemPlusJSONResponse](w)
+	case 504:
+		return strictResponse[httpapi.SaveStorageTarget504ApplicationProblemPlusJSONResponse](w)
+	}
+	return nil, fmt.Errorf("SaveStorageTarget 返回未声明状态 %d", w.status())
+}
+
+func (a *strictAPI) CheckStorageTarget(ctx context.Context, request httpapi.CheckStorageTargetRequestObject) (httpapi.CheckStorageTargetResponseObject, error) {
+	r := strictRequest(ctx)
+	w := newAPIResponse(r)
+	a.server.CheckStorageTarget(w, r, request.Id, request.Params)
+	a.server.prepareAPIResponse(w, r)
+	switch w.status() {
+	case 200:
+		return strictResponse[httpapi.CheckStorageTarget200JSONResponse](w)
+	case 400:
+		return strictResponse[httpapi.CheckStorageTarget400ApplicationProblemPlusJSONResponse](w)
+	case 401:
+		return strictResponse[httpapi.CheckStorageTarget401ApplicationProblemPlusJSONResponse](w)
+	case 403:
+		return strictResponse[httpapi.CheckStorageTarget403ApplicationProblemPlusJSONResponse](w)
+	case 404:
+		return strictResponse[httpapi.CheckStorageTarget404ApplicationProblemPlusJSONResponse](w)
+	case 405:
+		return strictResponse[httpapi.CheckStorageTarget405ApplicationProblemPlusJSONResponse](w)
+	case 406:
+		return strictResponse[httpapi.CheckStorageTarget406ApplicationProblemPlusJSONResponse](w)
+	case 409:
+		return strictResponse[httpapi.CheckStorageTarget409ApplicationProblemPlusJSONResponse](w)
+	case 412:
+		return strictResponse[httpapi.CheckStorageTarget412ApplicationProblemPlusJSONResponse](w)
+	case 413:
+		return strictResponse[httpapi.CheckStorageTarget413ApplicationProblemPlusJSONResponse](w)
+	case 415:
+		return strictResponse[httpapi.CheckStorageTarget415ApplicationProblemPlusJSONResponse](w)
+	case 422:
+		return strictResponse[httpapi.CheckStorageTarget422ApplicationProblemPlusJSONResponse](w)
+	case 428:
+		return strictResponse[httpapi.CheckStorageTarget428ApplicationProblemPlusJSONResponse](w)
+	case 429:
+		return strictResponse[httpapi.CheckStorageTarget429ApplicationProblemPlusJSONResponse](w)
+	case 500:
+		return strictResponse[httpapi.CheckStorageTarget500ApplicationProblemPlusJSONResponse](w)
+	case 503:
+		return strictResponse[httpapi.CheckStorageTarget503ApplicationProblemPlusJSONResponse](w)
+	case 504:
+		return strictResponse[httpapi.CheckStorageTarget504ApplicationProblemPlusJSONResponse](w)
+	}
+	return nil, fmt.Errorf("CheckStorageTarget 返回未声明状态 %d", w.status())
 }
 
 func (a *strictAPI) ListScheduledTasks(ctx context.Context, request httpapi.ListScheduledTasksRequestObject) (httpapi.ListScheduledTasksResponseObject, error) {

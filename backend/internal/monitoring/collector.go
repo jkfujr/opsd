@@ -28,6 +28,20 @@ func (c *Collector) Collect(stream string) protocol.Metrics {
 	}
 	m, raw := collect()
 	if before, ok := c.previous[stream]; ok {
+		if stream == "archive" {
+			if !raw.at.After(before.at) {
+				m.Errors = append(m.Errors, "主机采集时钟回拨")
+			}
+			reset := before.boot != "" && before.boot != raw.boot || raw.total < before.total || raw.idle < before.idle
+			for name, v := range raw.network {
+				if old, ok := before.network[name]; ok && (v[0] < old[0] || v[1] < old[1]) {
+					reset = true
+				}
+			}
+			if reset {
+				m.Errors = append(m.Errors, "主机计数器已重置")
+			}
+		}
 		if stream != "live" || raw.at.Sub(before.at) <= time.Minute {
 			rates(&m, before, raw)
 		}

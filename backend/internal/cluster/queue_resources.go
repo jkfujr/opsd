@@ -8,6 +8,11 @@ import (
 func requestResources(r Request) []protocol.ResourceClaim {
 	a := protocol.OperationAction{Kind: r.Kind}
 	switch r.Kind {
+	case "monitoring_config":
+		return []protocol.ResourceClaim{{Key: "monitoring-config"}}
+	case "monitoring_deploy":
+		a.Monitoring = &protocol.MonitoringDeployment{}
+		_ = json.Unmarshal(r.Payload, a.Monitoring)
 	case "shared_initialize":
 		return []protocol.ResourceClaim{{Key: "shared-migration"}}
 	case "database":

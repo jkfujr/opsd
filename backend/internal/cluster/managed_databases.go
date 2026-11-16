@@ -448,7 +448,8 @@ func (n *Node) managedDatabaseRead(ctx context.Context, id string, backups bool,
 	if e != nil {
 		return protocol.DatabaseReadResult{}, e
 	}
-	reply, e := n.executeRead(ctx, &protocol.DatabaseRead{Scope: request.Scope, Connection: c, ClusterID: request.ExpectedClusterID, Backups: backups, User: user, Host: host})
+	useMetrics := request.InstanceRevision == 0 && request.ExpectedClusterID == "" && !backups && user == ""
+	reply, e := n.executeRead(ctx, &protocol.DatabaseRead{UseMetrics: useMetrics, Scope: request.Scope, Connection: c, ClusterID: request.ExpectedClusterID, Backups: backups, User: user, Host: host})
 	if e != nil {
 		return protocol.DatabaseReadResult{}, e
 	}

@@ -8,6 +8,8 @@ import (
 
 func OperationModule(subject string) string {
 	switch subject {
+	case "monitoring_config", "monitoring_deploy":
+		return "monitoring"
 	case "name":
 		return "nodes"
 	case "container":
@@ -48,6 +50,13 @@ func ActionResources(a OperationAction) []ResourceClaim {
 		claims[key] = shared && (!exists || old)
 	}
 	switch {
+	case a.Monitoring != nil:
+		add("docker", true)
+		add("monitoring", false)
+		add("directory/"+a.Monitoring.Directory, false)
+		for port := 19291; port <= 19295; port++ {
+			add("port/"+strconv.Itoa(port), false)
+		}
 	case a.Shell != nil:
 		add("task/"+a.Shell.TaskID, false)
 	case a.Container != nil:

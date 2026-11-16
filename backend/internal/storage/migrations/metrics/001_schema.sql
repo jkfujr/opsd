@@ -1,0 +1,8 @@
+CREATE TABLE schema_migrations(version INTEGER PRIMARY KEY,name TEXT NOT NULL,applied_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')));
+CREATE TABLE batches(sequence INTEGER PRIMARY KEY AUTOINCREMENT,id TEXT UNIQUE NOT NULL,at INTEGER NOT NULL,body BLOB NOT NULL,size INTEGER NOT NULL);
+CREATE TABLE receipts(node_id TEXT NOT NULL,batch_id TEXT NOT NULL,sequence INTEGER NOT NULL,digest TEXT NOT NULL,error TEXT NOT NULL DEFAULT '',at INTEGER NOT NULL,PRIMARY KEY(node_id,batch_id),UNIQUE(node_id,sequence));
+CREATE TABLE gaps(id INTEGER PRIMARY KEY AUTOINCREMENT,node_id TEXT NOT NULL,from_ms INTEGER NOT NULL,to_ms INTEGER NOT NULL,reason TEXT NOT NULL,batch_id TEXT NOT NULL DEFAULT '');
+CREATE INDEX gap_time ON gaps(to_ms);
+CREATE INDEX gap_source_reason ON gaps(node_id,reason,id);
+CREATE TABLE state(key TEXT PRIMARY KEY,value TEXT NOT NULL);
+CREATE TABLE resources(sample_key TEXT PRIMARY KEY,seen_at INTEGER NOT NULL);

@@ -205,10 +205,22 @@ func (Manager) Read(ctx context.Context, c protocol.DatabaseConnection, scopes .
 		return out, e
 	}
 	defer s.Close()
-	if c.Kind == "proxysql" {
-		return readProxy(ctx, s, c, out, scope)
+	var sampled *metricSnapshot
+	if len(scopes) > 1 && scopes[1] == "sampled" {
+		if value, ok := recentMetrics(c); ok {
+			sampled = &value
+			out.CheckedAt = value.at
+		}
 	}
-	v, e := status(ctx, s)
+	if c.Kind == "proxysql" {
+		return readProxy(ctx, s, c, out, scope, sampled)
+	}
+	var v map[string]string
+	if sampled != nil && sampled.status != nil {
+		v = sampled.status
+	} else {
+		v, e = status(ctx, s)
+	}
 	if e != nil {
 		return out, e
 	}
@@ -326,7 +338,7 @@ func proxyRuntimeFingerprint(users []map[string]string) string {
 	})
 	return fingerprint(projected)
 }
-func readProxy(ctx context.Context, s *session, c protocol.DatabaseConnection, out protocol.DatabaseState, scope string) (protocol.DatabaseState, error) {
+func readProxy(ctx context.Context, s *session, c protocol.DatabaseConnection, out protocol.DatabaseState, scope string, sampled *metricSnapshot) (protocol.DatabaseState, error) {
 	v, e := rows(ctx, s, "SELECT @@version")
 	if e != nil {
 		return out, e
@@ -363,7 +375,12 @@ func readProxy(ctx context.Context, s *session, c protocol.DatabaseConnection, o
 			out.ProxyHostgroups = &protocol.ProxyHostgroups{Writer: int(number(row["writer_hostgroup"])), BackupWriter: int(number(row["backup_writer_hostgroup"])), Reader: int(number(row["reader_hostgroup"])), Offline: int(number(row["offline_hostgroup"]))}
 		}
 	}
-	pools, e := rows(ctx, s, "SELECT hostgroup,srv_host,srv_port,status,ConnUsed,ConnFree,MaxConnUsed,ConnERR,Queries,Latency_us FROM stats_mysql_connection_pool ORDER BY hostgroup,srv_host,srv_port")
+	var pools []map[string]string
+	if sampled != nil && sampled.pools != nil {
+		pools = sampled.pools
+	} else {
+		pools, e = rows(ctx, s, proxyMetricsQuery)
+	}
 	if e != nil {
 		return out, e
 	}

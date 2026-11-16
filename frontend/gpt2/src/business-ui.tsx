@@ -1,4 +1,4 @@
-import { Children, createContext, useCallback, useContext, useEffect, useId, useState, type ComponentProps, type ReactNode } from 'react';
+import { Children, createContext, useCallback, useContext, useEffect, useId, useMemo, useRef, useState, type ComponentProps, type ReactNode } from 'react';
 import { useBeforeUnload, useBlocker } from 'react-router';
 import { Button as AppicaButton, buttonVariants as appicaButtonVariants } from '@appica/ui-react/button';
 import { Pencil, RotateCw, ArrowUp, ArrowDown, FileText } from 'lucide-react';
@@ -57,19 +57,34 @@ export function StatusLabel({ state, children }: { state: string; children: Reac
   return <Status tone={tone}>{children}</Status>;
 }
 
-const UnsavedContext = createContext<(id: string, dirty: boolean) => void>(() => {});
+const UnsavedContext = createContext({ mark: (_id: string, _dirty: boolean) => {}, close: (_id: string, _dirty: boolean, onClose: () => void) => onClose() });
 export function UnsavedChangesProvider({ children }: { children: ReactNode }) {
-  const [forms, setForms] = useState(new Set<string>());
-  const mark = useCallback((id: string, dirty: boolean) => setForms((current) => { if (current.has(id) === dirty) return current; const next = new Set(current); if (dirty) next.add(id); else next.delete(id); return next; }), []);
-  const dirty = forms.size > 0;
-  const blocker = useBlocker(({ currentLocation, nextLocation }) => dirty && (currentLocation.pathname !== nextLocation.pathname || currentLocation.search !== nextLocation.search));
-  useBeforeUnload((event) => { if (dirty) { event.preventDefault(); event.returnValue = ''; } });
-  return <UnsavedContext value={mark}>{children}<Confirm open={blocker.state === 'blocked'} title="丢弃未提交的修改？" description="离开后将丢弃未提交的修改，已保存的配置继续应用。" confirmLabel="丢弃修改" busy={false} error={null} onCancel={() => blocker.reset?.()} onConfirm={() => { setForms(new Set()); blocker.proceed?.(); }} /></UnsavedContext>;
+  const forms = useRef(new Set<string>());
+  const [closing, setClosing] = useState<{ id: string; onClose: () => void } | null>(null);
+  const mark = useCallback((id: string, dirty: boolean) => {
+    if (dirty) forms.current.add(id);
+    else { forms.current.delete(id); setClosing(current => current?.id === id ? null : current); }
+  }, []);
+  const close = useCallback((id: string, dirty: boolean, onClose: () => void) => {
+    if (!dirty) { mark(id, false); onClose(); }
+    else setClosing(current => current ?? { id, onClose });
+  }, [mark]);
+  const context = useMemo(() => ({ mark, close }), [mark, close]);
+  const blocker = useBlocker(({ currentLocation, nextLocation }) => forms.current.size > 0 && (currentLocation.pathname !== nextLocation.pathname || currentLocation.search !== nextLocation.search));
+  useBeforeUnload((event) => { if (forms.current.size) { event.preventDefault(); event.returnValue = ''; } });
+  return <UnsavedContext value={context}>{children}<Confirm open={closing !== null || blocker.state === 'blocked'} title="丢弃未提交的修改？" description="离开后将丢弃未提交的修改，已保存的配置继续应用。" confirmLabel="丢弃修改" busy={false} error={null} onCancel={() => { setClosing(null); blocker.reset?.(); }} onConfirm={() => {
+    if (blocker.state === 'blocked') { forms.current.clear(); setClosing(null); blocker.proceed(); }
+    else if (closing) { mark(closing.id, false); closing.onClose(); }
+  }} /></UnsavedContext>;
 }
-export function useUnsavedChanges(dirty: boolean) {
-  const mark = useContext(UnsavedContext);
+export function useUnsavedChanges(dirty: boolean): void;
+export function useUnsavedChanges(dirty: boolean, onClose: () => void): () => void;
+export function useUnsavedChanges(dirty: boolean, onClose?: () => void) {
+  const { mark, close } = useContext(UnsavedContext);
   const id = useId();
-  useEffect(() => { mark(id, dirty); return () => mark(id, false); }, [id, dirty, mark]);
+  useEffect(() => { mark(id, dirty); }, [id, dirty, mark]);
+  useEffect(() => () => mark(id, false), [id, mark]);
+  return useCallback(() => { if (onClose) close(id, dirty, onClose); }, [close, id, dirty, onClose]);
 }
 
 export function Confirm({ open, title, description, busy, error, onCancel, onConfirm, confirmLabel = '确认撤销', dangerous = true, disabled = false }: { open: boolean; title: string; description: string; busy: boolean; error: unknown; onCancel: () => void; onConfirm: () => void; confirmLabel?: string; dangerous?: boolean; disabled?: boolean }) {

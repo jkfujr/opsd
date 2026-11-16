@@ -18,6 +18,9 @@ type liveRead struct {
 }
 
 func (n *Node) metrics(ctx context.Context, stream string) (protocol.MonitoringResult, error) {
+	if cached := n.telemetry.CurrentHost(); cached != nil {
+		return *cached, nil
+	}
 	if stream == "history" {
 		return n.collect(ctx, stream)
 	}

@@ -146,6 +146,7 @@ func (*DatabaseDiscovered) Kind() Kind { return "database.discovered" }
 func (*DatabaseDiscovered) isPayload() {}
 
 type DatabaseRead struct {
+	UseMetrics bool               `json:"use_metrics,omitempty"`
 	Scope      string             `json:"scope,omitempty"`
 	Connection DatabaseConnection `json:"connection"`
 	ClusterID  string             `json:"cluster_id,omitempty"`

@@ -60,6 +60,14 @@ func NewServices(db *sql.DB) *Services {
 }
 func (s *Services) Handle(ctx context.Context, payload protocol.Payload) (protocol.Payload, error) {
 	switch body := payload.(type) {
+	case *protocol.MonitoringStateRead:
+		if s.Docker == nil {
+			return nil, fmt.Errorf("Docker 读取入口不可用")
+		}
+		state, err := s.Docker.MonitoringState(ctx, body.Deployment)
+		return &state, err
+	case *protocol.ResourceMetricsRead:
+		return s.resourceMetrics(ctx, *body)
 	case *protocol.ComposeRead:
 		if s.Docker == nil {
 			return nil, fmt.Errorf("Docker 读取入口不可用")
@@ -125,7 +133,7 @@ func (s *Services) Handle(ctx context.Context, payload protocol.Payload) (protoc
 		defer unlock()
 		return s.Engine.InspectFirewall(ctx, body.Import, body.PreviewCurrent)
 	case *protocol.MonitoringRead:
-		if body.Stream != "live" && body.Stream != "history" {
+		if body.Stream != "live" && body.Stream != "history" && body.Stream != "archive" {
 			return nil, firewall.Unsupported("未知采集类型")
 		}
 		metrics := s.Metrics.Collect(body.Stream)

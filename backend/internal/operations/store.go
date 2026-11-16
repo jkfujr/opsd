@@ -153,7 +153,7 @@ func (s Store) Receive(ctx context.Context, id string, version int, action proto
 	if _, e := protocol.Encode(protocol.Message{RequestID: "validation", Payload: &protocol.OperationSubmit{OperationID: id, ContractVersion: version, Action: action}}); e != nil {
 		return Local{}, false, e
 	}
-	if action.Kind != "compose" && action.Kind != "shell" && action.Kind != "firewall" && action.Kind != "firewall_config" && action.Kind != "container" && action.Kind != "database" && !(action.Kind == "component" && action.Component != nil && action.Component.Component == "firewall" && action.Component.Action == "install") {
+	if action.Kind != "monitoring_deploy" && action.Kind != "compose" && action.Kind != "shell" && action.Kind != "firewall" && action.Kind != "firewall_config" && action.Kind != "container" && action.Kind != "database" && !(action.Kind == "component" && action.Component != nil && action.Component.Component == "firewall" && action.Component.Action == "install") {
 		return Local{}, false, firewall.Unsupported("当前版本不执行此类动作")
 	}
 	c, e := begin(ctx, s.DB)

@@ -180,6 +180,11 @@ export async function checkLayout(env) {
         assert(!overflow.document && !overflow.fields, '长节点名称、地址或公钥溢出'); await capture(`layout-long-node-${width}`);
       }
       metrics.push({ check: 'navigation', row, mobile, colors, menu, terminalPreserved: true });
+      await go('/tools/terminal');
+      const navigationBase = new URL(page.url()).pathname.replace(/\/tools\/terminal$/, '');
+      for (const [label, path] of [['监控', '/monitoring'], ['存储', '/storage']]) {
+        await page.getByRole('navigation', { name: '主导航', exact: true }).getByRole('link', { name: label, exact: true }).click(); await wait(() => new URL(page.url()).pathname.replace(/\/$/, '') === navigationBase + (path === '/' ? '' : path), `${label} 入口错误`);
+      }
     } finally { fixtures.nodes = originalNodes; }
   });
 

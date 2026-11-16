@@ -27,6 +27,9 @@ func (n *Node) describeOperation(ctx context.Context, tx firewallQuerier, r Requ
 		return json.Unmarshal([]byte(body), out)
 	}
 	switch r.Kind {
+	case "monitoring_config", "monitoring_deploy":
+		op.TargetName = "集中监控"
+		op.Resource = &OperationResource{Kind: "monitoring", NodeID: n.ID, ID: "monitoring"}
 	case "shared_initialize":
 		var input SharedInitialize
 		if err := json.Unmarshal(r.Payload, &input); err != nil {

@@ -225,6 +225,8 @@ func receiptResourceURL(value cluster.RequestReceipt) string {
 		return httpapi.APIBasePath + "/operations/" + value.OperationID
 	}
 	switch value.Kind {
+	case "storage_target", "storage_check":
+		return httpapi.APIBasePath + "/storage/targets/" + value.ResourceID
 	case "api-token":
 		return httpapi.APIBasePath + "/nodes/" + value.Owner + "/api-tokens/" + value.ResourceID
 	case "theme":

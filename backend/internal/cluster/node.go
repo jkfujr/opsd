@@ -21,6 +21,7 @@ import (
 	"github.com/jkfujr/opsd/internal/protocol"
 	"github.com/jkfujr/opsd/internal/sharedsql"
 	"github.com/jkfujr/opsd/internal/storage"
+	"github.com/jkfujr/opsd/internal/telemetry"
 )
 
 type Options struct {
@@ -84,6 +85,7 @@ type Node struct {
 	databaseReads        map[string]*managedDatabaseReadEntry
 	current              map[string]*currentRead
 	readSlots            chan struct{}
+	telemetry            *telemetry.Service
 }
 
 func Defaults(c Config) Config {
@@ -285,6 +287,7 @@ func Open(ctx context.Context, path string, o Options) (*Node, error) {
 			return nil, err
 		}
 	}
+	n.telemetry = n.newTelemetry(filepath.Dir(path))
 	return n, nil
 }
 func (n *Node) Start() {
@@ -295,6 +298,7 @@ func (n *Node) Start() {
 	}
 	n.started = true
 	n.wg.Add(11)
+	n.telemetry.Start(n.ctx)
 	n.mu.Unlock()
 	go func() { defer n.wg.Done(); n.discovery() }()
 	go func() { defer n.wg.Done(); n.queueLoop() }()
@@ -320,6 +324,7 @@ func (n *Node) Close() error {
 	}
 	n.mu.Unlock()
 	n.wg.Wait()
+	n.telemetry.Close()
 	n.storageMu.Lock()
 	if n.databaseHTTP != nil {
 		n.databaseHTTP.CloseIdleConnections()

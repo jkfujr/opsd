@@ -103,6 +103,9 @@ func (e *Engine) Run(ctx context.Context, id string) error {
 	if l.Action.Kind == "database" {
 		return e.database(ctx, &l)
 	}
+	if l.Action.Kind == "monitoring_deploy" {
+		return e.monitoring(ctx, &l)
+	}
 	if l.Action.FirewallConfig != nil && l.Action.FirewallConfig.AdoptFingerprint != "" {
 		return e.adoptFirewall(ctx, &l)
 	}
