@@ -562,17 +562,30 @@ func (n *Node) enqueueTx(ctx context.Context, origin string, r Request, related 
 	var existing string
 	var priorDigest []byte
 	// 去重与受理用同一归属：已认证来源 + 声明操作者 + 请求键。
+	// 同 ID 命中时先核对归属：不是本来源受理的记录，不能读回也不能执行 related。
+	var idOrigin string
+	var idActor string
+	if qe := tx.QueryRowContext(ctx, `SELECT body,request_digest,origin,actor FROM queue WHERE id=?`, r.ID).
+		Scan(&existing, &priorDigest, &idOrigin, &idActor); qe == nil {
+		if idOrigin != origin || idActor != actor {
+			return Operation{}, fault("forbidden", "操作标识已归属其他来源")
+		}
+	}
 	e = tx.QueryRowContext(ctx, `SELECT body,request_digest FROM queue
-		WHERE id=? OR (origin=? AND actor=? AND request_key<>'' AND request_key=?)`,
-		r.ID, origin, actor, r.Key).Scan(&existing, &priorDigest)
+		WHERE (origin=? AND actor=? AND request_key<>'' AND request_key=?)`,
+		origin, actor, r.Key).Scan(&existing, &priorDigest)
 	if e != nil && errors.Is(e, sql.ErrNoRows) && r.Key != "" {
 		// 迁移前的旧记录：(actor 为空) 且来源列存的是声明操作者。
 		// 这类记录**只能用来阻止重复执行**，归属无法确认，因此不读回原结果、
 		// 也不执行 related；按已知操作 ID 的授权查询仍然可用。
 		var legacy string
-		if qe := tx.QueryRowContext(ctx, `SELECT body FROM queue
-			WHERE actor='' AND origin=? AND request_key<>'' AND request_key=?`, actor, r.Key).Scan(&legacy); qe == nil {
+		qe := tx.QueryRowContext(ctx, `SELECT body FROM queue
+			WHERE actor='' AND origin=? AND request_key<>'' AND request_key=?`, actor, r.Key).Scan(&legacy)
+		if qe == nil {
 			return Operation{}, fault("outcome_unknown", "旧记录归属无法确认，请按操作标识查询原结果")
+		}
+		if !errors.Is(qe, sql.ErrNoRows) {
+			return Operation{}, qe
 		}
 	}
 	if e == nil {
@@ -1470,7 +1483,7 @@ func (n *Node) localOperations(ctx context.Context, q ListQuery) (OperationList,
 		query += " AND (kind<>'database' OR COALESCE(json_extract(body,'$.coordinator_epoch'),0)=0 OR json_extract(body,'$.node_id')=?)"
 		args = append(args, n.ID)
 	}
-	if q.Authorization == nil && q.Origin != "" && q.Origin != n.ID {
+	if q.Origin != "" && q.Origin != n.ID {
 		// 远端来源只看到自己有权推进的操作品种；过滤在分页与游标之前完成。
 		kinds := n.Capabilities.Kinds(q.Origin)
 		if len(kinds) == 0 {
@@ -1517,6 +1530,11 @@ func (n *Node) localOperations(ctx context.Context, q ListQuery) (OperationList,
 	if q.Key != "" {
 		query += " AND request_key=?"
 		args = append(args, q.Key)
+		if q.Origin != "" && q.Origin != n.ID {
+			// 请求键属于写入它的来源，不能跨入口按别人的键检索。
+			query += " AND origin=?"
+			args = append(args, q.Origin)
+		}
 		if q.Actor != "" {
 			query += " AND json_extract(body,'$.actor')=?"
 			args = append(args, q.Actor)

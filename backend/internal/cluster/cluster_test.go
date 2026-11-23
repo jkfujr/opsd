@@ -625,3 +625,23 @@ func authorizeAllPairs(t *testing.T, nodes ...*Node) {
 		}
 	}
 }
+
+// 操作标识不能跨来源复用：别的来源拿同一个 ID 既读不回原记录，也不能借它执行 related。
+func TestOperationIDBelongsToItsOrigin(t *testing.T) {
+	a, _ := openTestNode(t)
+	b, _ := openTestNode(t)
+	joinTest(t, b, a)
+	op, err := b.Submit(t.Context(), b.ID, Request{Kind: "name", Key: "owned", Payload: payload("原名")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	// a 用同一个操作 ID 提交：应当被拒绝，而不是返回 b 的记录。
+	if _, err := a.Submit(t.Context(), a.ID, Request{ID: op.ID, Kind: "name", Key: "other", Payload: payload("冒名")}); err == nil {
+		t.Fatal("跨来源复用操作标识未被拒绝")
+	}
+	// 原记录不变。
+	got, err := b.GetOperation(t.Context(), op.ID)
+	if err != nil || got.ID != op.ID {
+		t.Fatalf("原记录被影响：%v %v", got, err)
+	}
+}
