@@ -504,14 +504,50 @@ func (f *archiveNative) history(t *testing.T, n *Node, c metricsstore.Config) ma
 		text := fmt.Sprintf("# TYPE opsd_node_cpu_usage_percent gauge\nopsd_node_cpu_usage_percent{node_id=%q} 42.125 %d\nopsd_node_cpu_usage_percent{node_id=%q} 43.125 %d\n# EOF\n", n.ID, at.Unix(), n.ID, at.Add(time.Second).Unix())
 		// Prometheus TSDB 的块档位上限是 486h；跨度超过当前窗口就会被切成多个单样本块，
 		// 那样 Thanos 既不会生成 5 分钟汇总，也不会生成 1 小时汇总。
+		// Prometheus TSDB 的块档位上限是 486h；超过当前窗口的样本会被切成多个短块。
 		blockDuration := 486 * time.Hour
 		if days > 31 {
-			// Thanos 生成 1 小时汇总要求块跨度 ≥10 天。把首尾两点放进同一个 486h
-			// 对齐窗口，保证 promtool 产出一个 12 天跨度的块（实测 span=288h，1 块）。
-			window := time.Now().UTC().Truncate(blockDuration)
-			at = window.Add(time.Hour)
+			// 边界样本保持真实年龄：364/366 天用于保留策略与查询断言。
 			first := at.Add(-12 * 24 * time.Hour)
 			text = fmt.Sprintf("# TYPE opsd_node_cpu_usage_percent gauge\nopsd_node_cpu_usage_percent{node_id=%q} 40 %d\nopsd_node_cpu_usage_percent{node_id=%q} 42.125 %d\nopsd_node_cpu_usage_percent{node_id=%q} 43.125 %d\n# EOF\n", n.ID, first.Unix(), n.ID, at.Unix(), n.ID, at.Add(time.Second).Unix())
+			if days == 366 {
+				// 边界样本的 12 天跨度会跨窗口被切开（实测切成两块、跨度 0），
+				// Thanos 因此不会生成 5 分钟与 1 小时汇总。这里另造一个锚在 486h
+				// 对齐窗口内的 12 天长块（实测 1 块、跨度 288h）；锚点比 at 再前移
+				// 489h，保证它同样早于 365 天保留线，参与过期与删除标记断言。
+				longRoot := filepath.Join(f.root, "history-long-366")
+				if err := os.MkdirAll(longRoot, 0755); err != nil {
+					t.Fatal(err)
+				}
+				// 注意：Go 的 Time.Truncate 相对零值时间取整，promtool 的块边界相对
+				// Unix 纪元取整，两者相差约 97 小时，直接用 Truncate 会让两点跨窗口。
+				// 这里按纪元取整，得到与 promtool 一致的 486h 窗口起点。
+				rangeSeconds := int64(blockDuration / time.Second)
+				shifted := at.Add(-489 * time.Hour).Unix()
+				anchor := time.Unix(shifted-shifted%rangeSeconds, 0).UTC()
+				longFirst := anchor.Add(time.Hour)
+				longText := fmt.Sprintf("# TYPE opsd_node_cpu_usage_percent gauge\nopsd_node_cpu_usage_percent{node_id=%q} 40 %d\nopsd_node_cpu_usage_percent{node_id=%q} 42.125 %d\n# EOF\n", n.ID, longFirst.Unix(), n.ID, longFirst.Add(288*time.Hour).Unix())
+				if err := os.WriteFile(filepath.Join(longRoot, "input.prom"), []byte(longText), 0644); err != nil {
+					t.Fatal(err)
+				}
+				f.command(t, "docker", "run", "--rm", "--user", "0:0", "--entrypoint", "/bin/promtool", "-v", longRoot+":/work", "prom/prometheus:v3.5.0", "tsdb", "create-blocks-from", "openmetrics", "--max-block-duration="+blockDuration.String(), "/work/input.prom", "/work/blocks")
+				longEntries, err := os.ReadDir(filepath.Join(longRoot, "blocks"))
+				if err != nil {
+					t.Fatal(err)
+				}
+				// 主用例的 promtool 还没跑，blocks 目录尚不存在；先建好再并入。
+				if err = os.MkdirAll(filepath.Join(root, "blocks"), 0755); err != nil {
+					t.Fatal(err)
+				}
+				for _, entry := range longEntries {
+					if !entry.IsDir() || len(entry.Name()) != 26 {
+						continue
+					}
+					if err = os.Rename(filepath.Join(longRoot, "blocks", entry.Name()), filepath.Join(root, "blocks", entry.Name())); err != nil {
+						t.Fatal(err)
+					}
+				}
+			}
 		}
 		if err := os.WriteFile(filepath.Join(root, "input.prom"), []byte(text), 0644); err != nil {
 			t.Fatal(err)
