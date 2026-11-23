@@ -60,7 +60,7 @@ func (e *Engine) updateContainer(ctx context.Context, l *Local, boot string) err
 	}
 	defer file.Close()
 	// 读回与人工核对都在上面完成；真正发出更新命令前才复核策略。
-	if denied, denyErr := e.denyRestricted(ctx, l); denyErr != nil {
+	if denied, denyErr := e.denyRestricted(ctx, l, false); denyErr != nil {
 		return denyErr
 	} else if denied {
 		return nil

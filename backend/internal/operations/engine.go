@@ -536,13 +536,19 @@ func (e *Engine) install(ctx context.Context, l *Local, boot string) error {
 //
 // 判定必须落在"发命令前"这一刻：早于此会结案掉仍需要读回的操作，
 // 晚于此则命令已经发出去。取消、人工解决与只读核对从不经过这里。
-func (e *Engine) denyRestricted(ctx context.Context, l *Local) (bool, error) {
+func (e *Engine) denyRestricted(ctx context.Context, l *Local, attempted bool) (bool, error) {
 	if e.deny == nil {
 		return false, nil
 	}
 	if err := e.deny(*l.Action); err != nil {
 		// e.end 结案成功时返回 nil，因此必须单独返回"已拒绝"，
 		// 否则调用方会以为没拒绝而继续执行。
+		//
+		// 已经尝试过、结果待核对的步骤不能结案：那样会连同人工核对与
+		// 解决入口一起丢掉。此时转成待核对并记录策略原因，进度保留。
+		if attempted {
+			return true, e.attention(ctx, l, err)
+		}
 		return true, e.end(ctx, l, protocol.Failed, err)
 	}
 	return false, nil

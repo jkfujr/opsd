@@ -100,7 +100,7 @@ func (e *Engine) database(ctx context.Context, l *Local) error {
 				}
 			}
 			// 真正发出新命令（含对原步骤的重试）之前复核。
-			if denied, denyErr := e.denyRestricted(ctx, l); denyErr != nil {
+			if denied, denyErr := e.denyRestricted(ctx, l, state.Attempted); denyErr != nil {
 				return denyErr
 			} else if denied {
 				return nil

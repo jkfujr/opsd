@@ -105,3 +105,49 @@ func exists(path string) bool {
 }
 
 var errPolicyClosedForTest = fmt.Errorf("本机策略已关闭可执行代码能力")
+
+// TestAttemptedDatabaseStepKeepsManualPath 覆盖 A2 的收尾语义：
+// 已尝试、结果待核对的部署步骤在策略关闭后被拒时，必须保留待核对状态与执行进度，
+// 不能重复下发 Apply，人工解决仍然可受理。
+func TestAttemptedDatabaseStepKeepsManualPath(t *testing.T) {
+	e, _, _ := operationFixture(t)
+	runtime := databaseRuntimeFixture()
+	runtime.stages = []string{"deploy_docker", "deploy_create"}
+	e.Databases = runtime
+	local := accept(t, e, "policy-db", databaseAction())
+
+	// 模拟"已尝试、结果未知"：记录进度并置 Attempted。
+	step := 0
+	local.IntentStep = &step
+	local.Record.State = protocol.AttentionRequired
+	local.ContainerState = nil
+	if err := e.Store.Save(t.Context(), &local); err != nil {
+		t.Fatal(err)
+	}
+
+	denied := true
+	e.SetDenyAction(func(protocol.OperationAction) error {
+		if denied {
+			return errPolicyClosedForTest
+		}
+		return nil
+	})
+	before := runtime.writes["deploy_docker"]
+
+	// 人工请求"接受现状"后重跑：应被策略拒绝，但保留待核对而不是结案。
+	if _, err := e.Store.Request(t.Context(), local.Record.ID, "resolve", local.Record.Revision); err != nil {
+		t.Fatal(err)
+	}
+	_ = e.Run(t.Context(), local.Record.ID)
+
+	after, err := e.Store.Get(t.Context(), local.Record.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if after.Record.State == protocol.Failed {
+		t.Fatal("已尝试的步骤不应被结案为失败，否则人工解决入口丢失")
+	}
+	if runtime.writes["deploy_docker"] != before {
+		t.Fatal("被拒绝时不应再次下发 Apply")
+	}
+}

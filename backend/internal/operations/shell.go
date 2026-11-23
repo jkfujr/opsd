@@ -58,7 +58,7 @@ func (e *Engine) shell(ctx context.Context, l *Local, boot string) error {
 	if l.Action.Shell == nil || e.LogDirectory == "" {
 		return e.end(ctx, l, protocol.Rejected, fmt.Errorf("任务执行参数不完整"))
 	}
-	if denied, err := e.denyRestricted(ctx, l); err != nil {
+	if denied, err := e.denyRestricted(ctx, l, false); err != nil {
 		return err
 	} else if denied {
 		return nil

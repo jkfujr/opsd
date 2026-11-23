@@ -105,7 +105,7 @@ func (e *Engine) compose(ctx context.Context, l *Local, boot string) error {
 	names := map[string]string{"pull": "拉取项目镜像", "start": "启动项目", "stop": "停止项目", "recreate": "重建项目"}
 	for i := l.NextStep; i < len(steps); i++ {
 		// 每一步真正下发之前复核：已发出的步骤保留读回路径，未发的步骤被拒。
-		if denied, denyErr := e.denyRestricted(ctx, l); denyErr != nil {
+		if denied, denyErr := e.denyRestricted(ctx, l, false); denyErr != nil {
 			return denyErr
 		} else if denied {
 			return nil
