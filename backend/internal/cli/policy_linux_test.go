@@ -283,3 +283,60 @@ func TestExecutorRestartKeepsRunningOperation(t *testing.T) {
 	}
 	t.Fatalf("执行器重启后任务未完成，状态 %v", local.Record.State)
 }
+
+// TestInstallUnitsForBootCheck 把当前构建的单元写进 /etc/systemd/system 并启用，
+// 供一次真实的启动顺序验收使用（wsl --terminate 后观察 journal）。
+// 由 OPSD_BOOT_CHECK=1 显式触发，避免在普通测试里改动宿主。
+func TestInstallUnitsForBootCheck(t *testing.T) {
+	if os.Getenv("OPSD_BOOT_CHECK") != "1" || os.Geteuid() != 0 {
+		t.Skip("设置 OPSD_BOOT_CHECK=1 且以 root 运行")
+	}
+	binary := os.Getenv("OPSD_TEST_BINARY")
+	if binary == "" {
+		t.Skip("未提供本地 Linux 节点程序")
+	}
+	// 必须用持久目录：重启会清空 /tmp，配置与二进制都得留在原处，
+	// 否则开机验收会退化成"文件不存在"的假失败。
+	dir := "/var/lib/opsd-bootcheck"
+	if err := os.RemoveAll(dir); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	data := filepath.Join(dir, "node")
+	execDir := filepath.Join(dir, "exec")
+	for _, path := range []string{data, execDir} {
+		if err := os.MkdirAll(path, 0755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	f := installation.NodeFile{
+		DataDir: data, ExecutorDir: execDir,
+		Socket:        filepath.Join(dir, "executor.sock"),
+		ControlSocket: filepath.Join(data, "control.sock"),
+		Binary:        binary,
+		OperationPolicy: json.RawMessage(`{"arbitrary_code":false}`),
+	}
+	config := filepath.Join(dir, "node.json")
+	if err := localstate.Write(config, f, 0644); err != nil {
+		t.Fatal(err)
+	}
+	for name, body := range installation.Units(f, config) {
+		if err := os.WriteFile(filepath.Join("/etc/systemd/system", name), []byte(body), 0644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if output, err := runCommand("systemctl", "daemon-reload"); err != nil {
+		t.Fatalf("daemon-reload 失败：%v %s", err, firstLine(output))
+	}
+	// 只启用不启动：启动动作交给一次真实的发行版启动来完成。
+	if output, err := runCommand("systemctl", "enable", "opsd-recover.service", "opsd-executor.service"); err != nil {
+		t.Fatalf("enable 失败：%v %s", err, firstLine(output))
+	}
+	// 写一行标记，供重启后确认配置路径没变。
+	if err := os.WriteFile("/tmp/opsd-boot-check.json", []byte(config), 0644); err != nil {
+		t.Fatal(err)
+	}
+	t.Logf("单元已安装并启用，配置：%s", config)
+}
