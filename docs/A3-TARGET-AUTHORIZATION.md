@@ -11,8 +11,10 @@
 
 目标节点从**成员通道**取得来源 ID（`servePeer` 建立连接时已认证），这是唯一的授权主体。
 
-- 请求体里的 `Actor`／操作者字段只作为**声明信息**处理：既不用于授权，也不记录成"已认证的操作者"。
+- 请求体里的 `Actor`／操作者字段只作为**声明信息**处理：既不用于授权，也不记录成"已认证的操作者"，日志中必须标为未核验。
 - 因此第一阶段的粒度是"来源节点"，不是"某个人"。人员级判定属于后续阶段（A3-b），届时仍由目标节点判定人员与资源权限。
+
+**必须修掉的一处现状**：`enqueueTx` 现在用载荷里的 `Actor` **覆盖** `origin`，回执查询也按 `Actor` 查找——声明字段因此能跨来源命中别人的幂等键、读到别人的回执。首版要把两者彻底分开：幂等键与回执归属一律用**认证来源**；声明操作者只进日志并标为未核验；跨入口遇到未知结果时凭**已知操作 ID** 经授权查询原记录。
 
 ### 按内层动作授权，不按外层方法名
 
@@ -21,7 +23,7 @@
 规则：
 
 1. `submit` 的授权依据是 **内层动作类型 + 资源标识**；
-2. `operation.cancel`／`confirm`／`recover`／`resolve`／`get`／`list` 等**继承原操作的权限**：能提交某类操作，才能推进或查询它；
+2. `operation.cancel`／`confirm`／`recover`／`resolve`／`get`／`list`、`api.operation.decision`、`api.request` 以及数据库推进方法（`database.recover`／`resolve`／`reconcile` 等）都**继承原操作及其资源的权限**，且必须在**返回原结果或执行副作用之前**判定；
 3. 无法解析出内层动作的 `submit` 直接 `forbidden`。
 
 ## 2. 能力存放：目标节点的 root 配置
@@ -118,8 +120,11 @@ shared.status
 | 通道 | 归属 |
 |---|---|
 | 终端（`serveTerminal`） | 独立能力 `terminal`；**高风险开关由 A4 单列** |
-| 监控流（`serveArchive`／`monitoring_stream.go`） | 独立能力 `read_monitoring_stream` |
-| `archive.*` 前缀 | 归入上述监控流能力 |
+| 归档读取（`serveArchive`、`archive.*`） | 独立能力 `read_archive` |
+| 监控流上传（`telemetry/stream.go` 的 `upload`） | 独立能力 `upload_monitoring` |
+| 监控流回执（按来源读取的 `receipts`） | 独立能力 `read_stream_receipts`，只读自己 |
+
+归档读取与监控流上传**不能合并**：一个是从目标取数据，一个是把数据推到目标，方向与风险都不同。
 
 ### 4.5 未知方法
 
@@ -161,11 +166,14 @@ request_id、reason
 | 4 | 未登记方法一律 `forbidden`，无兜底路径 |
 | 5 | `submit` 按内层动作判定：只读核对放行、shell 任务被拒 |
 | 6 | `operation.cancel`／`confirm`／`recover`／`resolve` 继承原操作权限 |
-| 7 | `api_token.*` 需要 `manage_tokens`，普通成员无法自我提权 |
+| 7 | 令牌**管理**（`api_token.create`／`update`／`delete`／`list`／`get`）需要 `manage_tokens`；`api_token.verify` 是所属节点的身份核验调用，单独授权 |
 | 8 | `storage.check`／`storage.credentials` 不被当作只读 |
 | 9 | 旧版本来源只允许 `ping`／`directory`；混合版本下新目标与旧目标行为都被覆盖 |
 | 10 | 登记表中的每个方法都被授权测试覆盖，新增方法未登记即测试失败 |
 | 11 | 拒绝日志含来源、目标、方法、资源、请求 ID 与原因，且不含请求体与凭据 |
+| 12 | 声明操作者无法跨来源命中幂等键或读取回执 |
+| 13 | `operation.list` 先按权限过滤再分页 |
+| 14 | 归档读取、监控流上传、监控流回执分别受独立能力约束 |
 
 ## 8. 已定事项
 
