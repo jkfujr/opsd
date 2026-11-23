@@ -165,7 +165,7 @@ curl -fsS -X PUT "$OPSD_API_URL/nodes/$OPSD_NODE_ID/tasks/check/definition" \
   --data '{"name":"检查","schedule":"30 2 * * *","timezone":"Asia/Shanghai","script":"printf ok","directory":"/tmp","enabled":false}'
 ```
 
-任务使用五字段 cron 和 IANA 时区；脚本经 `/bin/bash -lc` 执行。重启只注册未来计划，错过不补跑。同任务禁止重入，每节点最多八个未结束任务。`POST/GET …/{task_id}/executions` 执行或读取记录，执行正文发送当前任务 `expected_revision`。取消通过原 Operation；日志 `data` 为 Base64，使用 `next_offset`、`has_more` 继续，每批最多 64 KiB、总保存最多 16 MiB，`truncated` 表示达到上限。
+任务使用五字段 cron 和 IANA 时区；脚本经 `/bin/bash -lc` 执行。重启只注册未来计划，错过不补跑。同任务禁止重入，每节点最多八个未结束任务。`POST/GET …/{task_id}/executions` 执行或读取记录，执行正文发送当前任务 `expected_revision`。执行记录由所属节点按任务与 `task_run` 过滤，按 `created_at`、ID 降序查询当前页；游标绑定任务、查询条件和授权范围，旧 ID 游标返回 400 后重新读取首页。取消通过原 Operation；日志 `data` 为 Base64，使用 `next_offset`、`has_more` 继续，每批最多 64 KiB、总保存最多 16 MiB，`truncated` 表示达到上限。
 
 Compose 集合为 `/compose-projects`，详情位于 `/nodes/{node_id}/engines/{engine_id}/compose-projects/{project_id}`。单项 `GET /registration` 读取已登记配置和 ETag，`PUT /registration` 首次使用 `If-None-Match: *`、替换使用原登记的 `If-Match`，并提供请求键。`POST /actions` 发送 `action`、`expected_revision` 和请求键。定义文件内容参与动作版本核验；执行前再次检查实际项目，配置编辑继续使用 SSH。容器详情、日志与动作采用相同节点／Engine／完整容器 ID 归属。
 

@@ -80,7 +80,7 @@ func collectionOwner(item map[string]any) string {
 }
 func (s *Server) prepareAPIResponse(w *apiResponse, r *http.Request) {
 	state := apiRequestOf(r.Context())
-	if state == nil || w.status() < 200 || w.status() >= 300 || !state.route.Pagination || state.route.OperationID == "listOperations" {
+	if state == nil || w.status() < 200 || w.status() >= 300 || !state.route.Pagination || state.route.OperationID == "listOperations" || state.route.OperationID == "listScheduledTaskRuns" {
 		return
 	}
 	var value map[string]any

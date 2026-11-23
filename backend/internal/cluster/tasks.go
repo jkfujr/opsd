@@ -27,6 +27,12 @@ type ScheduledTask struct {
 	NextAt    *time.Time `json:"next_at,omitempty"`
 }
 
+type TaskRunsQuery struct {
+	TaskID string             `json:"task_id"`
+	Before *OperationPosition `json:"before,omitempty"`
+	Limit  int                `json:"limit"`
+}
+
 func (t ScheduledTask) schedule() (cron.Schedule, error) {
 	if t.Timezone == "" || !operations.ValidID(t.ID) || len(strings.Fields(t.Schedule)) != 5 || strings.ContainsAny(t.Timezone, " \t\r\n") {
 		return nil, fault("invalid_request", "任务标识、五字段计划或时区无效")
@@ -108,6 +114,8 @@ func (n *Node) taskDispatch(ctx context.Context, origin, method string, body jso
 		}
 		return n.runTaskDigest(ctx, origin, input.ID, input.Key, input.Digest, input.ExpectedRevision)
 	case "task.runs":
+		// 兼容旧契约：入参为任务 ID 字符串，返回该任务的全部执行记录。
+		// 滚动更新期间新控制台仍可能调用旧节点，旧节点也只认这个形状。
 		var id string
 		if e := json.Unmarshal(body, &id); e != nil {
 			return nil, e
@@ -130,6 +138,12 @@ func (n *Node) taskDispatch(ctx context.Context, origin, method string, body jso
 			out = append(out, op)
 		}
 		return out, rows.Err()
+	case "task.runs.page":
+		var q TaskRunsQuery
+		if e := json.Unmarshal(body, &q); e != nil {
+			return nil, e
+		}
+		return n.taskRuns(ctx, q)
 	case "execution.logs":
 		var input protocol.ExecutionLogsRead
 		if e := json.Unmarshal(body, &input); e != nil {
@@ -166,6 +180,44 @@ func (n *Node) taskDispatch(ctx context.Context, origin, method string, body jso
 	}
 	return nil, fault("invalid_request", "任务操作无效")
 }
+
+func (n *Node) taskRuns(ctx context.Context, q TaskRunsQuery) (OperationList, error) {
+	out := OperationList{Items: []Operation{}}
+	if !operations.ValidID(q.TaskID) || q.Limit < 1 || q.Limit > 100 || q.Before != nil && (q.Before.CreatedAt.IsZero() || operationOwner(q.Before.ID) != n.ID) {
+		return out, fault("invalid_request", "任务执行记录的分页条件无效")
+	}
+	query := "SELECT body FROM queue WHERE kind='task_run' AND json_extract(body,'$.resource_id')=? AND json_extract(body,'$.node_id')=?"
+	args := []any{q.TaskID, n.ID}
+	if q.Before != nil {
+		query += " AND (" + operationCreatedOrder + ") < (?,?,?)"
+		args = append(args, q.Before.CreatedAt.UTC().Format("2006-01-02T15:04:05"), float64(q.Before.CreatedAt.Nanosecond())/1e9, q.Before.ID)
+	}
+	query += " ORDER BY " + operationCreatedOrderDesc + " LIMIT ?"
+	args = append(args, q.Limit+1)
+	rows, e := n.DB.QueryContext(ctx, query, args...)
+	if e != nil {
+		return out, e
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var body string
+		var op Operation
+		if e = rows.Scan(&body); e != nil {
+			return out, e
+		}
+		if e = json.Unmarshal([]byte(body), &op); e != nil {
+			return out, e
+		}
+		out.Items = append(out.Items, op)
+	}
+	if len(out.Items) > q.Limit {
+		out.Items = out.Items[:q.Limit]
+		last := out.Items[len(out.Items)-1]
+		out.Next = &OperationPosition{CreatedAt: last.CreatedAt, ID: last.ID}
+	}
+	return out, rows.Err()
+}
+
 func (n *Node) runTask(ctx context.Context, origin, id, key string) (Operation, error) {
 	return n.runTaskDigest(ctx, origin, id, key, "")
 }

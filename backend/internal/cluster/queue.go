@@ -49,7 +49,7 @@ func (n *Node) dispatch(ctx context.Context, origin, method string, body json.Ra
 	if validateManagedDatabaseKind(method) {
 		return n.databaseDispatch(ctx, origin, method, body)
 	}
-	if method == "tasks.list" || method == "task.get" || method == "task.run" || method == "task.runs" || method == "execution.logs" {
+	if method == "tasks.list" || method == "task.get" || method == "task.run" || method == "task.runs" || method == "task.runs.page" || method == "execution.logs" {
 		return n.taskDispatch(ctx, origin, method, body)
 	}
 	if method == "compose.list" {
@@ -1386,6 +1386,10 @@ type OperationPosition struct {
 	ID        string    `json:"id"`
 }
 
+// 历史 JSON 的 UTC 时间保留原样；分别比较秒和小数，兼容可变精度。
+const operationCreatedOrder = "substr(json_extract(body,'$.created_at'),1,19),CAST('0'||substr(json_extract(body,'$.created_at'),20) AS REAL),id"
+const operationCreatedOrderDesc = "substr(json_extract(body,'$.created_at'),1,19) DESC,CAST('0'||substr(json_extract(body,'$.created_at'),20) AS REAL) DESC,id DESC"
+
 func operationBefore(a, b Operation) bool {
 	if a.CreatedAt.Equal(b.CreatedAt) {
 		return a.ID > b.ID
@@ -1473,13 +1477,11 @@ func (n *Node) localOperations(ctx context.Context, q ListQuery) (OperationList,
 		query += " AND json_extract(body,'$.state')=?"
 		args = append(args, q.State)
 	}
-	// 历史 JSON 的 UTC 时间保留原样；分别比较秒和小数，兼容可变精度。
-	const createdOrder = "substr(json_extract(body,'$.created_at'),1,19),CAST('0'||substr(json_extract(body,'$.created_at'),20) AS REAL),id"
 	if q.Before != nil {
-		query += " AND (" + createdOrder + ") < (?,?,?)"
+		query += " AND (" + operationCreatedOrder + ") < (?,?,?)"
 		args = append(args, q.Before.CreatedAt.UTC().Format("2006-01-02T15:04:05"), float64(q.Before.CreatedAt.Nanosecond())/1e9, q.Before.ID)
 	}
-	query += " ORDER BY substr(json_extract(body,'$.created_at'),1,19) DESC,CAST('0'||substr(json_extract(body,'$.created_at'),20) AS REAL) DESC,id DESC LIMIT ?"
+	query += " ORDER BY " + operationCreatedOrderDesc + " LIMIT ?"
 	args = append(args, q.Limit+1)
 	rows, e := n.DB.QueryContext(ctx, query, args...)
 	out := OperationList{Items: []Operation{}}

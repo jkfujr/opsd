@@ -177,27 +177,99 @@ function TaskEditor({ open, task, onClose }: { open: boolean; task?: ScheduledTa
 
 function RunsSheet({ task, onClose }: { task: ScheduledTaskMetadata | null; onClose: () => void }) {
   const [selected, setSelected] = useState<Operation | null>(null);
-  useEffect(() => setSelected(null), [task?.id]);
+  // 开始翻页即冻结当时的首页与游标：轮询继续，但不再改写已展示的页边界，
+  // 否则新记录会把最后一条挤出首页、又不落在更早页里，导致漏行。
+  const [frozen, setFrozen] = useState<{ ids: string[]; next?: string } | null>(null);
+  const [older, setOlder] = useState<Operation[]>([]);
+  const [cursor, setCursor] = useState<string | undefined>(undefined);
+  const [paging, setPaging] = useState<{ busy: boolean; error: unknown }>({ busy: false, error: null });
+  const abort = useRef<AbortController | null>(null);
+  const key = task ? `${task.node_id}/${task.id}` : '';
+  const keyRef = useRef(key);
+  useEffect(() => {
+    keyRef.current = task ? `${task.node_id}/${task.id}` : '';
+  }, [task?.node_id, task?.id]);
   const q = useQuery({
     queryKey: ['tasks', 'runs', task?.node_id, task?.id],
-    queryFn: ({ signal }) => get<ScheduledTaskRuns>(`/nodes/${enc(task!.node_id!)}/tasks/${enc(task!.id)}/executions`, { signal, query: { limit: 50 } }),
+    queryFn: ({ signal }) => get<ScheduledTaskRuns>(`/nodes/${enc(task!.node_id!)}/tasks/${enc(task!.id!)}/executions`, { signal, query: { limit: 50 } }),
     enabled: !!task,
     refetchInterval: 5000,
   });
-  const current = selected ? q.data?.items.find((o) => o.id === selected.id) ?? selected : null;
+  // 切换任务或关闭面板：取消在途翻页，丢弃其结果与游标。
+  useEffect(() => {
+    setSelected(null);
+    setFrozen(null);
+    setOlder([]);
+    setCursor(undefined);
+    setPaging({ busy: false, error: null });
+    abort.current?.abort();
+    abort.current = null;
+  }, [task?.node_id, task?.id]);
+  const latest = () => {
+    abort.current?.abort();
+    abort.current = null;
+    setFrozen(null);
+    setOlder([]);
+    setCursor(undefined);
+    setPaging({ busy: false, error: null });
+  };
+  // 按 ID 取最新对象：首页来自轮询（状态会变），更早页是静态取回的。
+  const byId = useMemo(() => {
+    const map = new Map<string, Operation>();
+    for (const o of older) map.set(o.id, o);
+    for (const o of q.data?.items ?? []) map.set(o.id, o);
+    return map;
+  }, [q.data, older]);
+  // 冻结只影响"显示哪些、按什么顺序"，记录本身仍跟随轮询更新状态。
+  const items = useMemo(() => {
+    if (!frozen) return q.data?.items ?? [];
+    const seen = new Set<string>();
+    return frozen.ids
+      .map((id) => byId.get(id))
+      .filter((o): o is Operation => !!o && !seen.has(o.id) && !!seen.add(o.id));
+  }, [frozen, byId, q.data]);
+  const current = selected ? byId.get(selected.id) ?? selected : null;
+  const more = frozen ? cursor ?? frozen.next : q.data?.next_cursor;
+  const loadOlder = async () => {
+    if (!task || !more || paging.busy) return;
+    const controller = new AbortController();
+    abort.current?.abort();
+    abort.current = controller;
+    const startedAt = key;
+    // 点击即固定边界：首次翻页在途时也能"返回最新"，不会有中间态。
+    if (!frozen) setFrozen({ ids: (q.data?.items ?? []).map((o) => o.id), next: more });
+    setPaging({ busy: true, error: null });
+    try {
+      const page = await get<ScheduledTaskRuns>(`/nodes/${enc(task.node_id!)}/tasks/${enc(task.id)}/executions`, { signal: controller.signal, query: { limit: 50, cursor: more } });
+      // 迟到的应答不得写进另一个任务，也不得覆盖新一轮请求的结果。
+      if (controller.signal.aborted || abort.current !== controller || keyRef.current !== startedAt) return;
+      setOlder((list) => [...list, ...page.items]);
+      setFrozen((f) => (f ? { ...f, ids: [...f.ids, ...page.items.map((o) => o.id)] } : f));
+      setCursor(page.next_cursor);
+      setPaging({ busy: false, error: null });
+    } catch (reason) {
+      if (controller.signal.aborted) return;
+      // 游标绑定任务与授权范围；失效时提示并保留重试入口，不静默停在旧位置。
+      setPaging({ busy: false, error: reason });
+    }
+  };
   return (
-    <Sheet open={!!task} onClose={onClose} width={860} title={task ? `${task.name} · 执行记录` : ''} sub={task?.node_name} actions={current && <Button size="sm" variant="ghost" icon={<ChevronLeft />} onClick={() => setSelected(null)}>返回列表</Button>}>
+    <Sheet open={!!task} onClose={onClose} width={860} title={task ? `${task.name} · 执行记录` : ''} sub={task?.node_name} actions={<>
+        {current && <Button size="sm" variant="ghost" icon={<ChevronLeft />} onClick={() => setSelected(null)}>返回列表</Button>}
+        {!current && frozen && <Button size="sm" variant="ghost" onClick={latest}>返回最新</Button>}
+      </>}>
       {q.isError && <ErrorNotice error={q.error} retry={() => void q.refetch()} />}
+      {!current && !!paging.error && <ErrorNotice error={paging.error} retry={() => void loadOlder()} />}
       {current ? (
         <motion.div className="stack" key={current.id} initial={{ opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }}>
           <div className="row wrap"><Badge tone={operationTone(current.state)} dot>{operationStateLabel[current.state]}</Badge><span className="muted">{fullTime(current.created_at)}</span><span className="muted">耗时 {duration((Date.parse(current.updated_at) - Date.parse(current.created_at)) / 1000)}</span>{current.actor && <Tag>{current.actor}</Tag>}</div>
           {current.error && <Notice tone="bad">{current.error.message}</Notice>}
           <OperationLogs op={current} height="calc(100vh - 300px)" />
         </motion.div>
-      ) : !q.data ? <Skeleton height={200} /> : q.data.items.length === 0 ? <Empty icon={<History />} title="还没有执行记录" /> : (
+      ) : !q.data ? <Skeleton height={200} /> : items.length === 0 ? <Empty icon={<History />} title="还没有执行记录" /> : (
         <Card>
           <div className="list">
-            {q.data.items.map((o) => (
+            {items.map((o) => (
               <button key={o.id} type="button" className="list-item clickable" style={{ width: '100%', textAlign: 'left' }} onClick={() => setSelected(o)}>
                 <Dot tone={operationTone(o.state)} live={o.state === 'applying'} />
                 <div className="li-main">
@@ -208,6 +280,11 @@ function RunsSheet({ task, onClose }: { task: ScheduledTaskMetadata | null; onCl
               </button>
             ))}
           </div>
+          {more && (
+            <div className="row" style={{ justifyContent: "center", paddingTop: 12 }}>
+              <Button size="sm" variant="ghost" busy={paging.busy} onClick={() => void loadOlder()}>更早记录</Button>
+            </div>
+          )}
         </Card>
       )}
     </Sheet>

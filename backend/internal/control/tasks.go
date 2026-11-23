@@ -1,6 +1,9 @@
 package control
 
 import (
+	"encoding/base64"
+	"errors"
+	"encoding/json"
 	"github.com/jkfujr/opsd/internal/cluster"
 	"github.com/jkfujr/opsd/internal/httpapi"
 	"github.com/jkfujr/opsd/internal/protocol"
@@ -63,10 +66,48 @@ func (s *Server) ExecuteScheduledTask(w http.ResponseWriter, r *http.Request, id
 	}
 	s.resultError(w, r, 202, op, e)
 }
-func (s *Server) ListScheduledTaskRuns(w http.ResponseWriter, r *http.Request, id, taskId string, _ httpapi.ListScheduledTaskRunsParams) {
-	var items []cluster.Operation
-	e := s.node.Call(r.Context(), id, "task.runs", taskId, &items)
-	s.resultError(w, r, 200, httpapi.ScheduledTaskRuns{Items: convertHTTP[[]httpapi.Operation](items)}, e)
+func (s *Server) ListScheduledTaskRuns(w http.ResponseWriter, r *http.Request, id, taskId string, p httpapi.ListScheduledTaskRunsParams) {
+	q := cluster.TaskRunsQuery{TaskID: taskId, Limit: 50}
+	if p.Limit != nil {
+		q.Limit = *p.Limit
+	}
+	cursor, e := decodeCursor(r)
+	if e != nil {
+		s.fail(w, r, 400, "malformed_request", e.Error())
+		return
+	}
+	if r.URL.Query().Get("cursor") != "" {
+		body, err := base64.RawURLEncoding.DecodeString(cursor.Position)
+		if err != nil || len(body) > 16000 || json.Unmarshal(body, &q.Before) != nil || q.Before == nil || q.Before.CreatedAt.IsZero() || cluster.OperationOwner(q.Before.ID) != id {
+			s.fail(w, r, 400, "malformed_request", "分页位置无效")
+			return
+		}
+	}
+	var list cluster.OperationList
+	e = s.node.Call(r.Context(), id, "task.runs.page", q, &list)
+	if legacyNeeded(e) {
+		// 目标节点是旧版本：它按 seq 倒序返回全部记录，没有分页能力。
+		// 已带新游标的请求说明客户端先看到了分页应答，此时让客户端重读首页，
+		// 避免把首页当成下一页追加。
+		if r.URL.Query().Get("cursor") != "" {
+			s.fail(w, r, 400, "malformed_request", "目标节点不支持分页，请重新读取首页")
+			return
+		}
+		var items []cluster.Operation
+		e = s.node.Call(r.Context(), id, "task.runs", taskId, &items)
+		if e == nil && len(items) > q.Limit {
+			items = items[:q.Limit]
+		}
+		// 旧节点没有游标，不生成 next_cursor；界面退化为只显示最近一页。
+		list = cluster.OperationList{Items: items}
+	}
+	out := httpapi.ScheduledTaskRuns{Items: convertHTTP[[]httpapi.Operation](list.Items)}
+	if list.Next != nil {
+		body, _ := json.Marshal(list.Next)
+		cursor := encodeCursor(r, collectionCursor{Position: base64.RawURLEncoding.EncodeToString(body)})
+		out.NextCursor = &cursor
+	}
+	s.resultError(w, r, 200, out, e)
 }
 func (s *Server) ReadExecutionLogs(w http.ResponseWriter, r *http.Request, operationId string, p httpapi.ReadExecutionLogsParams) {
 	input := protocol.ExecutionLogsRead{OperationID: operationId, Limit: 65536}
@@ -83,4 +124,10 @@ func (s *Server) ReadExecutionLogs(w http.ResponseWriter, r *http.Request, opera
 	var logs protocol.ExecutionLogs
 	e := s.node.Call(r.Context(), cluster.OperationOwner(operationId), "execution.logs", input, &logs)
 	s.resultError(w, r, 200, logs, e)
+}
+
+// legacyNeeded 判断目标节点是否不认识分页方法。
+func legacyNeeded(err error) bool {
+	var fault *cluster.Fault
+	return errors.As(err, &fault) && fault.Code == "invalid_request" && fault.Message == "未知节点操作"
 }
