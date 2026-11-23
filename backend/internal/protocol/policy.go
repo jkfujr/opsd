@@ -23,7 +23,8 @@ func ActionRequiresArbitraryCode(action OperationAction) bool {
 	if action.Container != nil && action.Container.Action == "update" {
 		return true
 	}
-	if action.Database != nil && action.Kind == "deploy_database" && action.Deployment != nil {
+	// 注意：外层 Kind 是 "database"，deploy_database 与镜像都在内层结构里。
+	if action.Database != nil && action.Database.Kind == "deploy_database" && action.Database.Deployment != nil {
 		return true
 	}
 	return false

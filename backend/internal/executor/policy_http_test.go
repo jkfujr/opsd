@@ -1,12 +1,18 @@
 package executor
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
+	"net"
 	"net/http"
 	"net/http/httptest"
+	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
+	"github.com/jkfujr/opsd/internal/firewall"
 	"github.com/jkfujr/opsd/internal/protocol"
 )
 
@@ -44,35 +50,47 @@ func TestTerminalRejectedBeforeUpgrade(t *testing.T) {
 	}
 }
 
-// TestRPCRejectsArbitraryCodeBeforeDispatch 断言 shell 提交在分派之前被拒。
+// TestRPCRejectsArbitraryCodeBeforeDispatch 用真实客户端验证：R2 提交拿到的是
+// 协议内的确定拒绝（forbidden），而不是被当成通信故障；随后 R1 请求仍成功。
 func TestRPCRejectsArbitraryCodeBeforeDispatch(t *testing.T) {
-	handler := closedServer().Handler()
-	body, err := protocol.Encode(protocol.Message{
-		RequestID: "req",
-		Payload: &protocol.OperationSubmit{
-			OperationID:     "op",
-			ContractVersion: protocol.ContractVersion,
-			Action: protocol.OperationAction{
-				Kind:  "shell",
-				Shell: &protocol.ShellAction{TaskID: "job-1", Name: "任务", Script: "uname", Directory: "/tmp"},
-			},
-		},
-	})
+	dir := t.TempDir()
+	socket := filepath.Join(dir, "executor.sock")
+	listener, err := net.Listen("unix", socket)
 	if err != nil {
 		t.Fatal(err)
 	}
-	recorder := httptest.NewRecorder()
-	handler.ServeHTTP(recorder, httptest.NewRequest("POST", "/rpc", strings.NewReader(string(body))))
+	server := httptest.NewUnstartedServer(closedServer().Handler())
+	server.Listener.Close()
+	server.Listener = listener
+	server.Start()
+	defer server.Close()
 
-	if recorder.Code != http.StatusForbidden {
-		t.Fatalf("期望 403，得到 %d：%s", recorder.Code, recorder.Body.String())
+	client := NewClient(socket)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	submit := &protocol.OperationSubmit{
+		OperationID:     "op",
+		ContractVersion: protocol.ContractVersion,
+		Action: protocol.OperationAction{
+			Kind:  "shell",
+			Shell: &protocol.ShellAction{TaskID: "job-1", Name: "任务", Script: "uname", Directory: "/tmp"},
+		},
 	}
-	var failed protocol.RequestFailed
-	if err := json.Unmarshal(recorder.Body.Bytes(), &failed); err != nil {
-		t.Fatalf("拒绝响应不是约定的错误结构：%v %s", err, recorder.Body.String())
+	_, err = client.Call(ctx, submit)
+	if err == nil {
+		t.Fatal("R2 提交应当被拒绝")
 	}
-	if failed.Error.Code != "forbidden" {
-		t.Fatalf("错误码应为 forbidden，得到 %q", failed.Error.Code)
+	// 客户端必须拿到"确定拒绝"，而不是把它当成通信故障。
+	var fault *firewall.Fault
+	if !errors.As(err, &fault) {
+		t.Fatalf("拒绝不是协议内错误，而是：%v", err)
+	}
+	if fault.Code != "forbidden" {
+		t.Fatalf("错误码应为 forbidden，得到 %q", fault.Code)
+	}
+	if !strings.Contains(fault.Message, "关闭可执行代码能力") {
+		t.Fatalf("拒绝原因未说明能力被关闭：%q", fault.Message)
 	}
 }
 

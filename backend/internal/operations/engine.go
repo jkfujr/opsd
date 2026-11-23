@@ -91,7 +91,9 @@ func (e *Engine) Run(ctx context.Context, id string) error {
 	}
 	// 执行期复核：已受理的操作绕过不了后来的策略变更，由独立操作进程与
 	// 启动恢复共同走到这里，拒绝原因随 e.end 持久化。
-	if deny := e.deny; deny != nil {
+	// 取消与人工解决属于收尾，必须始终可行：关闭能力后仍要能收拾残留。
+	// 其余情况在即将执行（或被重试）时拒绝，并持久化原因。
+	if deny := e.deny; deny != nil && l.Request != "cancel" && l.Request != "resolve" {
 		if err := deny(*l.Action); err != nil {
 			return e.end(ctx, &l, protocol.Failed, err)
 		}

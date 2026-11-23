@@ -294,6 +294,13 @@ func operation(args []string, recoverAll bool) error {
 	ids := []string{*id}
 	service.Engine.NativeLock = operations.NativeLock(f.ExecutorDir)
 	service.Engine.StartupRecovery = recoverAll
+	// 独立操作进程与启动恢复也要装配同一份策略：只在执行器进程装配的话，
+	// 关闭策略后后台调度仍能把已受理的 R2 任务跑起来。
+	policy, _, e := executor.ParseOperationPolicy(f.OperationPolicy)
+	if e != nil {
+		return e
+	}
+	service.Engine.SetDenyAction(policy.DenyAction)
 	if recoverAll {
 		ids, e = service.Engine.Store.Pending(ctx)
 		if e != nil {

@@ -32,9 +32,14 @@ func (p OperationPolicy) AllowsArbitraryCode() bool { return !p.enforced || p.Ar
 // 允许任意代码，并由调用方记录一条日志；返回错误表示配置存在但不可用，
 // 调用方必须拒绝启动——拼写错误不能被静默当成默认值。
 func ParseOperationPolicy(raw json.RawMessage) (OperationPolicy, bool, error) {
-	if len(bytes.TrimSpace(raw)) == 0 || string(bytes.TrimSpace(raw)) == "null" {
+	trimmed := string(bytes.TrimSpace(raw))
+	// 只有"字段缺失"才走兼容模式；显式写成 null 属于配置错误。
+	if len(trimmed) == 0 {
 		// 旧配置升级：不启用策略（放行），由调用方记录兼容模式日志。
 		return OperationPolicy{ArbitraryCode: true}, false, nil
+	}
+	if trimmed == "null" {
+		return OperationPolicy{}, true, fmt.Errorf("operation_policy 不能为 null，需写明 arbitrary_code")
 	}
 	decoder := json.NewDecoder(bytes.NewReader(raw))
 	decoder.DisallowUnknownFields()
@@ -71,34 +76,14 @@ func (c Capability) String() string {
 //
 // 推进已存操作的请求（确认、取消、恢复、对账等）本身不带动作，必须回查
 // 已保存的操作；lookup 返回该操作的 action，无法取得时返回错误。
-func PayloadCapability(payload protocol.Payload, lookup func(id string) (protocol.OperationAction, error)) (Capability, error) {
-	switch body := payload.(type) {
-	case *protocol.OperationSubmit:
-		return actionCapability(body.Action), nil
-	case *protocol.OperationConfirm:
-		return savedCapability(body.OperationID, lookup)
-	case *protocol.OperationCancel:
-		// 取消永远允许：关闭能力后仍需能收拾残留。
-		return Regular, nil
-	case *protocol.OperationRecover:
-		return savedCapability(body.OperationID, lookup)
-	case *protocol.OperationResolve:
-		return savedCapability(body.OperationID, lookup)
-	case *protocol.OperationReconcile:
-		return savedCapability(body.OperationID, lookup)
+func PayloadCapability(payload protocol.Payload) (Capability, error) {
+	// 只拦"新提交"。推进已有操作的请求（确认、取消、恢复、对账、解决）继续交给
+	// 原处理器：它们内部要处理未知 ID、封存与收尾，提前拦截会破坏这些流程。
+	// 真正执行 R2 步骤前由 operations.Engine.Run 复核。
+	if submit, ok := payload.(*protocol.OperationSubmit); ok {
+		return actionCapability(submit.Action), nil
 	}
 	return Regular, nil
-}
-
-func savedCapability(id string, lookup func(string) (protocol.OperationAction, error)) (Capability, error) {
-	if lookup == nil {
-		return Regular, nil
-	}
-	action, err := lookup(id)
-	if err != nil {
-		return Regular, fmt.Errorf("无法确认已保存操作的动作：%w", err)
-	}
-	return actionCapability(action), nil
 }
 
 // actionCapability 按动作的实际内容判定能力档位。

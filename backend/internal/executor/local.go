@@ -158,12 +158,20 @@ func (s *Server) Handler() http.Handler {
 			http.Error(w, "请求无效", 422)
 			return
 		}
-		if capability, err := PayloadCapability(message.Payload, s.savedAction(r.Context())); err != nil {
-			http.Error(w, "无法确认操作动作", 422)
-			return
-		} else if capability == ArbitraryCode && !s.Policy.AllowsArbitraryCode() {
-			// 不进入 handler：受理前即拒绝，避免留下半受理的操作。
-			writeForbidden(w, errPolicyClosed)
+		if capability, _ := PayloadCapability(message.Payload); capability == ArbitraryCode && !s.Policy.AllowsArbitraryCode() {
+			// 不进入 handler：受理前即拒绝。响应必须是协议内的 RequestFailed，
+			// 否则客户端会把确定拒绝当成通信故障，进而触发不必要的对账。
+			out, err := protocol.Encode(protocol.Message{
+				RequestID: identity.Random(),
+				ReplyTo:   message.RequestID,
+				Payload:   &protocol.RequestFailed{Error: protocol.Error{Code: "forbidden", Message: errPolicyClosed.Error()}},
+			})
+			if err != nil {
+				http.Error(w, "应答失败", 500)
+				return
+			}
+			w.Header().Set("Content-Type", "application/json")
+			w.Write(out)
 			return
 		}
 		payload, e := s.Services.Handle(r.Context(), message.Payload)

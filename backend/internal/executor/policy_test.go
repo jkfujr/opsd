@@ -30,6 +30,7 @@ func TestParseOperationPolicy(t *testing.T) {
 		`{"arbitrary_code":"no"}`,         // 类型错误
 		`{}`,                              // 未写明
 		`{"arbitrary_code":false,"x":1}`,  // 多余字段
+		`null`,                            // 显式 null 是配置错误，不是"缺省"
 		`not json`,                        // 不是 JSON
 	} {
 		if _, _, err := ParseOperationPolicy(json.RawMessage(raw)); err == nil {
@@ -73,25 +74,37 @@ func TestPayloadCapability(t *testing.T) {
 		{"互信写入属常规能力", &protocol.PeerTrustTarget{}, Regular},
 	}
 	for _, c := range cases {
-		got, err := PayloadCapability(c.payload, nil)
+		got, err := PayloadCapability(c.payload)
 		if err != nil || got != c.want {
 			t.Errorf("%s：得到 %v %v，期望 %v", c.name, got, err, c.want)
 		}
 	}
 
 	// 取消永远允许，即使目标操作是 shell。
-	if got, _ := PayloadCapability(&protocol.OperationCancel{OperationID: "op"}, nil); got != Regular {
-		t.Errorf("取消应始终允许，得到 %v", got)
+	// 推进已有操作的请求不在载荷层拦截：它们内部要处理未知 ID、封存与收尾，
+	// 提前拦截会破坏原有流程；真正执行前由 Engine.Run 复核。
+	for _, payload := range []protocol.Payload{
+		&protocol.OperationCancel{OperationID: "op"},
+		&protocol.OperationConfirm{OperationID: "op"},
+		&protocol.OperationRecover{OperationID: "op"},
+		&protocol.OperationResolve{OperationID: "op"},
+		&protocol.OperationReconcile{OperationID: "op"},
+	} {
+		if got, _ := PayloadCapability(payload); got != Regular {
+			t.Errorf("推进已有操作不应在载荷层拦截，得到 %v", got)
+		}
 	}
-	// 推进已存操作时按已保存动作判定。
-	lookup := func(string) (protocol.OperationAction, error) {
-		return protocol.OperationAction{Kind: "shell", Shell: &protocol.ShellAction{TaskID: "job", Script: "x"}}, nil
-	}
-	if got, _ := PayloadCapability(&protocol.OperationConfirm{OperationID: "op"}, lookup); got != ArbitraryCode {
-		t.Errorf("确认 shell 操作应算任意代码，得到 %v", got)
-	}
-	if got, _ := PayloadCapability(&protocol.OperationRecover{OperationID: "op"}, lookup); got != ArbitraryCode {
-		t.Errorf("恢复 shell 操作应算任意代码，得到 %v", got)
+
+	// 数据库部署：镜像配置在内层结构里，外层 Kind 是 database。
+	deploy := &protocol.OperationSubmit{Action: protocol.OperationAction{
+		Kind: "database",
+		Database: &protocol.DatabaseAction{
+			Kind:       "deploy_database",
+			Deployment: &protocol.DatabaseDeployment{ID: "db", Kind: "galera", Image: "mariadb:11.4"},
+		},
+	}}
+	if got, _ := PayloadCapability(deploy); got != ArbitraryCode {
+		t.Errorf("数据库部署应算任意代码，得到 %v", got)
 	}
 }
 
