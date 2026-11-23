@@ -36,6 +36,12 @@ jobs:
           git diff --exit-code -- api/openapi.json backend/internal/httpapi/api.gen.go backend/internal/httpapi/policy.gen.go backend/internal/control/strict.gen.go backend/internal/cluster/api_contract.gen.go backend/internal/consoletheme/api_version.gen.go api/typescript/schema.gen.ts
           test "$(artifacts/opsd-linux-amd64 version --plain)" = "$(node -p 'require("./package.json").version')"
           sh -n artifacts/install.sh
+      - name: 静态检查与核心包竞态
+        env:
+          CGO_ENABLED: '1'
+        run: |
+          go -C backend vet ./...
+          go -C backend test -race -count=1 ./internal/cluster ./internal/transport ./internal/telemetry ./internal/control
       - name: 共享数据库迁移与节点代理恢复
         working-directory: backend/internal/control
         run: |
