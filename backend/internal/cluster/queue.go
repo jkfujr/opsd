@@ -61,7 +61,7 @@ func (n *Node) dispatch(ctx context.Context, origin, method string, body json.Ra
 		return n.archiveDispatch(ctx, origin, method, body)
 	}
 	if strings.HasPrefix(method, "api_token.") {
-		return n.tokenDispatch(ctx, method, body)
+		return n.tokenDispatch(ctx, origin, method, body)
 	}
 	if validateManagedDatabaseKind(method) {
 		return n.databaseDispatch(ctx, origin, method, body)
@@ -97,7 +97,8 @@ func (n *Node) dispatch(ctx context.Context, origin, method string, body json.Ra
 		if e := json.Unmarshal(body, &request); e != nil {
 			return nil, e
 		}
-		return n.requestReceipt(ctx, request)
+		request.Origin = origin
+		return n.requestReceipt(ctx, origin, request)
 	case "api.operation.decision":
 		var request operationDecisionRequest
 		if e := json.Unmarshal(body, &request); e != nil {
@@ -282,16 +283,16 @@ func (n *Node) enqueue(ctx context.Context, origin string, r Request) (Operation
 	return n.enqueueTx(ctx, origin, r, nil)
 }
 func (n *Node) enqueueTx(ctx context.Context, origin string, r Request, related func(*sql.Tx, Operation) error) (Operation, error) {
-	if strings.HasPrefix(r.Actor, "token:") || strings.HasPrefix(r.Actor, "account:") {
-		origin = r.Actor
-	}
+	// origin 是**已认证来源节点**，r.Actor 只是声明操作者：
+	// 声明只用于同一来源内的幂等分桶，不参与授权，也不能跨来源命中别人的键。
+	actor := r.Actor
 	if r.InputDigest != "" {
 		if _, e := hex.DecodeString(r.InputDigest); e != nil || len(r.InputDigest) != 64 {
 			return Operation{}, fault("invalid_request", "请求摘要无效")
 		}
 		var body string
 		var digest []byte
-		e := n.DB.QueryRowContext(ctx, "SELECT body,request_digest FROM queue WHERE origin=? AND request_key=?", origin, r.Key).Scan(&body, &digest)
+		e := n.DB.QueryRowContext(ctx, "SELECT body,request_digest FROM queue WHERE origin=? AND actor=? AND request_key=?", origin, actor, r.Key).Scan(&body, &digest)
 		if e == nil {
 			if hex.EncodeToString(digest) != r.InputDigest {
 				return Operation{}, fault("conflict", "同一请求不能使用不同参数")
@@ -312,7 +313,7 @@ func (n *Node) enqueueTx(ctx context.Context, origin string, r Request, related 
 		r.Payload, _ = json.Marshal(nameChange{Name: name, ExpectedRevision: *r.ExpectedRevision})
 	}
 	if r.ID == "" && r.Key != "" {
-		sum := sha256.Sum256([]byte(origin + "\x00" + r.Key))
+		sum := sha256.Sum256([]byte(origin + "\x00" + actor + "\x00" + r.Key))
 		r.ID = n.ID + "_" + hex.EncodeToString(sum[:])
 	}
 	payloadLimit := 256 * 1024
@@ -558,7 +559,12 @@ func (n *Node) enqueueTx(ctx context.Context, origin string, r Request, related 
 	defer tx.Rollback()
 	var existing string
 	var priorDigest []byte
-	e = tx.QueryRowContext(ctx, "SELECT body,request_digest FROM queue WHERE id=? OR (origin=? AND request_key=? AND request_key<>'')", r.ID, origin, r.Key).Scan(&existing, &priorDigest)
+	// 去重与受理用同一归属：已认证来源 + 声明操作者 + 请求键；
+	// 迁移前的旧记录没有可信来源，退化为按声明操作者匹配，避免旧键被当作首次请求重跑。
+	e = tx.QueryRowContext(ctx, `SELECT body,request_digest FROM queue
+		WHERE id=? OR (origin=? AND actor=? AND request_key<>'' AND request_key=?)
+		   OR (origin=? AND actor='' AND request_key<>'' AND request_key=?)`,
+		r.ID, origin, actor, r.Key, actor, r.Key).Scan(&existing, &priorDigest)
 	if e == nil {
 		if string(digest[:]) != string(priorDigest) {
 			return Operation{}, fault("conflict", "同一请求不能使用不同参数")
@@ -635,7 +641,13 @@ func (n *Node) enqueueTx(ctx context.Context, origin string, r Request, related 
 			return Operation{}, fault("precondition_failed", "资源版本已经改变")
 		}
 	}
-	op := Operation{Key: r.Key, OperationRecord: protocol.OperationRecord{ID: r.ID, State: protocol.Accepted, Revision: 1, Decision: "undecided", Steps: []protocol.OperationStep{}}, NodeID: n.ID, Subject: r.Kind, Actor: origin, CreatedAt: n.Now().UTC(), UpdatedAt: n.Now().UTC(), Executor: "node"}
+	// Actor 保留请求里的**声明操作者**（未核验），Origin 记录已认证来源；
+	// 两者不能互相覆盖。
+	recordedActor := r.Actor
+	if recordedActor == "" {
+		recordedActor = origin
+	}
+	op := Operation{Key: r.Key, Origin: origin, OperationRecord: protocol.OperationRecord{ID: r.ID, State: protocol.Accepted, Revision: 1, Decision: "undecided", Steps: []protocol.OperationStep{}}, NodeID: n.ID, Subject: r.Kind, Actor: recordedActor, CreatedAt: n.Now().UTC(), UpdatedAt: n.Now().UTC(), Executor: "node"}
 	if e = n.describeOperation(ctx, tx, r, targetName, &op); e != nil {
 		return Operation{}, e
 	}
@@ -669,7 +681,7 @@ func (n *Node) enqueueTx(ctx context.Context, origin string, r Request, related 
 		}
 	}
 	b, _ := json.Marshal(op)
-	result, e := tx.ExecContext(ctx, "INSERT INTO queue(id,origin,kind,payload,request_key,request_digest,body,terminal,phase) VALUES(?,?,?,?,?,?,?,?,?)", r.ID, origin, r.Kind, string(payload), r.Key, digest[:], string(b), operations.Terminal(op.State), phase)
+	result, e := tx.ExecContext(ctx, "INSERT INTO queue(id,origin,actor,kind,payload,request_key,request_digest,body,terminal,phase) VALUES(?,?,?,?,?,?,?,?,?,?)", r.ID, origin, actor, r.Kind, string(payload), r.Key, digest[:], string(b), operations.Terminal(op.State), phase)
 	if e != nil {
 		return op, e
 	}

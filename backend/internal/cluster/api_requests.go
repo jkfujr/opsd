@@ -34,11 +34,12 @@ type RequestReceipt struct {
 	Operation   *Operation `json:"operation,omitempty"`
 }
 
-func (n *Node) requestReceipt(ctx context.Context, request requeststate.Write) (RequestReceipt, error) {
+func (n *Node) requestReceipt(ctx context.Context, origin string, request requeststate.Write) (RequestReceipt, error) {
 	out := RequestReceipt{Key: request.Key, Owner: n.ID, Actor: request.Actor}
 	var body string
 	var digest []byte
-	e := n.DB.QueryRowContext(ctx, "SELECT body,request_digest FROM queue WHERE origin=? AND request_key=?", request.Actor, request.Key).Scan(&body, &digest)
+	// 归属规则与受理一致：已认证来源 + 声明操作者 + 请求键。
+	e := n.DB.QueryRowContext(ctx, "SELECT body,request_digest FROM queue WHERE origin=? AND actor=? AND request_key=?", origin, request.Actor, request.Key).Scan(&body, &digest)
 	if e == nil {
 		if request.Digest != "" && fmt.Sprintf("%x", digest) != request.Digest {
 			return out, fault("conflict", "同一请求键不能用于不同参数")
@@ -53,7 +54,14 @@ func (n *Node) requestReceipt(ctx context.Context, request requeststate.Write) (
 	if e != sql.ErrNoRows {
 		return out, e
 	}
+	// 队列里没有记录时按回执表查：先按**已认证来源**归属，
+	// 未命中再回退到迁移前的旧记录（旧记录的来源列存的是声明操作者）。
 	r, e := requeststate.Lookup(ctx, n.DB, request)
+	if e == sql.ErrNoRows {
+		legacy := request
+		legacy.Origin = request.Actor
+		r, e = requeststate.Lookup(ctx, n.DB, legacy)
+	}
 	if errors.Is(e, requeststate.ErrConflict) {
 		return out, fault("conflict", e.Error())
 	}
@@ -163,6 +171,10 @@ func (n *Node) apiOperationDecision(ctx context.Context, request operationDecisi
 	return op, e
 }
 func (n *Node) RequestReceipt(ctx context.Context, target string, request requeststate.Write) (RequestReceipt, error) {
+	// 归属以**已认证来源**为准：本地入口用本节点，远端入口由调度层填入。
+	if request.Origin == "" {
+		request.Origin = n.ID
+	}
 	if n.sharedActive() {
 		if store, err := n.sharedStore(ctx); err == nil {
 			prior, err := store.Receipt(ctx, sharedsql.Receipt{Actor: request.Actor, Key: request.Key, Digest: request.Digest})

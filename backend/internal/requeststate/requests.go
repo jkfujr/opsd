@@ -13,6 +13,8 @@ import (
 var ErrConflict = errors.New("同一请求键不能用于不同参数")
 
 type Write struct {
+	// Origin 是写入时的已认证来源节点；声明操作者不参与归属。
+	Origin string `json:"-"`
 	Actor  string `json:"actor"`
 	Key    string `json:"key"`
 	Digest string `json:"digest"`
@@ -44,10 +46,10 @@ func Lookup(ctx context.Context, q Querier, write Write) (Receipt, error) {
 	var r Receipt
 	var at int64
 	var body string
-	err := q.QueryRowContext(ctx, "SELECT digest,kind,resource_id,result_json,secret,created_at FROM api_requests WHERE actor=? AND request_key=?", write.Actor, write.Key).Scan(&r.Digest, &r.Kind, &r.ResourceID, &body, &r.Secret, &at)
+	err := q.QueryRowContext(ctx, "SELECT digest,kind,resource_id,result_json,secret,created_at FROM api_requests WHERE origin=? AND actor=? AND request_key=?", write.Origin, write.Actor, write.Key).Scan(&r.Digest, &r.Kind, &r.ResourceID, &body, &r.Secret, &at)
 	if errors.Is(err, sql.ErrNoRows) {
 		var digest []byte
-		err = q.QueryRowContext(ctx, "SELECT request_digest,body FROM queue WHERE origin=? AND request_key=?", write.Actor, write.Key).Scan(&digest, &body)
+		err = q.QueryRowContext(ctx, "SELECT request_digest,body FROM queue WHERE origin=? AND actor=? AND request_key=?", write.Origin, write.Actor, write.Key).Scan(&digest, &body)
 		if err == nil {
 			var operation struct {
 				ID        string    `json:"id"`
@@ -70,11 +72,11 @@ func Lookup(ctx context.Context, q Querier, write Write) (Receipt, error) {
 	return r, err
 }
 func Save(ctx context.Context, tx Executor, r Receipt) error {
-	_, e := tx.ExecContext(ctx, "INSERT INTO api_requests(actor,request_key,digest,kind,resource_id,result_json,secret,created_at) VALUES(?,?,?,?,?,?,?,?)", r.Actor, r.Key, r.Digest, r.Kind, r.ResourceID, string(r.Result), r.Secret, r.CreatedAt.Unix())
+	_, e := tx.ExecContext(ctx, "INSERT INTO api_requests(origin,actor,request_key,digest,kind,resource_id,result_json,secret,created_at) VALUES(?,?,?,?,?,?,?,?,?)", r.Origin, r.Actor, r.Key, r.Digest, r.Kind, r.ResourceID, string(r.Result), r.Secret, r.CreatedAt.Unix())
 	return e
 }
 
 func Finish(ctx context.Context, tx Executor, r Receipt) error {
-	_, e := tx.ExecContext(ctx, "UPDATE api_requests SET result_json=?,resource_id=?,secret=? WHERE actor=? AND request_key=? AND digest=?", string(r.Result), r.ResourceID, r.Secret, r.Actor, r.Key, r.Digest)
+	_, e := tx.ExecContext(ctx, "UPDATE api_requests SET result_json=?,resource_id=?,secret=? WHERE origin=? AND actor=? AND request_key=? AND digest=?", string(r.Result), r.ResourceID, r.Secret, r.Origin, r.Actor, r.Key, r.Digest)
 	return e
 }

@@ -124,6 +124,8 @@ type Operation struct {
 	Resource          *OperationResource       `json:"resource,omitempty"`
 	SupportsLogs      *bool                    `json:"supports_logs,omitempty"`
 	Key               string                   `json:"idempotency_key,omitempty"`
+	// Origin 是**已认证来源**，与声明操作者分开记录；授权只认 Origin。
+	Origin            string                   `json:"origin,omitempty"`
 	protocol.OperationRecord
 	NodeID            string    `json:"node_id"`
 	Sequence          uint64    `json:"queue_sequence"`

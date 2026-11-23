@@ -109,9 +109,7 @@ func (n *Node) taskDispatch(ctx context.Context, origin, method string, body jso
 		if e := json.Unmarshal(body, &input); e != nil {
 			return nil, e
 		}
-		if input.Actor != "" {
-			origin = input.Actor
-		}
+		// 声明操作者不再覆盖已认证来源：授权与归属都以来源为准。
 		return n.runTaskDigest(ctx, origin, input.ID, input.Key, input.Digest, input.ExpectedRevision)
 	case "task.runs":
 		// 兼容旧契约：入参为任务 ID 字符串，返回该任务的全部执行记录。
@@ -229,7 +227,7 @@ func (n *Node) runTaskDigest(ctx context.Context, origin, id, key, digest string
 	e := n.DB.QueryRowContext(ctx, "SELECT body FROM queue WHERE origin=? AND request_key=?", origin, key).Scan(&existing)
 	if e == nil {
 		if digest != "" {
-			_, e := n.requestReceipt(ctx, requeststate.Write{Actor: origin, Key: key, Digest: digest})
+			_, e := n.requestReceipt(ctx, origin, requeststate.Write{Actor: origin, Key: key, Digest: digest})
 			if e != nil {
 				return Operation{}, e
 			}

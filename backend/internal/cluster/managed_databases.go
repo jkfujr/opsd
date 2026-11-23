@@ -239,6 +239,9 @@ func (n *Node) saveDatabaseCluster(ctx context.Context, c ManagedDatabaseCluster
 		return c, e
 	}
 	if write != nil {
+		if write.Origin == "" {
+			write.Origin = n.ID
+		}
 		if e = requeststate.Save(ctx, tx, requeststate.Receipt{Write: *write, Kind: "database", ResourceID: c.ID, Result: b, CreatedAt: n.Now().UTC()}); e != nil {
 			return c, e
 		}

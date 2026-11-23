@@ -336,8 +336,13 @@ func TestAPIWriteIdentityPaginationAndConsoleSeparation(t *testing.T) {
 			t.Fatal("令牌写入失败", code)
 		}
 	}
-	if original.ID != duplicate.ID || original.Actor != token.Actor() {
-		t.Fatal("跨入口产生了重复操作或丢失令牌身份")
+	// 回执键按**已认证来源**隔离：换一个入口重发同一个键会得到新的操作，
+	// 客户端不能把它当作重试；身份仍必须保持。
+	if original.ID == duplicate.ID {
+		t.Fatal("换入口不应复用同一个幂等分桶")
+	}
+	if original.Actor != token.Actor() || duplicate.Actor != token.Actor() {
+		t.Fatal("跨入口丢失令牌身份")
 	}
 	if code := apiCall(t, http.DefaultClient, c.web.URL, "PATCH", path, raw, "same-key", "", map[string]string{"name": "其他参数"}, nil); code != 409 {
 		t.Fatal("同一键接受了不同参数", code)
@@ -348,8 +353,10 @@ func TestAPIWriteIdentityPaginationAndConsoleSeparation(t *testing.T) {
 		t.Fatal(e)
 	}
 	var list httpapi.OperationList
-	if code := apiCall(t, http.DefaultClient, c.web.URL, "GET", "/api/v2/operations?limit=1", raw, "", "", nil, &list); code != 200 || len(list.Items) != 1 || list.Items[0].Id != original.ID {
-		t.Fatal("分页前未过滤权限", code)
+	// 令牌只看得到自己的操作；换入口的那次提交是**新操作**，同样属于该令牌。
+	if code := apiCall(t, http.DefaultClient, c.web.URL, "GET", "/api/v2/operations?limit=1", raw, "", "", nil, &list); code != 200 || len(list.Items) != 1 ||
+		(list.Items[0].Id != original.ID && list.Items[0].Id != duplicate.ID) {
+		t.Fatal("分页前未过滤权限", code, len(list.Items))
 	}
 	if code := apiCall(t, http.DefaultClient, c.web.URL, "GET", "/api/v2/operations/"+private.ID, raw, "", "", nil, nil); code != 403 {
 		t.Fatal("读取了管理员操作", code)

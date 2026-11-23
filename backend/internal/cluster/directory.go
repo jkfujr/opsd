@@ -42,6 +42,9 @@ func (n *Node) Token(ctx context.Context) (string, string, time.Time, error) {
 	_, e = tx.ExecContext(ctx, "INSERT INTO enrollment_tokens(id,token_hash,created_at,expires_at) VALUES(?,?,?,?)", id, Digest(token), n.Now().Unix(), expires.Unix())
 	if e == nil && write != nil {
 		data, _ := json.Marshal(map[string]any{"id": id, "created_at": n.Now().UTC(), "expires_at": expires})
+		if write.Origin == "" {
+			write.Origin = n.ID
+		}
 		e = requeststate.Save(ctx, tx, requeststate.Receipt{Write: *write, Kind: "enrollment", ResourceID: id, Result: data, Secret: true, CreatedAt: n.Now().UTC()})
 	}
 	if e == nil {
@@ -348,6 +351,9 @@ func (n *Node) revokeRevision(ctx context.Context, id string, expected *uint64) 
 	}
 	if write != nil {
 		data, _ := json.Marshal(map[string]string{"id": id})
+		if write.Origin == "" {
+			write.Origin = n.ID
+		}
 		if e = requeststate.Save(ctx, tx, requeststate.Receipt{Write: *write, Kind: "node", ResourceID: id, Result: data, CreatedAt: n.Now().UTC()}); e != nil {
 			return e
 		}

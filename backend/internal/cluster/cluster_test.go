@@ -232,12 +232,21 @@ func TestAPIV2RequestReceiptsAcrossNodes(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, entry := range []*Node{a, b} {
-		receipt, err := entry.RequestReceipt(t.Context(), a.ID, request)
-		if err != nil || receipt.OperationID != op.ID || receipt.Operation == nil {
-			t.Fatal("原回执跨入口不可读", receipt, err)
-		}
+	// 原入口同键同参能读回原操作。
+	receipt, err := b.RequestReceipt(t.Context(), a.ID, request)
+	if err != nil || receipt.OperationID != op.ID || receipt.Operation == nil {
+		t.Fatal("原入口读不回原回执", receipt, err)
 	}
+	// 另一入口按原回执键查不到结果——即使携带相同的声明操作者。
+	if _, err := a.RequestReceipt(t.Context(), a.ID, request); !missingRequest(err) {
+		t.Fatal("回执键应按已认证来源隔离", err)
+	}
+	// 但凭已知操作 ID 可以取回原记录。
+	got, err := a.GetOperation(t.Context(), op.ID)
+	if err != nil || got.ID != op.ID {
+		t.Fatal("按操作 ID 应能取回原记录", got, err)
+	}
+	// 同键异参仍是冲突。
 	request.Digest = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
 	if _, err := b.RequestReceipt(t.Context(), a.ID, request); err == nil || missingRequest(err) {
 		t.Fatal("同键异参没有保留冲突", err)

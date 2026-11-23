@@ -123,7 +123,7 @@ func (n *Node) writeFirewall(ctx context.Context, origin string, request Firewal
 	defer tx.Rollback()
 	var existing string
 	var oldDigest []byte
-	e = tx.QueryRowContext(ctx, "SELECT body,request_digest FROM queue WHERE origin=? AND request_key=?", origin, request.Key).Scan(&existing, &oldDigest)
+	e = tx.QueryRowContext(ctx, "SELECT body,request_digest FROM queue WHERE origin=? AND actor=? AND request_key=?", origin, request.Actor, request.Key).Scan(&existing, &oldDigest)
 	if e == nil {
 		if string(oldDigest) != string(digest[:]) {
 			return out, fault("conflict", "同一请求不能使用不同参数")
@@ -239,7 +239,7 @@ func (n *Node) writeFirewall(ctx context.Context, origin string, request Firewal
 	}
 	op.TargetName = config.Name
 	opBody, _ := json.Marshal(op)
-	r, e := tx.ExecContext(ctx, "INSERT INTO queue(id,origin,kind,payload,request_key,request_digest,body) VALUES(?,?,'firewall_config',?,?,?,?)", id, origin, string(payload), request.Key, digest[:], string(opBody))
+	r, e := tx.ExecContext(ctx, "INSERT INTO queue(id,origin,actor,kind,payload,request_key,request_digest,body) VALUES(?,?,?,'firewall_config',?,?,?,?)", id, origin, request.Actor, string(payload), request.Key, digest[:], string(opBody))
 	if e != nil {
 		return out, e
 	}

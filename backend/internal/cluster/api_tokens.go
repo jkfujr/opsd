@@ -23,10 +23,17 @@ type createdToken struct {
 	Value string        `json:"value"`
 }
 
-func (n *Node) tokenDispatch(ctx context.Context, method string, body json.RawMessage) (any, error) {
+func (n *Node) tokenDispatch(ctx context.Context, origin, method string, body json.RawMessage) (any, error) {
 	var command TokenCommand
 	if e := json.Unmarshal(body, &command); e != nil {
 		return nil, fault("invalid_request", "令牌请求无效")
+	}
+	// 回执按已认证来源归属：声明操作者只区分来源内的请求。
+	if command.Write != nil {
+		command.Write.Origin = origin
+		if command.Write.Origin == "" {
+			command.Write.Origin = n.ID
+		}
 	}
 	store := apiauth.Store{DB: n.DB, Owner: n.ID, Now: n.Now}
 	var tx *sql.Tx
