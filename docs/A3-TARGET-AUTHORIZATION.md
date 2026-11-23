@@ -1,112 +1,161 @@
-# A3：目标侧按操作授权
+# A3：目标侧按来源节点授权（第一阶段）
 
 | 项目 | 内容 |
 |---|---|
-| 状态 | **设计稿，未实施**。 |
-| 前置 | A1（本机调用方准入）、A2（本机能力策略）已完成。 |
-| 目标 | 远端请求到达目标节点后，由**目标节点**判断"这个来源能不能做这件事"，而不是只认成员身份。 |
+| 状态 | **设计稿（评审后修订），未实施**。 |
+| 机制 | **A3-a：按来源节点的能力集合**。操作者级签名断言留作后续阶段。 |
+| 前置 | A1（本机调用方准入）、A2（本机能力策略）已结项。 |
+| 目标 | 远端请求到达目标节点后，由目标节点判断"**这个来源节点**能不能做这件事"。 |
 
-## 1. 现状（已核实）
+## 1. 授权主体：已认证的来源节点
 
-远端请求只有一个入口，`internal/cluster/queue.go`：
+目标节点从**成员通道**取得来源 ID（`servePeer` 建立连接时已认证），这是唯一的授权主体。
+
+- 请求体里的 `Actor`／操作者字段只作为**声明信息**处理：既不用于授权，也不记录成"已认证的操作者"。
+- 因此第一阶段的粒度是"来源节点"，不是"某个人"。人员级判定属于后续阶段（A3-b），届时仍由目标节点判定人员与资源权限。
+
+### 按内层动作授权，不按外层方法名
+
+`submit` 这类方法会把**载荷里的内层动作**分派到不同处理器（`queue.go` 的 `case "submit"` → `task_run`／`storage.save`／`firewall`／`database`／`compose`／`container`／`component`／`monitoring_deploy` …）。只按外层方法名查表，会把"提交只读核对"和"提交 shell 任务"归成同一个权限位。
+
+规则：
+
+1. `submit` 的授权依据是 **内层动作类型 + 资源标识**；
+2. `operation.cancel`／`confirm`／`recover`／`resolve`／`get`／`list` 等**继承原操作的权限**：能提交某类操作，才能推进或查询它；
+3. 无法解析出内层动作的 `submit` 直接 `forbidden`。
+
+## 2. 能力存放：目标节点的 root 配置
+
+能力表写在**目标节点**的 `instance.json`，按来源节点 ID 查找，由目标主机管理员写入。
+
+不放进共享库的原因（已核实）：共享库账号本身拥有库级 `INSERT`/`UPDATE`/`DELETE`（`databaseengine/shared_database.go`），在共享表里加能力列，等于让被约束的节点同时拥有**修改自己授权**的能力。
+
+首版语义：
+
+- 配置**重启生效**；
+- 撤销验收写成"目标完成重启后，下一次请求被拒"；
+- 配置非法（未知能力名、未知来源 ID 格式）**拒绝启动**，与 A2 的严格解析一致。
+
+## 3. 默认值：默认只读、写入逐项授予
+
+新旧成员一律默认最小：
+
+| 类别 | 默认 | 说明 |
+|---|---|---|
+| 节点协议 | 允许 | `ping`、`directory`（签名目录同步）、`api.capabilities` |
+| 非敏感读取 | **逐项确认后允许** | 明确列举，不含凭据、不含持久化副作用 |
+| `run_task` | 显式授予 | 提交任务类操作 |
+| 其他业务写入 | 显式授予 | 防火墙、存储、数据库、监控部署等 |
+| 敏感读取 | 显式授予 | 凭据、令牌、账号、配置正文 |
+
+升级前的准备工作：为仍需使用的远端流程**先准备授权清单**，否则升级后远端写入会立即被拒——这是刻意的，避免"升级即放权"。
+
+现有的管理版本检查继续生效：共享管理启用时，低版本来源目前只通过 `ping` 与 `directory`。混合版本验收要同时覆盖新目标与旧目标，并写明旧目标实际的保护范围。
+
+## 4. 方法清单与能力映射
+
+清单从代码归纳（`queue.go` 的 `switch method` 与 `method ==` 分支、`shared_dispatch.go`、`object_storage.go`、`api_tokens.go`、以及 `archive.`／`database.` 前缀分派）。**权威版本由代码里的登记表生成**，本表只用于评审边界。
+
+### 4.1 节点协议与非敏感读取（默认允许）
+
+```text
+ping, directory, api.capabilities
+account.read, config.read, containers.read, container.inspect, container.logs
+compose.list, compose.registration
+tasks.list, task.get, task.runs, task.runs.page, execution.logs
+operation.get, operation.list
+firewall.read, firewall.config.read, firewall.plan, firewall.preview
+public_addresses.read, metrics, history
+database.read, database.instance.get, database.cluster.get
+database.deployment.preview, database.deployment.profile, database.deployment.check,
+database.deployment.connectivity
+database.discovery.scan, database.discovery.inspect
+database.proxy_routing.read
+shared.status
+```
+
+### 4.2 需要显式授予的写入
+
+| 能力 | 方法 |
+|---|---|
+| `run_task` | `submit`（内层为 `task_run`）、`task_run`、`task_save` |
+| `write_storage` | `storage.save`、`storage.check`（**会持久化检查记录**）、`storage.credentials`（**会发放凭据**，另见敏感组） |
+| `manage_firewall` | `firewall`、`component`、`firewall.config.write`、`firewall.config.preview_adoption` |
+| `manage_database` | `database`、`database_step`、`database.deployment.execute`、`database.deployment.register`、`database.deployment.submit`、`database.discovery.register`、`database.instance.save`、`database.cluster.save`、`database.proxy_routing.state`、`database.proxy_routing.applied`、`database.reconcile`、`database.recover`、`database.resolve` |
+| `manage_compose` | `compose`、`compose_register` |
+| `manage_container` | `container` |
+| `manage_monitoring` | `monitoring_deploy`、`monitoring_config`（写入侧） |
+| `manage_public` | `public_addresses.patch`、`public_addresses.refresh` |
+| `manage_identity` | `name`、`config`、`account`、`peer_trust.rules`、`config.read` 之外的配置写入 |
+| `coordinate_shared` | `shared_initialize`、`shared.prepare`、`shared.export`、`shared.flush`、`shared.recover`、`shared.recover_steps` |
+
+### 4.3 `shared.*` 逐方法分类
+
+| 方法 | 授权 |
+|---|---|
+| `shared.status` | 默认允许（只读状态） |
+| `directory` | 有效成员（签名目录同步） |
+| `shared.bootstrap` | 有效成员为**自己**申请接入资料，并核对当前绑定关系 |
+| `shared.prepare`／`export`／`flush`／`recover`／`recover_steps` | 只放行给对应受权协调方，并核对迁移／恢复流程的归属 |
+| `api_token.*` | 独立权限 `manage_tokens`；`api_token.verify` 单列为"所属节点的身份核验调用" |
+
+### 4.4 独立通道
+
+| 通道 | 归属 |
+|---|---|
+| 终端（`serveTerminal`） | 独立能力 `terminal`；**高风险开关由 A4 单列** |
+| 监控流（`serveArchive`／`monitoring_stream.go`） | 独立能力 `read_monitoring_stream` |
+| `archive.*` 前缀 | 归入上述监控流能力 |
+
+### 4.5 未知方法
+
+登记表之外的方法**直接 `forbidden`**。当前 `dispatch` 末尾是 `switch` + 兜底错误，改造后必须保证不存在"落到兜底分支"的路径。
+
+## 5. 登记表同时供分派与授权
+
+方法登记是一份**数据结构**，同时被 `dispatch`（决定路由）与授权判定（决定权限）使用：
 
 ```go
-func (n *Node) dispatch(ctx context.Context, origin, method string, body json.RawMessage) (any, error) {
-	if !n.Active(ctx, origin) {
-		return nil, fault("forbidden", "节点未加入或已撤销")
-	}
-	if n.sharedEnabled() && origin != n.ID {
-		m, err := n.Member(ctx, origin)
-		if err != nil { return nil, err }
-		if m.ManagementVersion < protocol.SharedManagementVersion && method != "ping" && method != "directory" {
-			return nil, fault("unsupported", "节点版本不支持共享管理")
-		}
-	}
-	// 之后按前缀／方法名分派到 sharedDispatch / storageDispatch / taskDispatch / …
+type Method struct {
+	Name        string
+	Capability  Capability   // 空表示默认允许
+	Route       func(...)    // 现有分派逻辑
+	InnerAction bool         // true 表示按载荷内层动作再判一次
 }
 ```
 
-已校验的维度：
+好处：新增方法若未登记，`dispatch` 与授权都会拒绝，**测试不需要手工维护第二份清单**。
 
-| 维度 | 位置 | 说明 |
-|---|---|---|
-| 成员身份与撤销 | `Active(ctx, origin)` | 只回答"是不是有效成员" |
-| 管理版本兼容 | `Member(ctx, origin)` | 只回答"版本够不够新" |
+## 6. 拒绝日志（结构化）
 
-**没有**的维度：这个来源**能否执行某个具体操作**。
-
-远端可调用的方法（按 `queue.go` 的分类归纳）：
+拒绝时记录：
 
 ```text
-只读：  api.capabilities, directory, ping, containers.read, container.inspect,
-        container.logs, compose.list, compose.registration, tasks.list,
-        task.get, task.runs, task.runs.page, execution.logs,
-        database.discovery.scan, database.deployment.preview, storage.get, storage.check
-写入：  task.run, storage.save, api_token.*, database.deployment.submit,
-        database.discovery.register, database.recover, database.resolve,
-        operation.cancel, operation.recover, shared.*
+origin（已认证来源节点 ID）、target（本节点 ID）、method、resource（资源标识）、
+request_id、reason
 ```
 
-其中写入类里既有"受管变更"（任务、存储、数据库部署），也有"能被用来扩大权限"的（`api_token.create`、`shared.*` 的成员与账号改动）。
+不记录：请求体、令牌、凭据。首批沿用现有日志渠道，不落库。
 
-## 2. 两种候选机制
-
-### A3-a：按节点的能力集合（推荐先做）
-
-每个成员在共享库里有一组能力，例如：
-
-```text
-read_only        只读方法
-run_task         提交任务
-manage_database  数据库发现、部署、修复
-write_storage    存储写入
-manage_members   成员与账号、api token
-```
-
-`dispatch` 在分派**之前**查表：`method → 所需能力`，再比对来源节点的能力集合。默认拒绝（未知方法与未列入白名单一律 `forbidden`）。
-
-- 优点：改动集中在一个函数 + 一张表；不引入密钥；撤销即时（共享库 + 短 TTL 缓存）。
-- 缺点：粒度是"节点"，不是"哪个管理员"。来源节点上的任何管理员都继承该节点的能力。
-
-### A3-b：传递操作者身份
-
-来源节点把"谁在操作"连同权限一起签名传给目标节点，目标节点验签后按资源判定。
-
-- 优点：粒度到人，目标节点可以拒绝"某个管理员对某台机器的操作"。
-- 缺点：需要节点密钥与请求签名（新协议面）、防重放（nonce/时间窗）、密钥轮换；与"账号只留在自己节点"的既有所有权约定冲突，需要重新界定谁能代表谁。
-
-## 3. 实施落点（以 A3-a 为准）
-
-| 位置 | 改动 |
-|---|---|
-| `cluster/queue.go` | `dispatch` 在 `Active`/版本检查之后、分派之前，查 `Capability(method)` 并要求来源节点具备 |
-| 新增 `cluster/capability.go` | 方法 → 能力表；未知方法默认 `forbidden`；`read_only` 覆盖所有只读方法 |
-| 共享库 | 成员记录增加能力列；默认给新成员 `read_only + run_task` |
-| `shared.*` | 成员管理类方法要求 `manage_members`，避免"有节点身份就能自我提权" |
-
-注意点：
-
-1. **默认拒绝**：现在 `dispatch` 末尾是 `switch method` + 兜底错误，改造后必须保证"表里没有的方法"返回 `forbidden` 而不是走到别处。
-2. **兼容**：旧节点不发送能力声明。升级期按 `ManagementVersion` 走兼容：旧来源只允许只读，写入需要显式升级——比"默认放行"安全，也比"直接拒绝"可运维。
-3. **撤销传播**：能力变更通过共享库广播；`Active()` 已有的撤销路径可复用。
-4. **与 A2 的关系**：A2 是"本机允不允许执行任意代码"，A3 是"远端请求方允不允许在这里做这件事"。两者独立，都需要，判定顺序是先 A3（来源能不能做）再 A2（本机肯不肯执行）。
-
-## 4. 验收条件
+## 7. 验收条件
 
 | 编号 | 条件 |
 |---|---|
-| 1 | 只有 `read_only` 的来源调用 `task.run` 被拒，`forbidden`，且不产生半受理操作 |
-| 2 | 授予 `run_task` 后同一请求成功 |
-| 3 | 撤销能力后立即生效（下一次请求即被拒） |
-| 4 | 未知方法一律 `forbidden`，不存在"落到兜底分支"的路径 |
-| 5 | `api_token.create`／`shared.*` 需要 `manage_members`，普通成员无法自我提权 |
-| 6 | 旧版本来源（无能力声明）只允许只读，写入返回明确错误而不是静默放行 |
-| 7 | 表驱动的单元测试覆盖每个已知方法，新增方法若未登记会让测试失败 |
+| 1 | 只有默认能力的来源调用 `task.run` 被拒，`forbidden`，且不产生半受理操作 |
+| 2 | 显式授予 `run_task`（并重启目标）后同一请求成功 |
+| 3 | 撤销能力并重启目标后，下一次请求被拒 |
+| 4 | 未登记方法一律 `forbidden`，无兜底路径 |
+| 5 | `submit` 按内层动作判定：只读核对放行、shell 任务被拒 |
+| 6 | `operation.cancel`／`confirm`／`recover`／`resolve` 继承原操作权限 |
+| 7 | `api_token.*` 需要 `manage_tokens`，普通成员无法自我提权 |
+| 8 | `storage.check`／`storage.credentials` 不被当作只读 |
+| 9 | 旧版本来源只允许 `ping`／`directory`；混合版本下新目标与旧目标行为都被覆盖 |
+| 10 | 登记表中的每个方法都被授权测试覆盖，新增方法未登记即测试失败 |
+| 11 | 拒绝日志含来源、目标、方法、资源、请求 ID 与原因，且不含请求体与凭据 |
 
-## 5. 未决问题（需要评审确认）
+## 8. 未决问题
 
-1. **选 A3-a 还是 A3-b**：先只做节点级能力，还是直接做操作者级？
-2. **能力存哪里**：共享库成员表，还是每节点配置 + 共享库只存签名摘要？
-3. **默认能力**：现有安装升级时给什么默认值？我倾向"只读 + 提交任务"，与当前实际用法一致。
-4. **`shared.*` 的边界**：哪些算 `manage_members`，哪些是所有成员都该能做的（例如目录读取）？
-5. **是否需要审计**：拒绝事件是否要像 A2 那样落库，还是只写日志？
+1. **默认允许的读取清单**：是否需要再收窄（例如 `container.logs`、`database.query` 是否该算敏感读取）。
+2. **`instance.json` 的能力表结构**：按来源 ID 列白名单，还是"角色 + 角色成员"两段式？
+3. **重启生效是否够用**：首批接受重启；若运维要求热更新，需要一条受保护的重新加载路径（不能由远端触发）。
+4. **操作者级阶段（A3-b）的边界**：是否只做"审计标注"，不做授权判定。
