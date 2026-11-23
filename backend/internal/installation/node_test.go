@@ -53,3 +53,14 @@ func TestNodeNameAndRegionKeepExistingConfiguration(t *testing.T) {
 		n.Close()
 	}
 }
+
+// TestNewInstallDefaultsToPolicyClosed 覆盖 A2 的默认值：
+// 新装实例显式写入关闭值，只有显式开启才允许任意代码。
+func TestNewInstallDefaultsToPolicyClosed(t *testing.T) {
+	if raw := policyJSON(false); string(raw) != `{"arbitrary_code":false}` {
+		t.Fatalf("新装默认应为关闭，实际 %s", raw)
+	}
+	if raw := policyJSON(true); string(raw) != `{"arbitrary_code":true}` {
+		t.Fatalf("显式开启应写入 true，实际 %s", raw)
+	}
+}

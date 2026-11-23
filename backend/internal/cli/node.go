@@ -382,6 +382,7 @@ func install(args []string) error {
 	set.StringVar(name, "n", "", "")
 	set.StringVar(region, "r", "", "")
 	_ = set.Bool("non-interactive", false, "")
+	allowArbitraryCode := set.Bool("allow-arbitrary-code", false, "")
 	if e := command.Parse(set, args); e != nil {
 		return e
 	}
@@ -400,7 +401,7 @@ func install(args []string) error {
 	ctx, cancel := processContext()
 	defer cancel()
 	var actual cluster.AccountChange
-	created, e := installation.InstallNode(ctx, installation.NodeInstall{Account: &actual, Directory: *directory, ConfigPath: *config, Config: cluster.Config{Name: strings.TrimSpace(*name), Address: *address, Region: *region, Listen: *listen, ConsoleListen: *consoleListen}, Username: *username, Password: *password, Entrance: *entrance, Seed: *seed, SeedPublic: *public, Token: *token})
+	created, e := installation.InstallNode(ctx, installation.NodeInstall{Account: &actual, Directory: *directory, ConfigPath: *config, Config: cluster.Config{Name: strings.TrimSpace(*name), Address: *address, Region: *region, Listen: *listen, ConsoleListen: *consoleListen}, Username: *username, Password: *password, Entrance: *entrance, Seed: *seed, SeedPublic: *public, Token: *token, AllowArbitraryCode: *allowArbitraryCode})
 	if e != nil {
 		return e
 	}

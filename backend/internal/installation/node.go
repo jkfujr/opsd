@@ -37,6 +37,9 @@ type NodeInstall struct {
 	ConfigPath                                            string
 	Config                                                cluster.Config
 	Username, Password, Entrance, Seed, SeedPublic, Token string
+	// AllowArbitraryCode 决定新装实例是否允许可执行任意代码的动作；
+	// 默认关闭，只有显式开启才写入 true。
+	AllowArbitraryCode bool
 }
 
 func InstallNode(ctx context.Context, o NodeInstall) (bool, error) {
@@ -88,7 +91,7 @@ func InstallNode(ctx context.Context, o NodeInstall) (bool, error) {
 	if e != nil {
 		return false, e
 	}
-	f := NodeFile{DataDir: "/var/lib/opsd/node", ExecutorDir: "/var/lib/opsd/executor", Socket: "/run/opsd/executor.sock", ControlSocket: "/run/opsd-node/control.sock", Binary: filepath.Join(o.Directory, "bin", "opsd"), GroupID: gid, UserID: &uid, OperationPolicy: json.RawMessage(`{"arbitrary_code":false}`)}
+	f := NodeFile{DataDir: "/var/lib/opsd/node", ExecutorDir: "/var/lib/opsd/executor", Socket: "/run/opsd/executor.sock", ControlSocket: "/run/opsd-node/control.sock", Binary: filepath.Join(o.Directory, "bin", "opsd"), GroupID: gid, UserID: &uid, OperationPolicy: policyJSON(o.AllowArbitraryCode)}
 	for _, dir := range []string{filepath.Dir(f.Binary), filepath.Dir(o.ConfigPath), "/var/lib/opsd", f.DataDir, f.ExecutorDir} {
 		if e = os.MkdirAll(dir, 0755); e != nil {
 			return false, e
@@ -197,4 +200,12 @@ func NodePaths(configPath string) (NodeFile, error) {
 		e = fmt.Errorf("节点安装配置不完整")
 	}
 	return f, e
+}
+
+// policyJSON 按开关生成新装实例的策略；默认关闭可执行代码能力。
+func policyJSON(allow bool) json.RawMessage {
+	if allow {
+		return json.RawMessage(`{"arbitrary_code":true}`)
+	}
+	return json.RawMessage(`{"arbitrary_code":false}`)
 }

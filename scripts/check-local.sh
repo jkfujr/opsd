@@ -71,7 +71,7 @@ api() {
   OPSD_API_PASSWORD=$(openssl rand -hex 24)
   sudo mkdir -p /var/lib/opsd
   sudo chmod 0700 /var/lib/opsd
-  sudo env OPSD_PASSWORD="$OPSD_API_PASSWORD" artifacts/opsd-linux-amd64 install --non-interactive --address http://127.0.0.1:8444 -n api-check --username api-check --entrance /signin > artifacts/install-check.log
+  sudo env OPSD_PASSWORD="$OPSD_API_PASSWORD" artifacts/opsd-linux-amd64 install --non-interactive --address http://127.0.0.1:8444 -n api-check --username api-check --entrance /signin --allow-arbitrary-code > artifacts/install-check.log
   test "$(stat -c %a /var/lib/opsd)" = 755
   test "$(sudo stat -c %a /var/lib/opsd/node)" = 700
   test "$(sudo stat -c %a /var/lib/opsd/executor)" = 700
