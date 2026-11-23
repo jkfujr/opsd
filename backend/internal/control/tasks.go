@@ -2,8 +2,8 @@ package control
 
 import (
 	"encoding/base64"
-	"errors"
 	"encoding/json"
+	"errors"
 	"github.com/jkfujr/opsd/internal/cluster"
 	"github.com/jkfujr/opsd/internal/httpapi"
 	"github.com/jkfujr/opsd/internal/protocol"
