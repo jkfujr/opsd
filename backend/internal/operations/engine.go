@@ -91,9 +91,11 @@ func (e *Engine) Run(ctx context.Context, id string) error {
 	}
 	// 执行期复核：已受理的操作绕过不了后来的策略变更，由独立操作进程与
 	// 启动恢复共同走到这里，拒绝原因随 e.end 持久化。
-	// 取消与人工解决属于收尾，必须始终可行：关闭能力后仍要能收拾残留。
-	// 其余情况在即将执行（或被重试）时拒绝，并持久化原因。
-	if deny := e.deny; deny != nil && l.Request != "cancel" && l.Request != "resolve" {
+	// 只在"即将首次执行"时拒绝：尚未开始、且没有待人工核对的状态。
+	// 取消与人工解决属于收尾，永远可行；IntentStep 非空表示副作用已经发出，
+	// 必须保留读回与人工结案路径（例如 Compose 已下发、进程在读回前中断），
+	// 否则关闭策略会把需要核对的操作直接结案。
+	if deny := e.deny; deny != nil && canRefuse(&l) {
 		if err := deny(*l.Action); err != nil {
 			return e.end(ctx, &l, protocol.Failed, err)
 		}
@@ -537,4 +539,15 @@ func (e *Engine) install(ctx context.Context, l *Local, boot string) error {
 		return e.attention(ctx, l, err)
 	}
 	return e.end(ctx, l, protocol.Succeeded, nil)
+}
+
+// canRefuse 报告当前是否处于"可以安全拒绝"的时点。
+func canRefuse(l *Local) bool {
+	if l.Request == "cancel" || l.Request == "resolve" {
+		return false
+	}
+	if l.IntentStep != nil || l.Record.State == protocol.AttentionRequired {
+		return false
+	}
+	return true
 }

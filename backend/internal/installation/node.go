@@ -171,6 +171,11 @@ func activateNode(ctx context.Context, f NodeFile, configPath string) error {
 	if e = Command(ctx, "systemctl", "enable", "opsd.service", "opsd-executor.service", "opsd-recover.service"); e != nil {
 		return e
 	}
+	// 恢复单元不再由执行器 Wants 拉起（日常重启执行器不能打断运行中的任务），
+	// 因此安装时显式跑一次，保证首次安装也完成开机恢复的等价动作。
+	if e = Command(ctx, "systemctl", "start", "opsd-recover.service"); e != nil {
+		return e
+	}
 	if e = Command(ctx, "systemctl", "start", "opsd-executor.service", "opsd.service"); e != nil {
 		return e
 	}
@@ -181,7 +186,7 @@ func Units(f NodeFile, configPath string) map[string]string {
 	config := " --config " + quote(configPath)
 	return map[string]string{
 		"opsd.service":            "[Unit]\nDescription=OPSD 对等节点\nAfter=network-online.target opsd-executor.service\nWants=network-online.target opsd-executor.service\n\n[Service]\nUser=opsd\nType=notify\nNotifyAccess=main\nTimeoutStartSec=45\nGroup=opsd\nRuntimeDirectory=opsd-node\nRuntimeDirectoryMode=0700\nUMask=0077\nExecStart=" + command + " node" + config + "\nRestart=on-failure\nRestartSec=3\nEnvironment=GOMEMLIMIT=64MiB\nNoNewPrivileges=true\nProtectSystem=strict\nReadWritePaths=" + quote(f.DataDir) + "\n\n[Install]\nWantedBy=multi-user.target\n",
-		"opsd-executor.service":   "[Unit]\nDescription=OPSD 本机执行器\nAfter=network.target opsd-recover.service\nWants=opsd-recover.service\n\n[Service]\nUser=root\nType=notify\nNotifyAccess=main\nTimeoutStartSec=45\nGroup=opsd\nUMask=0007\nRuntimeDirectory=opsd\nRuntimeDirectoryMode=0750\nExecStart=" + command + " executor" + config + "\nRestart=on-failure\nRestartSec=3\n\n[Install]\nWantedBy=multi-user.target\n",
+		"opsd-executor.service":   "[Unit]\nDescription=OPSD 本机执行器\nAfter=network.target opsd-recover.service\n\n[Service]\nUser=root\nType=notify\nNotifyAccess=main\nTimeoutStartSec=45\nGroup=opsd\nUMask=0007\nRuntimeDirectory=opsd\nRuntimeDirectoryMode=0750\nExecStart=" + command + " executor" + config + "\nRestart=on-failure\nRestartSec=3\n\n[Install]\nWantedBy=multi-user.target\n",
 		"opsd-operation@.service": "[Unit]\nDescription=OPSD 本机操作 %i\nAfter=network.target\n\n[Service]\nType=oneshot\nUser=root\nUMask=0077\nExecStart=" + command + " operation" + config + " --id %i\nTimeoutStartSec=infinity\nTimeoutStopSec=30\nKillMode=control-group\nRestart=on-failure\nRestartSec=3\n",
 		"opsd-recover.service":    "[Unit]\nDescription=OPSD 本机操作恢复\nAfter=ufw.service firewalld.service nftables.service\nBefore=opsd-executor.service\n\n[Service]\nType=oneshot\nUser=root\nUMask=0077\nExecStart=" + command + " recover" + config + "\nTimeoutStartSec=infinity\nTimeoutStopSec=30\nKillMode=control-group\n\n[Install]\nWantedBy=multi-user.target\n"}
 }
