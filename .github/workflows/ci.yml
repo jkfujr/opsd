@@ -78,7 +78,7 @@ jobs:
           sudo chmod 0700 /var/lib/opsd
           sudo env OPSD_PASSWORD="$password" artifacts/opsd-linux-amd64 install --non-interactive --address http://127.0.0.1:8444 -n api-check --username api-check --entrance /signin > artifacts/install-check.log
           # 新装默认关闭：从实际配置读回，再显式开启供正向用例使用。
-          python3 -c 'import json,sys; d=json.load(open("/etc/opsd/instance.json")); p=d.get("operation_policy") or {}; sys.exit(0 if p.get("arbitrary_code") is False else 1)'
+          sudo python3 -c 'import json,sys; d=json.load(open("/etc/opsd/instance.json")); p=d.get("operation_policy") or {}; sys.exit(0 if p.get("arbitrary_code") is False else 1)'
           sudo python3 -c 'import json; path="/etc/opsd/instance.json"; d=json.load(open(path)); d["operation_policy"]={"arbitrary_code":True}; open(path,"w").write(json.dumps(d, ensure_ascii=False, indent=2))'
           sudo systemctl restart opsd-executor.service
           test "$(stat -c %a /var/lib/opsd)" = 755

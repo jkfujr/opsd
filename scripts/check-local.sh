@@ -73,7 +73,7 @@ api() {
   sudo chmod 0700 /var/lib/opsd
   sudo env OPSD_PASSWORD="$OPSD_API_PASSWORD" artifacts/opsd-linux-amd64 install --non-interactive --address http://127.0.0.1:8444 -n api-check --username api-check --entrance /signin > artifacts/install-check.log
   # 新装默认必须关闭可执行代码能力：从实际安装出来的配置读回，而不是看代码默认值。
-  python3 -c 'import json,sys; d=json.load(open("/etc/opsd/instance.json")); p=d.get("operation_policy") or {}; sys.exit(0 if p.get("arbitrary_code") is False else 1)' \
+  sudo python3 -c 'import json,sys; d=json.load(open("/etc/opsd/instance.json")); p=d.get("operation_policy") or {}; sys.exit(0 if p.get("arbitrary_code") is False else 1)' \
     || { echo "新装默认未关闭任意代码能力"; exit 1; }
   # 明确开启，供随后依赖 shell／compose／root 终端的正向用例使用。
   sudo python3 -c 'import json; path="/etc/opsd/instance.json"; d=json.load(open(path)); d["operation_policy"]={"arbitrary_code":True}; open(path,"w").write(json.dumps(d, ensure_ascii=False, indent=2))'

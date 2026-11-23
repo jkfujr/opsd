@@ -296,6 +296,19 @@ func (s *Services) Recover(ctx context.Context) error {
 	}
 	var failures []error
 	for _, id := range ids {
+		// 待人工核对的操作不能被无条件重派：它等待的是人，不是重试。
+		// 否则维护循环每 5 秒重新拉起它，既空转，也可能在无人确认时反复执行。
+		//
+		// 但已经持久化、且版本仍匹配的人工请求（recover／resolve／cancel）
+		// 必须继续可推进：首次启动失败或执行器重启后，它是唯一的恢复入口。
+		local, err := s.Engine.Store.Get(ctx, id)
+		if err != nil {
+			failures = append(failures, fmt.Errorf("恢复操作 %s：%w", id, err))
+			continue
+		}
+		if local.Record.State == protocol.AttentionRequired && !manualRequest(local) {
+			continue
+		}
 		if e = s.startOperation(ctx, id); e != nil {
 			failures = append(failures, fmt.Errorf("恢复操作 %s：%w", id, e))
 		}
@@ -324,4 +337,14 @@ func (s *Services) MaintainOperations(ctx context.Context) {
 		case <-ticker.C:
 		}
 	}
+}
+
+// manualRequest 报告记录上是否有仍然有效的人工请求。
+// 请求版本与记录当前版本不一致时视为过期，不能自动推进。
+func manualRequest(l operations.Local) bool {
+	switch l.Request {
+	case "recover", "resolve", "cancel":
+		return l.RequestRevision == l.Record.Revision
+	}
+	return false
 }
