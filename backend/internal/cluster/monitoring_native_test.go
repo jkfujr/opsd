@@ -178,7 +178,10 @@ func startArchiveNative(t *testing.T, n *Node) *archiveNative {
 		t.Fatal(err)
 	}
 	projectSum := sha256.Sum256([]byte(n.cluster))
-	f := &archiveNative{root: t.TempDir(), bin: bin, password: identity.Random(), bucket: "opsd-monitoring", prefix: "opsd/metrics/" + n.cluster + "/", sqlName: "opsd-monitoring-sql-" + n.ID[:10], component: "opsd-monitoring-" + hex.EncodeToString(projectSum[:6])}
+		// mc 把以 "-" 开头的参数当作开关；base64url 随机串可能以 "-" 开头，
+	// 这里替换成等长等价字符，密码仍不可预测。
+	password := strings.ReplaceAll(identity.Random(), "-", "x")
+	f := &archiveNative{root: t.TempDir(), bin: bin, password: password, bucket: "opsd-monitoring", prefix: "opsd/metrics/" + n.cluster + "/", sqlName: "opsd-monitoring-sql-" + n.ID[:10], component: "opsd-monitoring-" + hex.EncodeToString(projectSum[:6])}
 	for _, name := range []string{"minio", "mc"} {
 		if _, err = os.Stat(filepath.Join(bin, name)); err != nil {
 			t.Fatal("缺少 S3 验收程序，请先执行 scripts/check-monitoring.sh", err)
@@ -489,6 +492,9 @@ func (f *archiveNative) history(t *testing.T, n *Node, c metricsstore.Config) ma
 		days          int
 	}
 	blocks := []historicalBlock{}
+	// promtool 的块边界有一半取决于时钟对齐，同一用例在不同日期可能切出不同块数；
+	// 所以按用例断言至少一块，而不是断言总数为 4。
+	perCase := map[int]int{}
 	for _, days := range []int{29, 31, 364, 366} {
 		root := filepath.Join(f.root, fmt.Sprint("history-", days))
 		if err := os.MkdirAll(root, 0755); err != nil {
@@ -496,12 +502,15 @@ func (f *archiveNative) history(t *testing.T, n *Node, c metricsstore.Config) ma
 		}
 		at := time.Now().UTC().Add(-time.Duration(days) * 24 * time.Hour).Truncate(time.Hour).Add(10 * time.Minute)
 		text := fmt.Sprintf("# TYPE opsd_node_cpu_usage_percent gauge\nopsd_node_cpu_usage_percent{node_id=%q} 42.125 %d\nopsd_node_cpu_usage_percent{node_id=%q} 43.125 %d\n# EOF\n", n.ID, at.Unix(), n.ID, at.Add(time.Second).Unix())
-		blockDuration := 2 * time.Hour
+		// Prometheus TSDB 的块档位上限是 486h；跨度超过当前窗口就会被切成多个单样本块，
+		// 那样 Thanos 既不会生成 5 分钟汇总，也不会生成 1 小时汇总。
+		blockDuration := 486 * time.Hour
 		if days > 31 {
+			// Thanos 生成 1 小时汇总要求块跨度 ≥10 天。把首尾两点放进同一个 486h
+			// 对齐窗口，保证 promtool 产出一个 12 天跨度的块（实测 span=288h，1 块）。
+			window := time.Now().UTC().Truncate(blockDuration)
+			at = window.Add(time.Hour)
 			first := at.Add(-12 * 24 * time.Hour)
-			for first.UnixMilli()/blockDuration.Milliseconds() != at.Add(time.Second).UnixMilli()/blockDuration.Milliseconds() {
-				blockDuration *= 2
-			}
 			text = fmt.Sprintf("# TYPE opsd_node_cpu_usage_percent gauge\nopsd_node_cpu_usage_percent{node_id=%q} 40 %d\nopsd_node_cpu_usage_percent{node_id=%q} 42.125 %d\nopsd_node_cpu_usage_percent{node_id=%q} 43.125 %d\n# EOF\n", n.ID, first.Unix(), n.ID, at.Unix(), n.ID, at.Add(time.Second).Unix())
 		}
 		if err := os.WriteFile(filepath.Join(root, "input.prom"), []byte(text), 0644); err != nil {
@@ -532,6 +541,7 @@ func (f *archiveNative) history(t *testing.T, n *Node, c metricsstore.Config) ma
 				t.Fatal(err)
 			}
 			blocks = append(blocks, block)
+			perCase[days]++
 			if days > 31 {
 				if err = filepath.WalkDir(block.directory, func(path string, entry fs.DirEntry, err error) error {
 					if err != nil || entry.IsDir() {
@@ -573,9 +583,12 @@ func (f *archiveNative) history(t *testing.T, n *Node, c metricsstore.Config) ma
 			}
 		}
 	}
-	if len(blocks) != 4 {
-		t.Fatal("历史数据块数量错误", len(blocks))
+	for _, days := range []int{29, 31, 364, 366} {
+		if perCase[days] == 0 {
+			t.Fatal("历史数据块缺失", days, "天")
+		}
 	}
+	t.Logf("历史数据块：共 %d 块，按用例 %v", len(blocks), perCase)
 	f.seed = blocks[0].directory
 	if err := f.s3.Process.Signal(syscall.SIGSTOP); err != nil {
 		t.Fatal(err)
