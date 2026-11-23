@@ -15,7 +15,9 @@ import (
 func (n *Node) sharedDispatch(ctx context.Context, origin, method string, body json.RawMessage) (any, error) {
 	switch method {
 	case "shared.status":
-		return n.SharedStatus(ctx), nil
+		// 远端默认可见的状态只给脱敏摘要：绑定、代理标识与 SQL 地址
+		// 属于本机与协调方之间的资料，不下发给任意成员。
+		return redactedSharedStatus(n.SharedStatus(ctx)), nil
 	case "shared.prepare":
 		var state SharedLocal
 		if err := json.Unmarshal(body, &state); err != nil {
@@ -278,4 +280,16 @@ func (n *Node) recoverSharedSteps(ctx context.Context) error {
 	}
 	n.notify()
 	return nil
+}
+
+// redactedSharedStatus 去掉绑定细节，只保留远端成员需要的健康摘要。
+func redactedSharedStatus(status SharedStatus) SharedStatus {
+	return SharedStatus{
+		Pending:       status.Pending,
+		Phase:         status.Phase,
+		State:         status.State,
+		ProxyReady:    status.ProxyReady,
+		PolicyVersion: status.PolicyVersion,
+		Error:         status.Error,
+	}
 }

@@ -152,3 +152,15 @@ func TestWildcardOriginMustBeExplicit(t *testing.T) {
 		t.Error("显式写入通配来源后应放行")
 	}
 }
+
+// 远端默认可见的共享状态不得含绑定、代理标识与 SQL 地址。
+func TestRedactedSharedStatusDropsBindingDetails(t *testing.T) {
+	full := SharedStatus{Pending: 3, Phase: "active", State: "ready", ProxyID: "proxy-1", SQLAddress: "10.0.0.1:3306", ProxyReady: true}
+	got := redactedSharedStatus(full)
+	if got.ProxyID != "" || got.SQLAddress != "" || got.Binding != nil {
+		t.Fatalf("脱敏不完整：%+v", got)
+	}
+	if got.Pending != full.Pending || got.Phase != full.Phase || got.State != full.State || !got.ProxyReady {
+		t.Fatalf("健康字段被削掉：%+v", got)
+	}
+}
