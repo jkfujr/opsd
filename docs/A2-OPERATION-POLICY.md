@@ -2,7 +2,7 @@
 
 | 项目 | 内容 |
 |---|---|
-| 状态 | **设计稿，未实施**。 |
+| 状态 | **首批已实施**：策略解析、三个入口判定、执行期复核。 |
 | 前提 | A1 已实施并复审通过：执行器只放行节点服务账号（`SO_PEERCRED` 校验 UID） |
 | 边界 | A2 **只做本机策略**：决定"已获准的调用方能执行哪类操作"。远端请求的授权属于 A3，远端能力开关属于 A4。 |
 | 评审结论 | 机制选 A2-a（按实际动作判定）；首批只给 R2 加开关；R2 新装默认关闭、升级保留现状；策略放 `instance.json`。 |
@@ -38,9 +38,13 @@
 |---|---|
 | `GET /terminal` | WebSocket 直接提供 root shell（`executor/local.go:131`） |
 | `OperationAction.Shell` | `ShellAction.Script` 字段就是要执行的脚本（`protocol` `ShellAction`） |
-| `OperationAction.Compose` 且 `Action` 为 `update`／`recreate` | 会拉取并运行新镜像，等价于换上任意代码；`pull/start/stop` 不换代码，留在 R1 |
+| `OperationAction.Compose` 且 `Action` 为 `start`／`update`／`recreate` | `start` 走 `up --no-recreate --no-build`，仍会**创建并启动缺失容器**；`update`／`recreate` 直接换镜像。只有 `pull`／`stop` 留在 R1 |
+| `OperationAction.Container` 且 `Action` 为 `update` | 拉取镜像并创建替换容器 |
+| `OperationAction.Database` 且 `Kind` 为 `deploy_database` | 用请求里的 `Image` 拉取并启动容器，当前只校验镜像引用格式 |
 
-其余动作（`business`、`container`、`database`、`deployment`、`firewall`、`firewall_config`、`component`、`upgrade`、`monitoring`）都是受管变更，留在 R1。
+其余动作（`business`、容器 `start/stop/restart`、数据库其余子动作、`deployment`、`firewall`、`firewall_config`、`component`、`upgrade`、`monitoring`、Compose `pull/stop`）都是受管变更，留在 R1。
+
+判定实现放在 `protocol.ActionRequiresArbitraryCode`，`executor` 与 `operations` 共用同一份，避免两处口径漂移。
 
 ### 需要看已保存动作的请求
 
@@ -99,9 +103,22 @@
 7. **配置非法拒绝启动**：`{"operation_policy": {"arbitrary-code": false}}`（拼写错误）与 `{"operation_policy": {"arbitrary_code": "no"}}`（类型错误）都必须让执行器启动失败。
 8. **拒绝不影响后续**：一次被拒的请求之后，R1 请求仍成功。
 
-## 7. 未决问题
+## 7. 实施落点（已完成）
+
+| 位置 | 作用 |
+|---|---|
+| `protocol/policy.go` | `ActionRequiresArbitraryCode`，按实际执行效果分级 |
+| `executor/policy.go` | 严格解析 `operation_policy`；`AllowsArbitraryCode`；`PayloadCapability`（含回查已存动作） |
+| `executor/local.go` | `/terminal` 在升级前 403；`/rpc` 在分派前拒绝 |
+| `operations/engine.go` | `Engine.Run` 在执行前复核策略，拒绝原因经 `e.end(..., Failed, ...)` 持久化 |
+| `installation/node.go` | `NodeFile.OperationPolicy`（原始 JSON）；新装写入 `{"arbitrary_code":false}` |
+| `cli/node.go` | 启动时解析策略、缺省记兼容模式日志、装配 `Server.Policy` 与 `Engine.SetDenyAction` |
+
+**零值语义**：`OperationPolicy{}` 表示"未启用策略"，一律放行——否则任何手工构造 `Server` 的调用方（测试、其他路径）都会意外变成受限。只有经 `ParseOperationPolicy` 解析后才置 `enforced`。
+
+## 8. 未决问题
 
 1. **R2 的初始值是不是太快？** 新装默认关闭意味着新部署的 shell 任务与 root 终端默认不可用，这是功能层面的变化。我按评审结论执行，但需要确认文档与发布说明都写到这一条。
-2. **`POST /storage` 的档位**：已核实会创建 host 网络容器（镜像为固定常量），归 R1。若希望"容器创建"本身也受 R2 约束，需要在 R2 里增加"宿主级容器操作"这一类，请评审确认是否扩大 R2 范围。
+2. ~~`POST /storage` 的档位~~：评审确认为 **R1**——镜像取自固定常量 `CouchImage`，调用方不能指定镜像；host 网络与宿主目录挂载作为 R1 的受管副作用记录。
 3. **策略变更是否需要重启**：本设计按"启动时读取"处理，改配置需重启执行器；热更新会引入"同一进程内能力在运行中变化"的语义，暂不做。
 4. **拒绝是否要审计**：目前只记日志。若需要"谁在何时试图执行被禁能力"，那属于审计流（安全边界文档第 2 节第 6 条）。

@@ -21,7 +21,12 @@ type Engine struct {
 	Install         func(context.Context, *Local, func() error) error
 	Containers      ContainerRuntime
 	Databases       DatabaseRuntime
+	// deny 在真正执行前复核本机策略，返回错误表示该动作被拒绝；nil 表示不限制。
+	deny func(protocol.OperationAction) error
 }
+
+// SetDenyAction 注入执行期策略复核。执行器启动时装配。
+func (e *Engine) SetDenyAction(deny func(protocol.OperationAction) error) { e.deny = deny }
 
 func (e *Engine) clock() (string, int64, error) {
 	if e.Clock != nil {
@@ -83,6 +88,13 @@ func (e *Engine) Run(ctx context.Context, id string) error {
 	}
 	if l.Action == nil {
 		return fmt.Errorf("未决操作缺少动作")
+	}
+	// 执行期复核：已受理的操作绕过不了后来的策略变更，由独立操作进程与
+	// 启动恢复共同走到这里，拒绝原因随 e.end 持久化。
+	if deny := e.deny; deny != nil {
+		if err := deny(*l.Action); err != nil {
+			return e.end(ctx, &l, protocol.Failed, err)
+		}
 	}
 	boot, now, err := e.clock()
 	if err != nil {

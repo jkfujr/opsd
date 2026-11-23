@@ -2,6 +2,7 @@ package installation
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
@@ -26,6 +27,9 @@ type NodeFile struct {
 	// UserID 是执行器允许的本机调用方 UID（节点服务账号）。
 	// 用指针区分旧配置缺字段（需要按账号名推导）与显式写 0（非法配置）。
 	UserID *int `json:"user_id,omitempty"`
+	// OperationPolicy 是本机能力策略的原始 JSON；由执行器启动时严格解析，
+	// 未知字段或非法值拒绝启动。缺省表示旧配置升级，按兼容模式处理。
+	OperationPolicy json.RawMessage `json:"operation_policy,omitempty"`
 }
 type NodeInstall struct {
 	Account                                               *cluster.AccountChange
@@ -84,7 +88,7 @@ func InstallNode(ctx context.Context, o NodeInstall) (bool, error) {
 	if e != nil {
 		return false, e
 	}
-	f := NodeFile{DataDir: "/var/lib/opsd/node", ExecutorDir: "/var/lib/opsd/executor", Socket: "/run/opsd/executor.sock", ControlSocket: "/run/opsd-node/control.sock", Binary: filepath.Join(o.Directory, "bin", "opsd"), GroupID: gid, UserID: &uid}
+	f := NodeFile{DataDir: "/var/lib/opsd/node", ExecutorDir: "/var/lib/opsd/executor", Socket: "/run/opsd/executor.sock", ControlSocket: "/run/opsd-node/control.sock", Binary: filepath.Join(o.Directory, "bin", "opsd"), GroupID: gid, UserID: &uid, OperationPolicy: json.RawMessage(`{"arbitrary_code":false}`)}
 	for _, dir := range []string{filepath.Dir(f.Binary), filepath.Dir(o.ConfigPath), "/var/lib/opsd", f.DataDir, f.ExecutorDir} {
 		if e = os.MkdirAll(dir, 0755); e != nil {
 			return false, e

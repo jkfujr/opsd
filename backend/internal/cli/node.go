@@ -192,6 +192,15 @@ func serveExecutor(args []string) error {
 	if e != nil {
 		return e
 	}
+	// A2：本机能力策略。配置存在但不可用就拒绝启动；缺省按兼容模式允许，
+	// 因为升级不能悄悄关掉现网正在使用的功能。
+	policy, explicit, e := executor.ParseOperationPolicy(f.OperationPolicy)
+	if e != nil {
+		return e
+	}
+	if !explicit {
+		slog.Warn("配置缺少 operation_policy，按兼容模式允许可执行代码能力；请显式设置", "component", "executor")
+	}
 	ctx, cancel := processContext()
 	defer cancel()
 	db, e := storage.Open(ctx, filepath.Join(f.ExecutorDir, "executor.db"), storage.Executor)
@@ -231,7 +240,9 @@ func serveExecutor(args []string) error {
 	l = &executor.CallerGuard{Listener: l, Allowed: allowed, Logf: func(format string, args ...any) {
 		slog.Warn(fmt.Sprintf(format, args...), "component", "executor")
 	}}
-	handler := (&executor.Server{Services: service, Directory: f.ExecutorDir}).Handler()
+	// 执行期复核：已受理的操作绕过不了运行中生效的策略变更。
+	service.Engine.SetDenyAction(policy.DenyAction)
+	handler := (&executor.Server{Services: service, Directory: f.ExecutorDir, Policy: policy}).Handler()
 	server := &http.Server{Handler: handler, ReadHeaderTimeout: 5 * time.Second}
 	go func() { <-ctx.Done(); server.Close() }()
 	if e = installation.NotifyReady(); e != nil {

@@ -124,11 +124,18 @@ type Server struct {
 	Services  *Services
 	Directory string
 	Host      firewall.Host
+	// Policy 是本机能力策略；ArbitraryCode 关闭时拒绝新的任意代码动作。
+	Policy OperationPolicy
 }
 
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /terminal", func(w http.ResponseWriter, r *http.Request) {
+		// 必须在升级之前拒绝：一旦握手成功，客户端已拿到可交互通道。
+		if !s.Policy.AllowsArbitraryCode() {
+			http.Error(w, "本机策略已关闭可执行代码能力", 403)
+			return
+		}
 		socket, err := websocket.Accept(w, r, &websocket.AcceptOptions{InsecureSkipVerify: true})
 		if err != nil {
 			return
@@ -149,6 +156,14 @@ func (s *Server) Handler() http.Handler {
 		message, e := protocol.Decode(b)
 		if e != nil {
 			http.Error(w, "请求无效", 422)
+			return
+		}
+		if capability, err := PayloadCapability(message.Payload, s.savedAction(r.Context())); err != nil {
+			http.Error(w, "无法确认操作动作", 422)
+			return
+		} else if capability == ArbitraryCode && !s.Policy.AllowsArbitraryCode() {
+			// 不进入 handler：受理前即拒绝，避免留下半受理的操作。
+			writeForbidden(w, errPolicyClosed)
 			return
 		}
 		payload, e := s.Services.Handle(r.Context(), message.Payload)
