@@ -25,6 +25,8 @@ type Peer struct {
 	OpenStream func(context.Context, string) (Stream, error)
 	Active     func(context.Context, string) bool
 	Revoked    func(context.Context, string) bool
+	// Allowed 判定某个来源能否执行监控通道上的某个方法。
+	Allowed func(origin, method string) bool
 }
 
 // Parent 保留队列原对象，由所属节点持久保存完整操作。

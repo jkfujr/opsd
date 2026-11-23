@@ -151,6 +151,10 @@ var methodAccess = map[string]MethodAccess{
 	"container.inspect":   {Capability: CapabilityManageContainer},
 	"container.logs":      {Capability: CapabilityReadLogs},
 
+	// —— 监控数据通道（上传与回执是两种能力） ——
+	"stream.upload":   {Capability: CapabilityUploadMonitoring},
+	"stream.receipts": {Capability: CapabilityReadStreamReceipts},
+
 	// —— 归档读取（逐方法登记，不再按前缀兜底） ——
 	"archive.config":    {Capability: CapabilityReadArchive},
 	"archive.status":    {Capability: CapabilityReadArchive},

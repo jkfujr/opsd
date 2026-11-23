@@ -15,7 +15,7 @@ func (n *Node) newTelemetry(directory string) *telemetry.Service {
 	return telemetry.New(directory, telemetry.Dependencies{
 		DB: n.DB, NodeID: n.ID, ClusterID: func() string { return n.cluster }, Now: func() time.Time { return n.Now() },
 		Peer: telemetry.Peer{
-			Call: n.Call, Active: n.Active, Revoked: n.Revoked,
+			Call: n.Call, Active: n.Active, Revoked: n.Revoked, Allowed: n.authorize,
 			OpenStream: func(ctx context.Context, target string) (telemetry.Stream, error) {
 				return n.openArchiveChannel(ctx, target)
 			},

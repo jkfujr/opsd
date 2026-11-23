@@ -187,3 +187,26 @@ func TestKindsFollowGrantedCapabilities(t *testing.T) {
 		t.Fatalf("未授予时不应有可见品种：%v", got)
 	}
 }
+
+// 监控通道的上传与回执分开授权：只有对应能力才能用对应方法。
+func TestStreamMethodsNeedTheirOwnCapability(t *testing.T) {
+	const origin = "0123456789abcdef0123456789abcdef"
+	none := SourceCapabilities{}
+	if none.Allowed(origin, "stream.upload") || none.Allowed(origin, "stream.receipts") {
+		t.Fatal("没有授予时监控通道不应可用")
+	}
+	upload, err := ParseSourceCapabilities(json.RawMessage(`{"` + origin + `":["upload_monitoring"]}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !upload.Allowed(origin, "stream.upload") {
+		t.Error("授予上传后应放行上传")
+	}
+	if upload.Allowed(origin, "stream.receipts") {
+		t.Error("上传能力不应连带放行回执读取")
+	}
+	read, _ := ParseSourceCapabilities(json.RawMessage(`{"` + origin + `":["read_stream_receipts"]}`))
+	if read.Allowed(origin, "stream.upload") {
+		t.Error("回执能力不应连带放行上传")
+	}
+}

@@ -386,6 +386,19 @@ func (s *Service) Serve(ctx context.Context, origin string, channel Stream) {
 		default:
 			err = s.Errors.New("invalid_request", "监控数据通道不接受此方法")
 		}
+		// 上传与回执是两种能力：一个把数据推进来，一个读自己的回执。
+		if err == nil && s.Peer.Allowed != nil {
+			needed := ""
+			switch call.Method {
+			case "upload":
+				needed = "stream.upload"
+			case "receipts":
+				needed = "stream.receipts"
+			}
+			if needed != "" && !s.Peer.Allowed(origin, needed) {
+				err = s.Errors.New("forbidden", "来源节点无权使用监控数据通道")
+			}
+		}
 		var value any
 		if err == nil {
 			value, err = s.receive(requestCtx, origin, call.Method, input, &inventory)
