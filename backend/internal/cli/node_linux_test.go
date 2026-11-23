@@ -283,14 +283,12 @@ func TestExecutorDerivesAllowedCallerFromServiceAccount(t *testing.T) {
 	})
 
 	// 同组但不同 UID 的账号：拥有 Socket 的组权限，能连上，但必须被 A1 拒绝。
+	// 同组账号建不出来时必须让这项验收失败，否则整项只会报 PASS 而其实没验到。
 	intruder := "opsd-probe"
-	intruderReady := false
-	if output, err := runCommand("useradd", "--system", "--no-create-home", "--shell", "/usr/sbin/nologin", "-g", "opsd", intruder); err == nil {
-		intruderReady = true
-		defer runCommand("userdel", intruder)
-	} else {
-		t.Logf("无法创建同组账号，跳过同组拒绝检查：%v %s", err, firstLine(output))
+	if output, err := runCommand("useradd", "--system", "--no-create-home", "--shell", "/usr/sbin/nologin", "-g", "opsd", intruder); err != nil {
+		t.Fatalf("无法创建同组账号，同组拒绝无法验收：%v %s", err, firstLine(output))
 	}
+	defer runCommand("userdel", intruder)
 
 	call := func(as string) (string, error) {
 		return runCommandEnv(probeEnv, "runuser", "-u", as, "--", probe, "-test.run=TestHelperExecutorReadRPC", "-test.v")
@@ -326,11 +324,9 @@ func TestExecutorDerivesAllowedCallerFromServiceAccount(t *testing.T) {
 	// 1) 允许账号能完成真实 RPC（缺 user_id 的旧配置）。
 	mustSucceed("opsd", "opsd")
 	// 2) 同组不同 UID 被拒。
-	if intruderReady {
-		mustReject(intruder, "同组其他 UID")
-		// 3) 拒绝之后，允许账号必须仍能成功——证明拒绝没有打停服务。
-		mustSucceed("opsd", "拒绝之后的 opsd")
-	}
+	mustReject(intruder, "同组其他 UID")
+	// 3) 拒绝之后，允许账号必须仍能成功——证明拒绝没有打停服务。
+	mustSucceed("opsd", "拒绝之后的 opsd")
 	// 4) root 也被拒。
 	mustReject("root", "root")
 }

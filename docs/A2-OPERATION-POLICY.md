@@ -2,89 +2,106 @@
 
 | 项目 | 内容 |
 |---|---|
-| 状态 | **设计稿，未实施**。评审选定机制后再动代码。 |
-| 前提 | A1 已实施：执行器只放行节点服务账号（`SO_PEERCRED` 校验 UID） |
-| 边界 | A2 **只做本机策略**：决定"已获准的调用方能执行哪些操作"。远端请求的授权属于 A3，远端能力开关属于 A4。 |
+| 状态 | **设计稿，未实施**。 |
+| 前提 | A1 已实施并复审通过：执行器只放行节点服务账号（`SO_PEERCRED` 校验 UID） |
+| 边界 | A2 **只做本机策略**：决定"已获准的调用方能执行哪类操作"。远端请求的授权属于 A3，远端能力开关属于 A4。 |
+| 评审结论 | 机制选 A2-a（按实际动作判定）；首批只给 R2 加开关；R2 新装默认关闭、升级保留现状；策略放 `instance.json`。 |
 | 审查条目 | `docs/ARCHITECTURE-REVIEW.md` 方案 A2 |
 
 ---
 
-## 1. 现状
+## 1. 三个入口，不是三个档位
 
-执行器只有一个入口 `POST /rpc`（`executor/local.go:143`），把请求体解码成 `protocol.Payload` 后交给 `Services.Handle` 分派。`service.go` 目前分派 **27 种载荷**，彼此**没有任何权限差别**——只要通过 A1 的 UID 校验，任何载荷都能调用。
+执行器有三个 HTTP 入口（`executor/local.go`），能力差别比"载荷种类"更重要：
 
-节点正常运行时确实需要全部能力（它既读状态，也提交操作、改防火墙、部署数据库）。所以 A2 不是"给节点加限制"，而是**把能力分级，让部署方可以选择把高危档关掉**；默认行为必须与现在一致，否则会破坏现网。
+| 入口 | 现状 | 能力本质 |
+|---|---|---|
+| `GET /terminal` | 先 `websocket.Accept`，之后才进 `Terminals.Serve` | 直接拿到宿主 root shell |
+| `POST /rpc` | 解码后交 `Services.Handle` 分派 27 种载荷 | 依载荷而定：读状态、受管变更，或**执行任意代码** |
+| `POST /storage` | 写入本机存储状态 | 改本机状态，但不执行代码 |
 
-## 2. 载荷分级
+因此 A2 不能按"载荷种类"分级，而要按**实际要做的动作**判定：同一个 `OperationSubmit` 既可能是"改防火墙配置"（受管变更），也可能是"跑一段 shell"（任意代码）。
 
-按"读到写、写系统"的次序分三档。分档依据是 handler 是否改变本机状态，以及改动影响的范围。
+## 2. 两级能力
 
-### 档 1：只读（不改本机状态）
+### R1：常规能力（默认开启）
 
-`MonitoringStateRead`、`ResourceMetricsRead`、`ComposeRead`、`ExecutionLogsRead`、`DatabaseDiscovery`、`DatabaseDeploymentCheck`、`DatabaseDeploymentStateRead`、`DatabaseDeploymentProfileRead`、`DatabaseRead`、`ProxyRoutingRead`、`DockerRead`、`ContainerInspect`、`ContainerLogsRead`、`PeerTrustStatusQuery`、`FirewallInspect`、`FirewallRead`、`FirewallPreview`、`MonitoringRead`、`OperationQuery`
+节点正常运行需要的一切，包括所有只读查询、受管变更操作、防火墙与互信写入。
 
-三个名字带"检查"的载荷已核对为只读：
+`PeerTrustTarget` 属于 **R1**：它是维持集群互信的必要写入，不是任意代码执行。
 
-- `FirewallPreview` → `Manager.Preview(ctx, body.Change)`，只返回计划 `Plan`；
-- `DatabaseDeploymentCheck` → `CheckDeployment`，只返回检查结果；
-- `DatabaseNetworkCheck` → `CheckDeploymentNetwork`，只返回 `Checked` 布尔。
+### R2：可执行任意代码（首批唯一开关）
 
-它们都不写本机状态，因此留在档 1。
+只有三类动作归 R2，判据是"能让调用方在本机执行任意命令或换上任意镜像"：
 
-### 档 2：受管变更（改变可回滚的本机状态）
+| 动作 | 依据 |
+|---|---|
+| `GET /terminal` | WebSocket 直接提供 root shell（`executor/local.go:131`） |
+| `OperationAction.Shell` | `ShellAction.Script` 字段就是要执行的脚本（`protocol` `ShellAction`） |
+| `OperationAction.Compose` 且 `Action` 为 `update`／`recreate` | 会拉取并运行新镜像，等价于换上任意代码；`pull/start/stop` 不换代码，留在 R1 |
 
-`OperationSubmit`、`OperationCancel`、`OperationConfirm`、`OperationRecover`、`OperationResolve`、`OperationReconcile`
+其余动作（`business`、`container`、`database`、`deployment`、`firewall`、`firewall_config`、`component`、`upgrade`、`monitoring`）都是受管变更，留在 R1。
 
-这些经由 `operations` 引擎执行，有持久受理、幂等键与恢复语义，影响面受操作模型约束。
+### 需要看已保存动作的请求
 
-### 档 3：系统高危（改变宿主或网络边界）
+`OperationConfirm`、`OperationCancel`、`OperationRecover`、`OperationResolve`、`OperationReconcile` 本身不带动作，它们推进的是**已经受理的操作**。判定必须回到已保存的操作记录：该操作的 `Action` 属 R2 时，这一类请求也算 R2。
 
-`PeerTrustTarget` → `s.receiveTrust(ctx, *body)`，会写入互信状态，已核对。
+`POST /storage` 归 **R1**，但已核对它不是"只写文件"那么轻：`executor/storage.go` 会
 
-其余载荷经逐项核对后没有新增档 3 成员；后续新增会改变宿主状态的载荷必须在这里登记。
+- 写 `00-opsd.ini` 配置（`:153`）与 env 临时文件（`:164`）；
+- 以 `docker run --network host` 启动存储容器（`:196`），镜像取自固定常量 `CouchImage`。
 
-档 3 的判断标准：失败会切断现有连接、改变宿主网络边界，或让其他节点失去可达性。
+镜像是常量、调用方不能指定任意镜像，所以不构成"任意代码"；但它确实是宿主级变更（host 网络 + 容器创建），因此明确留在 R1 的受管变更档，而不是 R2。
 
-## 3. 机制候选
+## 3. 策略关闭后，三种状态怎么处理
 
-### 方案 A：策略文件 + 档位开关（推荐）
+这是 A2 最容易出事的地方：关掉 R2 之后，本机可能已经存在 shell 操作。规则按"越接近执行越严格、越接近收敛越宽松"：
 
-执行器配置文件增加：
+| 状态 | 处理 | 理由 |
+|---|---|---|
+| **尚未开始**（已受理、未执行） | 不启动，直接标记失败并写明"本机策略已关闭可执行代码能力" | 拒绝的目的是不让代码跑起来；此时拒绝代价最小 |
+| **正在运行** | **允许跑完**，不中断 | 中途杀掉会留下半完成的副作用，比让它收敛更危险 |
+| **取消与清理** | **始终允许**，即使 R2 关闭 | 清理是减少风险的方向；若连取消都要 R2，关闭策略后反而无法收拾残留 |
+
+也就是说：R2 关闭后**不能开始新的**任意代码动作，但**能收尾和清理已经存在的**。
+
+## 4. 配置与默认值
+
+策略放现有 root 管理的 `/etc/opsd/instance.json`（与 A1 的 `user_id` 同文件，安装器以 `root:opsd`、`0640` 写入）：
 
 ```json
-{ "operation_policy": { "read": true, "managed": true, "host": true } }
+{ "operation_policy": { "arbitrary_code": false } }
 ```
 
-- 缺省三项全 `true` → 行为与现在完全一致；
-- `Handle` 分派前查表，档位关闭时返回明确的 `forbidden` 错误，不进入 handler；
-- 档位值非法或未知字段 → **拒绝启动**（避免拼写错误被静默忽略）。
+| 场景 | 默认值 | 理由 |
+|---|---|---|
+| **全新安装** | `false`（写入明确值） | 新部署不应默认具备任意代码能力 |
+| **已有安装升级**（配置缺该字段） | `true`，并记一条"兼容模式"日志 | 升级不能悄悄关掉现网正在用的功能；由管理员显式关闭 |
 
-优点：改动小、可单机验收、失败模式清晰。缺点：不能按操作细分，只能整档开关。
+**严格校验**：未知字段、非布尔值、未知子对象一律**拒绝启动**并给出明确错误——拼写错误不能被静默忽略成"默认值"。
 
-### 方案 B：按载荷精确允许列表
+## 5. 拒绝语义
 
-配置里列出允许的载荷 kind。优点最细；缺点是 27 条清单要靠人工维护，新增载荷时容易忘记授权而中断生产功能（默认拒绝）。
+| 入口 | 拒绝方式 |
+|---|---|
+| `POST /rpc` | 返回 `forbidden`，消息注明"本机策略已关闭可执行代码能力"，**不进入 handler** |
+| `GET /terminal` | **在 `websocket.Accept` 之前**返回 `403` | 一旦升级成功，客户端已拿到可交互通道，事后拒绝会留下半开的会话 |
+| `POST /storage` | 无策略 |
 
-### 方案 C：高危操作需要额外凭据
+## 6. 验收
 
-档 3 操作要求额外令牌（本机签发、一次性）。这已经接近 A3 的形状，会把"本机策略"和"跨节点授权"混在一起，超出 A2 范围。
+1. **新装默认**：新安装的 `instance.json` 含 `"arbitrary_code": false`；`GET /terminal` 得到 `403`（且**没有** WebSocket 升级），`ShellAction` 的 `OperationSubmit` 被拒并标记失败，`ComposeAction(action=update)` 被拒。
+2. **R1 不受影响**：同一配置下只读查询、`PeerTrustTarget`、`ComposeAction(action=start)`、防火墙写入全部照常工作。
+3. **升级兼容**：配置缺 `operation_policy` 时按 `true` 运行（shell 可用），日志出现兼容模式提示。
+4. **已运行的操作跑完**：在 R2 开启时启动一个 shell 操作，运行中把策略改为关闭并重启执行器，该操作仍能跑完，不会因策略变化被中断。
+5. **取消始终可用**：R2 关闭时，取消一个已受理的 shell 操作仍然成功。
+6. **未开始的不启动**：R2 关闭后重新受理的 shell 操作直接失败，且本机没有产生执行痕迹。
+7. **配置非法拒绝启动**：`{"operation_policy": {"arbitrary-code": false}}`（拼写错误）与 `{"operation_policy": {"arbitrary_code": "no"}}`（类型错误）都必须让执行器启动失败。
+8. **拒绝不影响后续**：一次被拒的请求之后，R1 请求仍成功。
 
-## 4. 推荐与验收
+## 7. 未决问题
 
-推荐 **方案 A**：它把"能力可见、可关"这件事先做出来，粒度留到有真实需求再加。
-
-验收（全部可在单机完成）：
-
-1. **默认不变**：不写策略字段时，27 种载荷全部照常工作。
-2. **关掉档 3**：`host=false` 时 `PeerTrustTarget` 被拒且**未进入 handler**（用副作用断言：本机互信状态不变），档 1／2 不受影响。
-3. **关掉档 2**：`managed=false` 时 `OperationSubmit` 被拒，档 1 仍可用。
-4. **全部关闭**：只剩档 1 可读，节点仍在运行（不因拒绝而崩溃）。
-5. **配置非法**：未知识别符或非布尔值 → 执行器拒绝启动并给出明确错误。
-6. **拒绝不影响后续**：一次被拒的载荷之后，同连接／新连接的合法载荷仍成功。
-
-## 5. 未决问题
-
-1. 档 3 是否应当**默认关闭**？默认关闭更安全，但会改变现网功能（互信目标写入会失败），所以我认为第一版必须默认开启，由部署方显式关闭；请评审确认。
-2. 策略的粒度是否够用？如果实际运维需要"只允许某些操作"，方案 B 的清单维护成本要提前评估。
-3. 策略文件放在 `node.json` 还是执行器自己的配置文件？A1 已把 `user_id` 放进 `node.json`（两个服务共读），A2 的策略只被执行器使用，放执行器自己的配置更清晰，但要多一个文件与安装步骤。
-4. 拒绝时返回什么？统一 `forbidden` 并附档位名，还是细分错误码以便节点侧给出提示。
+1. **R2 的初始值是不是太快？** 新装默认关闭意味着新部署的 shell 任务与 root 终端默认不可用，这是功能层面的变化。我按评审结论执行，但需要确认文档与发布说明都写到这一条。
+2. **`POST /storage` 的档位**：已核实会创建 host 网络容器（镜像为固定常量），归 R1。若希望"容器创建"本身也受 R2 约束，需要在 R2 里增加"宿主级容器操作"这一类，请评审确认是否扩大 R2 范围。
+3. **策略变更是否需要重启**：本设计按"启动时读取"处理，改配置需重启执行器；热更新会引入"同一进程内能力在运行中变化"的语义，暂不做。
+4. **拒绝是否要审计**：目前只记日志。若需要"谁在何时试图执行被禁能力"，那属于审计流（安全边界文档第 2 节第 6 条）。
