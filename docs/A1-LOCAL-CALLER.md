@@ -2,7 +2,7 @@
 
 | 项目 | 内容 |
 |---|---|
-| 状态 | **设计稿，未实施**。评审通过前不改动执行器代码。 |
+| 状态 | **已实施**，见提交 `feat(executor): verify the local caller UID before serving` 及后续修正。 |
 | 目标 | 在保留现有目录与 Socket 权限的基础上，增加"连上来的是谁"的判定 |
 | 现状依据 | 见 [安全边界](SECURITY-BOUNDARY.md) 1.2 |
 | 审查条目 | `docs/ARCHITECTURE-REVIEW.md` 方案 A1 |

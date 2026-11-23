@@ -41,7 +41,7 @@ jobs:
           CGO_ENABLED: '1'
         run: |
           go -C backend vet ./...
-          go -C backend test -race -count=1 ./internal/cluster ./internal/transport ./internal/telemetry ./internal/control
+          go -C backend test -race -count=1 ./internal/cluster ./internal/transport ./internal/telemetry ./internal/control ./internal/executor
       - name: 共享数据库迁移与节点代理恢复
         working-directory: backend/internal/control
         run: |

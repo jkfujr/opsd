@@ -3,11 +3,13 @@ package cli
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"encoding/json"
 	"io"
 	"net"
 	"net/http"
 	"os"
+	"strings"
 	"os/exec"
 	"path/filepath"
 	"syscall"
@@ -203,4 +205,87 @@ func TestRealConsoleLifecycleAndNodeRestart(t *testing.T) {
 	if e = db.QueryRow("SELECT count(*) FROM monitoring_samples").Scan(&samples); e != nil || samples == 0 {
 		t.Fatal("控制台关闭时未采集本机历史", samples, e)
 	}
+}
+
+// TestExecutorDerivesAllowedCallerFromServiceAccount 覆盖 A1 的升级路径：
+// 配置里没有 user_id，执行器按 service_account 推导出允许的 UID，
+// 该账号能完成真实请求，其他身份被拒。
+func TestExecutorDerivesAllowedCallerFromServiceAccount(t *testing.T) {
+	binary := os.Getenv("OPSD_TEST_BINARY")
+	if binary == "" || os.Geteuid() != 0 {
+		t.Skip("未提供本地 Linux 节点程序")
+	}
+	dir := t.TempDir()
+	if e := os.Chmod(filepath.Dir(dir), 0755); e != nil {
+		t.Fatal(e)
+	}
+	data := filepath.Join(dir, "node")
+	execDir := filepath.Join(dir, "exec")
+	for _, path := range []string{data, execDir} {
+		if e := os.MkdirAll(path, 0755); e != nil {
+			t.Fatal(e)
+		}
+	}
+	if e := os.Chown(dir, 65534, 65534); e != nil {
+		t.Fatal(e)
+	}
+	for _, path := range []string{data, execDir} {
+		if e := os.Chown(path, 65534, 65534); e != nil {
+			t.Fatal(e)
+		}
+	}
+	// 关键：不写 UserID，只提供 ServiceAccount，模拟旧配置升级。
+	f := installation.NodeFile{DataDir: data, ExecutorDir: execDir, Socket: filepath.Join(dir, "executor.sock"), ControlSocket: filepath.Join(data, "control.sock"), Binary: binary, GroupID: 65534, ServiceAccount: "nobody"}
+	config := filepath.Join(dir, "node.json")
+	if e := localstate.Write(config, f, 0644); e != nil {
+		t.Fatal(e)
+	}
+	root := launch(t, binary, "executor", "--config", config)
+	waitLocal(t, root, func() bool {
+		_, e := os.Stat(f.Socket)
+		return e == nil
+	})
+	// root 与允许身份都试一次；nobody 成功才算推导正确。
+	rpc := func(user string) (string, error) {
+		script := `import socket,sys
+s=socket.socket(socket.AF_UNIX)
+s.settimeout(5)
+s.connect(sys.argv[1])
+s.sendall(b"POST /rpc HTTP/1.1\r\nHost: localhost\r\nContent-Length: 2\r\n\r\n{}")
+print(s.recv(32).decode(errors="replace"))
+`
+		args := []string{"-c", script, f.Socket}
+		if user != "" {
+			args = append([]string{"-u", user, "--", "python3"}, args...)
+			return runCommand("runuser", args...)
+		}
+		return runCommand("python3", args...)
+	}
+	var lastErr error
+	for attempt := 0; attempt < 50; attempt++ {
+		output, e := rpc("nobody")
+		if e == nil && strings.Contains(output, "HTTP/1.1") {
+			lastErr = nil
+			t.Logf("nobody 的请求得到响应：%s", strings.TrimSpace(output))
+			break
+		}
+		if e != nil {
+			lastErr = e
+		} else {
+			lastErr = fmt.Errorf("响应异常：%q", output)
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+	if lastErr != nil {
+		t.Fatalf("按 service_account 推导后 nobody 仍无法调用：%v", lastErr)
+	}
+	if output, e := rpc(""); e == nil && strings.Contains(output, "HTTP/1.1") {
+		t.Fatalf("root 不应被放行，却拿到了响应：%s", strings.TrimSpace(output))
+	}
+}
+
+func runCommand(name string, args ...string) (string, error) {
+	cmd := exec.Command(name, args...)
+	output, err := cmd.CombinedOutput()
+	return string(output), err
 }

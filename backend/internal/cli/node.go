@@ -184,6 +184,16 @@ func serveExecutor(args []string) error {
 	if e != nil {
 		return e
 	}
+	// A1：先解析允许的调用方 UID。任何失败都在打开数据库、启动维护任务和监听之前返回，
+	// 避免"服务已起但准入值非法"的中间态。
+	account := f.ServiceAccount
+	if account == "" {
+		account = "opsd"
+	}
+	allowed, e := executor.ResolveCallerUID(f.UserID, account)
+	if e != nil {
+		return e
+	}
 	ctx, cancel := processContext()
 	defer cancel()
 	db, e := storage.Open(ctx, filepath.Join(f.ExecutorDir, "executor.db"), storage.Executor)
@@ -219,12 +229,7 @@ func serveExecutor(args []string) error {
 	if e = os.Chown(f.Socket, 0, f.GroupID); e != nil {
 		return e
 	}
-	// A1：在目录与 Socket 权限之上，只放行节点服务账号。
-	// 必须在开始服务前解析出允许的 UID，解析失败直接拒绝启动。
-	allowed, e := executor.ResolveCallerUID(f.UserID, "opsd")
-	if e != nil {
-		return e
-	}
+	// A1：在目录与 Socket 权限之上，只放行节点服务账号（UID 已在启动前解析）。
 	l = &executor.CallerGuard{Listener: l, Allowed: allowed, Logf: func(format string, args ...any) {
 		slog.Warn(fmt.Sprintf(format, args...), "component", "executor")
 	}}

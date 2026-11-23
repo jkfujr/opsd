@@ -5,67 +5,80 @@ package executor
 import (
 	"net"
 	"os"
+	"os/user"
 	"path/filepath"
 	"sync/atomic"
 	"testing"
 	"time"
 )
 
-// TestCallerGuardRejectsOtherUIDAndKeepsServing 覆盖 A1 的两条硬要求：
-// 同组其他 UID 被拒，且拒绝单条连接之后合法连接仍能建立。
-//
-// 用真实 Unix socket 与真实 SO_PEERCRED；当前进程 UID 作为"合法"身份，
-// 把 Allowed 设成别的值即可模拟"另一个 UID 来连"。
-func TestCallerGuardRejectsOtherUIDAndKeepsServing(t *testing.T) {
-	probe := unixProbe(t)
-	_, err := peerCredential(probe)
-	probe.Close()
-	if err != nil {
-		t.Skip("当前平台无法读取对端凭据：", err)
-	}
+// newTestGuard 用注入的凭据读取函数构造 guard，避免在监听期间改写 Allowed
+// （那会与 Accept goroutine 形成数据竞态）。
+func newTestGuard(t *testing.T, allowed uint32, credentials func(net.Conn) (peerID, error), rejected *atomic.Int32) (*CallerGuard, string) {
+	t.Helper()
 	dir := t.TempDir()
 	socket := filepath.Join(dir, "executor.sock")
 	base, err := net.Listen("unix", socket)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer base.Close()
-
-	uid := uint32(os.Getuid())
-	var rejected atomic.Int32
 	guard := &CallerGuard{
-		Listener: base,
-		Allowed:  uid,
-		Logf: func(string, ...any) { rejected.Add(1) },
+		Listener:     base,
+		Allowed:      allowed,
+		credential:   credentials,
+		Logf:         func(string, ...any) { rejected.Add(1) },
 	}
-	defer guard.Close()
+	t.Cleanup(func() { guard.Close() })
+	return guard, socket
+}
 
-	accepted := make(chan net.Conn, 2)
+// TestCallerGuardRejectsOtherUIDAndKeepsServing 覆盖 A1 的硬要求：
+// 非允许 UID 被拒、且拒绝之后合法连接仍能建立。
+//
+// 凭据通过注入给出，因此不依赖特权，也不在运行时改写 Allowed。
+func TestCallerGuardRejectsOtherUIDAndKeepsServing(t *testing.T) {
+	const allowed = uint32(4242)
+	var rejected atomic.Int32
+	var calls atomic.Int32
+	credentials := func(net.Conn) (peerID, error) {
+		// 第一次返回别的 UID，之后返回允许的 UID。
+		if calls.Add(1) == 1 {
+			return peerID{uid: allowed + 1, gid: allowed, pid: 99}, nil
+		}
+		return peerID{uid: allowed, pid: 100}, nil
+	}
+	guard, socket := newTestGuard(t, allowed, credentials, &rejected)
+
+	accepted := make(chan net.Conn, 4)
+	serveErr := make(chan error, 1)
 	go func() {
 		for {
 			conn, err := guard.Accept()
 			if err != nil {
+				serveErr <- err
 				return
 			}
 			accepted <- conn
 		}
 	}()
 
-	// Allowed 已是本进程 UID：第一条连接应当被接受。
+	// 第一条：凭据不是允许 UID，应被关闭且不进入 accepted。
 	first, err := net.Dial("unix", socket)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer first.Close()
 	select {
 	case conn := <-accepted:
 		conn.Close()
-	case <-time.After(5 * time.Second):
-		t.Fatal("合法连接未被接受")
+		t.Fatal("非允许 UID 的连接被放行")
+	case <-time.After(500 * time.Millisecond):
+	}
+	first.Close()
+	if rejected.Load() == 0 {
+		t.Fatal("拒绝时没有记录日志")
 	}
 
-	// 把 Allowed 改成另一个 UID，模拟"同组其他 UID 来连"：应被拒绝且不进入 accepted。
-	guard.Allowed = uid + 1
+	// 第二条：允许 UID，必须成功——证明拒绝没有把 Accept 循环打停。
 	second, err := net.Dial("unix", socket)
 	if err != nil {
 		t.Fatal(err)
@@ -74,34 +87,74 @@ func TestCallerGuardRejectsOtherUIDAndKeepsServing(t *testing.T) {
 	select {
 	case conn := <-accepted:
 		conn.Close()
-		t.Fatal("非允许 UID 的连接被放行")
-	case <-time.After(500 * time.Millisecond):
+	case err := <-serveErr:
+		t.Fatalf("拒绝一条连接之后 Accept 退出：%v", err)
+	case <-time.After(5 * time.Second):
+		t.Fatal("拒绝一条连接之后不再接受合法连接")
 	}
-	if rejected.Load() == 0 {
-		t.Fatal("拒绝时没有记录日志")
-	}
-	// 拒绝发生在关闭连接后；对端应观察到连接被关闭。
-	if _, err = second.Write([]byte("x")); err == nil {
-		buffer := make([]byte, 1)
-		second.SetReadDeadline(time.Now().Add(2 * time.Second))
-		if _, readErr := second.Read(buffer); readErr == nil {
-			t.Fatal("被拒连接仍可收发")
-		}
-	}
-	second.Close()
+}
 
-	// 关键：拒绝之后服务仍然存活——恢复允许值，再连一次必须成功。
-	guard.Allowed = uid
-	third, err := net.Dial("unix", socket)
+// TestCallerGuardUsesRealCredentials 用真实 SO_PEERCRED 验证准入：
+// 只有配置的 UID 能连，其他 UID（含 root）被拒。
+func TestCallerGuardUsesRealCredentials(t *testing.T) {
+	probe := unixProbe(t)
+	_, err := peerCredential(probe)
+	probe.Close()
+	if err != nil {
+		t.Skip("当前平台无法读取对端凭据：", err)
+	}
+	self := uint32(os.Getuid())
+	var rejected atomic.Int32
+
+	// 允许值设成"别的 UID"：本进程连接必须被拒。
+	guard, socket := newTestGuard(t, self+1, peerCredential, &rejected)
+	accepted := make(chan net.Conn, 2)
+	go func() {
+		if conn, err := guard.Accept(); err == nil {
+			accepted <- conn
+		}
+	}()
+	conn, err := net.Dial("unix", socket)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer third.Close()
+	defer conn.Close()
 	select {
-	case conn := <-accepted:
-		conn.Close()
-	case <-time.After(5 * time.Second):
-		t.Fatal("拒绝一条连接之后服务不再接受合法连接")
+	case c := <-accepted:
+		c.Close()
+		t.Fatal("UID 不匹配时仍被放行")
+	case <-time.After(2 * time.Second):
+	}
+	if rejected.Load() == 0 {
+		t.Fatal("真实凭据拒绝时没有记录日志")
+	}
+}
+
+// TestResolveCallerUID 覆盖三种来源：显式值、显式 0/越界、缺字段。
+func TestResolveCallerUID(t *testing.T) {
+	value := 1234
+	if got, err := ResolveCallerUID(&value, "opsd"); err != nil || got != 1234 {
+		t.Fatalf("显式 UID 解析失败：%v %v", got, err)
+	}
+	for _, invalid := range []int{0, -1, int(int64(^uint32(0)) + 1)} {
+		bad := invalid
+		if _, err := ResolveCallerUID(&bad, "opsd"); err == nil {
+			t.Fatalf("非法 UID %d 未被拒绝（可能被截断成 0 而放行 root）", invalid)
+		}
+	}
+	// 缺字段：用真实存在的账号验证成功路径，并确认 0 被拒。
+	current, err := user.Current()
+	if err != nil {
+		t.Skip("无法获取当前账号")
+	}
+	if got, err := ResolveCallerUID(nil, current.Username); err != nil || got == 0 {
+		t.Fatalf("按账号名推导失败：%v %v", got, err)
+	}
+	if _, err := ResolveCallerUID(nil, "root"); err == nil {
+		t.Fatal("解析到 UID 0 时应拒绝，不能把 root 当调用方")
+	}
+	if _, err := ResolveCallerUID(nil, "opsd-nonexistent-account"); err == nil {
+		t.Fatal("推导失败时应拒绝启动，而不是放行")
 	}
 }
 
@@ -135,21 +188,4 @@ func unixProbe(t *testing.T) net.Conn {
 	}
 	// 不能在这里关闭：调用方要用这条连接读取凭据。
 	return server
-}
-
-// TestResolveCallerUID 覆盖配置解析的三种情况：显式值、显式 0、缺字段。
-func TestResolveCallerUID(t *testing.T) {
-	value := 1234
-	got, err := ResolveCallerUID(&value, "opsd")
-	if err != nil || got != 1234 {
-		t.Fatalf("显式 UID 解析失败：%v %v", got, err)
-	}
-	zero := 0
-	if _, err = ResolveCallerUID(&zero, "opsd"); err == nil {
-		t.Fatal("显式 0 应被判为非法配置")
-	}
-	// 缺字段时按账号名推导；用一个几乎不可能存在的账号名确保走失败分支。
-	if _, err = ResolveCallerUID(nil, "opsd-nonexistent-account"); err == nil {
-		t.Fatal("推导失败时应拒绝启动，而不是放行")
-	}
 }
