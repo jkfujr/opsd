@@ -4,6 +4,7 @@ package cli
 
 import (
 	"context"
+	"fmt"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -67,7 +68,8 @@ func TestQueuedRestrictedOperationRefusedByPolicy(t *testing.T) {
 	action := protocol.OperationAction{Kind: "shell", Shell: &protocol.ShellAction{
 		TaskID: "policy-job", Name: "策略验收", Script: "touch " + marker, Directory: dir,
 	}}
-	const id = "opqpolicytest"
+	// 每次运行用唯一 ID：单元文件与操作记录都不会与上一次或别人的残留冲突。
+	id := fmt.Sprintf("policy%d", time.Now().UnixNano())
 	if _, _, err := store.Receive(ctx, id, protocol.ContractVersion, action, ""); err != nil {
 		t.Fatalf("构造已受理操作失败：%v", err)
 	}
@@ -87,7 +89,16 @@ func TestQueuedRestrictedOperationRefusedByPolicy(t *testing.T) {
 		t.Fatal(err)
 	}
 	body := strings.ReplaceAll(units["opsd-operation@.service"], "%i", id)
-	if err := os.WriteFile(instancePath, []byte(body), 0644); err != nil {
+	// 独占创建：文件已存在就失败，避免覆盖别人的实例单元。
+	file, err := os.OpenFile(instancePath, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0644)
+	if err != nil {
+		t.Fatalf("无法独占创建实例单元：%v", err)
+	}
+	if _, err := file.WriteString(body); err != nil {
+		file.Close()
+		t.Fatal(err)
+	}
+	if err := file.Close(); err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() {
@@ -97,6 +108,18 @@ func TestQueuedRestrictedOperationRefusedByPolicy(t *testing.T) {
 	})
 	if output, err := runCommand("systemctl", "daemon-reload"); err != nil {
 		t.Fatalf("daemon-reload 失败：%v %s", err, firstLine(output))
+	}
+	// 启动前核对：systemd 解析到的确实是本实例单元，且 ExecStart 指向测试配置。
+	fragment, err := runCommand("systemctl", "show", "-p", "FragmentPath", "--value", "opsd-operation@"+id+".service")
+	if err != nil {
+		t.Fatalf("无法查询单元来源：%v %s", err, firstLine(fragment))
+	}
+	if strings.TrimSpace(fragment) != instancePath {
+		t.Fatalf("systemd 加载的不是本次实例单元：%q，期望 %q", strings.TrimSpace(fragment), instancePath)
+	}
+	execStart, err := runCommand("systemctl", "show", "-p", "ExecStart", "--value", "opsd-operation@"+id+".service")
+	if err != nil || !strings.Contains(execStart, config) {
+		t.Fatalf("单元未指向测试配置：%v %s", err, firstLine(execStart))
 	}
 	if output, err := runCommand("systemctl", "start", "opsd-operation@"+id+".service"); err != nil {
 		t.Logf("单元启动返回：%v %s", err, firstLine(output))

@@ -106,48 +106,98 @@ func exists(path string) bool {
 
 var errPolicyClosedForTest = fmt.Errorf("本机策略已关闭可执行代码能力")
 
-// TestAttemptedDatabaseStepKeepsManualPath 覆盖 A2 的收尾语义：
-// 已尝试、结果待核对的部署步骤在策略关闭后被拒时，必须保留待核对状态与执行进度，
-// 不能重复下发 Apply，人工解决仍然可受理。
+// TestAttemptedDatabaseStepKeepsManualPath 覆盖 A2 的收尾语义。
+//
+// 必须是真实的 R2 部署载荷，并且 DatabaseState.Attempted 已为真，才会走到
+// "读回之后、再次 Apply 之前"的策略判定；用 proxy_upsert 且 DatabaseState
+// 为空会提前按 resolve 结案，那样即使删掉策略判定用例也会通过。
 func TestAttemptedDatabaseStepKeepsManualPath(t *testing.T) {
 	e, _, _ := operationFixture(t)
 	runtime := databaseRuntimeFixture()
 	runtime.stages = []string{"deploy_docker", "deploy_create"}
 	e.Databases = runtime
-	local := accept(t, e, "policy-db", databaseAction())
 
-	// 模拟"已尝试、结果未知"：记录进度并置 Attempted。
+	action := protocol.OperationAction{
+		Kind: "database",
+		Database: &protocol.DatabaseAction{
+			Kind: "deploy_database",
+			Deployment: &protocol.DatabaseDeployment{
+				ID: "db-test", Kind: "galera", Image: "mariadb:11.4", Directory: "/var/lib/db-test",
+				Address: "10.0.0.5", SQLPort: 3306, ReplicationPort: 4567, ISTPort: 4568, SSTPort: 4444,
+				ClusterName: "db-test", ClusterID: "cluster-test", Bootstrap: true,
+				Seeds: []string{"10.0.0.5:4567"}, SSTMethod: "mariabackup",
+				SSTUser: "sstuser", SSTPassword: "sst-secret",
+				Connection: protocol.DatabaseConnection{Kind: "galera", Address: "127.0.0.1:3306", Username: "opsd_admin", Password: "admin-secret"},
+			},
+		},
+	}
+	if !protocol.ActionRequiresArbitraryCode(action) {
+		t.Fatal("该载荷应被判为可执行代码能力")
+	}
+	local := accept(t, e, "policy-db", action)
+
+	// 构造"已尝试、结果待核对"：记录指纹并置 Attempted，使 recover 能通过核对。
+	observed, err := runtime.Observe(t.Context(), *action.Database, "deploy_create")
+	if err != nil {
+		t.Fatal(err)
+	}
 	step := 0
 	local.IntentStep = &step
 	local.Record.State = protocol.AttentionRequired
-	local.ContainerState = nil
+	local.DatabaseState = &databaseState{
+		Stages:    runtime.stages,
+		Index:     1,
+		Attempted: true,
+		Before:    observed.Fingerprint,
+		Source:    observed.Source,
+	}
 	if err := e.Store.Save(t.Context(), &local); err != nil {
 		t.Fatal(err)
 	}
 
-	denied := true
-	e.SetDenyAction(func(protocol.OperationAction) error {
-		if denied {
+	// 关闭任意代码能力。
+	e.SetDenyAction(func(action protocol.OperationAction) error {
+		if protocol.ActionRequiresArbitraryCode(action) {
 			return errPolicyClosedForTest
 		}
 		return nil
 	})
-	before := runtime.writes["deploy_docker"]
+	before := runtime.writes["deploy_create"]
 
-	// 人工请求"接受现状"后重跑：应被策略拒绝，但保留待核对而不是结案。
-	if _, err := e.Store.Request(t.Context(), local.Record.ID, "resolve", local.Record.Revision); err != nil {
+	// 人工选择"继续处理"：应被策略拒绝，但不能结案。
+	if _, err := e.Store.Request(t.Context(), local.Record.ID, "recover", local.Record.Revision); err != nil {
 		t.Fatal(err)
 	}
-	_ = e.Run(t.Context(), local.Record.ID)
+	if err := e.Run(t.Context(), local.Record.ID); err != nil {
+		t.Fatalf("拒绝时应正常返回而不是报错：%v", err)
+	}
 
 	after, err := e.Store.Get(t.Context(), local.Record.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if after.Record.State == protocol.Failed {
-		t.Fatal("已尝试的步骤不应被结案为失败，否则人工解决入口丢失")
+	if after.Record.State != protocol.AttentionRequired {
+		t.Fatalf("已尝试步骤应保留待核对，实际 %v", after.Record.State)
 	}
-	if runtime.writes["deploy_docker"] != before {
+	if after.Record.Error == nil || !strings.Contains(after.Record.Error.Message, "策略") {
+		t.Fatalf("策略拒绝原因应记录：%+v", after.Record.Error)
+	}
+	if runtime.writes["deploy_create"] != before {
 		t.Fatal("被拒绝时不应再次下发 Apply")
+	}
+
+	// 人工解决仍必须可用。
+	if _, err := e.Store.Request(t.Context(), local.Record.ID, "resolve", after.Record.Revision); err != nil {
+		t.Fatal(err)
+	}
+	if err := e.Run(t.Context(), local.Record.ID); err != nil {
+		t.Fatalf("人工解决应被受理：%v", err)
+	}
+	final, err := e.Store.Get(t.Context(), local.Record.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if final.Record.State != protocol.ResolvedManually {
+		t.Fatalf("人工解决后应结束原操作，实际 %v", final.Record.State)
 	}
 }
