@@ -23,7 +23,13 @@
 
 `MonitoringStateRead`、`ResourceMetricsRead`、`ComposeRead`、`ExecutionLogsRead`、`DatabaseDiscovery`、`DatabaseDeploymentCheck`、`DatabaseDeploymentStateRead`、`DatabaseDeploymentProfileRead`、`DatabaseRead`、`ProxyRoutingRead`、`DockerRead`、`ContainerInspect`、`ContainerLogsRead`、`PeerTrustStatusQuery`、`FirewallInspect`、`FirewallRead`、`FirewallPreview`、`MonitoringRead`、`OperationQuery`
 
-`FirewallPreview`／`DatabaseDeploymentCheck`／`DatabaseNetworkCheck` 名字里带"检查"，需要在实施前逐个确认 handler 不写入（预检类通常只计算）。
+三个名字带"检查"的载荷已核对为只读：
+
+- `FirewallPreview` → `Manager.Preview(ctx, body.Change)`，只返回计划 `Plan`；
+- `DatabaseDeploymentCheck` → `CheckDeployment`，只返回检查结果；
+- `DatabaseNetworkCheck` → `CheckDeploymentNetwork`，只返回 `Checked` 布尔。
+
+它们都不写本机状态，因此留在档 1。
 
 ### 档 2：受管变更（改变可回滚的本机状态）
 
@@ -33,7 +39,9 @@
 
 ### 档 3：系统高危（改变宿主或网络边界）
 
-`PeerTrustTarget`（写互信目标）、`DatabaseNetworkCheck` 若含写入则归此档，以及 `FirewallPreview` 若被证实会落盘也要重分。
+`PeerTrustTarget` → `s.receiveTrust(ctx, *body)`，会写入互信状态，已核对。
+
+其余载荷经逐项核对后没有新增档 3 成员；后续新增会改变宿主状态的载荷必须在这里登记。
 
 档 3 的判断标准：失败会切断现有连接、改变宿主网络边界，或让其他节点失去可达性。
 
