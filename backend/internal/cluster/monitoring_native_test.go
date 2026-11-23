@@ -520,7 +520,7 @@ func (f *archiveNative) history(t *testing.T, n *Node, c metricsstore.Config) ma
 					t.Fatal(err)
 				}
 				// 注意：Go 的 Time.Truncate 相对零值时间取整，promtool 的块边界相对
-				// Unix 纪元取整，两者相差约 97 小时，直接用 Truncate 会让两点跨窗口。
+				// Unix 纪元取整，两者相位差 302400 秒（84 小时），直接用 Truncate 会让两点跨窗口。
 				// 这里按纪元取整，得到与 promtool 一致的 486h 窗口起点。
 				rangeSeconds := int64(blockDuration / time.Second)
 				shifted := at.Add(-489 * time.Hour).Unix()
@@ -571,7 +571,13 @@ func (f *archiveNative) history(t *testing.T, n *Node, c metricsstore.Config) ma
 			if err = json.Unmarshal(data, &meta); err != nil {
 				t.Fatal(err)
 			}
-			meta["thanos"] = map[string]any{"version": 1, "labels": map[string]string{"cluster_id": n.cluster, "receive_replica": n.ID}, "downsample": map[string]int{"resolution": 0}, "source": "receive"}
+			labels := map[string]string{"cluster_id": n.cluster, "receive_replica": n.ID}
+			if days == 366 {
+				// 测试专用标签：让 366 组与 364 组保持不同标签集，避免压实把它们合并，
+				// 否则过期删除会连带影响 364 天样本。
+				labels["test_group"] = "retention"
+			}
+			meta["thanos"] = map[string]any{"version": 1, "labels": labels, "downsample": map[string]int{"resolution": 0}, "source": "receive"}
 			data, _ = json.Marshal(meta)
 			if err = os.WriteFile(metaPath, data, 0644); err != nil {
 				t.Fatal(err)
@@ -733,6 +739,7 @@ func (f *archiveNative) history(t *testing.T, n *Node, c metricsstore.Config) ma
 	}
 	compact(true)
 	deleted := 0
+	var retentionMarks []string
 	for object := range f.rootS3.ListObjects(t.Context(), f.bucket, minio.ListObjectsOptions{Prefix: f.prefix, Recursive: true}) {
 		if object.Err != nil {
 			t.Fatal(object.Err)
@@ -748,21 +755,72 @@ func (f *archiveNative) history(t *testing.T, n *Node, c metricsstore.Config) ma
 		if json.Unmarshal(data, &marker) != nil {
 			t.Fatal("删除标记无效")
 		}
+		// 压实替换写的是 "source of compacted block"，只有保留策略写的
+		// "block exceeding retention of 8760h0m0s" 才能证明过期删除生效。
+		if details, _ := marker["details"].(string); !strings.HasPrefix(details, "block exceeding retention") {
+			continue
+		}
+		retentionMarks = append(retentionMarks, object.Key)
 		marker["deletion_time"] = time.Now().Add(-49 * time.Hour).Unix()
 		data, _ = json.Marshal(marker)
 		f.put(t, object.Key, data)
 		deleted++
 	}
-	if deleted < 3 {
-		t.Fatal("一年保留未覆盖三种分辨率", deleted)
+	if len(retentionMarks) < 3 {
+		t.Fatalf("一年保留未覆盖三种分辨率：保留标记 %d 个", len(retentionMarks))
 	}
-	compact(true)
-	for _, block := range blocks {
-		if block.days == 366 {
-			if _, err := f.rootS3.StatObject(t.Context(), f.bucket, f.prefix+block.id+"/meta.json", minio.StatObjectOptions{}); err == nil {
-				t.Fatal("删除延迟过后仍保留过期原始块")
-			}
+	// 过期块必须在原始、5 分钟、1 小时三档都被保留策略标记删除。
+	resolutionMarks := map[int64]int{}
+	for _, key := range retentionMarks {
+		id := strings.TrimSuffix(strings.TrimPrefix(key, f.prefix), "/deletion-mark.json")
+		data, err := objectstore.Read(t.Context(), f.rootS3, f.bucket, f.prefix+id+"/meta.json")
+		if err != nil {
+			// 元数据可能已随标记一起被清理，此时按删除标记本身计入。
+			resolutionMarks[-1]++
+			continue
 		}
+		var meta struct {
+			Thanos struct {
+				Downsample struct {
+					Resolution int64 `json:"resolution"`
+				} `json:"downsample"`
+			} `json:"thanos"`
+		}
+		if json.Unmarshal(data, &meta) != nil {
+			t.Fatal("历史块元数据无效")
+		}
+		resolutionMarks[meta.Thanos.Downsample.Resolution]++
+	}
+	t.Logf("保留策略删除标记：共 %d 个，按分辨率 %v", len(retentionMarks), resolutionMarks)
+	compact(true)
+	// 被保留策略标记的块必须被物理清理。这里按标记本身核对，而不是要求原始块 ID
+	// 全部消失——压实合并会合法地把多个原始块替换成新 ID。
+	for _, key := range retentionMarks {
+		if _, err := f.rootS3.StatObject(t.Context(), f.bucket, key, minio.StatObjectOptions{}); err == nil {
+			t.Fatalf("删除延迟过后仍保留过期块：%s", key)
+		}
+	}
+	// 保留清理之后再查一次 364 天样本：此前的查询发生在启用保留策略之前，
+	// 不能证明边界数据存活。
+	for _, block := range blocks {
+		if block.days != 364 {
+			continue
+		}
+		q := metricsstore.Query{Metric: "opsd_node_cpu_usage_percent", From: block.at.Add(-time.Second), To: block.at.Add(3 * time.Second), StepSeconds: 1, Targets: []metricsstore.QueryTarget{{NodeID: n.ID}}}
+		archiveWait(t, "保留清理后 364 天仍可读", 45*time.Second, func() bool {
+			result, err := n.archiveSeries(t.Context(), q)
+			if err != nil {
+				return false
+			}
+			for _, item := range result.Items {
+				for _, point := range item.Points {
+					if point.Value != nil && *point.Value == 42.125 {
+						return true
+					}
+				}
+			}
+			return false
+		})
 	}
 	f.command(t, "docker", "start", f.component+"-compact")
 	f.command(t, "docker", "restart", f.component+"-receive")
