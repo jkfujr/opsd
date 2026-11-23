@@ -1683,27 +1683,24 @@ func (n *Node) authorizeAdvance(ctx context.Context, origin string, body json.Ra
 	return n.Capabilities.Allowed(origin, op.Subject)
 }
 
-// operationIDFromBody 取出推进类请求里的操作标识。
-// operation.cancel 的载荷是裸字符串，其余是带 operation_id 的对象。
+// operationIDFromBody 按各路径**实际使用的类型**取出操作标识，
+// 与处理器解析同一字段，避免授权判定的对象与真正推进的对象不一致。
+//
+//	operation.cancel           裸字符串
+//	operation.confirm/recover/resolve  OperationDecision{ID}
+//	api.operation.decision     operationDecisionRequest{Decision.ID}
 func operationIDFromBody(body json.RawMessage) (string, bool) {
 	var id string
 	if err := json.Unmarshal(body, &id); err == nil && id != "" {
 		return id, true
 	}
-	var object struct {
-		OperationID string `json:"operation_id"`
-		Decision    struct {
-			OperationID string `json:"operation_id"`
-		} `json:"decision"`
+	var decision OperationDecision
+	if err := json.Unmarshal(body, &decision); err == nil && decision.ID != "" {
+		return decision.ID, true
 	}
-	if err := json.Unmarshal(body, &object); err != nil {
-		return "", false
-	}
-	if object.OperationID != "" {
-		return object.OperationID, true
-	}
-	if object.Decision.OperationID != "" {
-		return object.Decision.OperationID, true
+	var wrapped operationDecisionRequest
+	if err := json.Unmarshal(body, &wrapped); err == nil && wrapped.Decision.ID != "" {
+		return wrapped.Decision.ID, true
 	}
 	return "", false
 }

@@ -88,6 +88,11 @@ func joinAPINodes(t *testing.T, nodes ...*apiNode) {
 			t.Fatal(e)
 		}
 	}
+	nodes2 := make([]*cluster.Node, 0, len(nodes))
+	for _, entry := range nodes {
+		nodes2 = append(nodes2, entry.node)
+	}
+	authorizePeers(nodes2...)
 	d, e := nodes[0].node.Directory(t.Context())
 	if e != nil {
 		t.Fatal(e)

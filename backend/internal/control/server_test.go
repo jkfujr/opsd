@@ -116,10 +116,26 @@ func TestConsoleAuthTargetQueueAndAccount(t *testing.T) {
 }
 
 // grantAllCapabilities 让测试节点模拟"已配好授权的集群"。
-func grantAllCapabilities(n *cluster.Node) {
+func grantAllCapabilities(n *cluster.Node, origins ...string) {
 	set := make(map[cluster.Capability]bool)
 	for _, name := range cluster.CapabilityNames() {
 		set[cluster.Capability(name)] = true
 	}
-	n.Capabilities = cluster.SourceCapabilities{"*": set}
+	if n.Capabilities == nil {
+		n.Capabilities = cluster.SourceCapabilities{}
+	}
+	for _, origin := range origins {
+		n.Capabilities[origin] = set
+	}
+}
+
+// authorizePeers 让给定节点两两互相拥有全部能力（按真实节点 ID 授权）。
+func authorizePeers(nodes ...*cluster.Node) {
+	for _, target := range nodes {
+		for _, source := range nodes {
+			if target != source {
+				grantAllCapabilities(target, source.ID)
+			}
+		}
+	}
 }

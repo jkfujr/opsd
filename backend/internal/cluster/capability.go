@@ -190,7 +190,7 @@ var methodAccess = map[string]MethodAccess{
 	"operation.confirm":       {Advance: true},
 	"operation.recover":       {Advance: true},
 	"operation.resolve":       {Advance: true},
-	"operation.get":           {Capability: CapabilityReadOperations},
+	"operation.get":           {Advance: true},
 	"operation.list":          {Capability: CapabilityReadOperations},
 	"api.request":             {Capability: CapabilityReadOperations},
 	"api.operation.decision":  {Advance: true},
@@ -273,9 +273,8 @@ func (s SourceCapabilities) Allowed(origin, method string) bool {
 	if access.Capability == "" {
 		return false
 	}
-	// "*" 是显式写入的通配来源（例如测试或"对所有成员开放"的部署）；
-	// 不写就完全没有授予，默认仍然是拒绝。
-	return s[origin][access.Capability] || s["*"][access.Capability]
+	// 只按认证来源精确匹配：没有条目就是没有授予，不存在任何通配回查。
+	return s[origin][access.Capability]
 }
 
 // CapabilityNames 返回全部已知能力名，供配置校验与文档使用。
