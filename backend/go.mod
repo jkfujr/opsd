@@ -8,7 +8,7 @@ require (
 	github.com/containerd/errdefs v1.0.0
 	github.com/creack/pty v1.1.24
 	github.com/flynn/noise v1.1.0
-	github.com/getkin/kin-openapi v0.142.0
+	github.com/getkin/kin-openapi v0.149.0
 	github.com/go-sql-driver/mysql v1.10.1
 	github.com/golang/snappy v0.0.4
 	github.com/minio/minio-go/v7 v7.4.1
