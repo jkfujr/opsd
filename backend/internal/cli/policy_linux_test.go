@@ -258,11 +258,12 @@ func TestInstalledExecutorRestartKeepsRunningOperation(t *testing.T) {
 	waitForState(t, f, id, func(r protocol.OperationRecord) bool {
 		return r.State == protocol.Applying
 	}, 30*time.Second)
-	if _, err := os.Stat(marker); err == nil {
-		t.Fatal("任务在重启之前就已完成，验收无效")
-	}
-	recoverBefore, _ := runCommand("systemctl", "show", "-p", "ActiveEnterTimestamp", "--value", "opsd-recover.service")
+	// Applying 是在 Shell 执行前写入的，必须再等到开始标记出现、完成标记尚未出现，
+	// 才能确定重启发生在任务真正运行期间。
+	waitFile(t, started, true, 10*time.Second)
+	waitFile(t, marker, false, 0)
 
+	windowStart := time.Now()
 	// 重启真正的执行器单元。
 	if output, err := runCommand("systemctl", "restart", "opsd-executor.service"); err != nil {
 		t.Fatalf("重启执行器失败：%v %s", err, firstLine(output))
@@ -273,10 +274,9 @@ func TestInstalledExecutorRestartKeepsRunningOperation(t *testing.T) {
 	if _, err := os.Stat(marker); err != nil {
 		t.Fatal("重启后任务未完成")
 	}
-	recoverAfter, _ := runCommand("systemctl", "show", "-p", "ActiveEnterTimestamp", "--value", "opsd-recover.service")
-	if strings.TrimSpace(recoverBefore) != strings.TrimSpace(recoverAfter) {
-		t.Fatal("重启执行器不应唤起恢复单元")
-	}
+	// 恢复单元是 oneshot，执行完会回到 inactive，时间戳相同说明不了问题；
+	// 直接看这段窗口内的 journal 有没有启动记录。
+	assertRecoverNotStarted(t, windowStart)
 
 	// 重复安装：正在运行的任务同样不能被中止。
 	os.Remove(marker)
@@ -285,12 +285,16 @@ func TestInstalledExecutorRestartKeepsRunningOperation(t *testing.T) {
 	waitForState(t, f, second, func(r protocol.OperationRecord) bool {
 		return r.State == protocol.Applying
 	}, 30*time.Second)
+	waitFile(t, started, true, 10*time.Second)
+	waitFile(t, marker, false, 0)
+	reinstallWindow := time.Now()
 	if output, err := runCommand(installedBinary(t, f), "install", "-n", "重复安装保留账号", "--address", "http://127.0.0.1:1"); err != nil {
 		t.Fatalf("重复安装失败：%v %s", err, firstLine(output))
 	}
 	waitForState(t, f, second, func(r protocol.OperationRecord) bool {
 		return r.State == protocol.Succeeded
 	}, 60*time.Second)
+	assertRecoverNotStarted(t, reinstallWindow)
 	if _, err := os.Stat(marker); err != nil {
 		t.Fatal("重复安装后任务未完成")
 	}
@@ -316,4 +320,89 @@ func pendingOperations(t *testing.T, f installation.NodeFile) ([]string, error) 
 	}
 	defer db.Close()
 	return operations.Store{DB: db}.Pending(context.Background())
+}
+
+// waitFile 等待文件出现（want=true）或确认不存在（want=false）。
+func waitFile(t *testing.T, path string, want bool, timeout time.Duration) {
+	t.Helper()
+	deadline := time.Now().Add(timeout)
+	for {
+		_, err := os.Stat(path)
+		exists := err == nil
+		if exists == want {
+			return
+		}
+		if !time.Now().Before(deadline) {
+			if want {
+				t.Fatalf("等待文件出现超时：%s", path)
+			}
+			t.Fatalf("文件不应存在：%s", path)
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+}
+
+// assertRecoverNotStarted 用 journal 判断窗口内恢复单元是否被唤起。
+func assertRecoverNotStarted(t *testing.T, since time.Time) {
+	t.Helper()
+	out, err := runCommand("journalctl", "-u", "opsd-recover.service", "--since",
+		since.Format("2006-01-02 15:04:05"), "--no-pager")
+	if err != nil && !strings.Contains(out, "No entries") && !strings.Contains(out, "无条目") {
+		t.Fatalf("无法读取恢复单元日志：%v %s", err, firstLine(out))
+	}
+	if strings.Contains(out, "Starting opsd-recover") {
+		t.Fatalf("窗口内恢复单元被唤起：%s", firstLine(out))
+	}
+}
+
+// TestInterruptedOperationIsNotRedoneByScheduler 覆盖隔离环境下的另一条验收：
+// 任务被中断后进入待人工核对，跨过多个调度周期也不得被自动补跑。
+func TestInterruptedOperationIsNotRedoneByScheduler(t *testing.T) {
+	if os.Getenv("OPSD_INSTALLED_TEST") != "1" || os.Geteuid() != 0 {
+		t.Skip("设置 OPSD_INSTALLED_TEST=1 且以 root 运行")
+	}
+	f := installedInstance(t)
+	if pending, err := pendingOperations(t, f); err == nil && len(pending) > 0 {
+		t.Skipf("实例存在未结束操作（%v），请在干净实例上运行", pending)
+	}
+	marker := "/tmp/opsd-interrupt-marker"
+	started := marker + ".started"
+	os.Remove(marker)
+	os.Remove(started)
+
+	id := acceptInstalledOperation(t, f, "touch "+started+"; sleep 30; touch "+marker)
+	waitForState(t, f, id, func(r protocol.OperationRecord) bool {
+		return r.State == protocol.Applying
+	}, 30*time.Second)
+	waitFile(t, started, true, 10*time.Second)
+
+	// 中断正在运行的操作。
+	if output, err := runCommand("systemctl", "stop", "opsd-operation@"+id+".service"); err != nil {
+		t.Fatalf("中断操作失败：%v %s", err, firstLine(output))
+	}
+	// 中断后会有一次"分类运行"：进程重新进入、看到 IntentStep 已置位，
+	// 把记录转为待人工核对。这次运行是允许的，计时要从它之后开始。
+	waitForState(t, f, id, func(r protocol.OperationRecord) bool {
+		return r.State == protocol.AttentionRequired || r.State == protocol.Failed
+	}, 30*time.Second)
+	classified := time.Now()
+
+	// 跨过至少两个调度周期（维护循环 5 秒一次）。
+	time.Sleep(13 * time.Second)
+	record := waitForState(t, f, id, func(protocol.OperationRecord) bool { return true }, time.Second)
+	if record.State != protocol.AttentionRequired {
+		t.Fatalf("中断后应等待人工核对，实际 %v", record.State)
+	}
+	if _, err := os.Stat(marker); err == nil {
+		t.Fatal("被中断的任务不应被自动补跑")
+	}
+	// 只统计"分类运行"之后的启动记录。
+	out, err := runCommand("journalctl", "-u", "opsd-operation@"+id+".service", "--since",
+		classified.Format("2006-01-02 15:04:05"), "--no-pager")
+	if err != nil && !strings.Contains(out, "No entries") && !strings.Contains(out, "无条目") {
+		t.Fatalf("无法读取操作单元日志：%v %s", err, firstLine(out))
+	}
+	if strings.Contains(out, "Starting opsd-operation@"+id) {
+		t.Fatalf("待核对的操作被调度重新拉起：%s", firstLine(out))
+	}
 }
