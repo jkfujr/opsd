@@ -72,23 +72,20 @@
 
 清单从代码归纳（`queue.go` 的 `switch method` 与 `method ==` 分支、`shared_dispatch.go`、`object_storage.go`、`api_tokens.go`、以及 `archive.`／`database.` 前缀分派）。**权威版本由代码里的登记表生成**，本表只用于评审边界。
 
-### 4.1 节点协议与非敏感读取（默认允许）
+### 4.1 默认允许（仅此四项）
 
 ```text
-ping, directory, api.capabilities
-account.read, config.read, containers.read, container.inspect, container.logs
-compose.list, compose.registration
-tasks.list, task.get, task.runs, task.runs.page, execution.logs
-operation.get, operation.list
-firewall.read, firewall.config.read, firewall.plan, firewall.preview
-public_addresses.read, metrics, history
-database.read, database.instance.get, database.cluster.get
-database.deployment.preview, database.deployment.profile, database.deployment.check,
-database.deployment.connectivity
-database.discovery.scan, database.discovery.inspect
-database.proxy_routing.read
-shared.status
+ping          节点存活
+directory     签名目录同步（会合并目录）
+api.capabilities
+shared.status 脱敏后返回
 ```
+
+其余一切——包括 `container.logs`、`execution.logs`、`account.read`／`config.read` 的正文、
+任务正文、`firewall.preview`（**会持久化计划**）、`database.query`（**查的是操作结果，
+权限继承原操作及其资源**）——都必须逐来源显式授予。
+
+`operation.list` 必须先按权限过滤、再分页，不能先分页再过滤（否则泄漏总数）。
 
 ### 4.2 需要显式授予的写入
 
@@ -137,9 +134,10 @@ shared.status
 ```go
 type Method struct {
 	Name        string
-	Capability  Capability   // 空表示默认允许
+	Capability  Capability   // 零值 = 拒绝，不会被当成"默认允许"
 	Route       func(...)    // 现有分派逻辑
 	InnerAction bool         // true 表示按载荷内层动作再判一次
+	DefaultAllowed bool      // 默认允许的方法必须显式声明
 }
 ```
 
