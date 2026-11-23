@@ -321,6 +321,17 @@ func TestDatabaseNativeClusterAPIAndDashboard(t *testing.T) {
 		node.node.Start()
 	}
 	manager := databaseengine.Manager{}
+	for _, connection := range append(append([]protocol.DatabaseConnection{}, f.galera...), f.proxies...) {
+		values, err := manager.Metrics(t.Context(), "metrics-instance", connection)
+		if err != nil || len(values) < 2 {
+			t.Fatal("轻量数据库采集失败", values, err)
+		}
+		before := time.Now().UTC()
+		sampled, err := manager.Read(t.Context(), connection, "health", "sampled")
+		if err != nil || !sampled.CheckedAt.Before(before) || before.Sub(sampled.CheckedAt) > 1500*time.Millisecond {
+			t.Fatal("页面未复用本轮采样或改写采集时间", sampled, err)
+		}
+	}
 	state, e := manager.Read(t.Context(), f.galera[0])
 	if e != nil {
 		t.Fatal(e)

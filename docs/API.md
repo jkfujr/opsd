@@ -120,7 +120,7 @@ curl -fsS --get "$OPSD_API_URL/operations" \
 
 只有存在 `next_cursor` 才继续。后续页保持路径、筛选、页大小和身份不变。游标绑定查询与授权范围；令牌版本或地域范围变化后重新查询。跨节点游标仅推进已返回项目，不可用节点保留位置。部分失败时有效数据与 `read`／`unavailable` 一并返回；没有可用结果且无法完成请求返回 503。读取缓存、离线历史和待同步结果以各响应的状态及时间区分。
 
-规则数组等有业务顺序的完整定义不分页。监控历史继续按时间范围和点数限制：最近七天，`node_ids`、`from`／`to`、`group_by=node` 或 `range=24h|7d`；历史存储不可用时返回 503。当前监控的缺值保留为空，汇总只计算有效读数。
+规则数组等有业务顺序的完整定义不分页。原 `/monitoring/history` 已进入废弃流程，P0/P1 继续保留最近七天，支持 `node_ids`、`from`／`to`、`group_by=node` 或 `range=24h|7d`；历史存储不可用时返回 503。秒级归档使用下文 `/monitoring/series`，P3 将其设为唯一历史入口并删除旧入口。当前监控的缺值保留为空，汇总只计算有效读数。
 
 ## 幂等、异步操作与未知结果
 
@@ -200,6 +200,23 @@ SSE 是刷新通知，不保存命令结果；断线重连后重新 GET 对应�
 
 root 终端先以管理员会话 `POST /nodes/{node_id}/terminal` 创建票据，再使用返回的 `url`、同一 Cookie 和同源 Origin 建立 WebSocket。票据三十秒有效且单次使用。JSON 帧使用 `type: input|output|resize|exit`；`input`／`output` 的 `data` 为 Base64，每帧解码最多 32 KiB。`resize` 提供 `cols` 2～500、`rows` 2～300；Ctrl+C 发送 `{"type":"input","data":"Aw=="}`。发送 exit、断连或退出登录释放 root PTY 与其作业。原始终端输入输出不进入共享历史。
 
+## S3 与集中监控
+
+“监控服务宿主”表示运行监控组件的节点；采集、归档、查询分别指样本生成、S3 保存和授权时序读取。`/monitoring/slos` 为 P4 计划的只读展示接口，当前尚未实现。目标与当前实现的区别见 [ADR 0001](adr/0001-monitoring-single-pipeline.md)。
+
+| 接口 | 用途及写入条件 |
+|---|---|
+| `GET /storage/targets`、`GET /storage/targets/{id}` | S3 目标和连接检查状态；单项返回 ETag |
+| `PUT /storage/targets/{id}` | 新建用 `If-None-Match: *`，更新用原 `If-Match`；`enabled=false` 停用 |
+| `POST /storage/targets/{id}/check` | 原 `If-Match`、正文 `prefix`；在所属节点持久登记临时对象键，按原请求恢复 |
+| `GET /monitoring/config`、`PUT /monitoring/config` | 配置 ETag 及条件写入，返回原持久 Operation |
+| `GET /monitoring/status` | 授权节点的采集、缓冲、组件、归档及磁盘状态，可用 `node_id` 筛选 |
+| `GET /monitoring/series` | 受控指标、资源与时间查询，按权限筛选后汇总 |
+
+存储目标与监控配置要求管理员会话；写入继续使用请求键和目标节点规则。S3 凭据按 Receive／Store／Compactor 分别提交，读取只返回 `credential_ref` 和配置状态。检查结果绑定目标版本与前缀，修改后重新检查；正在使用的目标受引用保护。配置启用、停用和迁移通过原操作查询与显式重新处理入口恢复。
+
+序列查询要求 `metric`，可选 `node_id`、`resource_id`、UTC `from/to`、`step_seconds` 及 `aggregate=sum|avg`。令牌需要对应的监控、容器或数据库读取权限，数据库实例范围来自已授权集群。默认最近 30 天、约 1200 点；每序列最多 10000 点，总计最多 250000 点，时间范围为最近 365 天。`step_seconds` 是返回点间隔，`source_resolution_seconds` 是允许使用的来源分辨率上限，0 表示原始数据；缩放到一秒后读取原始样本。缺口值为 `null`，S3 等部分读取故障通过 `partial`、`warnings` 和 `missing` 返回。
+
 ## Prometheus 与 Grafana
 
 指标保留根路径 `/metrics`，使用 Bearer，并按监控、容器及数据库读取授权过滤：
@@ -217,7 +234,7 @@ scrape_configs:
       credentials: '生成的令牌'
 ```
 
-Accept 为 `application/openmetrics-text` 时返回 OpenMetrics，否则为 Prometheus 文本。Grafana 使用 Prometheus 数据源查询 `opsd_node_up` 及其他 `opsd_` 指标；Infinity 数据源可向 v2 JSON 地址附加 Bearer。Prometheus 保存连续趋势，OPSD 自身历史继续五分钟采集、保留七天。
+Accept 为 `application/openmetrics-text` 时返回 OpenMetrics，否则为 Prometheus 文本。Grafana 使用 Prometheus 数据源查询 `opsd_node_up` 及其他 `opsd_` 指标；Infinity 数据源可向 v2 JSON 地址附加 Bearer。原五分钟采集、七天历史继续服务；集中监控从启用时开始保存秒级数据，本地 30 天、S3 365 天。
 
 ## v1 迁移
 
