@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net"
 	"net/http"
 	"os"
@@ -218,6 +219,15 @@ func serveExecutor(args []string) error {
 	if e = os.Chown(f.Socket, 0, f.GroupID); e != nil {
 		return e
 	}
+	// A1：在目录与 Socket 权限之上，只放行节点服务账号。
+	// 必须在开始服务前解析出允许的 UID，解析失败直接拒绝启动。
+	allowed, e := executor.ResolveCallerUID(f.UserID, "opsd")
+	if e != nil {
+		return e
+	}
+	l = &executor.CallerGuard{Listener: l, Allowed: allowed, Logf: func(format string, args ...any) {
+		slog.Warn(fmt.Sprintf(format, args...), "component", "executor")
+	}}
 	handler := (&executor.Server{Services: service, Directory: f.ExecutorDir}).Handler()
 	server := &http.Server{Handler: handler, ReadHeaderTimeout: 5 * time.Second}
 	go func() { <-ctx.Done(); server.Close() }()

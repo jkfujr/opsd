@@ -23,6 +23,9 @@ type NodeFile struct {
 	ControlSocket string `json:"control_socket"`
 	Binary        string `json:"binary"`
 	GroupID       int    `json:"group_id"`
+	// UserID 是执行器允许的本机调用方 UID（节点服务账号）。
+	// 用指针区分旧配置缺字段（需要按账号名推导）与显式写 0（非法配置）。
+	UserID *int `json:"user_id,omitempty"`
 }
 type NodeInstall struct {
 	Account                                               *cluster.AccountChange
@@ -81,7 +84,7 @@ func InstallNode(ctx context.Context, o NodeInstall) (bool, error) {
 	if e != nil {
 		return false, e
 	}
-	f := NodeFile{DataDir: "/var/lib/opsd/node", ExecutorDir: "/var/lib/opsd/executor", Socket: "/run/opsd/executor.sock", ControlSocket: "/run/opsd-node/control.sock", Binary: filepath.Join(o.Directory, "bin", "opsd"), GroupID: gid}
+	f := NodeFile{DataDir: "/var/lib/opsd/node", ExecutorDir: "/var/lib/opsd/executor", Socket: "/run/opsd/executor.sock", ControlSocket: "/run/opsd-node/control.sock", Binary: filepath.Join(o.Directory, "bin", "opsd"), GroupID: gid, UserID: &uid}
 	for _, dir := range []string{filepath.Dir(f.Binary), filepath.Dir(o.ConfigPath), "/var/lib/opsd", f.DataDir, f.ExecutorDir} {
 		if e = os.MkdirAll(dir, 0755); e != nil {
 			return false, e

@@ -119,7 +119,10 @@ func TestRealConsoleLifecycleAndNodeRestart(t *testing.T) {
 	if e = os.Chown(data, 65534, 65534); e != nil {
 		t.Fatal(e)
 	}
-	f := installation.NodeFile{DataDir: data, ExecutorDir: execDir, Socket: filepath.Join(dir, "executor.sock"), ControlSocket: filepath.Join(data, "control.sock"), Binary: binary, GroupID: 65534}
+	// A1：集成测试以 nobody(65534) 启动节点，必须显式写入允许的调用方 UID，
+	// 不能依赖按账号名推导（nobody 与生产账号名不同）。
+	uid := 65534
+	f := installation.NodeFile{DataDir: data, ExecutorDir: execDir, Socket: filepath.Join(dir, "executor.sock"), ControlSocket: filepath.Join(data, "control.sock"), Binary: binary, GroupID: 65534, UserID: &uid}
 	config := filepath.Join(dir, "node.json")
 	if e = localstate.Write(config, f, 0644); e != nil {
 		t.Fatal(e)
