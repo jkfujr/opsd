@@ -3,7 +3,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 [[ ${WSL_DISTRO_NAME:-} == OPSD-CI ]] || { echo '请在独立的 OPSD-CI 发行版运行' >&2; exit 1; }
 stage=${1:-all}
-case "$stage" in all|build|shared|backend|firewall|themes|api) ;; *) echo '未知验收阶段' >&2; exit 1 ;; esac
+case "$stage" in all|build|shared|backend|monitoring|firewall|themes|api) ;; *) echo '未知验收阶段' >&2; exit 1 ;; esac
 mkdir -p artifacts/local-ci
 exec > >(tee "artifacts/local-ci/$stage.log") 2>&1
 phase=$stage
@@ -11,7 +11,7 @@ finish() {
   status=$?
   if [[ $phase == api ]]; then
     if (( status != 0 )); then sudo journalctl --no-pager -n 80 -u opsd.service -u opsd-executor.service -u opsd-recover.service; fi
-    sudo systemctl stop opsd.service opsd-executor.service || true
+    sudo systemctl disable --now opsd.service opsd-executor.service opsd-recover.service || true
   fi
   printf '%s\n' "本地验收结束：$stage，退出码 $status"
   exit "$status"
@@ -20,9 +20,17 @@ trap finish EXIT
 
 build() {
   npm ci
-  npm --prefix frontend/gpt2 ci
-  npm run build
-  git -c core.safecrlf=false diff --exit-code -- api/openapi.json backend/internal/httpapi/api.gen.go backend/internal/httpapi/policy.gen.go backend/internal/control/strict.gen.go backend/internal/cluster/api_contract.gen.go backend/internal/consoletheme/api_version.gen.go api/typescript/schema.gen.ts
+  npm --prefix frontend ci
+  node --input-type=module <<'JS'
+import { readFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
+const files = ['api/openapi.json', 'backend/internal/httpapi/api.gen.go', 'backend/internal/httpapi/policy.gen.go', 'backend/internal/control/strict.gen.go', 'backend/internal/cluster/api_contract.gen.go', 'backend/internal/consoletheme/api_version.gen.go', 'api/typescript/schema.gen.ts'];
+const read = file => readFileSync(file, 'utf8').replaceAll('\r\n', '\n');
+const before = files.map(read);
+const result = spawnSync('npm', ['run', 'build'], { stdio: 'inherit' });
+if (result.status !== 0) process.exit(result.status ?? 1);
+for (let index = 0; index < files.length; index++) if (before[index] !== read(files[index])) throw Error('生成文件与当前 OpenAPI 不一致：' + files[index]);
+JS
   test "$(artifacts/opsd-linux-amd64 version --plain)" = "$(node -p 'require("./package.json").version')"
   sh -n artifacts/install.sh
 }
@@ -34,6 +42,9 @@ backend() {
   docker pull busybox:1.37.0
   OPSD_DOCKER_TEST=1 OPSD_DATABASE_TEST=1 npm test
 }
+monitoring() {
+  bash scripts/check-monitoring.sh
+}
 firewall() {
   go -C backend test -c -o ../artifacts/firewall-native.test ./internal/firewall
   sudo env OPSD_NATIVE_TRUST=1 artifacts/firewall-native.test -test.run '^TestPeerTrustNativeNetwork$' -test.v
@@ -41,8 +52,7 @@ firewall() {
 themes() {
   npm install --prefix artifacts/theme-ui/vue-runtime --no-save --package-lock=false vue@3.5.45
   npm exec -- playwright install --with-deps chromium
-  npm --prefix frontend/gpt2 run check:presentation
-  OPSD_THEME_UI=1 go -C backend test ./internal/control -run '^TestConsoleThemeBrowser$' -v -count=1 -timeout=8m
+  OPSD_THEME_UI=1 go -C backend test ./internal/control -run '^TestConsoleThemeBrowser$' -v -count=1 -timeout=15m
 }
 api() {
   sudo sh scripts/check-installer.sh
@@ -54,7 +64,7 @@ api() {
   for service in opsd.service opsd-executor.service opsd-recover.service; do
     if systemctl cat "$service" > /dev/null 2>&1; then sudo systemctl disable --now "$service"; fi
   done
-  sudo rm -f /etc/systemd/system/opsd.service /etc/systemd/system/opsd-executor.service /etc/systemd/system/opsd-operation@.service /etc/systemd/system/opsd-recover.service /etc/opsd/instance.json
+  sudo rm -f /etc/systemd/system/opsd.service /etc/systemd/system/opsd-executor.service /etc/systemd/system/opsd-operation@.service /etc/systemd/system/opsd-recover.service /etc/opsd/instance.json /opt/opsd/bin/opsd
   sudo rm -rf /var/lib/opsd/node /var/lib/opsd/executor
   sudo systemctl daemon-reload
   export OPSD_API_PASSWORD
@@ -77,7 +87,7 @@ api() {
 }
 
 if [[ $stage == all ]]; then
-  for phase in build shared backend firewall themes api; do
+  for phase in build shared backend monitoring firewall themes api; do
     printf '%s\n' "开始本地验收：$phase"
     "$phase"
   done

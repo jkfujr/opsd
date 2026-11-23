@@ -236,7 +236,7 @@ func TestBuiltinConsoleAssetsAndRoutes(t *testing.T) {
 	}
 	c := openThemeConsole(t, assets)
 	c.node.Start()
-	routes := []string{"/tools", "/tools/tasks", "/tools/terminal", "/terminal?node=example#session", "/__opsd/builtin/tools/tasks"}
+	routes := []string{"/tools", "/tools/tasks", "/tools/tasks?view=edit&node_id=example&task_id=daily", "/tools/tasks?view=runs&node_id=example&task_id=daily", "/tools/terminal", "/tools/operations", "/terminal?node=example#session", "/tasks?view=runs&node_id=example#top", "/operations", "/monitoring", "/__opsd/builtin/tools/tasks", "/__opsd/builtin/monitoring"}
 	for _, path := range routes {
 		if code, _, _ := c.request(t, "GET", path, "", nil, nil); code != 404 {
 			t.Fatal("未登录页面泄露", path, code)

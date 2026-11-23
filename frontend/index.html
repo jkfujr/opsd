@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="color-scheme" content="dark light" />
+    <meta name="theme-color" content="#0b0c0f" />
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 64 64%27%3E%3Crect width=%2764%27 height=%2764%27 rx=%2716%27 fill=%27%230b0c0f%27/%3E%3Ccircle cx=%2732%27 cy=%2732%27 r=%2715%27 fill=%27none%27 stroke=%27%235ef1c2%27 stroke-width=%275%27/%3E%3Ccircle cx=%2732%27 cy=%2732%27 r=%274.5%27 fill=%27%235ef1c2%27/%3E%3C/svg%3E" />
+    <title>OPSD</title>
+    <script>
+      try {
+        var p = JSON.parse(localStorage.getItem('opsd.t1.prefs') || '{}');
+        var t = p.theme === 'light' || p.theme === 'dark' ? p.theme : (matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
+        document.documentElement.dataset.theme = t;
+        if (typeof p.hue === 'number') document.documentElement.style.setProperty('--hue', String(p.hue));
+        if (p.density === 'compact') document.documentElement.dataset.density = 'compact';
+      } catch (e) {}
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

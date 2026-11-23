@@ -1,6 +1,6 @@
 # UI 规范
 
-默认控制台为 `frontend/gpt2`，采用 React 19、Appica 1.3，视觉约定见 [gpt2 设计](../frontend/gpt2/DESIGN.md)。组件从子路径导入，颜色、边框、圆角和交互使用 Appica 角色变量。本文保留通用业务交互约定；旧前端的具体尺寸作为参考。
+默认控制台为 `frontend`,采用 React 19、Motion 与自研组件,视觉约定见 [前端设计](../frontend/DESIGN.md)。组件来自 `frontend/src/ui/kit.tsx`,颜色、尺寸与动效使用 `frontend/src/styles/tokens.css` 令牌。本文保留通用业务交互约定;旧前端的具体尺寸仅作参考。
 
 ## 布局与文字
 

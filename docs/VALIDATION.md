@@ -10,13 +10,13 @@
 pwsh -NoProfile -File scripts/check-wsl.ps1
 ```
 
-入口同步当前工作区到 WSL 的 `/home/ci/opsd`，在 Linux 文件系统构建，保留依赖缓存；产物和日志复制到本机被忽略的 `artifacts/wsl-ci/`。安装验收会修改独立发行版内的 OPSD 服务与防火墙，每次重建验收节点及执行器数据，脚本校验发行版名称。需要重跑失败阶段时使用 `-Stage build|shared|backend|firewall|themes|api`；成功且输入未变的阶段直接复用。
+入口同步当前工作区到 WSL 的 `/home/ci/opsd`，在 Linux 文件系统构建，保留依赖缓存；产物和日志复制到本机被忽略的 `artifacts/wsl-ci/`。安装验收会修改独立发行版内的 OPSD 服务与防火墙，每次重建验收节点及执行器数据，脚本校验发行版名称。需要重跑失败阶段时使用 `-Stage build|shared|backend|monitoring|firewall|themes|api`；成功且输入未变的阶段直接复用。
 
 本地与 GitHub Actions 使用相同的项目构建及验收命令，Linux 手动构建入口为：
 
 ```bash
 npm ci
-npm --prefix frontend/gpt2 ci
+npm --prefix frontend ci
 npm run build
 OPSD_DOCKER_TEST=1 OPSD_DATABASE_TEST=1 npm test
 ```

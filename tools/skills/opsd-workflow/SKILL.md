@@ -5,10 +5,10 @@ description: 开发、审查和验收 OPSD 对等节点、控制台、通用 API
 
 # OPSD 工作流
 
-从项目根目录执行，先读取当前 `AGENTS.md` 和本任务涉及的改动，保留其他任务的工作。Go 模块位于 `backend/`；默认前端为 `frontend/gpt2`，分工及接入方式见 [前端开发](../../../frontend/README.md)。
+从项目根目录执行，先读取当前 `AGENTS.md` 和本任务涉及的改动，保留其他任务的工作。Go 模块位于 `backend/`；默认前端为 `frontend`，分工及接入方式见 [前端开发](../../../frontend/README.md)。
 
 - 只读审查：读取相关入口与现有运行结果，不改源码、不运行更新。
-- 源码开发：按需读取 [开发参考](references/development.md)。HTTP 类型只改 OpenAPI 后生成，界面沿用当前 Appica。
+- 源码开发：按需读取 [开发参考](references/development.md)。HTTP 类型只改 OpenAPI 后生成。界面按 [前端设计](../../../frontend/DESIGN.md) 使用自研组件。
 - 界面布局、间距、状态与浮层采用 [UI 规范](../../../docs/UI.md)；公网地址与互信边界见 [架构](../../../docs/ARCHITECTURE.md)。
 - CI 与固定版本发布：读取 [验收](../../../docs/VALIDATION.md) 和 [发布](../../../docs/RELEASING.md)，复用同提交成功工件。版本只改根 `package.json`，产物写入 `artifacts/`。
 - 本地验收：复用输入未变的成功结果；运行用户要求的受影响测试。构建、接口应答、浏览器交互及实机恢复分别报告。

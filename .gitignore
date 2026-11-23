@@ -2,7 +2,8 @@
 /AGENTS.md
 /backend/internal/httpapi/static/
 /backend/internal/webassets/artifacts/
-/.agents/skills/
+/.agents/
+/.impeccable/
 **/node_modules/
 **/dist/
 /artifacts/

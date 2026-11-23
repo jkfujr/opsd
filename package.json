@@ -12,7 +12,7 @@
     "build:frontend": "node scripts/build-frontend.mjs",
     "build:backend": "node scripts/build-backend.mjs",
     "test": "go -C backend test ./internal/...",
-    "dev": "npm --prefix frontend/gpt2 run dev",
+    "dev": "npm --prefix frontend run dev",
     "dev:backend": "go -C backend run ./tools/local-console"
   },
   "devDependencies": {

@@ -33,7 +33,7 @@ func run() error {
 	if err = json.Unmarshal(data, &project); err != nil {
 		return err
 	}
-	artifacts := filepath.Join(root, "artifacts", "frontend", "gpt2")
+	artifacts := filepath.Join(root, "artifacts", "frontend")
 	if err = os.MkdirAll(artifacts, 0755); err != nil {
 		return err
 	}
@@ -52,10 +52,14 @@ func run() error {
 		return err
 	}
 	defer s.Close()
-	web := &http.Server{Addr: "127.0.0.1:5183", Handler: s.Handler(), ReadHeaderTimeout: 10 * time.Second}
+	consolePort := os.Getenv("OPSD_LOCAL_PORT")
+	if consolePort == "" {
+		consolePort = "5183"
+	}
+	web := &http.Server{Addr: "127.0.0.1:" + consolePort, Handler: s.Handler(), ReadHeaderTimeout: 10 * time.Second}
 	done := make(chan error, 1)
 	go func() { done <- web.ListenAndServe() }()
-	fmt.Printf("http://127.0.0.1:5183 node=%s data=%s\n", n.ID, dir)
+	fmt.Printf("http://127.0.0.1:%s node=%s data=%s\n", consolePort, n.ID, dir)
 	select {
 	case err := <-done:
 		return err

@@ -7,7 +7,7 @@ const output = resolve('artifacts/theme-ui');
 const builtin = '/__opsd/builtin/';
 
 async function buildThemes() {
-  const { build } = await import('../frontend/gpt2/node_modules/vite/dist/node/index.js');
+  const { build } = await import('../frontend/node_modules/vite/dist/node/index.js');
   const vue = resolve(process.env.OPSD_THEME_VUE ?? join(output, 'vue-runtime/node_modules/vue/dist/vue.runtime.esm-bundler.js'));
   assert(existsSync(vue), '请先安装 Vue 验证依赖：npm install --prefix artifacts/theme-ui/vue-runtime --no-save --package-lock=false vue@3.5.45');
   const version = JSON.parse(readFileSync('package.json', 'utf8')).version;
@@ -73,8 +73,8 @@ async function buildThemes() {
     `;
     writeFileSync(join(root, 'main.js'), source);
     await build({ configFile: false, root, base: './', logLevel: 'warn', resolve: { alias: framework === 'react' ? [
-      { find: /^react-dom\/client$/, replacement: resolve('frontend/gpt2/node_modules/react-dom/client.js') },
-      { find: /^react$/, replacement: resolve('frontend/gpt2/node_modules/react/index.js') },
+      { find: /^react-dom\/client$/, replacement: resolve('frontend/node_modules/react-dom/client.js') },
+      { find: /^react$/, replacement: resolve('frontend/node_modules/react/index.js') },
     ] : [{ find: /^vue$/, replacement: vue }] }, define: { __VUE_OPTIONS_API__: 'false', __VUE_PROD_DEVTOOLS__: 'false', __VUE_PROD_HYDRATION_MISMATCH_DETAILS__: 'false' }, build: { outDir: 'dist', emptyOutDir: true } });
   }
   const broken = join(output, 'broken');
@@ -112,7 +112,7 @@ async function checkThemes() {
     await row(name).getByRole('button', { name: '启用', exact: true }).click();
     const saved = await response;
     assert.equal(saved.status(), 200, await saved.text());
-    await visible(page.getByRole('status').filter({ hasText: '已切换主题' }));
+    await visible(page.getByRole('status').filter({ hasText: '已切换主题' }).last());
     await page.getByRole('button', { name: '刷新界面', exact: true }).click();
   };
   const checkDocumentation = async () => {
@@ -253,14 +253,15 @@ async function checkThemes() {
     await page.waitForURL(base + builtin);
     await goAppearance();
     await page.getByRole('button', { name: '切回内置', exact: true }).click();
-    await visible(page.getByRole('status').filter({ hasText: '已切换主题' }));
+    await visible(page.getByRole('status').filter({ hasText: '已切换主题' }).last());
     await row('React 整包主题').getByRole('button', { name: '删除', exact: true }).click();
     await visible(page.getByRole('alertdialog'));
     await page.getByRole('alertdialog').getByRole('button', { name: '删除', exact: true }).click();
     await row('React 整包主题').waitFor({ state: 'detached' });
-    // 使用实际内置 gpt2 页面修改安全入口并验证两种登录、退出及失效路径。
+    // 使用实际内置前端页面修改安全入口并验证两种登录、退出及失效路径。
     await page.getByRole('button', { name: '刷新界面', exact: true }).click();
-    await page.getByRole('heading', { name: '概览', exact: true }).waitFor();
+    await page.getByRole('navigation', { name: '主导航', exact: true }).getByRole('link', { name: '概览', exact: true }).waitFor();
+    assert.equal(new URL(page.url()).pathname, '/');
     await page.goto(base + '/settings/account');
     await page.getByLabel('安全入口', { exact: true }).fill('/secure-opsd');
     await page.getByLabel('当前密码', { exact: true }).fill('test-password');
@@ -278,16 +279,17 @@ async function checkThemes() {
     await page.getByRole('heading', { name: '节点设置', exact: true }).waitFor();
     await page.reload(); await page.getByRole('heading', { name: '节点设置', exact: true }).waitFor();
     assert.equal(new URL(page.url()).hash, '#node-settings');
-    await page.getByRole('navigation', { name: '主导航', exact: true }).getByRole('link', { name: '工具', exact: true }).click();
+    await page.getByRole('navigation', { name: '主导航', exact: true }).getByRole('link', { name: '终端', exact: true }).click();
     await page.waitForURL(url => url.pathname.startsWith(builtin + 'tools/'));
     await page.goto(base + builtin + `terminal?node=${current.local_node_id}&keep=1#terminal-end`);
     await page.waitForURL(url => url.pathname === builtin + 'tools/terminal' && url.searchParams.has('session'));
     assert.equal(new URL(page.url()).searchParams.get('keep'), '1');
     assert.equal(new URL(page.url()).hash, '#terminal-end');
+    const expiredLocation = new URL(page.url());
     await context.request.delete(base + '/api/v2/auth/sessions/current', { headers: { Origin: base, 'X-CSRF-Token': current.csrf_token } });
-    await page.waitForURL(base + '/secure-opsd?builtin=1');
+    await page.waitForURL(url => url.pathname === '/secure-opsd' && url.searchParams.get('builtin') === '1' && url.searchParams.get('return_to') === expiredLocation.pathname + expiredLocation.search + expiredLocation.hash);
     assert.equal((await context.request.get(base + builtin + 'settings/appearance')).status(), 404);
-    await submitBuiltinLogin(); await page.waitForURL(base + builtin);
+    await submitBuiltinLogin(); await page.waitForURL(url => url.pathname === builtin + 'tools/terminal' && url.searchParams.get('keep') === '1' && url.hash === '#terminal-end');
     await page.goto(base + builtin + 'settings/account');
     await page.getByLabel('安全入口', { exact: true }).fill('/recover-opsd');
     await page.getByLabel('当前密码', { exact: true }).fill('test-password');

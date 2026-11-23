@@ -1,0 +1,10 @@
+{
+  "format_version": 1,
+  "id": "opsd",
+  "name": "OPSD",
+  "version": "1.0.0",
+  "api_version": 2,
+  "min_opsd_version": "0.1.0-dev",
+  "login": "theme",
+  "author": "OPSD"
+}

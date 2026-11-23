@@ -1,6 +1,0 @@
-node_modules/
-dist/
-artifacts/
-.impeccable/review/
-.impeccable/questions/
-*.tsbuildinfo

@@ -2,7 +2,7 @@
 
 `backend/cmd/opsd` 是唯一程序入口。Go 模块和内部包统一位于 `backend/`，模块名及导入路径保持不变。普通用户节点通过认证 Noise 通道管理成员、配置、目标队列、监控和可选控制台；root 执行器只监听本机 Unix Socket，接受类型化操作。
 
-`frontend/gpt2` 为默认内置界面，`frontend/legacy` 和 `frontend/variants` 保留独立前端。内置构建以绝对资源基址直接输出到 `backend/internal/webassets/artifacts`，由 `webassets` 嵌入程序；独立主题仍以相对基址构建。OpenAPI、生成配置和共享 TypeScript 类型位于根 `api/`，根 `scripts/` 调度生成与构建。前端接入尚待完成的交互见 [前端开发](../frontend/README.md)。
+`frontend` 是唯一前端,并作为默认内置界面。内置构建以绝对资源基址直接输出到 `backend/internal/webassets/artifacts`，由 `webassets` 嵌入程序；独立主题仍以相对基址构建。OpenAPI、生成配置和共享 TypeScript 类型位于根 `api/`，根 `scripts/` 调度生成与构建。前端接入尚待完成的交互见 [前端开发](../frontend/README.md)。
 
 ## 数据与执行边界
 

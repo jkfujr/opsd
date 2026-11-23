@@ -6,7 +6,7 @@
 - `backend/internal/installation/node.go`：安装记录和 systemd 服务；重复安装先读取已有实例，不重新生成身份或账号。`address.go` 在新安装写入前识别加入节点的地址。
 - `backend/internal/cluster`：节点身份、成员目录、Noise 通信、持久队列、配置及账号、签名记录、共享 SQL 上传、查询及迁移。`node.go` 定义本机配置和默认值，`firewall.go` 连接统一防火墙配置与队列。
 - `backend/internal/control`：浏览器会话、HTTP、SSE；`backend/internal/executor`：root Socket 和类型化服务；`backend/internal/operations`：独立执行、读回、确认与恢复；`backend/internal/firewall`：UFW、firewalld、nftables 适配。
-- `backend/internal/monitoring` 与 `frontend/gpt2/src/monitoring.tsx`：本机历史采集、当前读数与趋势。当前缺值显示“—”，不能拿历史补当前数据。
+- `backend/internal/monitoring` 与 `frontend/src/monitoring.tsx`：本机历史采集、当前读数与趋势。当前缺值显示“—”，不能拿历史补当前数据。
 - `backend/internal/dockerengine`：显式本机 Socket、官方 SDK、容器身份核对和有界日志；容器执行意图保存在执行器 SQLite，恢复入口只核对原操作。列表与日志分别合并五秒及两秒内读取，操作更新后清除缓存。
 - `backend/internal/apiauth` 与 `backend/internal/control/api_authorization.go`：令牌摘要、生命周期、统一模块与资源权限；核验通过 `cluster/api_tokens.go`，受理身份进入原队列。
 - `backend/internal/databaseengine`：本机数据库发现、Galera／ProxySQL 读写及只读备份状态；`cluster/database_workflow.go` 管理协调与远端持久步骤，`operations/database.go` 保存发送意图及恢复记录。
@@ -25,15 +25,15 @@
 
 ## HTTP 与前端
 
-只修改 `api/openapi.json`，执行 `npm run generate` 生成 backend 内的 HTTP Go 类型、`api/typescript/schema.gen.ts` 共享类型、严格接口、授权和节点／主题 API 能力版本，不手改生成文件或另写 DTO。`/api/v2/docs` 使用同份规范及内置 Swagger 资源；通用调用规则只维护在 [API](../../../../docs/API.md)。`frontend/gpt2/src/api/client.ts` 统一附加 CSRF、记录 GET 的 ETag、遍历集合分页并处理 Problem；写入禁止自动重试，未知结果查询原请求键。
+只修改 `api/openapi.json`,执行 `npm run generate` 生成 backend 内的 HTTP Go 类型、`api/typescript/schema.gen.ts` 共享类型、严格接口、授权和节点/主题 API 能力版本,不手改生成文件或另写 DTO。`/api/v2/docs` 使用同份规范及内置 Swagger 资源;通用调用规则只维护在 [API](../../../../docs/API.md)。`frontend/src/api/http.ts` 统一附加 CSRF、条件头与请求键并处理 Problem;写入统一经 `frontend/src/app/commands.ts` 的 `useCommand`,禁止自动重试,未知结果查询原请求键。
 
-先读 `frontend/gpt2/node_modules/@appica/ui-react/agent-rules.md`，组件从各自子路径导入；沿用角色颜色和现有样式，不修改组件库。
+先读 [前端设计](../../../../frontend/DESIGN.md);组件来自 `frontend/src/ui/kit.tsx`,颜色、尺寸与动效使用 `frontend/src/styles/tokens.css` 令牌。
 
-内置界面的明暗配色集中在 `frontend/gpt2/src/theme.ts`。Vite 使用 `getThemeScript()` 将同步脚本插入 HTML 头部，React `ThemeProvider` 使用同一配置；纯客户端首次配色由 HTML 脚本应用。配色修改使用生产构建验收首次打开、刷新和系统偏好，开发环境 StrictMode 会重复执行 Effect。
+内置界面的明暗配色与强调色集中在 `frontend/src/styles/tokens.css` 与 `frontend/src/lib/prefs.ts`;`frontend/index.html` 头部同步脚本先应用保存的偏好,避免首屏闪烁。配色修改使用生产构建验收首次打开、刷新和系统偏好,开发环境 StrictMode 会重复执行 Effect。
 
-整套控制台主题由 `backend/internal/consoletheme` 安装和检查，`control/themes.go` 提供管理接口，`server.go` 选择主题及资源；节点迁移保存安装记录和选择，文件位于节点数据目录的 `themes/`。修改前读取 [主题格式与恢复契约](../../../../docs/THEMES.md)。内置恢复入口为 `/__opsd/builtin/`，前端路由的 basename 与 API 根路径分开；原登录地址保留 `?builtin=1`。gpt2 根据实际路径选择业务路由基址；恢复模式的退出及账号修改保留强制内置登录，主题切换后点击“刷新界面”进入普通根路径。完整交互以实际内置资源的浏览器结果为准。
+整套控制台主题由 `backend/internal/consoletheme` 安装和检查，`control/themes.go` 提供管理接口，`server.go` 选择主题及资源；节点迁移保存安装记录和选择，文件位于节点数据目录的 `themes/`。修改前读取 [主题格式与恢复契约](../../../../docs/THEMES.md)。内置恢复入口为 `/__opsd/builtin/`，前端路由的 basename 与 API 根路径分开；原登录地址保留 `?builtin=1`。默认前端 根据实际路径选择业务路由基址；恢复模式的退出及账号修改保留强制内置登录，主题切换后点击“刷新界面”进入普通根路径。完整交互以实际内置资源的浏览器结果为准。
 
-导航定义与共享查询位于 `frontend/gpt2/src/navigation.ts`。账号菜单顺序经 v2 `GET/PUT /settings/navigation` 和 `If-Match` 保存到所属节点的 `account_navigation` 表，SSE 的 `navigation` 事件只刷新对应节点查询；编辑器保留未提交版本。账号偏好独立于凭据版本与其他节点账号，修改密码时保留偏好。“存储”的当前入口只展示未接入状态，Silo 功能按后续批次建设。
+导航定义位于 `frontend/src/app/nav.ts`,共享查询位于 `frontend/src/app/queries.ts`。账号菜单顺序经 v2 `GET/PUT /settings/navigation` 和 `If-Match` 保存到所属节点的 `account_navigation` 表，SSE 的 `navigation` 事件只刷新对应节点查询；编辑器保留未提交版本。账号偏好独立于凭据版本与其他节点账号，修改密码时保留偏好。“存储”的当前入口只展示未接入状态，Silo 功能按后续批次建设。
 
 - `DialogContent` 的直接子项使用 Header、Body、Footer；长内容在 Body 滚动。表单放 Body，Footer 的提交按钮用 `form` 关联。
 - 抽屉同样使用 Header、Body、Footer；用框架焦点管理及中文关闭标签。确认框复用 `ui.tsx` 的 `Confirm`。
@@ -61,9 +61,9 @@ UFW 互信只改写 OPSD 所属链与带标记的引用，`INPUT` 首条引用�
 
 本批先使用独立 WSL 发行版完成本地 CI，通过后再提交，入口和分阶段重跑命令见 [验收文档](../../../../docs/VALIDATION.md)；GitHub Actions 触发方式保留。`npm run build` 包含接口生成、前端类型检查、构建与双架构程序编译；当前成功结果输入未变就复用，已授权发布仍按发布流程执行。
 
-本批停止旧前端开发，CI 使用 `OPSD_API_TEST=1 go -C backend test ./internal/control -run '^TestProductionBackendAPI$'` 在实际安装程序上检查 HTTP、终端 WebSocket、任务取消和日志、容器更新与 Compose。结果为 `api-check`；`frontend/gpt2` 为默认业务与内置恢复界面，开发和检查入口见 [前端开发](../../../../frontend/README.md)，其他方案保留在 `frontend/variants`。以下旧界面流程仅在后续明确要求界面工作时使用。
+本批停止旧前端开发，CI 使用 `OPSD_API_TEST=1 go -C backend test ./internal/control -run '^TestProductionBackendAPI$'` 在实际安装程序上检查 HTTP、终端 WebSocket、任务取消和日志、容器更新与 Compose。结果为 `api-check`；`frontend` 为默认业务与内置恢复界面，开发和检查入口见 [前端开发](../../../../frontend/README.md)，`frontend` 是唯一前端。以下旧界面流程仅在后续明确要求界面工作时使用。
 
-`scripts/check-ui.mjs` 在实际安装的生产程序上运行 Chromium，覆盖页面、主题、窄屏、浮层和未提交修改，截图写入 `artifacts/ui/`。防火墙顶部按筛选组、状态与操作组分别核对位置，包含 639／640px 换行边界、1000px 中等宽度和长名称、状态换行、加载、错误；模拟加载结束后定向移除所属处理器，并等待已进入的拦截请求完成，保留其他页面处理器。通过结果后下载该产物，检查中等宽度与换行边界的实际视觉；交互与人工视觉结果分别记录。人工浏览器缺少连接时，继续使用已授权 CI，保留其尚未覆盖的实机范围。
+`scripts/check-frontend.mjs` 在隔离本地服务上运行 Chromium,覆盖登录页字段可访问名称、整页登录落地、页面白名单路由、旧地址带参数与锚点重定向、白名单外 404、外观主题管理与内置恢复,结果写入 `artifacts/frontend-check/`。
 
 界面检查失败时先读取工件中的 `failure-state.json`，核对防火墙配置、实际互信状态、待处理及最近操作，再处理 `failure.txt` 和截图；响应解析失败时保留原始响应正文。
 
