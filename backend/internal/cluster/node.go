@@ -38,6 +38,11 @@ type Node struct {
 	age                  *age.X25519Identity
 	cluster              string
 	Executor             Executor
+	// Log 是拒绝等安全事件的日志出口；为空时不记录。
+	Log func(format string, args ...any)
+	// Capabilities 是目标节点对每个来源节点授予的能力。
+	// 零值表示没有任何授予，只保留默认允许的四个方法。
+	Capabilities SourceCapabilities
 	Now                  func() time.Time
 	mu                   sync.Mutex
 	connections          map[string]*peer

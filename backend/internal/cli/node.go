@@ -97,6 +97,16 @@ func serveNode(args []string) error {
 		return e
 	}
 	defer n.Close()
+	// 来源授权表必须在使用任何监听之前解析并通过：配置写错就要拒绝启动，
+	// 否则管理员会以为授权已生效而实际是默认权限。
+	capabilities, e := cluster.ParseSourceCapabilities(f.SourceCapabilities)
+	if e != nil {
+		return e
+	}
+	n.Capabilities = capabilities
+	n.Log = func(format string, args ...any) {
+		slog.Info(fmt.Sprintf(format, args...), "component", "cluster")
+	}
 	s, e := control.New(ctx, n.DB, control.Options{EnforceListenerState: true, Node: n, Assets: webassets.Assets(), NodeVersion: buildinfo.Version, FrontendVersion: webassets.Version(), ThemeDir: filepath.Join(f.DataDir, "themes")})
 	if e != nil {
 		return e

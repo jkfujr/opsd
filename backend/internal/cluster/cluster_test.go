@@ -29,6 +29,9 @@ func openTestNode(t *testing.T) (*Node, *httptest.Server) {
 	if e != nil {
 		t.Fatal(e)
 	}
+	// 现有用例模拟"已经配好授权的集群"：显式写入通配来源的全部能力。
+	// 默认拒绝的行为由 TestAuthorizeByOrigin 与 TestAccess* 单独覆盖。
+	n.Capabilities = allCapabilities()
 	s := httptest.NewServer(n.PeerHandler())
 	c, e := n.Config(t.Context())
 	if e != nil {

@@ -25,6 +25,12 @@ func (n *Node) dispatch(ctx context.Context, origin, method string, body json.Ra
 	if !n.Active(ctx, origin) {
 		return nil, fault("forbidden", "节点未加入或已撤销")
 	}
+	// 目标侧按**已认证来源节点**授权：成员身份只说明"是谁"，
+	// 不说明"能做什么"。本节点自身的本地调用不受此限。
+	if !n.authorize(origin, method) {
+		n.logDenied(origin, method)
+		return nil, fault("forbidden", "来源节点无权执行此操作")
+	}
 	if n.sharedEnabled() && origin != n.ID {
 		m, err := n.Member(ctx, origin)
 		if err != nil {
@@ -1624,4 +1630,22 @@ func operationError(e error) error {
 		return &Fault{f.Code, f.Message}
 	}
 	return e
+}
+
+// logDenied 记录一次拒绝：只记来源、目标、方法与原因，
+// 不记请求体、令牌或凭据。
+func (n *Node) logDenied(origin, method string) {
+	if n.Log == nil {
+		return
+	}
+	n.Log("远端请求被拒绝：来源=%s 目标=%s 方法=%s 原因=来源节点无权执行此操作", origin, n.ID, method)
+}
+
+// authorize 判定某个已认证来源能否执行某个方法。
+// 本节点自身的本地调用不受来源授权限制。
+func (n *Node) authorize(origin, method string) bool {
+	if origin == n.ID {
+		return true
+	}
+	return n.Capabilities.Allowed(origin, method)
 }

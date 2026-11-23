@@ -122,3 +122,22 @@ func TestCapabilityNamesCoverRegistry(t *testing.T) {
 		}
 	}
 }
+
+// allCapabilities 构造"通配来源拥有全部能力"的表，供跨节点用例使用。
+func allCapabilities() SourceCapabilities {
+	set := make(map[Capability]bool, len(knownCapabilities))
+	for capability := range knownCapabilities {
+		set[capability] = true
+	}
+	return SourceCapabilities{"*": set}
+}
+
+// 通配来源只有在显式写入时才生效；不写仍然是默认拒绝。
+func TestWildcardOriginMustBeExplicit(t *testing.T) {
+	if (SourceCapabilities{}).Allowed("peer-a", "task.run") {
+		t.Error("没有通配条目时不应放行")
+	}
+	if !allCapabilities().Allowed("peer-a", "task.run") {
+		t.Error("显式写入通配来源后应放行")
+	}
+}

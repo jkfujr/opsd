@@ -30,6 +30,9 @@ type NodeFile struct {
 	// OperationPolicy 是本机能力策略的原始 JSON；由执行器启动时严格解析，
 	// 未知字段或非法值拒绝启动。缺省表示旧配置升级，按兼容模式处理。
 	OperationPolicy json.RawMessage `json:"operation_policy,omitempty"`
+	// SourceCapabilities 是"来源节点 ID → 能力集合"的授权表原始 JSON；
+	// 由节点启动时严格解析，格式或能力名非法即拒绝启动。
+	SourceCapabilities json.RawMessage `json:"source_capabilities,omitempty"`
 }
 type NodeInstall struct {
 	Account                                               *cluster.AccountChange

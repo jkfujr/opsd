@@ -22,6 +22,7 @@ func TestConsoleAuthTargetQueueAndAccount(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
+	grantAllCapabilities(n)
 	defer n.Close()
 	n.Start()
 	s, e := New(t.Context(), n.DB, Options{Node: n})
@@ -112,4 +113,13 @@ func TestConsoleAuthTargetQueueAndAccount(t *testing.T) {
 	if status := request("GET", "/nodes", nil, nil); status != 401 {
 		t.Fatal("旧会话未撤销", status)
 	}
+}
+
+// grantAllCapabilities 让测试节点模拟"已配好授权的集群"。
+func grantAllCapabilities(n *cluster.Node) {
+	set := make(map[cluster.Capability]bool)
+	for _, name := range cluster.CapabilityNames() {
+		set[cluster.Capability(name)] = true
+	}
+	n.Capabilities = cluster.SourceCapabilities{"*": set}
 }

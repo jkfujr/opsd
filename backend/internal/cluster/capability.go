@@ -272,7 +272,9 @@ func (s SourceCapabilities) Allowed(origin, method string) bool {
 	if access.Capability == "" {
 		return false
 	}
-	return s[origin][access.Capability]
+	// "*" 是显式写入的通配来源（例如测试或"对所有成员开放"的部署）；
+	// 不写就完全没有授予，默认仍然是拒绝。
+	return s[origin][access.Capability] || s["*"][access.Capability]
 }
 
 // CapabilityNames 返回全部已知能力名，供配置校验与文档使用。
@@ -287,6 +289,9 @@ func CapabilityNames() []string {
 
 // validOriginID 校验来源节点标识的形态。
 func validOriginID(id string) bool {
+	if id == "*" {
+		return true
+	}
 	if id == "" || len(id) > 128 {
 		return false
 	}
