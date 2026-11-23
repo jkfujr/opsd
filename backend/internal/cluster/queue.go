@@ -183,6 +183,8 @@ func (n *Node) dispatch(ctx context.Context, origin, method string, body json.Ra
 		if e := json.Unmarshal(body, &q); e != nil {
 			return nil, e
 		}
+		// 来源由成员通道给出，载荷不能影响它。
+		q.Origin = origin
 		return n.localOperations(ctx, q)
 	case "operation.cancel":
 		var id string
@@ -559,12 +561,20 @@ func (n *Node) enqueueTx(ctx context.Context, origin string, r Request, related 
 	defer tx.Rollback()
 	var existing string
 	var priorDigest []byte
-	// 去重与受理用同一归属：已认证来源 + 声明操作者 + 请求键；
-	// 迁移前的旧记录没有可信来源，退化为按声明操作者匹配，避免旧键被当作首次请求重跑。
+	// 去重与受理用同一归属：已认证来源 + 声明操作者 + 请求键。
 	e = tx.QueryRowContext(ctx, `SELECT body,request_digest FROM queue
-		WHERE id=? OR (origin=? AND actor=? AND request_key<>'' AND request_key=?)
-		   OR (origin=? AND actor='' AND request_key<>'' AND request_key=?)`,
-		r.ID, origin, actor, r.Key, actor, r.Key).Scan(&existing, &priorDigest)
+		WHERE id=? OR (origin=? AND actor=? AND request_key<>'' AND request_key=?)`,
+		r.ID, origin, actor, r.Key).Scan(&existing, &priorDigest)
+	if e != nil && errors.Is(e, sql.ErrNoRows) && r.Key != "" {
+		// 迁移前的旧记录：(actor 为空) 且来源列存的是声明操作者。
+		// 这类记录**只能用来阻止重复执行**，归属无法确认，因此不读回原结果、
+		// 也不执行 related；按已知操作 ID 的授权查询仍然可用。
+		var legacy string
+		if qe := tx.QueryRowContext(ctx, `SELECT body FROM queue
+			WHERE actor='' AND origin=? AND request_key<>'' AND request_key=?`, actor, r.Key).Scan(&legacy); qe == nil {
+			return Operation{}, fault("outcome_unknown", "旧记录归属无法确认，请按操作标识查询原结果")
+		}
+	}
 	if e == nil {
 		if string(digest[:]) != string(priorDigest) {
 			return Operation{}, fault("conflict", "同一请求不能使用不同参数")
@@ -1435,6 +1445,8 @@ type ListQuery struct {
 	Authorization *apiauth.Token               `json:"authorization,omitempty"`
 	Key           string                       `json:"key,omitempty"`
 	Actor         string                       `json:"actor,omitempty"`
+	// Origin 由调度层填入的是已认证来源，不来自载荷。
+	Origin        string                       `json:"-"`
 	Positions     map[string]OperationPosition `json:"positions,omitempty"`
 	Pending       bool                         `json:"pending"`
 	State         string                       `json:"state"`
@@ -1457,6 +1469,17 @@ func (n *Node) localOperations(ctx context.Context, q ListQuery) (OperationList,
 	if n.sharedActive() {
 		query += " AND (kind<>'database' OR COALESCE(json_extract(body,'$.coordinator_epoch'),0)=0 OR json_extract(body,'$.node_id')=?)"
 		args = append(args, n.ID)
+	}
+	if q.Authorization == nil && q.Origin != "" && q.Origin != n.ID {
+		// 远端来源只看到自己有权推进的操作品种；过滤在分页与游标之前完成。
+		kinds := n.Capabilities.Kinds(q.Origin)
+		if len(kinds) == 0 {
+			return OperationList{Items: []Operation{}}, nil
+		}
+		query += " AND kind IN (?" + strings.Repeat(",?", len(kinds)-1) + ")"
+		for _, kind := range kinds {
+			args = append(args, kind)
+		}
 	}
 	if q.Authorization != nil {
 		m, e := n.Member(ctx, n.ID)

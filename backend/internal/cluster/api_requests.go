@@ -35,6 +35,8 @@ type RequestReceipt struct {
 }
 
 func (n *Node) requestReceipt(ctx context.Context, origin string, request requeststate.Write) (RequestReceipt, error) {
+	// 可信来源由目标端的成员通道给出，不能取自请求体（Write.Origin 不随 JSON 传输）。
+	request.Origin = origin
 	out := RequestReceipt{Key: request.Key, Owner: n.ID, Actor: request.Actor}
 	var body string
 	var digest []byte
@@ -54,14 +56,9 @@ func (n *Node) requestReceipt(ctx context.Context, origin string, request reques
 	if e != sql.ErrNoRows {
 		return out, e
 	}
-	// 队列里没有记录时按回执表查：先按**已认证来源**归属，
-	// 未命中再回退到迁移前的旧记录（旧记录的来源列存的是声明操作者）。
+	// 队列里没有记录时按回执表查，同样只用**已认证来源**：
+	// 迁移前的旧记录没有可信来源，不再按声明操作者猜测归属。
 	r, e := requeststate.Lookup(ctx, n.DB, request)
-	if e == sql.ErrNoRows {
-		legacy := request
-		legacy.Origin = request.Actor
-		r, e = requeststate.Lookup(ctx, n.DB, legacy)
-	}
 	if errors.Is(e, requeststate.ErrConflict) {
 		return out, fault("conflict", e.Error())
 	}

@@ -164,3 +164,26 @@ func TestRedactedSharedStatusDropsBindingDetails(t *testing.T) {
 		t.Fatalf("健康字段被削掉：%+v", got)
 	}
 }
+
+// 列表预筛：来源只看到自己有权推进的品种，且预筛发生在分页之前。
+func TestKindsFollowGrantedCapabilities(t *testing.T) {
+	const origin = "0123456789abcdef0123456789abcdef"
+	table, err := ParseSourceCapabilities(json.RawMessage(`{"` + origin + `":["run_task"]}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	kinds := table.Kinds(origin)
+	if len(kinds) == 0 {
+		t.Fatal("授予 run_task 后应至少允许一个品种")
+	}
+	for _, kind := range kinds {
+		access, ok := Access(kind)
+		if !ok || access.Capability != CapabilityRunTask {
+			t.Fatalf("越权品种出现在列表预筛里：%s", kind)
+		}
+	}
+	// 没有任何授予时，预筛结果为空——列表不会回退成全量。
+	if got := (SourceCapabilities{}).Kinds(origin); len(got) != 0 {
+		t.Fatalf("未授予时不应有可见品种：%v", got)
+	}
+}

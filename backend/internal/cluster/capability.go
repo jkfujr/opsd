@@ -300,3 +300,25 @@ func validOriginID(id string) bool {
 	}
 	return true
 }
+
+// Kinds 返回该来源有权推进的操作品种，用于列表在分页前预筛。
+// 与 operation.get 共用同一张登记表，避免两处口径不一致。
+func (s SourceCapabilities) Kinds(origin string) []string {
+	granted := s[origin]
+	if len(granted) == 0 {
+		return nil
+	}
+	seen := map[string]bool{}
+	for method, access := range methodAccess {
+		if access.Capability == "" || !granted[access.Capability] {
+			continue
+		}
+		seen[method] = true
+	}
+	kinds := make([]string, 0, len(seen))
+	for kind := range seen {
+		kinds = append(kinds, kind)
+	}
+	sort.Strings(kinds)
+	return kinds
+}
