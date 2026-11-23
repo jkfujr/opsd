@@ -179,7 +179,7 @@ function RunsSheet({ task, onClose }: { task: ScheduledTaskMetadata | null; onCl
   const [selected, setSelected] = useState<Operation | null>(null);
   // 开始翻页即冻结当时的首页与游标：轮询继续，但不再改写已展示的页边界，
   // 否则新记录会把最后一条挤出首页、又不落在更早页里，导致漏行。
-  const [frozen, setFrozen] = useState<{ ids: string[]; next?: string } | null>(null);
+  const [frozen, setFrozen] = useState<{ items: Operation[]; ids: string[]; next?: string } | null>(null);
   const [older, setOlder] = useState<Operation[]>([]);
   const [cursor, setCursor] = useState<string | undefined>(undefined);
   const [paging, setPaging] = useState<{ busy: boolean; error: unknown }>({ busy: false, error: null });
@@ -213,13 +213,15 @@ function RunsSheet({ task, onClose }: { task: ScheduledTaskMetadata | null; onCl
     setCursor(undefined);
     setPaging({ busy: false, error: null });
   };
-  // 按 ID 取最新对象：首页来自轮询（状态会变），更早页是静态取回的。
+  // 按 ID 取最新状态，同时保证被挤出首页的记录不丢：
+  // 冻结快照留底 → 更早页 → 轮询首页（最新状态覆盖前两者）。
   const byId = useMemo(() => {
     const map = new Map<string, Operation>();
+    for (const o of frozen?.items ?? []) map.set(o.id, o);
     for (const o of older) map.set(o.id, o);
     for (const o of q.data?.items ?? []) map.set(o.id, o);
     return map;
-  }, [q.data, older]);
+  }, [frozen, older, q.data]);
   // 冻结只影响"显示哪些、按什么顺序"，记录本身仍跟随轮询更新状态。
   const items = useMemo(() => {
     if (!frozen) return q.data?.items ?? [];
@@ -227,17 +229,23 @@ function RunsSheet({ task, onClose }: { task: ScheduledTaskMetadata | null; onCl
     return frozen.ids
       .map((id) => byId.get(id))
       .filter((o): o is Operation => !!o && !seen.has(o.id) && !!seen.add(o.id));
-  }, [frozen, byId, q.data]);
+  }, [frozen, byId]);
   const current = selected ? byId.get(selected.id) ?? selected : null;
-  const more = frozen ? cursor ?? frozen.next : q.data?.next_cursor;
+  // 冻结后只读 cursor：末页返回空游标即隐藏入口，不得退回最初游标重复请求。
+  const more = frozen ? cursor : q.data?.next_cursor;
   const loadOlder = async () => {
     if (!task || !more || paging.busy) return;
     const controller = new AbortController();
     abort.current?.abort();
     abort.current = controller;
     const startedAt = key;
-    // 点击即固定边界：首次翻页在途时也能"返回最新"，不会有中间态。
-    if (!frozen) setFrozen({ ids: (q.data?.items ?? []).map((o) => o.id), next: more });
+    // 点击即固定边界：保留快照对象（防止被轮询挤出首页后找不到），
+    // 并把初始游标写入 cursor，冻结期间只读 cursor，末页返回空游标即关闭入口。
+    if (!frozen) {
+      const snapshot = q.data?.items ?? [];
+      setFrozen({ items: snapshot, ids: snapshot.map((o) => o.id), next: more });
+      setCursor(more);
+    }
     setPaging({ busy: true, error: null });
     try {
       const page = await get<ScheduledTaskRuns>(`/nodes/${enc(task.node_id!)}/tasks/${enc(task.id)}/executions`, { signal: controller.signal, query: { limit: 50, cursor: more } });
@@ -245,6 +253,7 @@ function RunsSheet({ task, onClose }: { task: ScheduledTaskMetadata | null; onCl
       if (controller.signal.aborted || abort.current !== controller || keyRef.current !== startedAt) return;
       setOlder((list) => [...list, ...page.items]);
       setFrozen((f) => (f ? { ...f, ids: [...f.ids, ...page.items.map((o) => o.id)] } : f));
+      // 末页返回空游标时 cursor 变空，按钮随之隐藏，不会退回首页游标。
       setCursor(page.next_cursor);
       setPaging({ busy: false, error: null });
     } catch (reason) {
