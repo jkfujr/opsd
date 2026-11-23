@@ -739,7 +739,8 @@ func (f *archiveNative) history(t *testing.T, n *Node, c metricsstore.Config) ma
 	}
 	compact(true)
 	deleted := 0
-	var retentionMarks []string
+	type retentionMark struct{ key, id, details string }
+	var retentionMarks []retentionMark
 	for object := range f.rootS3.ListObjects(t.Context(), f.bucket, minio.ListObjectsOptions{Prefix: f.prefix, Recursive: true}) {
 		if object.Err != nil {
 			t.Fatal(object.Err)
@@ -757,27 +758,30 @@ func (f *archiveNative) history(t *testing.T, n *Node, c metricsstore.Config) ma
 		}
 		// 压实替换写的是 "source of compacted block"，只有保留策略写的
 		// "block exceeding retention of 8760h0m0s" 才能证明过期删除生效。
-		if details, _ := marker["details"].(string); !strings.HasPrefix(details, "block exceeding retention") {
+		details, _ := marker["details"].(string)
+		if !strings.HasPrefix(details, "block exceeding retention") {
 			continue
 		}
-		retentionMarks = append(retentionMarks, object.Key)
+		retentionMarks = append(retentionMarks, retentionMark{
+			key:     object.Key,
+			id:      strings.TrimSuffix(strings.TrimPrefix(object.Key, f.prefix), "/deletion-mark.json"),
+			details: details,
+		})
 		marker["deletion_time"] = time.Now().Add(-49 * time.Hour).Unix()
 		data, _ = json.Marshal(marker)
 		f.put(t, object.Key, data)
 		deleted++
 	}
-	if len(retentionMarks) < 3 {
-		t.Fatalf("一年保留未覆盖三种分辨率：保留标记 %d 个", len(retentionMarks))
-	}
 	// 过期块必须在原始、5 分钟、1 小时三档都被保留策略标记删除。
+	// 标记原因里必须写明确切的 365 天，防止保留期被改大后仍然通过。
 	resolutionMarks := map[int64]int{}
-	for _, key := range retentionMarks {
-		id := strings.TrimSuffix(strings.TrimPrefix(key, f.prefix), "/deletion-mark.json")
-		data, err := objectstore.Read(t.Context(), f.rootS3, f.bucket, f.prefix+id+"/meta.json")
+	for _, mark := range retentionMarks {
+		if !strings.Contains(mark.details, "8760h0m0s") {
+			t.Fatalf("保留原因不是 365 天：%s", mark.details)
+		}
+		data, err := objectstore.Read(t.Context(), f.rootS3, f.bucket, f.prefix+mark.id+"/meta.json")
 		if err != nil {
-			// 元数据可能已随标记一起被清理，此时按删除标记本身计入。
-			resolutionMarks[-1]++
-			continue
+			t.Fatalf("保留标记对应的块元数据不可读：%s %v", mark.id, err)
 		}
 		var meta struct {
 			Thanos struct {
@@ -791,13 +795,24 @@ func (f *archiveNative) history(t *testing.T, n *Node, c metricsstore.Config) ma
 		}
 		resolutionMarks[meta.Thanos.Downsample.Resolution]++
 	}
+	for _, resolution := range []int64{0, 300000, 3600000} {
+		if resolutionMarks[resolution] == 0 {
+			t.Fatalf("保留标记未覆盖分辨率 %d：%v", resolution, resolutionMarks)
+		}
+	}
 	t.Logf("保留策略删除标记：共 %d 个，按分辨率 %v", len(retentionMarks), resolutionMarks)
 	compact(true)
 	// 被保留策略标记的块必须被物理清理。这里按标记本身核对，而不是要求原始块 ID
 	// 全部消失——压实合并会合法地把多个原始块替换成新 ID。
-	for _, key := range retentionMarks {
-		if _, err := f.rootS3.StatObject(t.Context(), f.bucket, key, minio.StatObjectOptions{}); err == nil {
-			t.Fatalf("删除延迟过后仍保留过期块：%s", key)
+	// 按块前缀递归列举：任何剩余对象都算未清理，任何列举错误都直接失败，
+	// 避免把 403 或超时误当成"已删除"。
+	for _, mark := range retentionMarks {
+		prefix := f.prefix + mark.id + "/"
+		for object := range f.rootS3.ListObjects(t.Context(), f.bucket, minio.ListObjectsOptions{Prefix: prefix, Recursive: true}) {
+			if object.Err != nil {
+				t.Fatalf("列举过期块失败：%s %v", prefix, object.Err)
+			}
+			t.Fatalf("删除延迟过后仍保留过期块对象：%s", object.Key)
 		}
 	}
 	// 保留清理之后再查一次 364 天样本：此前的查询发生在启用保留策略之前，
