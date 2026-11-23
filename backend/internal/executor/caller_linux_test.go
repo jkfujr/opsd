@@ -142,12 +142,12 @@ func TestResolveCallerUID(t *testing.T) {
 			t.Fatalf("非法 UID %d 未被拒绝（可能被截断成 0 而放行 root）", invalid)
 		}
 	}
-	// 缺字段：用真实存在的账号验证成功路径，并确认 0 被拒。
-	current, err := user.Current()
-	if err != nil {
-		t.Skip("无法获取当前账号")
+	// 缺字段：用真实存在的非 root 账号验证成功路径（root 下 user.Current() 会是 0，
+	// 不能拿它当成功样本）。
+	if _, err := user.Lookup("nobody"); err != nil {
+		t.Skip("缺少 nobody 账号，无法验证推导成功路径")
 	}
-	if got, err := ResolveCallerUID(nil, current.Username); err != nil || got == 0 {
+	if got, err := ResolveCallerUID(nil, "nobody"); err != nil || got == 0 {
 		t.Fatalf("按账号名推导失败：%v %v", got, err)
 	}
 	if _, err := ResolveCallerUID(nil, "root"); err == nil {

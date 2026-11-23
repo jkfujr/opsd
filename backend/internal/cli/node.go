@@ -186,11 +186,9 @@ func serveExecutor(args []string) error {
 	}
 	// A1：先解析允许的调用方 UID。任何失败都在打开数据库、启动维护任务和监听之前返回，
 	// 避免"服务已起但准入值非法"的中间态。
-	account := f.ServiceAccount
-	if account == "" {
-		account = "opsd"
-	}
-	allowed, e := executor.ResolveCallerUID(f.UserID, account)
+	// 服务账号固定为 opsd：安装单元也是 User=opsd，两边必须同一个身份，
+	// 否则执行器会放行一个根本不存在的"节点账号"。
+	allowed, e := executor.ResolveCallerUID(f.UserID, "opsd")
 	if e != nil {
 		return e
 	}

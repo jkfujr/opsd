@@ -3,22 +3,26 @@ package cli
 import (
 	"bytes"
 	"context"
-	"fmt"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net"
 	"net/http"
 	"os"
-	"strings"
 	"os/exec"
+	"os/user"
 	"path/filepath"
+	"strconv"
+	"strings"
 	"syscall"
 	"testing"
 	"time"
 
 	"github.com/jkfujr/opsd/internal/cluster"
+	"github.com/jkfujr/opsd/internal/executor"
 	"github.com/jkfujr/opsd/internal/installation"
 	"github.com/jkfujr/opsd/internal/localstate"
+	"github.com/jkfujr/opsd/internal/protocol"
 	"github.com/jkfujr/opsd/internal/storage"
 )
 
@@ -208,13 +212,37 @@ func TestRealConsoleLifecycleAndNodeRestart(t *testing.T) {
 }
 
 // TestExecutorDerivesAllowedCallerFromServiceAccount 覆盖 A1 的升级路径：
-// 配置里没有 user_id，执行器按 service_account 推导出允许的 UID，
-// 该账号能完成真实请求，其他身份被拒。
+// 配置里没有 user_id（真实旧配置形态），执行器固定解析 opsd，
+// 该账号能完成一条合法只读 RPC，root 则在建立连接时就被关闭。
 func TestExecutorDerivesAllowedCallerFromServiceAccount(t *testing.T) {
 	binary := os.Getenv("OPSD_TEST_BINARY")
 	if binary == "" || os.Geteuid() != 0 {
 		t.Skip("未提供本地 Linux 节点程序")
 	}
+	// 缺 user_id 时固定解析 opsd；测试环境未必有该系统账号，临时建一个再清理。
+	created := false
+	if _, err := user.Lookup("opsd"); err != nil {
+		if output, err := runCommand("useradd", "--system", "--no-create-home", "--shell", "/usr/sbin/nologin", "opsd"); err != nil {
+			t.Skipf("无法创建 opsd 账号：%v %s", err, output)
+		}
+		created = true
+	}
+	if created {
+		defer runCommand("userdel", "opsd")
+	}
+	account, err := user.Lookup("opsd")
+	if err != nil {
+		t.Fatal(err)
+	}
+	uid, err := strconv.Atoi(account.Uid)
+	if err != nil || uid == 0 {
+		t.Fatalf("opsd 账号 UID 不可用：%v %v", uid, err)
+	}
+	gid, err := strconv.Atoi(account.Gid)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	dir := t.TempDir()
 	if e := os.Chmod(filepath.Dir(dir), 0755); e != nil {
 		t.Fatal(e)
@@ -226,16 +254,13 @@ func TestExecutorDerivesAllowedCallerFromServiceAccount(t *testing.T) {
 			t.Fatal(e)
 		}
 	}
-	if e := os.Chown(dir, 65534, 65534); e != nil {
-		t.Fatal(e)
-	}
-	for _, path := range []string{data, execDir} {
-		if e := os.Chown(path, 65534, 65534); e != nil {
+	for _, path := range []string{dir, data, execDir} {
+		if e := os.Chown(path, uid, gid); e != nil {
 			t.Fatal(e)
 		}
 	}
-	// 关键：不写 UserID，只提供 ServiceAccount，模拟旧配置升级。
-	f := installation.NodeFile{DataDir: data, ExecutorDir: execDir, Socket: filepath.Join(dir, "executor.sock"), ControlSocket: filepath.Join(data, "control.sock"), Binary: binary, GroupID: 65534, ServiceAccount: "nobody"}
+	// 关键：不写 UserID，模拟旧配置。
+	f := installation.NodeFile{DataDir: data, ExecutorDir: execDir, Socket: filepath.Join(dir, "executor.sock"), ControlSocket: filepath.Join(data, "control.sock"), Binary: binary, GroupID: gid}
 	config := filepath.Join(dir, "node.json")
 	if e := localstate.Write(config, f, 0644); e != nil {
 		t.Fatal(e)
@@ -245,47 +270,105 @@ func TestExecutorDerivesAllowedCallerFromServiceAccount(t *testing.T) {
 		_, e := os.Stat(f.Socket)
 		return e == nil
 	})
-	// root 与允许身份都试一次；nobody 成功才算推导正确。
-	rpc := func(user string) (string, error) {
-		script := `import socket,sys
-s=socket.socket(socket.AF_UNIX)
-s.settimeout(5)
-s.connect(sys.argv[1])
-s.sendall(b"POST /rpc HTTP/1.1\r\nHost: localhost\r\nContent-Length: 2\r\n\r\n{}")
-print(s.recv(32).decode(errors="replace"))
-`
-		args := []string{"-c", script, f.Socket}
-		if user != "" {
-			args = append([]string{"-u", user, "--", "python3"}, args...)
-			return runCommand("runuser", args...)
-		}
-		return runCommand("python3", args...)
+
+	// go test 的临时构建目录对 opsd 不可读，复制一份可执行的测试二进制再以该账号重入。
+	self, err := os.Executable()
+	if err != nil {
+		t.Fatal(err)
 	}
+	probe := filepath.Join(dir, "probe.test")
+	if e := copyExecutable(self, probe); e != nil {
+		t.Fatal(e)
+	}
+	if e := os.Chmod(dir, 0755); e != nil {
+		t.Fatal(e)
+	}
+	probeEnv := []string{"OPSD_EXECUTOR_PROBE_SOCKET=" + f.Socket}
+	// 1) 允许账号必须能完成真实 RPC：以 opsd 重入本测试程序跑一条只读调用。
 	var lastErr error
 	for attempt := 0; attempt < 50; attempt++ {
-		output, e := rpc("nobody")
-		if e == nil && strings.Contains(output, "HTTP/1.1") {
+		output, e := runCommandEnv(probeEnv, "runuser", "-u", "opsd", "--", probe, "-test.run=TestHelperExecutorReadRPC", "-test.v")
+		// 子进程必须在真正执行 helper，而不是因为缺环境变量而 SKIP（SKIP 也返回 0）。
+		if e == nil && !strings.Contains(output, "SKIP") && strings.Contains(output, "PASS") {
 			lastErr = nil
-			t.Logf("nobody 的请求得到响应：%s", strings.TrimSpace(output))
+			t.Logf("opsd 的只读 RPC 成功：%s", firstLine(output))
 			break
 		}
-		if e != nil {
-			lastErr = e
-		} else {
-			lastErr = fmt.Errorf("响应异常：%q", output)
+		if e == nil {
+			lastErr = fmt.Errorf("helper 未真正执行：%s", firstLine(output))
+			break
 		}
+		lastErr = fmt.Errorf("%v %s", e, firstLine(output))
 		time.Sleep(100 * time.Millisecond)
 	}
 	if lastErr != nil {
-		t.Fatalf("按 service_account 推导后 nobody 仍无法调用：%v", lastErr)
+		t.Fatalf("缺 user_id 的旧配置下 opsd 无法调用：%v", lastErr)
 	}
-	if output, e := rpc(""); e == nil && strings.Contains(output, "HTTP/1.1") {
-		t.Fatalf("root 不应被放行，却拿到了响应：%s", strings.TrimSpace(output))
+
+	// 2) root 必须被拒，且表现为连接关闭而不是客户端自身故障。
+	output, e := runCommandEnv(probeEnv, "runuser", "-u", "root", "--", probe, "-test.run=TestHelperExecutorReadRPC", "-test.v")
+	if e == nil {
+		t.Fatalf("root 不应被放行，却完成了 RPC：%s", firstLine(output))
+	}
+	if !closedByPeer(output) {
+		t.Fatalf("root 的失败不是连接关闭：%s", firstLine(output))
+	}
+	t.Logf("root 被连接关闭：%s", firstLine(output))
+}
+
+// TestHelperExecutorReadRPC 是子进程入口：以指定账号连接执行器 socket，
+// 发一条合法只读 RPC 并断言成功。
+func TestHelperExecutorReadRPC(t *testing.T) {
+	socket := os.Getenv("OPSD_EXECUTOR_PROBE_SOCKET")
+	if socket == "" {
+		t.Skip("helper")
+	}
+	client := executor.NewClient(socket)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if _, err := client.Call(ctx, &protocol.ResourceMetricsRead{}); err != nil {
+		t.Fatalf("只读 RPC 失败：%v", err)
 	}
 }
 
+// copyExecutable 把测试二进制复制到可被其他账号执行的路径。
+func copyExecutable(source, target string) error {
+	data, err := os.ReadFile(source)
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(target, data, 0755)
+}
+
+func firstLine(text string) string {
+	text = strings.TrimSpace(text)
+	if index := strings.IndexByte(text, '\n'); index >= 0 {
+		text = text[:index]
+	}
+	return strings.TrimSpace(text)
+}
+
+// closedByPeer 判断失败是否来自对端关闭连接（A1 的拒绝方式），
+// 而不是子进程启动失败或缺依赖。
+func closedByPeer(text string) bool {
+	for _, marker := range []string{"EOF", "connection reset", "broken pipe", "connection closed"} {
+		if strings.Contains(text, marker) {
+			return true
+		}
+	}
+	return false
+}
+
 func runCommand(name string, args ...string) (string, error) {
+	return runCommandEnv(nil, name, args...)
+}
+
+// runCommandEnv 在继承父进程环境的基础上追加 env，用于把 socket 路径传给子进程。
+func runCommandEnv(env []string, name string, args ...string) (string, error) {
 	cmd := exec.Command(name, args...)
+	if env != nil {
+		cmd.Env = append(os.Environ(), env...)
+	}
 	output, err := cmd.CombinedOutput()
 	return string(output), err
 }
