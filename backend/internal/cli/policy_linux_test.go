@@ -170,3 +170,116 @@ func TestExecutorUnitNoLongerWantsRecovery(t *testing.T) {
 		t.Fatal("恢复单元应保留开机启动")
 	}
 }
+
+// TestExecutorRestartKeepsRunningOperation 覆盖 A2 的恢复语义验收：
+// 一个正在运行的 Shell 任务，在执行器进程重启之后仍能跑完；重启不会拉起
+// 恢复单元去停掉操作单元。
+func TestExecutorRestartKeepsRunningOperation(t *testing.T) {
+	binary := os.Getenv("OPSD_TEST_BINARY")
+	if binary == "" || os.Geteuid() != 0 {
+		t.Skip("未提供本地 Linux 节点程序或非 root")
+	}
+	if output, err := runCommand("systemctl", "is-system-running"); err != nil && !strings.Contains(output, "degraded") {
+		t.Skipf("systemd 不可用：%v %s", err, firstLine(output))
+	}
+
+	dir := t.TempDir()
+	if err := os.Chmod(dir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	data := filepath.Join(dir, "node")
+	execDir := filepath.Join(dir, "exec")
+	for _, path := range []string{data, execDir} {
+		if err := os.MkdirAll(path, 0755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	f := installation.NodeFile{
+		DataDir: data, ExecutorDir: execDir,
+		Socket:        filepath.Join(dir, "executor.sock"),
+		ControlSocket: filepath.Join(data, "control.sock"),
+		Binary:        binary,
+		OperationPolicy: json.RawMessage(`{"arbitrary_code":true}`),
+	}
+	config := filepath.Join(dir, "node.json")
+	if err := localstate.Write(config, f, 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	// 受理一条会跑一段时间的任务。
+	marker := filepath.Join(dir, "done")
+	ctx := context.Background()
+	db, err := storage.Open(ctx, filepath.Join(execDir, "executor.db"), storage.Executor)
+	if err != nil {
+		t.Fatal(err)
+	}
+	store := operations.Store{DB: db}
+	action := protocol.OperationAction{Kind: "shell", Shell: &protocol.ShellAction{
+		TaskID: "restart-job", Name: "重启验收", Script: "sleep 3; touch " + marker, Directory: dir,
+	}}
+	id := fmt.Sprintf("restart%d", time.Now().UnixNano())
+	if _, _, err := store.Receive(ctx, id, protocol.ContractVersion, action, ""); err != nil {
+		t.Fatalf("受理失败：%v", err)
+	}
+	db.Close()
+
+	// 单元：本次唯一的实例单元，指向测试配置。
+	units := installation.Units(f, config)
+	instanceName := "opsd-operation@" + id
+	instancePath := "/run/systemd/system/" + instanceName + ".service"
+	body := strings.ReplaceAll(units["opsd-operation@.service"], "%i", id)
+	file, err := os.OpenFile(instancePath, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0644)
+	if err != nil {
+		t.Fatalf("无法独占创建实例单元：%v", err)
+	}
+	if _, err := file.WriteString(body); err != nil {
+		file.Close()
+		t.Fatal(err)
+	}
+	file.Close()
+	t.Cleanup(func() {
+		runCommand("systemctl", "stop", instanceName+".service")
+		os.Remove(instancePath)
+		runCommand("systemctl", "daemon-reload")
+	})
+	if output, err := runCommand("systemctl", "daemon-reload"); err != nil {
+		t.Fatalf("daemon-reload 失败：%v %s", err, firstLine(output))
+	}
+
+	// 启动执行器（进程级，不装单元）并跑任务。
+	executor := launch(t, binary, "executor", "--config", config)
+	waitLocal(t, executor, func() bool {
+		_, err := os.Stat(f.Socket)
+		return err == nil
+	})
+	if output, err := runCommand("systemctl", "start", instanceName+".service"); err != nil {
+		t.Logf("单元启动返回：%v %s", err, firstLine(output))
+	}
+
+	// 任务已经在跑时重启执行器：任务必须跑完，不被中断。
+	time.Sleep(300 * time.Millisecond)
+	executor.stop()
+	restarted := launch(t, binary, "executor", "--config", config)
+	waitLocal(t, restarted, func() bool {
+		_, err := os.Stat(f.Socket)
+		return err == nil
+	})
+
+	deadline := time.Now().Add(30 * time.Second)
+	for time.Now().Before(deadline) {
+		if _, err := os.Stat(marker); err == nil {
+			return // 任务跑完了
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+	db, err = storage.Open(ctx, filepath.Join(execDir, "executor.db"), storage.Executor)
+	if err != nil {
+		t.Fatal(err)
+	}
+	local, err := operations.Store{DB: db}.Get(ctx, id)
+	db.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Fatalf("执行器重启后任务未完成，状态 %v", local.Record.State)
+}
