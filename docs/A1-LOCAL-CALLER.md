@@ -17,6 +17,8 @@
 
 **不做**：A1 不判断"这个调用方可以执行哪些操作"（那是 A2），也不处理远端请求授权（A3/A4）。
 
+**已存在的相邻通道**：同一进程还另起一个节点控制 socket（`/run/opsd-node/control.sock`，`cli/node.go:160`），权限 `0600`，所在目录 `RuntimeDirectoryMode=0700`。CLI 的 `data`／`operation` 等命令连的是它（`cli/data.go:40`、`cli/node.go:399`），由节点处理后再转执行器。也就是说 **root 无需直连执行器 socket**——这条通道已经只允许属主，A1 不去改动它。它也是"权限位 + 目录模式"足够用的先例。
+
 ## 2. 机制
 
 Linux 上用 `SO_PEERCRED` 取对端身份：
