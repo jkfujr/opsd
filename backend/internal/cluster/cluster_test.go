@@ -23,15 +23,41 @@ import (
 	"github.com/jkfujr/opsd/internal/requeststate"
 )
 
+var (
+	testNodesMu sync.Mutex
+	testNodesByTest = map[*testing.T]*[]*Node{}
+)
+
+// testNodesFor 返回当前测试用例创建过的节点，避免跨用例互相写入。
+func testNodesFor(t *testing.T) *[]*Node {
+	t.Helper()
+	testNodesMu.Lock()
+	defer testNodesMu.Unlock()
+	nodes, ok := testNodesByTest[t]
+	if !ok {
+		nodes = &[]*Node{}
+		testNodesByTest[t] = nodes
+		t.Cleanup(func() {
+			testNodesMu.Lock()
+			delete(testNodesByTest, t)
+			testNodesMu.Unlock()
+		})
+	}
+	return nodes
+}
+
 func openTestNode(t *testing.T) (*Node, *httptest.Server) {
 	t.Helper()
 	n, e := Open(t.Context(), filepath.Join(t.TempDir(), "节点.db"), Options{Password: "test-password"})
 	if e != nil {
 		t.Fatal(e)
 	}
-	// 现有用例模拟"已经配好授权的集群"：显式写入通配来源的全部能力。
-	// 默认拒绝的行为由 TestAuthorizeByOrigin 与 TestAccess* 单独覆盖。
-	n.Capabilities = allCapabilities()
+	// 夹具模拟"已配好授权的集群"：每建立一个测试节点，就按真实节点 ID
+	// 重建一次两两授权；默认拒绝本身由 TestAuthorizeByOrigin 覆盖。
+	n.Log = t.Logf
+	nodes := testNodesFor(t)
+	*nodes = append(*nodes, n)
+	authorizeAllPairs(t, *nodes...)
 	s := httptest.NewServer(n.PeerHandler())
 	c, e := n.Config(t.Context())
 	if e != nil {
@@ -112,6 +138,23 @@ func joinTest(t *testing.T, n, seed *Node) {
 	if e = n.Join(ctx, m.Address, m.Public, token); e != nil {
 		t.Fatal(e)
 	}
+	// 夹具模拟"已配好授权的集群"：按真实对端 ID 双向授予全部能力。
+	// 新入群节点默认没有任何能力，默认拒绝由 TestAuthorizeByOrigin 覆盖。
+	grantAll(t, n, seed.ID)
+	grantAll(t, seed, n.ID)
+}
+
+// grantAll 给某个来源节点授予全部能力，供测试夹具使用。
+func grantAll(t *testing.T, node *Node, origin string) {
+	t.Helper()
+	set := make(map[Capability]bool, len(knownCapabilities))
+	for capability := range knownCapabilities {
+		set[capability] = true
+	}
+	if node.Capabilities == nil {
+		node.Capabilities = SourceCapabilities{}
+	}
+	node.Capabilities[origin] = set
 }
 func payload(v any) json.RawMessage { b, _ := json.Marshal(v); return b }
 
@@ -289,6 +332,8 @@ func TestEnrollmentOnceAndRevocationDoesNotRevive(t *testing.T) {
 	if e = b.Join(t.Context(), m.Address, m.Public, token); e != nil {
 		t.Fatal(e)
 	}
+	grantAll(t, b, a.ID)
+	grantAll(t, a, b.ID)
 	if e = c.Join(t.Context(), m.Address, m.Public, token); e == nil {
 		t.Fatal("接入码被重复消费")
 	}
@@ -556,5 +601,18 @@ func TestQueuedRevokedOriginRejected(t *testing.T) {
 	op, e = a.GetOperation(t.Context(), op.ID)
 	if e != nil || !operations.Terminal(op.State) || op.State != protocol.Rejected {
 		t.Fatal(op, e)
+	}
+}
+
+// authorizeAllPairs 让给定节点两两互相拥有全部能力，模拟"已配好授权的集群"。
+// 只用真实节点 ID 授权，不引入通配来源。
+func authorizeAllPairs(t *testing.T, nodes ...*Node) {
+	t.Helper()
+	for _, target := range nodes {
+		for _, source := range nodes {
+			if target != source {
+				grantAll(t, target, source.ID)
+			}
+		}
 	}
 }

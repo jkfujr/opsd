@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"sort"
-	"strings"
 )
 
 // Capability 是目标节点授予某个来源节点的一组操作能力。
@@ -33,6 +32,7 @@ const (
 	CapabilityReadLogs           Capability = "read_logs"
 	CapabilityReadConfig         Capability = "read_config"
 	CapabilityReadAccount        Capability = "read_account"
+	CapabilityReadOperations     Capability = "read_operations"
 )
 
 // knownCapabilities 是配置里允许出现的全部能力名。
@@ -58,6 +58,7 @@ var knownCapabilities = map[Capability]bool{
 	CapabilityReadLogs:           true,
 	CapabilityReadConfig:         true,
 	CapabilityReadAccount:        true,
+	CapabilityReadOperations:     true,
 }
 
 // MethodAccess 描述一个远端方法需要的授权。
@@ -66,8 +67,12 @@ type MethodAccess struct {
 	Capability Capability
 	// DefaultAllowed 必须显式声明：零值不表示"默认允许"。
 	DefaultAllowed bool
-	// InnerAction 表示授权依据是载荷里的内层动作，而不是方法名本身。
+	// InnerAction 表示授权依据是载荷里的内层动作品种（submit）。
 	InnerAction bool
+	// Advance 表示推进已有操作：权限继承原操作及其资源。
+	Advance bool
+	// SelfOnly 表示只允许来源节点申请**自己**的资料，由处理器核对绑定关系。
+	SelfOnly bool
 }
 
 // methodAccess 是唯一的方法登记表：分派与授权都读它。
@@ -113,6 +118,7 @@ var methodAccess = map[string]MethodAccess{
 	"database_step":                  {Capability: CapabilityManageDatabase},
 	"database.execute":               {Capability: CapabilityManageDatabase},
 	"database.read":                  {Capability: CapabilityManageDatabase},
+	"database.query":                 {Capability: CapabilityManageDatabase},
 	"database.discover":              {Capability: CapabilityManageDatabase},
 	"database.reconcile":             {Capability: CapabilityManageDatabase},
 	"database.recover":               {Capability: CapabilityManageDatabase},
@@ -145,6 +151,12 @@ var methodAccess = map[string]MethodAccess{
 	"container.inspect":   {Capability: CapabilityManageContainer},
 	"container.logs":      {Capability: CapabilityReadLogs},
 
+	// —— 归档读取（逐方法登记，不再按前缀兜底） ——
+	"archive.config":    {Capability: CapabilityReadArchive},
+	"archive.status":    {Capability: CapabilityReadArchive},
+	"archive.inventory": {Capability: CapabilityReadArchive},
+	"archive.series":    {Capability: CapabilityReadArchive},
+
 	// —— 监控 ——
 	"monitoring_deploy":   {Capability: CapabilityManageMonitoring},
 	"monitoring_config":   {Capability: CapabilityManageMonitoring},
@@ -166,7 +178,7 @@ var methodAccess = map[string]MethodAccess{
 	"shared_initialize": {Capability: CapabilityCoordinateShared},
 
 	// —— 共享协调 ——
-	"shared.bootstrap":     {DefaultAllowed: true},
+	"shared.bootstrap":     {SelfOnly: true},
 	"shared.prepare":       {Capability: CapabilityCoordinateShared},
 	"shared.export":        {Capability: CapabilityCoordinateShared},
 	"shared.flush":         {Capability: CapabilityCoordinateShared},
@@ -174,14 +186,14 @@ var methodAccess = map[string]MethodAccess{
 	"shared.recover_steps": {Capability: CapabilityCoordinateShared},
 
 	// —— 操作推进：继承原操作及其资源的权限，由调用方按操作判定 ——
-	"operation.cancel":        {InnerAction: true},
-	"operation.confirm":       {InnerAction: true},
-	"operation.recover":       {InnerAction: true},
-	"operation.resolve":       {InnerAction: true},
-	"operation.get":           {InnerAction: true},
-	"operation.list":          {InnerAction: true},
-	"api.request":             {InnerAction: true},
-	"api.operation.decision":  {InnerAction: true},
+	"operation.cancel":        {Advance: true},
+	"operation.confirm":       {Advance: true},
+	"operation.recover":       {Advance: true},
+	"operation.resolve":       {Advance: true},
+	"operation.get":           {Capability: CapabilityReadOperations},
+	"operation.list":          {Capability: CapabilityReadOperations},
+	"api.request":             {Capability: CapabilityReadOperations},
+	"api.operation.decision":  {Advance: true},
 
 	// —— API 令牌 ——
 	"api_token.create": {Capability: CapabilityManageTokens},
@@ -192,25 +204,10 @@ var methodAccess = map[string]MethodAccess{
 	"api_token.verify": {Capability: CapabilityVerifyTokens},
 }
 
-// prefixAccess 覆盖按前缀分派的方法组。
-var prefixAccess = []struct {
-	prefix string
-	access MethodAccess
-}{
-	{"archive.", MethodAccess{Capability: CapabilityReadArchive}},
-	{"database.", MethodAccess{Capability: CapabilityManageDatabase}},
-	{"api_token.", MethodAccess{Capability: CapabilityManageTokens}},
-}
-
 // Access 返回某个方法需要的授权；第二个返回值为假表示方法未登记。
 func Access(method string) (MethodAccess, bool) {
 	if access, ok := methodAccess[method]; ok {
 		return access, true
-	}
-	for _, group := range prefixAccess {
-		if strings.HasPrefix(method, group.prefix) {
-			return group.access, true
-		}
 	}
 	return MethodAccess{}, false
 }
@@ -265,8 +262,12 @@ func (s SourceCapabilities) Allowed(origin, method string) bool {
 	if access.DefaultAllowed {
 		return true
 	}
-	if access.InnerAction {
-		// 操作推进类由调用方按原操作及其资源判定，这里不额外拦。
+	if access.SelfOnly {
+		// 只允许来源节点申请自身资料；具体归属由处理器核对绑定后放行。
+		return true
+	}
+	if access.InnerAction || access.Advance {
+		// 具体判定在 dispatch 里按载荷进行（authorizeSubmit / authorizeAdvance）。
 		return true
 	}
 	if access.Capability == "" {
@@ -289,19 +290,12 @@ func CapabilityNames() []string {
 
 // validOriginID 校验来源节点标识的形态。
 func validOriginID(id string) bool {
-	if id == "*" {
-		return true
-	}
-	if id == "" || len(id) > 128 {
+	// 成员 ID 是 32 位小写十六进制；不接受通配或任意别名。
+	if len(id) != 32 {
 		return false
 	}
 	for _, r := range id {
-		switch {
-		case r >= 'a' && r <= 'z':
-		case r >= 'A' && r <= 'Z':
-		case r >= '0' && r <= '9':
-		case r == '-' || r == '_' || r == '.':
-		default:
+		if (r < '0' || r > '9') && (r < 'a' || r > 'f') {
 			return false
 		}
 	}

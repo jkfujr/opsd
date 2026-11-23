@@ -9,6 +9,16 @@ import (
 // 默认允许的只有约定的四项，其余方法零值必须是"拒绝"。
 func TestAccessDefaults(t *testing.T) {
 	allowed := []string{"ping", "directory", "api.capabilities", "shared.status"}
+	// 默认允许集合必须**恰好**是这四项：多一项就是权限扩大。
+	count := 0
+	for _, access := range methodAccess {
+		if access.DefaultAllowed {
+			count++
+		}
+	}
+	if count != len(allowed) {
+		t.Errorf("默认允许项有 %d 个，期望 %d", count, len(allowed))
+	}
 	for _, method := range allowed {
 		access, ok := Access(method)
 		if !ok || !access.DefaultAllowed {
@@ -44,21 +54,21 @@ func TestAccessRejectsUnregistered(t *testing.T) {
 
 // 能力授予与撤销都按来源节点独立生效。
 func TestAllowedByCapability(t *testing.T) {
-	table, err := ParseSourceCapabilities(json.RawMessage(`{"peer-a":["run_task"],"peer-b":[]}`))
+	table, err := ParseSourceCapabilities(json.RawMessage(`{"0123456789abcdef0123456789abcdef":["run_task"],"fedcba9876543210fedcba9876543210":[]}`))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !table.Allowed("peer-a", "task.run") {
+	if !table.Allowed("0123456789abcdef0123456789abcdef", "task.run") {
 		t.Error("授予 run_task 后应允许")
 	}
-	if table.Allowed("peer-b", "task.run") {
+	if table.Allowed("fedcba9876543210fedcba9876543210", "task.run") {
 		t.Error("未授予的来源不应允许")
 	}
-	if table.Allowed("peer-c", "task.run") {
+	if table.Allowed("00112233445566778899aabbccddeeff", "task.run") {
 		t.Error("没有条目的来源不应允许写入")
 	}
 	// 默认允许的方法对任何有效成员成立。
-	if !table.Allowed("peer-c", "ping") {
+	if !table.Allowed("00112233445566778899aabbccddeeff", "ping") {
 		t.Error("默认允许的方法应对有效成员开放")
 	}
 }
@@ -67,12 +77,13 @@ func TestAllowedByCapability(t *testing.T) {
 func TestParseSourceCapabilitiesStrict(t *testing.T) {
 	bad := []string{
 		`{"peer-a":["unknown_capability"]}`,
-		`{"bad id":["run_task"]}`,
+		`{"peer-a":["run_task"]}`,
 		`{"":["run_task"]}`,
+		`{"*":["run_task"]}`,
 		`null`,
 		`[]`,
 		`"run_task"`,
-		`{"peer-a":"run_task"}`,
+		`{"0123456789abcdef0123456789abcdef":"run_task"}`,
 		`{`,
 	}
 	for _, raw := range bad {
@@ -84,9 +95,9 @@ func TestParseSourceCapabilitiesStrict(t *testing.T) {
 	if table, err := ParseSourceCapabilities(nil); err != nil || len(table) != 0 {
 		t.Fatalf("缺失字段应得到空表：%v %v", table, err)
 	}
-	if table, err := ParseSourceCapabilities(json.RawMessage(`{"peer-a":["run_task","read_logs"]}`)); err != nil {
+	if table, err := ParseSourceCapabilities(json.RawMessage(`{"0123456789abcdef0123456789abcdef":["run_task","read_logs"]}`)); err != nil {
 		t.Fatal(err)
-	} else if !table["peer-a"][CapabilityRunTask] || !table["peer-a"][CapabilityReadLogs] {
+	} else if !table["0123456789abcdef0123456789abcdef"][CapabilityRunTask] || !table["0123456789abcdef0123456789abcdef"][CapabilityReadLogs] {
 		t.Fatalf("解析结果不完整：%v", table)
 	}
 }
@@ -101,7 +112,7 @@ func TestNoImplicitAllow(t *testing.T) {
 			}
 			continue
 		}
-		if access.InnerAction {
+		if access.InnerAction || access.Advance || access.SelfOnly {
 			continue
 		}
 		if access.Capability == "" {
@@ -123,21 +134,21 @@ func TestCapabilityNamesCoverRegistry(t *testing.T) {
 	}
 }
 
-// allCapabilities 构造"通配来源拥有全部能力"的表，供跨节点用例使用。
+// allCapabilities 构造"某个来源拥有全部能力"的表，供授权单测使用。
 func allCapabilities() SourceCapabilities {
 	set := make(map[Capability]bool, len(knownCapabilities))
 	for capability := range knownCapabilities {
 		set[capability] = true
 	}
-	return SourceCapabilities{"*": set}
+	return SourceCapabilities{"0123456789abcdef0123456789abcdef": set}
 }
 
 // 通配来源只有在显式写入时才生效；不写仍然是默认拒绝。
 func TestWildcardOriginMustBeExplicit(t *testing.T) {
-	if (SourceCapabilities{}).Allowed("peer-a", "task.run") {
+	if (SourceCapabilities{}).Allowed("0123456789abcdef0123456789abcdef", "task.run") {
 		t.Error("没有通配条目时不应放行")
 	}
-	if !allCapabilities().Allowed("peer-a", "task.run") {
+	if !allCapabilities().Allowed("0123456789abcdef0123456789abcdef", "task.run") {
 		t.Error("显式写入通配来源后应放行")
 	}
 }

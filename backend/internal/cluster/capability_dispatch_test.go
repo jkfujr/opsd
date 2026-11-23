@@ -9,7 +9,7 @@ import (
 // 并且本节点自身的本地调用不受限。
 func TestAuthorizeByOrigin(t *testing.T) {
 	n := &Node{ID: "target"}
-	const origin = "peer-source"
+	const origin = "0123456789abcdef0123456789abcdef"
 
 	// 默认权限：协议方法放行，业务写入拒绝，未登记方法拒绝。
 	if !n.authorize(origin, "ping") {
@@ -23,7 +23,7 @@ func TestAuthorizeByOrigin(t *testing.T) {
 	}
 
 	// 授予后放行。
-	table, err := ParseSourceCapabilities(json.RawMessage(`{"peer-source":["run_task"]}`))
+	table, err := ParseSourceCapabilities(json.RawMessage(`{"0123456789abcdef0123456789abcdef":["run_task"]}`))
 	if err != nil {
 		t.Fatal(err)
 	}

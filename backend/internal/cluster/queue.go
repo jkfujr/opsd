@@ -31,6 +31,17 @@ func (n *Node) dispatch(ctx context.Context, origin, method string, body json.Ra
 		n.logDenied(origin, method)
 		return nil, fault("forbidden", "来源节点无权执行此操作")
 	}
+	// 推进已有操作的请求继承"原操作及其资源"的权限。
+	if access, ok := Access(method); ok {
+		if access.InnerAction && !n.authorizeSubmit(ctx, origin, body) {
+			n.logDenied(origin, method)
+			return nil, fault("forbidden", "来源节点无权提交此操作")
+		}
+		if access.Advance && !n.authorizeAdvance(ctx, origin, body) {
+			n.logDenied(origin, method)
+			return nil, fault("forbidden", "来源节点无权推进此操作")
+		}
+	}
 	if n.sharedEnabled() && origin != n.ID {
 		m, err := n.Member(ctx, origin)
 		if err != nil {
@@ -1648,4 +1659,66 @@ func (n *Node) authorize(origin, method string) bool {
 		return true
 	}
 	return n.Capabilities.Allowed(origin, method)
+}
+
+// authorizeAdvance 按原操作所属的动作判定推进权限。
+// 解析不出操作或动作时一律拒绝（fail closed）。
+func (n *Node) authorizeAdvance(ctx context.Context, origin string, body json.RawMessage) bool {
+	// 本节点自身的本地推进不受来源授权限制，与 authorize 保持一致。
+	if origin == n.ID {
+		return true
+	}
+	id, ok := operationIDFromBody(body)
+	if !ok {
+		return false
+	}
+	op, err := n.operation(ctx, id)
+	if err != nil {
+		return false
+	}
+	access, known := Access(op.Subject)
+	if !known || access.Capability == "" {
+		return false
+	}
+	return n.Capabilities.Allowed(origin, op.Subject)
+}
+
+// operationIDFromBody 取出推进类请求里的操作标识。
+// operation.cancel 的载荷是裸字符串，其余是带 operation_id 的对象。
+func operationIDFromBody(body json.RawMessage) (string, bool) {
+	var id string
+	if err := json.Unmarshal(body, &id); err == nil && id != "" {
+		return id, true
+	}
+	var object struct {
+		OperationID string `json:"operation_id"`
+		Decision    struct {
+			OperationID string `json:"operation_id"`
+		} `json:"decision"`
+	}
+	if err := json.Unmarshal(body, &object); err != nil {
+		return "", false
+	}
+	if object.OperationID != "" {
+		return object.OperationID, true
+	}
+	if object.Decision.OperationID != "" {
+		return object.Decision.OperationID, true
+	}
+	return "", false
+}
+
+// authorizeSubmit 按载荷里的内层动作品种判定提交权限。
+// 解析不出品种时一律拒绝。
+func (n *Node) authorizeSubmit(ctx context.Context, origin string, body json.RawMessage) bool {
+	if origin == n.ID {
+		return true
+	}
+	var request struct {
+		Kind string `json:"kind"`
+	}
+	if err := json.Unmarshal(body, &request); err != nil || request.Kind == "" {
+		return false
+	}
+	return n.Capabilities.Allowed(origin, request.Kind)
 }
