@@ -211,15 +211,17 @@ func TestRealConsoleLifecycleAndNodeRestart(t *testing.T) {
 	}
 }
 
-// TestExecutorDerivesAllowedCallerFromServiceAccount 覆盖 A1 的升级路径：
-// 配置里没有 user_id（真实旧配置形态），执行器固定解析 opsd，
-// 该账号能完成一条合法只读 RPC，root 则在建立连接时就被关闭。
+// TestExecutorDerivesAllowedCallerFromServiceAccount 覆盖 A1 的升级路径与真实拒绝路径：
+// 配置没有 user_id（真实旧配置形态），执行器固定解析 opsd；
+// opsd 能完成合法只读 RPC，同组其他 UID 与 root 都被拒绝，且拒绝之后服务仍可用。
+//
+// 目录权限：测试根目录、helper 与执行器目录都由 root 拥有，只给其他账号遍历与执行权限。
+// 若把这些路径交给 opsd，root 再执行其中的程序就等于允许提权。
 func TestExecutorDerivesAllowedCallerFromServiceAccount(t *testing.T) {
 	binary := os.Getenv("OPSD_TEST_BINARY")
 	if binary == "" || os.Geteuid() != 0 {
 		t.Skip("未提供本地 Linux 节点程序")
 	}
-	// 缺 user_id 时固定解析 opsd；测试环境未必有该系统账号，临时建一个再清理。
 	created := false
 	if _, err := user.Lookup("opsd"); err != nil {
 		if output, err := runCommand("useradd", "--system", "--no-create-home", "--shell", "/usr/sbin/nologin", "opsd"); err != nil {
@@ -244,7 +246,11 @@ func TestExecutorDerivesAllowedCallerFromServiceAccount(t *testing.T) {
 	}
 
 	dir := t.TempDir()
+	// root 拥有、其他账号可遍历；helper 与目录都不交给 opsd 写。
 	if e := os.Chmod(filepath.Dir(dir), 0755); e != nil {
+		t.Fatal(e)
+	}
+	if e := os.Chmod(dir, 0755); e != nil {
 		t.Fatal(e)
 	}
 	data := filepath.Join(dir, "node")
@@ -254,24 +260,12 @@ func TestExecutorDerivesAllowedCallerFromServiceAccount(t *testing.T) {
 			t.Fatal(e)
 		}
 	}
-	for _, path := range []string{dir, data, execDir} {
-		if e := os.Chown(path, uid, gid); e != nil {
-			t.Fatal(e)
-		}
-	}
-	// 关键：不写 UserID，模拟旧配置。
+	// 不写 UserID，模拟旧配置；目录保持 root:root。
 	f := installation.NodeFile{DataDir: data, ExecutorDir: execDir, Socket: filepath.Join(dir, "executor.sock"), ControlSocket: filepath.Join(data, "control.sock"), Binary: binary, GroupID: gid}
 	config := filepath.Join(dir, "node.json")
 	if e := localstate.Write(config, f, 0644); e != nil {
 		t.Fatal(e)
 	}
-	root := launch(t, binary, "executor", "--config", config)
-	waitLocal(t, root, func() bool {
-		_, e := os.Stat(f.Socket)
-		return e == nil
-	})
-
-	// go test 的临时构建目录对 opsd 不可读，复制一份可执行的测试二进制再以该账号重入。
 	self, err := os.Executable()
 	if err != nil {
 		t.Fatal(err)
@@ -280,40 +274,65 @@ func TestExecutorDerivesAllowedCallerFromServiceAccount(t *testing.T) {
 	if e := copyExecutable(self, probe); e != nil {
 		t.Fatal(e)
 	}
-	if e := os.Chmod(dir, 0755); e != nil {
-		t.Fatal(e)
-	}
 	probeEnv := []string{"OPSD_EXECUTOR_PROBE_SOCKET=" + f.Socket}
-	// 1) 允许账号必须能完成真实 RPC：以 opsd 重入本测试程序跑一条只读调用。
-	var lastErr error
-	for attempt := 0; attempt < 50; attempt++ {
-		output, e := runCommandEnv(probeEnv, "runuser", "-u", "opsd", "--", probe, "-test.run=TestHelperExecutorReadRPC", "-test.v")
-		// 子进程必须在真正执行 helper，而不是因为缺环境变量而 SKIP（SKIP 也返回 0）。
-		if e == nil && !strings.Contains(output, "SKIP") && strings.Contains(output, "PASS") {
-			lastErr = nil
-			t.Logf("opsd 的只读 RPC 成功：%s", firstLine(output))
-			break
-		}
-		if e == nil {
-			lastErr = fmt.Errorf("helper 未真正执行：%s", firstLine(output))
-			break
-		}
-		lastErr = fmt.Errorf("%v %s", e, firstLine(output))
-		time.Sleep(100 * time.Millisecond)
-	}
-	if lastErr != nil {
-		t.Fatalf("缺 user_id 的旧配置下 opsd 无法调用：%v", lastErr)
+
+	root := launch(t, binary, "executor", "--config", config)
+	waitLocal(t, root, func() bool {
+		_, e := os.Stat(f.Socket)
+		return e == nil
+	})
+
+	// 同组但不同 UID 的账号：拥有 Socket 的组权限，能连上，但必须被 A1 拒绝。
+	intruder := "opsd-probe"
+	intruderReady := false
+	if output, err := runCommand("useradd", "--system", "--no-create-home", "--shell", "/usr/sbin/nologin", "-g", "opsd", intruder); err == nil {
+		intruderReady = true
+		defer runCommand("userdel", intruder)
+	} else {
+		t.Logf("无法创建同组账号，跳过同组拒绝检查：%v %s", err, firstLine(output))
 	}
 
-	// 2) root 必须被拒，且表现为连接关闭而不是客户端自身故障。
-	output, e := runCommandEnv(probeEnv, "runuser", "-u", "root", "--", probe, "-test.run=TestHelperExecutorReadRPC", "-test.v")
-	if e == nil {
-		t.Fatalf("root 不应被放行，却完成了 RPC：%s", firstLine(output))
+	call := func(as string) (string, error) {
+		return runCommandEnv(probeEnv, "runuser", "-u", as, "--", probe, "-test.run=TestHelperExecutorReadRPC", "-test.v")
 	}
-	if !closedByPeer(output) {
-		t.Fatalf("root 的失败不是连接关闭：%s", firstLine(output))
+	mustSucceed := func(as, label string) {
+		var last error
+		for attempt := 0; attempt < 50; attempt++ {
+			output, e := call(as)
+			if e == nil && strings.Contains(output, "PASS") && !strings.Contains(output, "SKIP") {
+				t.Logf("%s：只读 RPC 成功", label)
+				return
+			}
+			if e == nil {
+				last = fmt.Errorf("helper 未真正执行：%s", firstLine(output))
+				break
+			}
+			last = fmt.Errorf("%v %s", e, firstLine(output))
+			time.Sleep(100 * time.Millisecond)
+		}
+		t.Fatalf("%s：无法调用执行器：%v", label, last)
 	}
-	t.Logf("root 被连接关闭：%s", firstLine(output))
+	mustReject := func(as, label string) {
+		output, e := call(as)
+		if e == nil {
+			t.Fatalf("%s 不应被放行，却完成了 RPC：%s", label, firstLine(output))
+		}
+		if !closedByPeer(output) {
+			t.Fatalf("%s 的失败不是连接关闭：%s", label, firstLine(output))
+		}
+		t.Logf("%s 被连接关闭", label)
+	}
+
+	// 1) 允许账号能完成真实 RPC（缺 user_id 的旧配置）。
+	mustSucceed("opsd", "opsd")
+	// 2) 同组不同 UID 被拒。
+	if intruderReady {
+		mustReject(intruder, "同组其他 UID")
+		// 3) 拒绝之后，允许账号必须仍能成功——证明拒绝没有打停服务。
+		mustSucceed("opsd", "拒绝之后的 opsd")
+	}
+	// 4) root 也被拒。
+	mustReject("root", "root")
 }
 
 // TestHelperExecutorReadRPC 是子进程入口：以指定账号连接执行器 socket，
@@ -331,7 +350,7 @@ func TestHelperExecutorReadRPC(t *testing.T) {
 	}
 }
 
-// copyExecutable 把测试二进制复制到可被其他账号执行的路径。
+// copyExecutable 把测试二进制复制到 root 拥有、其他账号可执行的路径。
 func copyExecutable(source, target string) error {
 	data, err := os.ReadFile(source)
 	if err != nil {
