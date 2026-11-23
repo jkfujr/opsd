@@ -57,7 +57,7 @@ func InstallNode(ctx context.Context, o NodeInstall) (bool, error) {
 				return false, fmt.Errorf("已安装其他版本，请通过明确的程序更新流程升级")
 			}
 		}
-		return false, activateNode(ctx, f, o.ConfigPath)
+		return false, activateNode(ctx, f, o.ConfigPath, false)
 	} else if !os.IsNotExist(e) {
 		return false, e
 	}
@@ -152,9 +152,9 @@ func InstallNode(ctx context.Context, o NodeInstall) (bool, error) {
 	if e = os.Chown(o.ConfigPath, 0, gid); e != nil {
 		return false, e
 	}
-	return true, activateNode(ctx, f, o.ConfigPath)
+	return true, activateNode(ctx, f, o.ConfigPath, true)
 }
-func activateNode(ctx context.Context, f NodeFile, configPath string) error {
+func activateNode(ctx context.Context, f NodeFile, configPath string, first bool) error {
 	var e error
 	if filepath.Dir(f.DataDir) == "/var/lib/opsd" {
 		// 代理先准备目录时，父目录可能只有 root 能进入。
@@ -175,9 +175,11 @@ func activateNode(ctx context.Context, f NodeFile, configPath string) error {
 		return e
 	}
 	// 恢复单元不再由执行器 Wants 拉起（日常重启执行器不能打断运行中的任务），
-	// 因此安装时显式跑一次，保证首次安装也完成开机恢复的等价动作。
-	if e = Command(ctx, "systemctl", "start", "opsd-recover.service"); e != nil {
-		return e
+	// 因此只在首次安装时显式跑一次；重复安装不能借这里中止运行中的任务。
+	if first {
+		if e = Command(ctx, "systemctl", "start", "opsd-recover.service"); e != nil {
+			return e
+		}
 	}
 	if e = Command(ctx, "systemctl", "start", "opsd-executor.service", "opsd.service"); e != nil {
 		return e

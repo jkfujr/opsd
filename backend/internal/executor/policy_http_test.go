@@ -104,11 +104,17 @@ func TestRPCRejectsArbitraryCodeAndKeepsServing(t *testing.T) {
 		t.Fatalf("拒绝原因未说明能力被关闭：%q", fault.Message)
 	}
 
-	// 同一服务实例上，常规能力必须仍可用：拒绝没有打停服务，也没有污染状态。
-	if _, err := client.Call(ctx, &protocol.OperationQuery{OperationID: "op"}); err != nil {
-		var queryFault *firewall.Fault
-		if errors.As(err, &queryFault) && queryFault.Code == "forbidden" {
-			t.Fatalf("R1 查询被策略拒绝：%v", err)
-		}
+	// 同一服务实例上，常规能力必须仍可用，且拒绝没有留下记录：
+	// 查询不仅要成功，还要明确 Found == false。
+	reply, err := client.Call(ctx, &protocol.OperationQuery{OperationID: "op"})
+	if err != nil {
+		t.Fatalf("R1 查询失败：%v", err)
+	}
+	result, ok := reply.(*protocol.OperationQueryResult)
+	if !ok {
+		t.Fatalf("查询返回了非预期载荷：%T", reply)
+	}
+	if result.Found {
+		t.Fatal("被拒绝的提交不应在库里留下记录")
 	}
 }

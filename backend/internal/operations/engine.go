@@ -91,15 +91,6 @@ func (e *Engine) Run(ctx context.Context, id string) error {
 	}
 	// 执行期复核：已受理的操作绕过不了后来的策略变更，由独立操作进程与
 	// 启动恢复共同走到这里，拒绝原因随 e.end 持久化。
-	// 只在"即将首次执行"时拒绝：尚未开始、且没有待人工核对的状态。
-	// 取消与人工解决属于收尾，永远可行；IntentStep 非空表示副作用已经发出，
-	// 必须保留读回与人工结案路径（例如 Compose 已下发、进程在读回前中断），
-	// 否则关闭策略会把需要核对的操作直接结案。
-	if deny := e.deny; deny != nil && canRefuse(&l) {
-		if err := deny(*l.Action); err != nil {
-			return e.end(ctx, &l, protocol.Failed, err)
-		}
-	}
 	boot, now, err := e.clock()
 	if err != nil {
 		return err
@@ -541,13 +532,18 @@ func (e *Engine) install(ctx context.Context, l *Local, boot string) error {
 	return e.end(ctx, l, protocol.Succeeded, nil)
 }
 
-// canRefuse 报告当前是否处于"可以安全拒绝"的时点。
-func canRefuse(l *Local) bool {
-	if l.Request == "cancel" || l.Request == "resolve" {
-		return false
+// denyRestricted 在即将发出新命令、或即将重试原步骤之前复核策略。
+//
+// 判定必须落在"发命令前"这一刻：早于此会结案掉仍需要读回的操作，
+// 晚于此则命令已经发出去。取消、人工解决与只读核对从不经过这里。
+func (e *Engine) denyRestricted(ctx context.Context, l *Local) (bool, error) {
+	if e.deny == nil {
+		return false, nil
 	}
-	if l.IntentStep != nil || l.Record.State == protocol.AttentionRequired {
-		return false
+	if err := e.deny(*l.Action); err != nil {
+		// e.end 结案成功时返回 nil，因此必须单独返回"已拒绝"，
+		// 否则调用方会以为没拒绝而继续执行。
+		return true, e.end(ctx, l, protocol.Failed, err)
 	}
-	return true
+	return false, nil
 }

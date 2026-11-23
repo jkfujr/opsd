@@ -59,6 +59,12 @@ func (e *Engine) updateContainer(ctx context.Context, l *Local, boot string) err
 		return e.attention(ctx, l, err)
 	}
 	defer file.Close()
+	// 读回与人工核对都在上面完成；真正发出更新命令前才复核策略。
+	if denied, denyErr := e.denyRestricted(ctx, l); denyErr != nil {
+		return denyErr
+	} else if denied {
+		return nil
+	}
 	l.ContainerState = &containerState{Attempted: true, Update: &dockerengine.UpdateState{}}
 	state := l.ContainerState.Update
 	persist := func() error {

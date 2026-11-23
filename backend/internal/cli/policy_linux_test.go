@@ -73,16 +73,33 @@ func TestQueuedRestrictedOperationRefusedByPolicy(t *testing.T) {
 	}
 	db.Close()
 
-	// 安装真实单元（只装操作单元，避免影响宿主上的其他服务）。
+	// 单元名是契约的一部分：operation 入口会按 cgroup 名核对
+	// opsd-operation@<id>.service，因此不能换名字。
+	// 规则：模板已存在就沿用且绝不删；只有本次新建的才在清理时删除。
 	units := installation.Units(f, config)
-	unitPath := "/etc/systemd/system/opsd-operation@.service"
-	if err := os.WriteFile(unitPath, []byte(units["opsd-operation@.service"]), 0644); err != nil {
+	const templatePath = "/etc/systemd/system/opsd-operation@.service"
+	templateBody := units["opsd-operation@.service"]
+	createdTemplate := false
+	if _, err := os.Stat(templatePath); os.IsNotExist(err) {
+		if err := os.WriteFile(templatePath, []byte(templateBody), 0644); err != nil {
+			t.Fatal(err)
+		}
+		createdTemplate = true
+	} else if err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() {
 		runCommand("systemctl", "stop", "opsd-operation@"+id+".service")
-		os.Remove(unitPath)
+		if createdTemplate {
+			os.Remove(templatePath)
+		}
 		runCommand("systemctl", "daemon-reload")
+		if !createdTemplate {
+			// 复用了既有模板：必须确认它没有被本次测试改写。
+			if body, err := os.ReadFile(templatePath); err != nil || string(body) != templateBody {
+				t.Errorf("既有操作模板被改动：%s", templatePath)
+			}
+		}
 	})
 	if output, err := runCommand("systemctl", "daemon-reload"); err != nil {
 		t.Fatalf("daemon-reload 失败：%v %s", err, firstLine(output))

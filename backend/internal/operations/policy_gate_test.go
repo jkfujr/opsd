@@ -99,27 +99,6 @@ func TestRunAllowsCancelOfRestrictedAction(t *testing.T) {
 	}
 }
 
-// TestCanRefuse 覆盖判定时点：取消、解决、已发副作用、待人工核对都不允许拒绝。
-func TestCanRefuse(t *testing.T) {
-	step := 0
-	cases := []struct {
-		name  string
-		local Local
-		want  bool
-	}{
-		{"未开始", Local{}, true},
-		{"取消", Local{Request: "cancel"}, false},
-		{"解决", Local{Request: "resolve"}, false},
-		{"已发出副作用", Local{IntentStep: &step}, false},
-		{"待人工核对", Local{Record: protocol.OperationRecord{State: protocol.AttentionRequired}}, false},
-	}
-	for _, c := range cases {
-		if got := canRefuse(&c.local); got != c.want {
-			t.Errorf("%s：得到 %v，期望 %v", c.name, got, c.want)
-		}
-	}
-}
-
 func exists(path string) bool {
 	_, err := os.Stat(path)
 	return err == nil

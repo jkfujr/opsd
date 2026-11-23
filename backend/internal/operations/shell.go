@@ -58,6 +58,11 @@ func (e *Engine) shell(ctx context.Context, l *Local, boot string) error {
 	if l.Action.Shell == nil || e.LogDirectory == "" {
 		return e.end(ctx, l, protocol.Rejected, fmt.Errorf("任务执行参数不完整"))
 	}
+	if denied, err := e.denyRestricted(ctx, l); err != nil {
+		return err
+	} else if denied {
+		return nil
+	}
 	a := l.Action.Shell
 	return e.runCommand(ctx, l, exec.CommandContext(ctx, "/bin/bash", "-lc", a.Script), a.Directory, "执行任务 "+a.Name)
 }

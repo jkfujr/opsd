@@ -99,6 +99,12 @@ func (e *Engine) database(ctx context.Context, l *Local) error {
 					return e.attention(ctx, l, fmt.Errorf("原步骤结果待核对，请重新处理或接受现状"))
 				}
 			}
+			// 真正发出新命令（含对原步骤的重试）之前复核。
+			if denied, denyErr := e.denyRestricted(ctx, l); denyErr != nil {
+				return denyErr
+			} else if denied {
+				return nil
+			}
 			state.Before = observed.Fingerprint
 			state.Attempted = true
 			l.Record.State = protocol.Applying
