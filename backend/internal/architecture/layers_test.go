@@ -5,7 +5,6 @@ import (
 	"go/token"
 	"os"
 	"path/filepath"
-	"runtime"
 	"sort"
 	"strconv"
 	"strings"
@@ -23,13 +22,6 @@ const modulePrefix = "github.com/jkfujr/opsd/internal/"
 // 叶子层：协议、身份、存储、构建信息、请求状态不依赖任何其他 internal 包。
 var leafPackages = []string{"protocol", "identity", "storage", "buildinfo", "requeststate"}
 
-// 控制面之外的包一律不得依赖控制面；控制面自身不得依赖命令行入口。
-var forbidden = map[string][]string{
-	"control":      {"cli"},
-	"executor":     {"control", "cli"},
-	"installation": {"control", "cli"},
-}
-
 // 观测面与传输层不得依赖业务枢纽（cluster）或控制面。
 var observability = map[string][]string{
 	"monitoring":   {"cluster", "control", "executor", "cli"},
@@ -40,27 +32,35 @@ var observability = map[string][]string{
 	"transport":    {"cluster", "control", "executor", "cli"},
 }
 
-// importsOf 解析 backend/internal 下所有包的直接 import，返回 包名 -> 目标包集合。
-func importsOf(t *testing.T) map[string]map[string]bool {
+// edge 记录一条内部 import 及其位置，便于把违规直接指到源码行。
+type edge struct {
+	target string
+	file   string
+	line   int
+}
+
+// importsOf 解析 backend/internal 下所有包的生产源码 import，返回 包名 -> 目标包集合。
+// 包目录取自测试工作目录的上一级：go test 把工作目录设为被测包目录，
+// 这样不依赖 runtime.Caller，在 -trimpath 构建下同样可用。
+func importsOf(t *testing.T) map[string]map[string]edge {
 	t.Helper()
-	_, file, _, ok := runtime.Caller(0)
-	if !ok {
-		t.Fatal("无法定位测试文件")
+	wd, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
 	}
-	// backend/internal/architecture/layers_test.go -> backend/internal
-	root := filepath.Dir(filepath.Dir(file))
+	root := filepath.Dir(wd)
 	entries, err := os.ReadDir(root)
 	if err != nil {
 		t.Fatal(err)
 	}
-	result := map[string]map[string]bool{}
+	result := map[string]map[string]edge{}
 	fset := token.NewFileSet()
 	for _, entry := range entries {
 		if !entry.IsDir() {
 			continue
 		}
 		name := entry.Name()
-		targets := map[string]bool{}
+		targets := map[string]edge{}
 		err = filepath.WalkDir(filepath.Join(root, name), func(path string, item os.DirEntry, err error) error {
 			if err != nil {
 				return err
@@ -88,7 +88,8 @@ func importsOf(t *testing.T) map[string]map[string]bool {
 					continue
 				}
 				if target := strings.TrimPrefix(value, modulePrefix); target != name {
-					targets[target] = true
+					position := fset.Position(spec.Pos())
+					targets[target] = edge{target: target, file: position.Filename, line: position.Line}
 				}
 			}
 			return nil
@@ -111,8 +112,8 @@ func TestLeafPackagesHaveNoInternalDependencies(t *testing.T) {
 		if !ok {
 			t.Fatalf("缺少包 %s", name)
 		}
-		for _, target := range sorted(targets) {
-			t.Errorf("%s 属于叶子层，却依赖 %s", name, target)
+		for _, item := range sortedEdges(targets) {
+			t.Errorf("%s:%d %s 属于叶子层，却依赖 %s", item.file, item.line, name, item.target)
 		}
 	}
 }
@@ -123,11 +124,11 @@ func TestNothingDependsOnConsoleOrCLI(t *testing.T) {
 		if name == "cli" {
 			continue // 命令行入口只被 main 使用，允许它依赖其他包。
 		}
-		if targets["control"] && name != "cli" {
-			t.Errorf("%s 依赖控制面 control；只有 cli 可以", name)
+		if item, ok := targets["control"]; ok {
+			t.Errorf("%s:%d %s 依赖控制面 control；只有 cli 可以", item.file, item.line, name)
 		}
-		if targets["cli"] {
-			t.Errorf("%s 依赖命令行入口 cli", name)
+		if item, ok := targets["cli"]; ok {
+			t.Errorf("%s:%d %s 依赖命令行入口 cli", item.file, item.line, name)
 		}
 	}
 }
@@ -140,33 +141,18 @@ func TestObservabilityAvoidsBusinessHub(t *testing.T) {
 			t.Fatalf("缺少包 %s", name)
 		}
 		for _, target := range banned {
-			if targets[target] {
-				t.Errorf("%s 属于观测/传输层，却依赖 %s", name, target)
+			if item, ok := targets[target]; ok {
+				t.Errorf("%s:%d %s 属于观测/传输层，却依赖 %s", item.file, item.line, name, target)
 			}
 		}
 	}
 }
 
-func TestExecutorAndInstallationAvoidConsole(t *testing.T) {
-	imports := importsOf(t)
-	for name, banned := range forbidden {
-		targets, ok := imports[name]
-		if !ok {
-			continue
-		}
-		for _, target := range banned {
-			if targets[target] {
-				t.Errorf("%s 不应依赖 %s", name, target)
-			}
-		}
-	}
-}
-
-func sorted(set map[string]bool) []string {
-	list := make([]string, 0, len(set))
-	for value := range set {
+func sortedEdges(set map[string]edge) []edge {
+	list := make([]edge, 0, len(set))
+	for _, value := range set {
 		list = append(list, value)
 	}
-	sort.Strings(list)
+	sort.Slice(list, func(i, j int) bool { return list[i].target < list[j].target })
 	return list
 }
