@@ -437,6 +437,9 @@ func TestInstalledNodeAcceptsJoinedPeer(t *testing.T) {
 			t.Logf("诊断：失败操作队列体 %s", body)
 		}
 		t.Logf("诊断：回执原文 %s", rawOperation(t, client, aWeb.URL, broken.location))
+		if os.Getenv("OPSD_TRACE") != "" {
+			t.Logf("诊断：B 的节点日志 %s", node.log.String())
+		}
 		t.Fatal("单元缺失时对端读不到任何失败原因（操作看起来仍在进行中）")
 	}
 	t.Logf("单元缺失时对端读到失败原因：%s", reason)
