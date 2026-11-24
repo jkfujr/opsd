@@ -576,3 +576,4 @@ func nativeDashboard(t *testing.T, f *nativeDatabases, node *apiNode) {
 		return checkProm(grafanaURL, "/api/datasources/proxy/uid/opsd-ci/api/v1/query?query="+url.QueryEscape("opsd_node_up"), password)
 	})
 }
+

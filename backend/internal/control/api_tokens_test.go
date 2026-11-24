@@ -26,6 +26,10 @@ type apiExecutor struct {
 	cores int
 	cpu   float64
 	live  atomic.Int32
+	// existing 是读回时报告“已存在”的库名，用来模拟集群里已有该库。
+	existing atomic.Value
+	// existsErr 非空时读回直接失败，用来模拟集群不可达。
+	existsErr atomic.Value
 }
 
 func (e *apiExecutor) Call(_ context.Context, p protocol.Payload) (protocol.Payload, error) {
@@ -37,6 +41,12 @@ func (e *apiExecutor) Call(_ context.Context, p protocol.Payload) (protocol.Payl
 		used, total := uint64(e.cores*20), uint64(e.cores*100)
 		cpu := e.cpu
 		return &protocol.MonitoringResult{Metrics: protocol.Metrics{CollectedAt: time.Now().UTC(), CPUCores: e.cores, CPUUsage: &cpu, MemoryUsed: &used, MemoryTotal: &total, Errors: []string{}}, Firewall: "enabled"}, nil
+	case *protocol.DatabaseExists:
+		if failure, _ := e.existsErr.Load().(error); failure != nil {
+			return nil, failure
+		}
+		known, _ := e.existing.Load().(string)
+		return &protocol.DatabaseExistsResult{Exists: known != "" && known == p.Database}, nil
 	case *protocol.DockerRead:
 		return &protocol.DockerReadResult{State: protocol.DockerState{EngineID: "test-engine", State: "ready", Containers: []protocol.ContainerSummary{{ContainerRef: protocol.ContainerRef{EngineID: "test-engine", ContainerID: strings.Repeat("b", 64)}, Name: "测试容器", State: "running", Ports: []protocol.ContainerPort{}}}, CheckedAt: time.Now().UTC()}}, nil
 	}
