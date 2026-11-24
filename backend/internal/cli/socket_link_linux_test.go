@@ -47,8 +47,11 @@ func TestInstalledNodeAcceptsJoinedPeer(t *testing.T) {
 	peer := freeAddress(t)
 
 	// A：测试进程内的真实节点，稍后加入 B。
+	// 监听与公告必须是同一个地址：分两次 freeAddress 会选到不同端口，
+	// B 主动回连时就拨不到 A。
+	aListen := freeAddress(t)
 	a, e := cluster.Open(t.Context(), filepath.Join(dir, "a", "node.db"), cluster.Options{
-		Config:   cluster.Config{Listen: freeAddress(t), Address: "http://" + freeAddress(t)},
+		Config:   cluster.Config{Listen: aListen, Address: "http://" + aListen},
 		Username: "admin", Password: "test-password", Entrance: "/signin",
 	})
 	if e != nil {
@@ -173,8 +176,9 @@ func TestInstalledNodeAcceptsJoinedPeer(t *testing.T) {
 	if e != nil {
 		t.Fatalf("执行器 Socket 只读调用失败：%v %s", e, output)
 	}
-	if !strings.Contains(string(output), "PASS") {
-		t.Fatalf("执行器只读探测没有通过：%s", output)
+	// 必须看到这条用例自己通过：只有总 "PASS" 时，跳过或未匹配也会出现 PASS。
+	if !strings.Contains(string(output), "--- PASS: TestHelperExecutorReadRPC") {
+		t.Fatalf("执行器只读探测没有真正执行：%s", output)
 	}
 	t.Logf("链路已通：A(%s) → B(%s, %s)；执行器 Socket 只读调用成功", a.ID, self.ID, "http://"+peer)
 
