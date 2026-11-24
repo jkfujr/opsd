@@ -164,8 +164,12 @@ func TestInstalledNodeAcceptsJoinedPeer(t *testing.T) {
 	if e = localstate.Write(config, files, 0644); e != nil {
 		t.Fatal(e)
 	}
-	// 节点以 nobody 运行，配置与目录都要可读/可进。
-	if e = os.Chown(config, 65534, 65534); e != nil {
+	// 配置按安装器的权限边界：root 所有、节点组可读、0640。
+	// 归属 nobody 会让 root 单元读到的配置可被节点自重写，越过了真实边界。
+	if e = os.Chown(config, 0, 65534); e != nil {
+		t.Fatal(e)
+	}
+	if e = os.Chmod(config, 0640); e != nil {
 		t.Fatal(e)
 	}
 	if e = os.Chmod(dir, 0755); e != nil {
@@ -243,15 +247,17 @@ func TestInstalledNodeAcceptsJoinedPeer(t *testing.T) {
 
 	// 第二步：B 未授予 manage_database 时，A 经**真实 HTTP 入口**提交必须被拒，
 	// 且 B 零入队。走 HTTP 才能排除"节点 RPC 拒绝"与"HTTP 层拒绝"的差异。
-	key := "socket-refused-" + identity.Random()[:8]
+	// 两轮用**同一个库名与同一个键**：拒绝轮零行，放行轮一行，直接对上。
+	database := "opsd_link_" + strings.ToLower(identity.Random()[:8])
+	key := "socket-acceptance-" + identity.Random()[:8]
 	client, csrf := adminSession(t, aWeb.URL)
-	code, problem := submitCreate(t, client, csrf, aWeb.URL, registered.ID, registered.Revision, "opsd_link_refused", key)
-	if code != 403 {
-		t.Fatalf("未授予 manage_database 时应返回 403，实际 %d", code)
+	denied := submitCreate(t, client, csrf, aWeb.URL, registered.ID, registered.Revision, database, key)
+	if denied.code != 403 {
+		t.Fatalf("未授予 manage_database 时应返回 403，实际 %d", denied.code)
 	}
 	// 403 也可能来自 CSRF 或会话问题：必须核对问题码是授权拒绝。
-	if problem != "forbidden" {
-		t.Fatalf("问题码应为 forbidden，实际 %q", problem)
+	if denied.problem != "forbidden" {
+		t.Fatalf("问题码应为 forbidden，实际 %q", denied.problem)
 	}
 	// 被拒的请求不能在 B 的队列里留下任何行——在线只读读取 B 的库。
 	queued, e := queueRows(t.Context(), filepath.Join(data, "node.db"), key)
@@ -274,7 +280,10 @@ func TestInstalledNodeAcceptsJoinedPeer(t *testing.T) {
 	if e = localstate.Write(config, files, 0644); e != nil {
 		t.Fatal(e)
 	}
-	if e = os.Chown(config, 65534, 65534); e != nil {
+	if e = os.Chown(config, 0, 65534); e != nil {
+		t.Fatal(e)
+	}
+	if e = os.Chmod(config, 0640); e != nil {
 		t.Fatal(e)
 	}
 	node = launch(t, "runuser", "-u", "nobody", "--", binary, "node", "--config", config)
@@ -298,10 +307,8 @@ func TestInstalledNodeAcceptsJoinedPeer(t *testing.T) {
 	// 父操作 ID 由受理时按 (来源, 操作者, 键) 推导，不是我们自选的值：
 	//   队列 ID = 节点 + "_" + sha256(origin \x00 actor \x00 key)
 	// 步骤 ID 再用 (父操作 ID/序号) 推导，两步都可预测，才能在提交前建单元。
-	database := "opsd_link_" + strings.ToLower(identity.Random()[:8])
-	key2 := "socket-allowed-" + identity.Random()[:8]
 	actor := "account:" + a.ID + ":1"
-	queueHash := sha256.Sum256([]byte(a.ID + "\x00" + actor + "\x00" + key2))
+	queueHash := sha256.Sum256([]byte(a.ID + "\x00" + actor + "\x00" + key))
 	operationID := self.ID + "_" + hex.EncodeToString(queueHash[:])
 	sum := sha256.Sum256([]byte(fmt.Sprintf("%s/%d", operationID, 0)))
 	stepID := self.ID + "_" + hex.EncodeToString(sum[:])
@@ -317,25 +324,55 @@ func TestInstalledNodeAcceptsJoinedPeer(t *testing.T) {
 	if e != nil {
 		t.Fatalf("无法独占创建实例单元：%v", e)
 	}
+	// 独占创建成功后立刻登记清理：写入中途失败也不会留下半截单元。
+	t.Cleanup(func() {
+		runCommand("systemctl", "stop", "opsd-operation@"+stepID+".service")
+		_ = os.Remove(unitPath)
+		runCommand("systemctl", "daemon-reload")
+	})
 	if _, e = file.WriteString(unit); e != nil {
 		file.Close()
-		t.Fatal(e)
+		t.Fatalf("写入单元失败：%v", e)
 	}
-	file.Close()
-	t.Cleanup(func() { _ = os.Remove(unitPath) })
-
-	code, problem = submitCreate(t, client, csrf, aWeb.URL, registered.ID, registered.Revision, database, key2)
-	if code != 202 {
-		t.Fatalf("授权后应返回 202，实际 %d（%s）", code, problem)
+	if e = file.Close(); e != nil {
+		t.Fatalf("关闭单元失败：%v", e)
 	}
+	if output, e := runCommand("systemctl", "daemon-reload"); e != nil {
+		t.Fatalf("daemon-reload 失败：%v %s", e, output)
+	}
+	// 核对 systemd 实际加载的就是本次实例单元，且 ExecStart 指向本次配置。
+	fragment, e := runCommand("systemctl", "show", "-p", "FragmentPath", "--value", "opsd-operation@"+stepID+".service")
+	if e != nil {
+		t.Fatalf("无法查询单元来源：%v %s", e, fragment)
+	}
+	if strings.TrimSpace(fragment) != unitPath {
+		t.Fatalf("systemd 加载的不是本次实例单元：%q，期望 %q", strings.TrimSpace(fragment), unitPath)
+	}
+	execStart, e := runCommand("systemctl", "show", "-p", "ExecStart", "--value", "opsd-operation@"+stepID+".service")
+	if e != nil || !strings.Contains(execStart, config) {
+		t.Fatalf("单元未指向本次配置：%v %s", e, execStart)
+	}
+	allowed := submitCreate(t, client, csrf, aWeb.URL, registered.ID, registered.Revision, database, key)
+	if allowed.code != 202 {
+		t.Fatalf("授权后应返回 202，实际 %d（%s）", allowed.code, allowed.problem)
+	}
+	// 回执必须指向我们预测的那条操作，否则后面的单元名与状态检查都会错位。
+	if allowed.opID != operationID {
+		t.Fatalf("202 回执的操作 ID 与预测不符：%s != %s", allowed.opID, operationID)
+	}
+	if !strings.HasSuffix(allowed.location, operationID) {
+		t.Fatalf("Location 未指向该操作：%q", allowed.location)
+	}
+	// 沿 Location 用 A 的管理员会话查：客户端看到的就是这条操作。
+	followOperation(t, client, aWeb.URL, allowed.location, operationID)
 	// 沿操作 ID 等到终态，并核对这条操作属于 A 这个来源。
 	defer func() {
 		// 失败时把 B 队列里这条操作的真实状态带出来，而不是只说"超时"。
 		if t.Failed() {
-			if origin, state, e := queueRow(t.Context(), filepath.Join(data, "node.db"), key2); e == nil {
+			if origin, state, e := queueRow(t.Context(), filepath.Join(data, "node.db"), key); e == nil {
 				t.Logf("诊断：B 队列 origin=%s state=%s", origin, state)
 			}
-			if body, e := queueBody(t.Context(), filepath.Join(data, "node.db"), key2); e == nil {
+			if body, e := queueBody(t.Context(), filepath.Join(data, "node.db"), key); e == nil {
 				t.Logf("诊断：队列体 %s", body)
 			}
 			if out, e := exec.Command("systemctl", "status", "--no-pager", "opsd-operation@"+stepID+".service").CombinedOutput(); e != nil {
@@ -344,7 +381,7 @@ func TestInstalledNodeAcceptsJoinedPeer(t *testing.T) {
 		}
 	}()
 	waitFor(t, "建库操作完成", 3*time.Minute, func() bool {
-		origin, state, e := queueRow(t.Context(), filepath.Join(data, "node.db"), key2)
+		origin, state, e := queueRow(t.Context(), filepath.Join(data, "node.db"), key)
 		if e != nil {
 			return false
 		}
@@ -355,7 +392,7 @@ func TestInstalledNodeAcceptsJoinedPeer(t *testing.T) {
 	})
 	_ = operationID
 	// 最后直接问 Galera：库真的建出来了。
-	if !targetHasDatabase(t, connection, database) {
+	if !targetHasDatabase(t, connection, galeraState.ClusterID, database) {
 		t.Fatalf("Galera 里查不到 %s", database)
 	}
 	t.Logf("授权后建库完成：%s 已存在于集群 %s", database, galeraState.ClusterID)
@@ -420,8 +457,17 @@ func adminSession(t *testing.T, web string) (*http.Client, string) {
 	return client, session.CsrfToken
 }
 
-// submitCreate 经 A 的真实 HTTP 入口提交一次建库，返回状态码与问题码。
-func submitCreate(t *testing.T, client *http.Client, csrf, web, clusterID string, revision uint64, database, key string) (int, string) {
+// submitReceipt 是提交的回执：状态码、问题码、Location 与操作 ID。
+type submitReceipt struct {
+	code     int
+	problem  string
+	location string
+	opID     string
+}
+
+// submitCreate 经 A 的真实 HTTP 入口提交一次建库，并把回执原样带出来。
+// 只返回状态码会让"服务给了错误的 Location/操作 ID"也能通过。
+func submitCreate(t *testing.T, client *http.Client, csrf, web, clusterID string, revision uint64, database, key string) submitReceipt {
 	t.Helper()
 	body, e := json.Marshal(map[string]any{
 		"expected_revision": revision,
@@ -451,7 +497,14 @@ func submitCreate(t *testing.T, client *http.Client, csrf, web, clusterID string
 		Code string `json:"code"`
 	}
 	_ = json.Unmarshal(payload, &problem)
-	return response.StatusCode, problem.Code
+	var op struct {
+		ID string `json:"id"`
+	}
+	_ = json.Unmarshal(payload, &op)
+	return submitReceipt{
+		code: response.StatusCode, problem: problem.Code,
+		location: response.Header.Get("Location"), opID: op.ID,
+	}
 }
 
 // queueRow 在线只读地取 B 队列里某个请求键的来源与状态。
@@ -473,11 +526,14 @@ func queueRow(ctx context.Context, path, key string) (string, string, error) {
 }
 
 // targetHasDatabase 直接查目标集群的 information_schema。
-func targetHasDatabase(t *testing.T, connection protocol.DatabaseConnection, database string) bool {
+func targetHasDatabase(t *testing.T, connection protocol.DatabaseConnection, clusterID, database string) bool {
 	t.Helper()
-	// clusterID 传空：这里只问"库在不在"，不做集群身份比对。
-	exists, e := (databaseengine.Manager{}).DatabaseExists(t.Context(), connection, "", database)
-	return e == nil && exists
+	// 带上集群身份：连错集群时"查不到"与"没有这个库"必须能区分。
+	exists, e := (databaseengine.Manager{}).DatabaseExists(t.Context(), connection, clusterID, database)
+	if e != nil {
+		t.Fatalf("查目标库失败：%v", e)
+	}
+	return exists
 }
 
 // queueBody 返回 B 队列里该请求键的原始体，用于诊断。
@@ -490,4 +546,36 @@ func queueBody(ctx context.Context, path, key string) (string, error) {
 	var body string
 	e = db.QueryRow("SELECT body FROM queue WHERE request_key=?", key).Scan(&body)
 	return body, e
+}
+
+// followOperation 沿 202 返回的地址查询，确认客户端能读到这条操作。
+func followOperation(t *testing.T, client *http.Client, web, location, operationID string) {
+	t.Helper()
+	url := location
+	if strings.HasPrefix(url, "/") {
+		url = web + url
+	}
+	request, e := http.NewRequest("GET", url, nil)
+	if e != nil {
+		t.Fatal(e)
+	}
+	request.Header.Set("Origin", web)
+	response, e := client.Do(request)
+	if e != nil {
+		t.Fatal(e)
+	}
+	defer response.Body.Close()
+	payload, _ := io.ReadAll(response.Body)
+	if response.StatusCode != 200 {
+		t.Fatalf("沿回执查询失败：%d %s", response.StatusCode, payload)
+	}
+	var op struct {
+		ID string `json:"id"`
+	}
+	if e = json.Unmarshal(payload, &op); e != nil {
+		t.Fatal(e)
+	}
+	if op.ID != operationID {
+		t.Fatalf("回执查询到的是另一条操作：%s", op.ID)
+	}
 }
