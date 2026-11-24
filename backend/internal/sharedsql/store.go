@@ -10,6 +10,8 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"slices"
+	"strings"
 	"time"
 
 	"github.com/go-sql-driver/mysql"
@@ -478,19 +480,23 @@ func Migrate(ctx context.Context, db *sql.DB, cluster string) error {
 	if version != 1 {
 		return fmt.Errorf("共享数据库版本 %d 无法直接迁移到 %d", version, SchemaVersion)
 	}
-	steps := []string{
-		// 回执：认证来源进入主键，旧记录的来源为空，只能用于防重。
-		"ALTER TABLE shared_requests ADD COLUMN origin VARCHAR(32) CHARACTER SET ascii COLLATE ascii_bin NOT NULL DEFAULT ''",
-		"ALTER TABLE shared_requests DROP PRIMARY KEY",
-		"ALTER TABLE shared_requests ADD PRIMARY KEY(origin,actor,request_key)",
-		// 流程：细粒度资源键，默认空表示旧流程不参与细粒度互斥。
-		"ALTER TABLE shared_flows ADD COLUMN resource_key VARCHAR(192) CHARACTER SET ascii COLLATE ascii_bin NOT NULL DEFAULT ''",
-		"ALTER TABLE shared_flows ADD KEY resource_key_flows(resource_key,terminal)",
+	// 每一步都先看实际结构再决定做不做：中断后重跑时，已经完成的步骤会跳过，
+	// 而不是在重复列或重复主键上直接失败。
+	if err := ensureColumn(ctx, db, "shared_requests", "origin",
+		"VARCHAR(32) CHARACTER SET ascii COLLATE ascii_bin NOT NULL DEFAULT ''"); err != nil {
+		return err
 	}
-	for _, step := range steps {
-		if _, err := db.ExecContext(ctx, step); err != nil {
-			return fmt.Errorf("%s：%w", step, err)
-		}
+	// 主键变更必须一条 ALTER 完成：拆成 DROP 再 ADD 若中途中断，
+	// 表会处于**没有主键**的状态，重跑也无从判断原状。
+	if err := ensurePrimaryKey(ctx, db, "shared_requests", []string{"origin", "actor", "request_key"}); err != nil {
+		return err
+	}
+	if err := ensureColumn(ctx, db, "shared_flows", "resource_key",
+		"VARCHAR(192) CHARACTER SET ascii COLLATE ascii_bin NOT NULL DEFAULT ''"); err != nil {
+		return err
+	}
+	if err := ensureIndex(ctx, db, "shared_flows", "resource_key_flows", []string{"resource_key", "terminal"}, false); err != nil {
+		return err
 	}
 	// DDL 之后、发布之前的核对：结构不对就不要把版本写上去。
 	if err := verifyV2(ctx, db); err != nil {
@@ -509,25 +515,126 @@ func Migrate(ctx context.Context, db *sql.DB, cluster string) error {
 	return err
 }
 
-// verifyV2 核对 v2 的结构：列、主键与索引都在，才允许发布版本号。
-func verifyV2(ctx context.Context, db *sql.DB) error {
+// columnDefinition 返回该列在 information_schema 里的类型定义。
+func columnDefinition(ctx context.Context, db *sql.DB, table, column string) (string, error) {
+	var kind, nullable string
+	var length sql.NullInt64
+	err := db.QueryRowContext(ctx, `SELECT DATA_TYPE, IS_NULLABLE, CHARACTER_MAXIMUM_LENGTH
+		FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME=? AND COLUMN_NAME=?`, table, column).Scan(&kind, &nullable, &length)
+	if err != nil {
+		return "", err
+	}
+	definition := strings.ToUpper(kind)
+	if length.Valid {
+		definition += fmt.Sprintf("(%d)", length.Int64)
+	}
+	if nullable == "NO" {
+		definition += " NOT NULL"
+	}
+	return definition, nil
+}
+
+// ensureColumn 缺列才加；已有同名列则什么都不做（中断重跑的常见情况）。
+func ensureColumn(ctx context.Context, db *sql.DB, table, column, definition string) error {
 	var count int
-	for _, check := range []struct {
-		query string
-		args  []any
-		what  string
-	}{
-		{"SELECT count(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='shared_requests' AND COLUMN_NAME='origin'", nil, "shared_requests.origin"},
-		{"SELECT count(*) FROM information_schema.STATISTICS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='shared_requests' AND INDEX_NAME='PRIMARY' AND COLUMN_NAME='origin' AND SEQ_IN_INDEX=1", nil, "shared_requests 主键首选列"},
-		{"SELECT count(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='shared_flows' AND COLUMN_NAME='resource_key'", nil, "shared_flows.resource_key"},
-		{"SELECT count(*) FROM information_schema.STATISTICS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='shared_flows' AND INDEX_NAME='resource_key_flows'", nil, "shared_flows.resource_key_flows"},
-	} {
-		if err := db.QueryRowContext(ctx, check.query, check.args...).Scan(&count); err != nil {
+	if err := db.QueryRowContext(ctx, `SELECT count(*) FROM information_schema.COLUMNS
+		WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME=? AND COLUMN_NAME=?`, table, column).Scan(&count); err != nil {
+		return err
+	}
+	if count > 0 {
+		return nil
+	}
+	_, err := db.ExecContext(ctx, fmt.Sprintf("ALTER TABLE %s ADD COLUMN %s %s", table, column, definition))
+	return err
+}
+
+// primaryKey 返回主键列（按顺序）。
+func primaryKey(ctx context.Context, db *sql.DB, table string) ([]string, error) {
+	rows, err := db.QueryContext(ctx, `SELECT COLUMN_NAME FROM information_schema.STATISTICS
+		WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME=? AND INDEX_NAME='PRIMARY' ORDER BY SEQ_IN_INDEX`, table)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var columns []string
+	for rows.Next() {
+		var name string
+		if err := rows.Scan(&name); err != nil {
+			return nil, err
+		}
+		columns = append(columns, name)
+	}
+	return columns, rows.Err()
+}
+
+// ensurePrimaryKey 把主键调整成目标列序；已经是目标形状就不动。
+func ensurePrimaryKey(ctx context.Context, db *sql.DB, table string, want []string) error {
+	have, err := primaryKey(ctx, db, table)
+	if err != nil {
+		return err
+	}
+	if slices.Equal(have, want) {
+		return nil
+	}
+	// 一条语句完成替换，任何时刻都不会留下“没有主键”的中间状态。
+	_, err = db.ExecContext(ctx, fmt.Sprintf("ALTER TABLE %s DROP PRIMARY KEY, ADD PRIMARY KEY(%s)", table, strings.Join(want, ",")))
+	return err
+}
+
+// ensureIndex 缺索引才建；已有同名列索引则跳过。
+func ensureIndex(ctx context.Context, db *sql.DB, table, name string, columns []string, unique bool) error {
+	var count int
+	if err := db.QueryRowContext(ctx, `SELECT count(*) FROM information_schema.STATISTICS
+		WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME=? AND INDEX_NAME=?`, table, name).Scan(&count); err != nil {
+		return err
+	}
+	if count > 0 {
+		return nil
+	}
+	kind := "INDEX"
+	if unique {
+		kind = "UNIQUE INDEX"
+	}
+	_, err := db.ExecContext(ctx, fmt.Sprintf("ALTER TABLE %s ADD %s %s(%s)", table, kind, name, strings.Join(columns, ",")))
+	return err
+}
+
+// verifyV2 核对 v2 的结构：列、主键列序与索引都在，才允许发布版本号。
+func verifyV2(ctx context.Context, db *sql.DB) error {
+	hasColumn := func(table, column string) error {
+		var count int
+		if err := db.QueryRowContext(ctx, `SELECT count(*) FROM information_schema.COLUMNS
+			WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME=? AND COLUMN_NAME=?`, table, column).Scan(&count); err != nil {
 			return err
 		}
 		if count == 0 {
-			return fmt.Errorf("结构核对失败：缺少 %s", check.what)
+			return fmt.Errorf("结构核对失败：缺少 %s.%s", table, column)
 		}
+		return nil
+	}
+	for _, c := range []struct{ table, column string }{
+		{"shared_requests", "origin"},
+		{"shared_flows", "resource_key"},
+	} {
+		if err := hasColumn(c.table, c.column); err != nil {
+			return err
+		}
+	}
+	// 主键要按**完整列序**核对：只有首列对不算迁移完成。
+	have, err := primaryKey(ctx, db, "shared_requests")
+	if err != nil {
+		return err
+	}
+	if want := []string{"origin", "actor", "request_key"}; !slices.Equal(have, want) {
+		return fmt.Errorf("结构核对失败：shared_requests 主键为 %v，期望 %v", have, want)
+	}
+	var indexes int
+	if err := db.QueryRowContext(ctx, `SELECT count(*) FROM information_schema.STATISTICS
+		WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='shared_flows' AND INDEX_NAME='resource_key_flows'`).Scan(&indexes); err != nil {
+		return err
+	}
+	if indexes == 0 {
+		return fmt.Errorf("结构核对失败：缺少 shared_flows.resource_key_flows")
 	}
 	return nil
 }
