@@ -4,6 +4,8 @@ package cli
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
 	"net"
 	"net/http/httptest"
 	"os"
@@ -15,7 +17,9 @@ import (
 
 	"github.com/jkfujr/opsd/internal/cluster"
 	"github.com/jkfujr/opsd/internal/installation"
+	"github.com/jkfujr/opsd/internal/identity"
 	"github.com/jkfujr/opsd/internal/localstate"
+	"github.com/jkfujr/opsd/internal/storage"
 )
 
 // 第一步：B 的 node 与 executor 都由安装的二进制启动，
@@ -173,4 +177,57 @@ func TestInstalledNodeAcceptsJoinedPeer(t *testing.T) {
 		t.Fatalf("执行器只读探测没有通过：%s", output)
 	}
 	t.Logf("链路已通：A(%s) → B(%s, %s)；执行器 Socket 只读调用成功", a.ID, self.ID, "http://"+peer)
+
+	// 第二步：B 未授予 manage_database 时，A 的数据库提交必须被拒，且 B 零入队。
+	payload, e := json.Marshal(cluster.DatabaseSubmission{
+		Change: cluster.DatabaseChange{Cluster: "missing", ExpectedRevision: 1, Kind: "create_database", Database: "opsd_link_refused", Charset: "utf8mb4"},
+		Cluster: cluster.ManagedDatabaseCluster{
+			ID: "missing", Coordinator: self.ID, ClusterID: "galera", Revision: 1, Name: "占位",
+			Members: []cluster.DatabaseRef{}, Proxies: []cluster.DatabaseRef{},
+		},
+	})
+	if e != nil {
+		t.Fatal(e)
+	}
+	key := "socket-refused-" + identity.Random()[:8]
+	if _, e = a.Submit(t.Context(), self.ID, cluster.Request{
+		ID: cluster.NewOperationID(a.ID), Kind: "database", Key: key,
+		Actor: "account:" + a.ID + ":1", Payload: payload,
+	}); e == nil {
+		t.Fatal("未授予 manage_database 的提交不应被受理")
+	} else if code := clusterFaultCode(e); code != "forbidden" {
+		t.Fatalf("应以 forbidden 拒绝，实际 %s（%v）", code, e)
+	}
+	// 被拒的请求不能在 B 的队列里留下任何行——在线只读读取 B 的库。
+	queued, e := queueRows(t.Context(), filepath.Join(data, "node.db"), key)
+	if e != nil {
+		t.Fatal(e)
+	}
+	if queued != 0 {
+		t.Fatalf("被拒后 B 仍有入队：%d", queued)
+	}
+	t.Logf("未授权提交被拒（forbidden），B 的 queue 中该请求键为 0 行")
+}
+
+// queueRows 在线只读地数 B 队列里某个请求键的行数。
+func queueRows(ctx context.Context, path, key string) (int, error) {
+	db, e := storage.ReadOnly(ctx, path)
+	if e != nil {
+		return 0, e
+	}
+	defer db.Close()
+	var count int
+	if e = db.QueryRow("SELECT count(*) FROM queue WHERE request_key=?", key).Scan(&count); e != nil {
+		return 0, e
+	}
+	return count, nil
+}
+
+// clusterFaultCode 取出集群故障码，用来断言拒绝的性质而不是只断言"报错了"。
+func clusterFaultCode(err error) string {
+	var f *cluster.Fault
+	if errors.As(err, &f) {
+		return f.Code
+	}
+	return ""
 }
