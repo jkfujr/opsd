@@ -4,12 +4,17 @@ package sharedsql
 
 import (
 	"context"
+	"crypto/rand"
 	"database/sql"
+	"encoding/hex"
+	"errors"
 	"fmt"
 	"os"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/go-sql-driver/mysql"
 )
 
 // 停写演练：按维护窗口的硬判据走一遍，两端都要有证据。
@@ -51,23 +56,39 @@ func TestStopWriteRehearsal(t *testing.T) {
 	t.Logf("步骤 1：已建立 v1 结构（schema_version=1），含一条迁移前旧回执")
 
 	// 2) 写账号持有一笔**已执行更新、尚未提交**的事务。
+	// 专用账号：名字带本次随机后缀，权限只到测试库，结束时删除。
+	account := "opsd_rehearsal_" + strings.ToLower(identitySuffix())[:8]
+	create := fmt.Sprintf("CREATE USER '%s'@'%%' IDENTIFIED BY 'rehearsal-write'", account)
+	if _, err = admin.ExecContext(ctx, create); err != nil {
+		t.Fatal(err)
+	}
+	// 清理必须用**新的**连接：admin 由 defer 关闭，早于 t.Cleanup 执行。
+	t.Cleanup(func() {
+		cleaner, e := sql.Open("mysql", dsn)
+		if e != nil {
+			return
+		}
+		defer cleaner.Close()
+		if _, e = cleaner.ExecContext(context.Background(), fmt.Sprintf("DROP USER IF EXISTS '%s'@'%%'", account)); e != nil {
+			t.Logf("清理演练账号失败（%s）：%v", account, e)
+		}
+	})
+	var schema string
+	if err = admin.QueryRowContext(ctx, "SELECT DATABASE()").Scan(&schema); err != nil {
+		t.Fatal(err)
+	}
+	grant := fmt.Sprintf("GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, ALTER, INDEX, DROP, REFERENCES ON `%s`.* TO '%s'@'%%'", schema, account)
+	if _, err = admin.ExecContext(ctx, grant); err != nil {
+		t.Fatal(err)
+	}
+
 	writer := &sql.DB{}
-	writerDSN := writeDSN(dsn)
+	writerDSN := writeDSN(dsn, account)
 	writer, err = sql.Open("mysql", writerDSN)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer writer.Close()
-	// 上一次演练可能留下同名账号：先删再建，保证口令就是这次用的。
-	if _, err = admin.ExecContext(ctx, "DROP USER IF EXISTS 'opsd_write'@'%'"); err != nil {
-		t.Fatal(err)
-	}
-	if _, err = admin.ExecContext(ctx, "CREATE USER 'opsd_write'@'%' IDENTIFIED BY 'rehearsal-write'"); err != nil {
-		t.Fatal(err)
-	}
-	if _, err = admin.ExecContext(ctx, "GRANT ALL ON *.* TO 'opsd_write'@'%'"); err != nil {
-		t.Fatal(err)
-	}
 	writeTx, err := writer.BeginTx(ctx, nil)
 	if err != nil {
 		t.Fatal(err)
@@ -86,7 +107,7 @@ func TestStopWriteRehearsal(t *testing.T) {
 	t.Logf("步骤 2：写账号 %s 持有未提交事务（连接 %d）", login, writeConn)
 
 	// 3) 停写：锁账号。锁住后新连接必须被拒，但已有事务仍在——两个观察都要有。
-	if _, err = admin.ExecContext(ctx, "ALTER USER 'opsd_write'@'%' ACCOUNT LOCK"); err != nil {
+	if _, err = admin.ExecContext(ctx, fmt.Sprintf("ALTER USER '%s'@'%%' ACCOUNT LOCK", account)); err != nil {
 		t.Fatal(err)
 	}
 	fresh, err := sql.Open("mysql", writerDSN)
@@ -99,6 +120,11 @@ func TestStopWriteRehearsal(t *testing.T) {
 	fresh.Close()
 	if pingErr == nil {
 		t.Fatal("账号锁定后新连接仍被接受")
+	}
+	// 必须是"账号被锁"（4151），不能是随便什么连接错误——否则口令写错也会通过。
+	var mysqlErr *mysql.MySQLError
+	if !errors.As(pingErr, &mysqlErr) || mysqlErr.Number != 4151 {
+		t.Fatalf("新连接应因账号锁定被拒（4151），实际 %v", pingErr)
 	}
 	t.Logf("步骤 3：账号已锁定，新连接被拒（%v）", pingErr)
 
@@ -163,7 +189,7 @@ func TestStopWriteRehearsal(t *testing.T) {
 	t.Logf("步骤 7：旧回执命中返回 outcome_unknown")
 
 	// 8) 恢复写入：新版写入方用**写账号**重新连接，写入并读回回执。
-	if _, err = admin.ExecContext(ctx, "ALTER USER 'opsd_write'@'%' ACCOUNT UNLOCK"); err != nil {
+	if _, err = admin.ExecContext(ctx, fmt.Sprintf("ALTER USER '%s'@'%%' ACCOUNT UNLOCK", account)); err != nil {
 		t.Fatal(err)
 	}
 	resumed, err := sql.Open("mysql", writerDSN)
@@ -196,10 +222,19 @@ func TestStopWriteRehearsal(t *testing.T) {
 }
 
 // writeDSN 把维护账号的连接串换成写账号，只用于演练。
-func writeDSN(dsn string) string {
+func writeDSN(dsn, account string) string {
 	at := strings.Index(dsn, "@")
 	if at < 0 {
 		return dsn
 	}
-	return fmt.Sprintf("opsd_write:rehearsal-write%s", dsn[at:])
+	return fmt.Sprintf("%s:rehearsal-write%s", account, dsn[at:])
+}
+
+// identitySuffix 给演练账号加一个随机后缀，避免与其它运行互相干扰。
+func identitySuffix() string {
+	seeded := make([]byte, 8)
+	if _, err := rand.Read(seeded); err != nil {
+		return "00000000"
+	}
+	return hex.EncodeToString(seeded)
 }
