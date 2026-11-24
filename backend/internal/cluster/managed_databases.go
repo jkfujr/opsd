@@ -528,7 +528,10 @@ func (n *Node) databaseDispatch(ctx context.Context, origin, method string, body
 		return n.databaseInstance(ctx, request.InstanceID)
 	case "database.cluster.save":
 		// Origin 是 json:"-"，跨 RPC 后为空；按调度层给出的已认证来源回填。
-		request.Write.Origin = origin
+		// Write 可以为 nil：只有创建集群才带回执，更新与集成夹具都不带。
+		if request.Write != nil {
+			request.Write.Origin = origin
+		}
 		return n.saveDatabaseCluster(requeststate.With(ctx, request.Write), request.Cluster)
 	case "database.cluster.get":
 		return n.DatabaseCluster(ctx, request.ResourceID)
