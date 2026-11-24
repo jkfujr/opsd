@@ -282,7 +282,7 @@ func stopDatabaseEntry(t *testing.T, node *apiNode) func(cluster.Executor) {
 		if e != nil {
 			t.Fatal(e)
 		}
-		grantAllCapabilities(n)
+		registerNode(t, n)
 		if n.ID != id {
 			t.Fatal("重新启动改变了节点身份")
 		}

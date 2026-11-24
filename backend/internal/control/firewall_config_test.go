@@ -34,7 +34,7 @@ func TestFirewallConfigHTTPReadsAndAtomicSave(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	grantAllCapabilities(n)
+	registerNode(t, n)
 	defer n.Close()
 	definition := protocol.FirewallDefinition{Backend: "ufw", Rules: []protocol.ManagedRule{}, DefaultPolicies: []protocol.ManagedPolicy{{Family: protocol.IPv4, Action: "deny"}}}
 	state := protocol.ManagedFirewallState{FirewallDefinition: definition, Revision: 1, ConfirmedRevision: 1, State: "in_sync"}

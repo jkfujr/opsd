@@ -284,12 +284,16 @@ func (n *Node) recoverSharedSteps(ctx context.Context) error {
 
 // redactedSharedStatus 去掉绑定细节，只保留远端成员需要的健康摘要。
 func redactedSharedStatus(status SharedStatus) SharedStatus {
-	// 字段白名单：错误正文可能带内部地址与诊断信息，策略版本属本机细节，
-	// 都不下发给任意成员。
+	// 字段白名单：错误正文可能带内部地址与诊断信息，绑定、代理标识与 SQL
+	// 地址属于本机资料，都不下发给任意成员。
+	//
+	// policy_version 必须保留：协作方用它判断路由策略是否已经收敛，
+	// 缺了它各节点会反复重算并写入新的集群版本。
 	return SharedStatus{
-		Pending:    status.Pending,
-		Phase:      status.Phase,
-		State:      status.State,
-		ProxyReady: status.ProxyReady,
+		Pending:       status.Pending,
+		Phase:         status.Phase,
+		State:         status.State,
+		ProxyReady:    status.ProxyReady,
+		PolicyVersion: status.PolicyVersion,
 	}
 }

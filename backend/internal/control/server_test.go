@@ -22,7 +22,7 @@ func TestConsoleAuthTargetQueueAndAccount(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
-	grantAllCapabilities(n)
+	registerNode(t, n)
 	defer n.Close()
 	n.Start()
 	s, e := New(t.Context(), n.DB, Options{Node: n})
@@ -138,4 +138,17 @@ func authorizePeers(nodes ...*cluster.Node) {
 			}
 		}
 	}
+}
+
+// controlNodes 记录当前用例创建的节点，用于两两授权（按真实节点 ID）。
+var controlNodes = map[*testing.T][]*cluster.Node{}
+
+// registerNode 登记节点并重建两两授权，模拟"已配好授权的集群"。
+func registerNode(t *testing.T, n *cluster.Node) {
+	t.Helper()
+	n.Log = t.Logf
+	list := append(controlNodes[t], n)
+	controlNodes[t] = list
+	t.Cleanup(func() { delete(controlNodes, t) })
+	authorizePeers(list...)
 }

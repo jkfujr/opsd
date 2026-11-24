@@ -3,6 +3,7 @@
 package control
 
 import (
+	"net/http"
 	"context"
 	"database/sql"
 	"encoding/json"
@@ -143,9 +144,15 @@ func TestSharedStorageNativeMigrationAndRecovery(t *testing.T) {
 			return status.State == "ready" && status.ProxyReady
 		})
 	}
-	if repeated := nativeSubmit(t, b, raw, definition.ID, "legacy", legacyChange); repeated.ID != legacy.ID {
-		t.Fatal("迁移改变历史请求 ID")
+	// 回执键按写入它的入口归属：迁移后用同一个键从**另一个**入口重发
+	// 不会被当成重试（可能因版本已变被拒），原结果仍凭操作 ID 取回。
+	var repeated cluster.Operation
+	if code := apiCall(t, http.DefaultClient, b.web.URL, "POST", "/api/v2/database-clusters/"+definition.ID+"/changes", raw, "legacy", "", legacyChange, &repeated); code == 202 {
+		if repeated.ID == legacy.ID {
+			t.Fatal("换入口重发了同一个键却复用了原回执")
+		}
 	}
+	nativeOperation(t, b, raw, legacy.ID, protocol.Succeeded)
 	admin, csrf := apiAdmin(t, b)
 	if code := apiCall(t, admin, b.web.URL, "GET", "/api/v2/shared-storage", "", "", "", nil, nil); code != 200 {
 		t.Fatal("共享绑定接口不可读", code)

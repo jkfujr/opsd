@@ -61,7 +61,7 @@ func openAPINode(t *testing.T, name, region string, cores int, cpu float64) *api
 	if e != nil {
 		t.Fatal(e)
 	}
-	grantAllCapabilities(n)
+	registerNode(t, n)
 	peer.Config.Handler = n.PeerHandler()
 	peer.Start()
 	server, e := New(t.Context(), n.DB, Options{Node: n, EnforceListenerState: true})
