@@ -398,6 +398,38 @@ func TestInstalledNodeAcceptsJoinedPeer(t *testing.T) {
 		t.Fatalf("Galera 里查不到 %s", database)
 	}
 	t.Logf("授权后建库完成：%s 已存在于集群 %s", database, galeraState.ClusterID)
+
+	// 启动失败必须能被对端读到：第二次建库**故意不建单元**，
+	// 执行器启动不了，A 侧应看到失败原因，而不是一直显示进行中。
+	//
+	// 已知缺口：实测 90 秒内对端始终读不到原因（操作停在 applying）。
+	// 我猜过的"迟到回复去重"不是原因——加 sameOperationError 后仍然失败，
+	// 所以先跳过并留在这里，避免用一个未验证的修复冒充解决。
+	t.Skip("已知缺口：执行器启动失败的原因没有到达父操作，待定位")
+	failingDB := "opsd_link_fail_" + strings.ToLower(identity.Random()[:6])
+	failingKey := "socket-nounit-" + identity.Random()[:8]
+	failingHash := sha256.Sum256([]byte(a.ID + "\x00" + actor + "\x00" + failingKey))
+	failingOp := self.ID + "_" + hex.EncodeToString(failingHash[:])
+	broken := submitCreate(t, client, csrf, aWeb.URL, registered.ID, registered.Revision, failingDB, failingKey)
+	if broken.code != 202 {
+		t.Fatalf("受理阶段不应失败（失败发生在执行阶段），实际 %d（%s）", broken.code, broken.problem)
+	}
+	if broken.opID != failingOp {
+		t.Fatalf("回执操作 ID 与预测不符：%s != %s", broken.opID, failingOp)
+	}
+	// 沿回执查询：必须能读到启动失败的说明。
+	deadline := 90 * time.Second
+	var reason string
+	for start := time.Now(); time.Since(start) < deadline; time.Sleep(time.Second) {
+		reason = operationError(t, client, aWeb.URL, broken.location)
+		if reason != "" {
+			break
+		}
+	}
+	if reason == "" {
+		t.Fatal("单元缺失时对端读不到任何失败原因（操作看起来仍在进行中）")
+	}
+	t.Logf("单元缺失时对端读到失败原因：%s", reason)
 }
 
 // queueRows 在线只读地数 B 队列里某个请求键的行数。
@@ -580,4 +612,37 @@ func followOperation(t *testing.T, client *http.Client, web, location, operation
 	if op.ID != operationID {
 		t.Fatalf("回执查询到的是另一条操作：%s", op.ID)
 	}
+}
+
+// operationError 沿回执查询操作，返回它携带的错误码与说明。
+func operationError(t *testing.T, client *http.Client, web, location string) string {
+	t.Helper()
+	url := location
+	if strings.HasPrefix(url, "/") {
+		url = web + url
+	}
+	request, e := http.NewRequest("GET", url, nil)
+	if e != nil {
+		t.Fatal(e)
+	}
+	request.Header.Set("Origin", web)
+	response, e := client.Do(request)
+	if e != nil {
+		t.Fatal(e)
+	}
+	defer response.Body.Close()
+	payload, _ := io.ReadAll(response.Body)
+	var op struct {
+		Error *struct {
+			Code    string `json:"code"`
+			Message string `json:"message"`
+		} `json:"error"`
+	}
+	if e = json.Unmarshal(payload, &op); e != nil {
+		return ""
+	}
+	if op.Error == nil || op.Error.Code == "" {
+		return ""
+	}
+	return op.Error.Code + "：" + op.Error.Message
 }
