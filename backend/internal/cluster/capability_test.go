@@ -372,6 +372,22 @@ func TestBackfillResourceKeyForInFlightDatabase(t *testing.T) {
 	if occupiedNow(t, n2, "galera-1\x1fbiz") == false {
 		t.Fatal("回填后该库名应被占用")
 	}
+	// 不只“占用”：同库的新建库请求必须真的被拒，且不产生第二条操作。
+	probe, _ := json.Marshal(DatabaseSubmission{
+		Change:  DatabaseChange{Cluster: "managed-1", ExpectedRevision: 1, Kind: "create_database", Database: "biz", Charset: "utf8mb4"},
+		Cluster: ManagedDatabaseCluster{ID: "managed-1", ClusterID: "galera-1", Name: "集群", Coordinator: n2.ID, Revision: 1},
+	})
+	_, err = n2.enqueueTx(t.Context(), n2.ID, Request{Kind: "database", Key: "fresh", Payload: probe}, nil)
+	if err == nil || faultCode(err) != "conflict" {
+		t.Fatalf("旧在途记录应挡住同库新建，实际 %v", err)
+	}
+	var count int
+	if err = n2.DB.QueryRow("SELECT count(*) FROM queue WHERE kind='database'").Scan(&count); err != nil {
+		t.Fatal(err)
+	}
+	if count != 1 {
+		t.Fatalf("被拒后仍产生了操作：%d", count)
+	}
 }
 
 // 读回与受理之间有人建了同一个库：那次读回已经过期，必须拒绝而不是照样受理。
