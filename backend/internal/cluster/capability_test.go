@@ -283,10 +283,7 @@ func TestDatabaseResourceFreedAfterDelete(t *testing.T) {
 	if exists, _ := databaseExistsNow(t, n, key); !exists {
 		t.Fatal("建库成功后应视为已存在")
 	}
-	// 已存在时必须拒绝再次建库。
-	if err := submit("create_database", "create-2"); err == nil || faultCode(err) != "conflict" {
-		t.Fatalf("库已存在时应拒绝建库，实际 %v", err)
-	}
+	// 库是否存在由受理方读回判断（见读回相关用例）；这里只验证资源占用与释放。
 	// 删库不能被“已存在”挡住。
 	if err := submit("delete_database", "delete-1"); err != nil {
 		t.Fatalf("已存在时应允许删库：%v", err)

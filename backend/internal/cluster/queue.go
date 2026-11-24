@@ -638,15 +638,8 @@ func (n *Node) enqueueTx(ctx context.Context, origin string, r Request, related 
 				return Operation{}, fault("conflict", "该数据库在受理期间已变化，请重新提交")
 			}
 		}
-		if databaseChangeKind(r.Payload) == "create_database" {
-			exists, e := databaseResourceExists(ctx, tx, resourceKey)
-			if e != nil {
-				return Operation{}, e
-			}
-			if exists {
-				return Operation{}, fault("conflict", "该数据库已存在，删除后才可重建")
-			}
-		}
+		// 库是否存在不在这里判断：受理方已经向真实集群读回过。
+		// 用历史操作推断会漏掉外部建的库，也会在库被外部删除后永久拒绝重建。
 	}
 	if r.Kind == "compose_register" {
 		var selection ComposeSelection

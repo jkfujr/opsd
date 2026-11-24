@@ -599,6 +599,25 @@ func ensureIndex(ctx context.Context, db *sql.DB, table, name string, columns []
 	return err
 }
 
+// indexColumns 返回索引的列（按 SEQ_IN_INDEX 顺序）。
+func indexColumns(ctx context.Context, db *sql.DB, table, name string) ([]string, error) {
+	rows, err := db.QueryContext(ctx, `SELECT COLUMN_NAME FROM information_schema.STATISTICS
+		WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME=? AND INDEX_NAME=? ORDER BY SEQ_IN_INDEX`, table, name)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var columns []string
+	for rows.Next() {
+		var column string
+		if err := rows.Scan(&column); err != nil {
+			return nil, err
+		}
+		columns = append(columns, column)
+	}
+	return columns, rows.Err()
+}
+
 // verifyV2 核对 v2 的结构：列、主键列序与索引都在，才允许发布版本号。
 func verifyV2(ctx context.Context, db *sql.DB) error {
 	hasColumn := func(table, column string) error {
@@ -628,13 +647,13 @@ func verifyV2(ctx context.Context, db *sql.DB) error {
 	if want := []string{"origin", "actor", "request_key"}; !slices.Equal(have, want) {
 		return fmt.Errorf("结构核对失败：shared_requests 主键为 %v，期望 %v", have, want)
 	}
-	var indexes int
-	if err := db.QueryRowContext(ctx, `SELECT count(*) FROM information_schema.STATISTICS
-		WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='shared_flows' AND INDEX_NAME='resource_key_flows'`).Scan(&indexes); err != nil {
+	// 索引也要按**完整列序**核对：只判断存在会把列序错的索引当成没问题。
+	indexed, err := indexColumns(ctx, db, "shared_flows", "resource_key_flows")
+	if err != nil {
 		return err
 	}
-	if indexes == 0 {
-		return fmt.Errorf("结构核对失败：缺少 shared_flows.resource_key_flows")
+	if want := []string{"resource_key", "terminal"}; !slices.Equal(indexed, want) {
+		return fmt.Errorf("结构核对失败：resource_key_flows 列为 %v，期望 %v", indexed, want)
 	}
 	return nil
 }
