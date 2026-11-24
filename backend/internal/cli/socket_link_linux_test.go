@@ -4,6 +4,9 @@ package cli
 
 import (
 	"bytes"
+	"fmt"
+	"encoding/hex"
+	"crypto/sha256"
 	"context"
 	"io"
 	"net/http"
@@ -25,6 +28,7 @@ import (
 	"github.com/jkfujr/opsd/internal/installation"
 	"github.com/jkfujr/opsd/internal/identity"
 	"github.com/jkfujr/opsd/internal/localstate"
+	"github.com/jkfujr/opsd/internal/protocol"
 	"github.com/jkfujr/opsd/internal/storage"
 )
 
@@ -258,6 +262,103 @@ func TestInstalledNodeAcceptsJoinedPeer(t *testing.T) {
 		t.Fatalf("被拒后 B 仍有入队：%d", queued)
 	}
 	t.Logf("未授权提交被拒（forbidden），B 的 queue 中该请求键为 0 行")
+
+	// 第三步：只给 A 增加 manage_database，只重启 B 的 node（数据目录与执行器保留），
+	// 然后走同一条 HTTP 入口建库，直到 Succeeded 并能在 Galera 里查到。
+	node.stop()
+	capabilities, e := json.Marshal(map[string][]string{a.ID: {"read_operations", "manage_database"}})
+	if e != nil {
+		t.Fatal(e)
+	}
+	files.SourceCapabilities = capabilities
+	if e = localstate.Write(config, files, 0644); e != nil {
+		t.Fatal(e)
+	}
+	if e = os.Chown(config, 65534, 65534); e != nil {
+		t.Fatal(e)
+	}
+	node = launch(t, "runuser", "-u", "nobody", "--", binary, "node", "--config", config)
+	waitLocal(t, node, func() bool {
+		c, e := net.DialTimeout("tcp", peer, 200*time.Millisecond)
+		if e == nil {
+			c.Close()
+		}
+		return e == nil
+	})
+	// A 用已有目录重连：成员身份已持久化，不需要重新加入。
+	if e = a.Call(t.Context(), self.ID, "ping", nil, &answered); e != nil {
+		t.Fatalf("重启后 A 应能重连到同一 B：%v", e)
+	}
+	if answered.ID != self.ID {
+		t.Fatalf("重启后 ping 到的是别的节点：%s", answered.ID)
+	}
+
+	// 执行器按 opsd-operation@<步骤 ID>.service 拉起写操作，步骤 ID 由
+	// sha256(父操作 ID/序号) 推出，所以可以在提交前就建好独占实例单元。
+	// 父操作 ID 由受理时按 (来源, 操作者, 键) 推导，不是我们自选的值：
+	//   队列 ID = 节点 + "_" + sha256(origin \x00 actor \x00 key)
+	// 步骤 ID 再用 (父操作 ID/序号) 推导，两步都可预测，才能在提交前建单元。
+	database := "opsd_link_" + strings.ToLower(identity.Random()[:8])
+	key2 := "socket-allowed-" + identity.Random()[:8]
+	actor := "account:" + a.ID + ":1"
+	queueHash := sha256.Sum256([]byte(a.ID + "\x00" + actor + "\x00" + key2))
+	operationID := self.ID + "_" + hex.EncodeToString(queueHash[:])
+	sum := sha256.Sum256([]byte(fmt.Sprintf("%s/%d", operationID, 0)))
+	stepID := self.ID + "_" + hex.EncodeToString(sum[:])
+	unitPath := "/run/systemd/system/opsd-operation@" + stepID + ".service"
+	if _, e = os.Stat(unitPath); e == nil {
+		t.Fatalf("实例单元已存在：%s", unitPath)
+	}
+	unit := strings.ReplaceAll(installation.Units(files, config)["opsd-operation@.service"], "%i", stepID)
+	if e = os.MkdirAll("/run/systemd/system", 0755); e != nil {
+		t.Fatal(e)
+	}
+	file, e := os.OpenFile(unitPath, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0644)
+	if e != nil {
+		t.Fatalf("无法独占创建实例单元：%v", e)
+	}
+	if _, e = file.WriteString(unit); e != nil {
+		file.Close()
+		t.Fatal(e)
+	}
+	file.Close()
+	t.Cleanup(func() { _ = os.Remove(unitPath) })
+
+	code, problem = submitCreate(t, client, csrf, aWeb.URL, registered.ID, registered.Revision, database, key2)
+	if code != 202 {
+		t.Fatalf("授权后应返回 202，实际 %d（%s）", code, problem)
+	}
+	// 沿操作 ID 等到终态，并核对这条操作属于 A 这个来源。
+	defer func() {
+		// 失败时把 B 队列里这条操作的真实状态带出来，而不是只说"超时"。
+		if t.Failed() {
+			if origin, state, e := queueRow(t.Context(), filepath.Join(data, "node.db"), key2); e == nil {
+				t.Logf("诊断：B 队列 origin=%s state=%s", origin, state)
+			}
+			if body, e := queueBody(t.Context(), filepath.Join(data, "node.db"), key2); e == nil {
+				t.Logf("诊断：队列体 %s", body)
+			}
+			if out, e := exec.Command("systemctl", "status", "--no-pager", "opsd-operation@"+stepID+".service").CombinedOutput(); e != nil {
+				t.Logf("诊断：单元状态 %s", out)
+			}
+		}
+	}()
+	waitFor(t, "建库操作完成", 3*time.Minute, func() bool {
+		origin, state, e := queueRow(t.Context(), filepath.Join(data, "node.db"), key2)
+		if e != nil {
+			return false
+		}
+		if origin != a.ID {
+			t.Fatalf("B 的队列行来源应为 A（%s），实际 %s", a.ID, origin)
+		}
+		return state == "succeeded"
+	})
+	_ = operationID
+	// 最后直接问 Galera：库真的建出来了。
+	if !targetHasDatabase(t, connection, database) {
+		t.Fatalf("Galera 里查不到 %s", database)
+	}
+	t.Logf("授权后建库完成：%s 已存在于集群 %s", database, galeraState.ClusterID)
 }
 
 // queueRows 在线只读地数 B 队列里某个请求键的行数。
@@ -351,4 +452,42 @@ func submitCreate(t *testing.T, client *http.Client, csrf, web, clusterID string
 	}
 	_ = json.Unmarshal(payload, &problem)
 	return response.StatusCode, problem.Code
+}
+
+// queueRow 在线只读地取 B 队列里某个请求键的来源与状态。
+func queueRow(ctx context.Context, path, key string) (string, string, error) {
+	db, e := storage.ReadOnly(ctx, path)
+	if e != nil {
+		return "", "", e
+	}
+	defer db.Close()
+	var origin, body string
+	if e = db.QueryRow("SELECT origin,body FROM queue WHERE request_key=?", key).Scan(&origin, &body); e != nil {
+		return "", "", e
+	}
+	var state struct {
+		State string `json:"state"`
+	}
+	_ = json.Unmarshal([]byte(body), &state)
+	return origin, state.State, nil
+}
+
+// targetHasDatabase 直接查目标集群的 information_schema。
+func targetHasDatabase(t *testing.T, connection protocol.DatabaseConnection, database string) bool {
+	t.Helper()
+	// clusterID 传空：这里只问"库在不在"，不做集群身份比对。
+	exists, e := (databaseengine.Manager{}).DatabaseExists(t.Context(), connection, "", database)
+	return e == nil && exists
+}
+
+// queueBody 返回 B 队列里该请求键的原始体，用于诊断。
+func queueBody(ctx context.Context, path, key string) (string, error) {
+	db, e := storage.ReadOnly(ctx, path)
+	if e != nil {
+		return "", e
+	}
+	defer db.Close()
+	var body string
+	e = db.QueryRow("SELECT body FROM queue WHERE request_key=?", key).Scan(&body)
+	return body, e
 }
