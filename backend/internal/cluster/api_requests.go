@@ -173,7 +173,13 @@ func (n *Node) RequestReceipt(ctx context.Context, target string, request reques
 		request.Origin = n.ID
 	}
 	if n.sharedActive() {
-		if store, err := n.sharedStore(ctx); err == nil {
+		store, err := n.sharedStore(ctx)
+		if err != nil {
+			// 共享模式下打不开共享库是依赖故障，不能继续查本地——
+			// 那会把"查不到共享状态"误报成"没有这条回执"。
+			return RequestReceipt{}, sharedFault(err)
+		}
+		{
 			// Origin 必传：回执按来源归属，漏传会查不到新版回执，
 			// 还可能把迁移前的空来源记录当成有效回执返回。
 			prior, err := store.Receipt(ctx, sharedsql.Receipt{Origin: request.Origin, Actor: request.Actor, Key: request.Key, Digest: request.Digest})

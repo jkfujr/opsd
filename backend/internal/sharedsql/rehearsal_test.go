@@ -71,7 +71,7 @@ func TestStopWriteRehearsal(t *testing.T) {
 		}
 		defer cleaner.Close()
 		if _, e = cleaner.ExecContext(context.Background(), fmt.Sprintf("DROP USER IF EXISTS '%s'@'%%'", account)); e != nil {
-			t.Logf("清理演练账号失败（%s）：%v", account, e)
+			t.Errorf("清理演练账号失败（%s）：%v", account, e)
 		}
 	})
 	var schema string

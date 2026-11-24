@@ -23,10 +23,14 @@ type StorageCommand struct {
 	Write    *requeststate.Write `json:"write,omitempty"`
 }
 
-func (n *Node) storageDispatch(ctx context.Context, method string, body json.RawMessage) (any, error) {
+func (n *Node) storageDispatch(ctx context.Context, origin, method string, body json.RawMessage) (any, error) {
 	var c StorageCommand
 	if err := json.Unmarshal(body, &c); err != nil {
 		return nil, err
+	}
+	// 回执按已认证来源归属；Write.Origin 跨 RPC 后为空，在这里回填。
+	if c.Write != nil {
+		c.Write.Origin = origin
 	}
 	switch method {
 	case "storage.save":

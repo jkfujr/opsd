@@ -55,7 +55,7 @@ func (n *Node) dispatch(ctx context.Context, origin, method string, body json.Ra
 		return n.sharedDispatch(ctx, origin, method, body)
 	}
 	if method == "storage.save" || method == "storage.get" || method == "storage.check" {
-		return n.storageDispatch(ctx, method, body)
+		return n.storageDispatch(ctx, origin, method, body)
 	}
 	if strings.HasPrefix(method, "archive.") {
 		return n.archiveDispatch(ctx, origin, method, body)
@@ -104,6 +104,9 @@ func (n *Node) dispatch(ctx context.Context, origin, method string, body json.Ra
 		if e := json.Unmarshal(body, &request); e != nil {
 			return nil, e
 		}
+		// 回执按已认证来源归属。Write.Origin 是 json:"-"（内部状态不进载荷），
+		// 编码后必然为空，所以在这里按调度层给出的来源回填。
+		request.Write.Origin = origin
 		return n.apiOperationDecision(ctx, request)
 	case "containers.read", "container.inspect", "container.logs":
 		return n.containerDispatch(ctx, method, body)
@@ -311,6 +314,18 @@ func (n *Node) enqueue(ctx context.Context, origin string, r Request) (Operation
 	return n.enqueueTxObserved(ctx, origin, r, nil, observed)
 }
 
+// retryOperation 在返回冲突或依赖错误前再查一次回执。
+//
+// 条件与首查**完全相同**（有键且有服务端摘要）：没有摘要时无法排除
+// "同键换参数"，只凭键返回原操作会把另一个请求当成重试。查询故障照实传出，
+// 不能降级成 409。
+func (n *Node) retryOperation(ctx context.Context, origin string, r Request) (Operation, bool, error) {
+	if r.Key == "" || r.InputDigest == "" {
+		return Operation{}, false, nil
+	}
+	return n.priorOperation(ctx, origin, r.Actor, r.Key, r.InputDigest)
+}
+
 // priorOperation 按已认证来源、操作者、请求键查已受理的操作。
 //
 // 摘要不一致说明同一个键被用于另一份参数，按冲突处理；
@@ -357,9 +372,13 @@ func (n *Node) prepareDatabaseTarget(ctx context.Context, origin string, r Reque
 	}
 	if inFlight > 0 {
 		// 并发同参重试：两份请求都首查未命中，第一份先入队，第二份走到这里。
-		// 返回冲突前再按原来源、键、摘要查一次——第一份此刻已登记，
+		// 返回冲突前按**与首查相同的条件**再查一次——第一份此刻已登记，
 		// 这次提交应当原样返回它，而不是把重试变成一次失败。
-		if prior, hit, e := n.priorOperation(ctx, origin, r.Actor, r.Key, r.InputDigest); e == nil && hit {
+		prior, hit, e := n.retryOperation(ctx, origin, r)
+		if e != nil {
+			return nil, nil, e
+		}
+		if hit {
 			return nil, &prior, nil
 		}
 		return nil, nil, fault("conflict", "该数据库已有未结束的操作")
@@ -370,9 +389,20 @@ func (n *Node) prepareDatabaseTarget(ctx context.Context, origin string, r Reque
 		cluster, database := databaseTarget(r.Payload)
 		exists, e := n.databaseSchemaExists(ctx, cluster, database)
 		if e != nil {
+			// 读不回来时先确认这次提交是不是重试：第一份可能刚刚完成。
+			if prior, hit, e2 := n.retryOperation(ctx, origin, r); e2 != nil {
+				return nil, nil, e2
+			} else if hit {
+				return nil, &prior, nil
+			}
 			return nil, nil, fault("dependency_unavailable", "无法确认目标库状态，已暂停受理")
 		}
 		if exists {
+			if prior, hit, e2 := n.retryOperation(ctx, origin, r); e2 != nil {
+				return nil, nil, e2
+			} else if hit {
+				return nil, &prior, nil
+			}
 			return nil, nil, fault("conflict", "该数据库已存在，删除后才可重建")
 		}
 	}

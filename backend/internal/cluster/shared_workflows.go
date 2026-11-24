@@ -74,15 +74,46 @@ func (n *Node) createSharedWorkflow(ctx context.Context, r Request, origin strin
 	if err != nil {
 		return Operation{}, sharedFault(err)
 	}
+	// 提前返回前都再查一次回执：并发同参重试时第一份可能刚刚登记，
+	// 第二份应当拿到它，而不是拿到冲突或依赖错误。
+	retry := func() (Operation, bool, error) {
+		prior, e := s.Receipt(ctx, sharedsql.Receipt{Origin: origin, Actor: actor, Key: key, Digest: digest})
+		if e == sql.ErrNoRows {
+			return Operation{}, false, nil
+		}
+		if e != nil {
+			return Operation{}, false, sharedFault(e)
+		}
+		var op Operation
+		if e = json.Unmarshal(prior.Result, &op); e != nil {
+			return Operation{}, false, e
+		}
+		return op, true, nil
+	}
 	if inFlight > 0 {
+		if op, hit, e := retry(); e != nil {
+			return Operation{}, e
+		} else if hit {
+			return op, nil
+		}
 		return Operation{}, fault("conflict", "该数据库已有未结束的操作")
 	}
 	if input.Change.Kind == "create_database" {
 		exists, e := n.databaseSchemaExists(ctx, input.Cluster, input.Change.Database)
 		if e != nil {
+			if op, hit, e2 := retry(); e2 != nil {
+				return Operation{}, e2
+			} else if hit {
+				return op, nil
+			}
 			return Operation{}, fault("dependency_unavailable", "无法确认目标库状态，已暂停受理")
 		}
 		if exists {
+			if op, hit, e2 := retry(); e2 != nil {
+				return Operation{}, e2
+			} else if hit {
+				return op, nil
+			}
 			return Operation{}, fault("conflict", "该数据库已存在，删除后才可重建")
 		}
 	}

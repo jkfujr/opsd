@@ -491,3 +491,31 @@ func TestRetryReturnsOriginalWhileStillInFlight(t *testing.T) {
 		t.Fatalf("换来源应作为新请求（此时被在途挡住），实际 %v", err)
 	}
 }
+
+// 在途分支的复查不能把异参请求当成重试。
+//
+// 同键、无摘要的第二份请求在读回后走到在途分支：不能凭键返回原操作，
+// 必须仍是冲突——否则"同键换参数"会被静默吞成一次成功。
+func TestInFlightRecheckDoesNotAcceptDifferentParameters(t *testing.T) {
+	n, _ := openTestNode(t)
+	n.Executor = &schemaExecutor{}
+	seedDatabaseInstance(t, n, "inst-1")
+	payload := func(database string) json.RawMessage {
+		b, _ := json.Marshal(DatabaseSubmission{
+			Change: DatabaseChange{Cluster: "managed-1", ExpectedRevision: 1, Kind: "create_database", Database: database, Charset: "utf8mb4"},
+			Cluster: ManagedDatabaseCluster{
+				ID: "managed-1", ClusterID: "galera-1", Name: "集群", Coordinator: n.ID, Revision: 1,
+				Members: []DatabaseRef{{NodeID: n.ID, InstanceID: "inst-1"}},
+			},
+		})
+		return b
+	}
+	// 第一份无摘要登记。
+	if _, err := n.enqueue(t.Context(), n.ID, Request{Kind: "database", Key: "k", Actor: "account:1", Payload: payload("biz")}); err != nil {
+		t.Fatal(err)
+	}
+	// 同键、换库、同样没有摘要：不能被当成重试。
+	if _, err := n.enqueue(t.Context(), n.ID, Request{Kind: "database", Key: "k", Actor: "account:1", Payload: payload("other")}); err == nil || faultCode(err) != "conflict" {
+		t.Fatalf("同键换参数应冲突，实际 %v", err)
+	}
+}
