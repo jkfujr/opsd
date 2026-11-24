@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net"
 	"os/exec"
+	"strings"
 	"testing"
 	"time"
 
@@ -42,14 +43,17 @@ func startGaleraFixture(t *testing.T) galeraFixture {
 	t.Cleanup(func() {
 		if t.Failed() {
 			logs, _ := exec.Command("docker", "logs", "--tail", "30", f.name).CombinedOutput()
-			t.Logf("%s 日志：%s", f.name, logs)
+			// 容器输出可能带本次随机口令：脱敏后再打印。
+			t.Logf("%s 日志：%s", f.name, strings.ReplaceAll(string(logs), f.password, "[已隐藏]"))
 		}
 		_ = exec.Command("docker", "rm", "-f", f.name).Run()
 		_ = exec.Command("docker", "network", "rm", f.network).Run()
 	})
 	run := func(args ...string) {
 		if out, e := exec.Command("docker", args...).CombinedOutput(); e != nil {
-			t.Fatalf("docker %v 失败：%v %s", args, e, out)
+			// 参数里有口令：失败信息也要脱敏。
+			message := strings.ReplaceAll(string(out)+strings.Join(args, " "), f.password, "[已隐藏]")
+			t.Fatalf("docker 命令失败：%v %s", e, message)
 		}
 	}
 	run("network", "create", "--subnet", "172.31.20.0/24", f.network)

@@ -57,9 +57,10 @@ func TestInstalledNodeAcceptsJoinedPeer(t *testing.T) {
 	peer := freeAddress(t)
 
 	// A：测试进程内的真实节点，稍后加入 B。
-	// 监听与公告必须是同一个地址：分两次 freeAddress 会选到不同端口，
-	// B 主动回连时就拨不到 A。
-	aListen := freeAddress(t)
+	// 公告地址必须是**实际监听**的那个：先起未启动的服务拿到端口，
+	// 再用同一地址建节点并挂上处理器，否则 B 回连会拨到空端口。
+	aPeer := httptest.NewUnstartedServer(nil)
+	aListen := aPeer.Listener.Addr().String()
 	a, e := cluster.Open(t.Context(), filepath.Join(dir, "a", "node.db"), cluster.Options{
 		// Console/API 必须显式开：EnforceListenerState 会拒绝"控制台未开"的请求。
 		Config: cluster.Config{
@@ -72,7 +73,8 @@ func TestInstalledNodeAcceptsJoinedPeer(t *testing.T) {
 		t.Fatal(e)
 	}
 	defer a.Close()
-	aPeer := httptest.NewServer(a.PeerHandler())
+	aPeer.Config.Handler = a.PeerHandler()
+	aPeer.Start()
 	defer aPeer.Close()
 	// A 的 HTTP 入口：拒绝轮必须走真实控制台，才能排除"节点 RPC 拒绝"与
 	// "HTTP 层拒绝"之间的差异。
