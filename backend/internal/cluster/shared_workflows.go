@@ -28,7 +28,10 @@ func (n *Node) sharedRecipients(ctx context.Context) ([]string, error) {
 	}
 	return []string{key.Recipient().String()}, nil
 }
-func (n *Node) createSharedWorkflow(ctx context.Context, r Request) (Operation, error) {
+// createSharedWorkflow 在共享事务内受理数据库变更。
+//
+// origin 是**已认证来源**：回执键按来源归属，资源键用来在同一事务内判重。
+func (n *Node) createSharedWorkflow(ctx context.Context, r Request, origin string) (Operation, error) {
 	var input DatabaseSubmission
 	if err := json.Unmarshal(r.Payload, &input); err != nil {
 		return Operation{}, err
@@ -56,7 +59,7 @@ func (n *Node) createSharedWorkflow(ctx context.Context, r Request) (Operation, 
 		sum := sha256.Sum256(r.Payload)
 		digest = hex.EncodeToString(sum[:])
 	}
-	prior, err := s.Receipt(ctx, sharedsql.Receipt{Actor: actor, Key: key, Digest: digest})
+	prior, err := s.Receipt(ctx, sharedsql.Receipt{Origin: origin, Actor: actor, Key: key, Digest: digest})
 	if err == nil {
 		var op Operation
 		err = json.Unmarshal(prior.Result, &op)
@@ -102,7 +105,7 @@ func (n *Node) createSharedWorkflow(ctx context.Context, r Request) (Operation, 
 		return Operation{}, err
 	}
 	err = s.Transact(ctx, n.ID, false, func(t *sharedsql.Tx) error {
-		if receipt, e := t.Receipt(ctx, sharedsql.Receipt{Actor: actor, Key: key, Digest: digest}); e == nil {
+		if receipt, e := t.Receipt(ctx, sharedsql.Receipt{Origin: origin, Actor: actor, Key: key, Digest: digest}); e == nil {
 			return json.Unmarshal(receipt.Result, &op)
 		} else if e != sql.ErrNoRows {
 			return e
@@ -141,11 +144,11 @@ func (n *Node) createSharedWorkflow(ctx context.Context, r Request) (Operation, 
 			return e
 		}
 		payload, _ := json.Marshal(sharedFlowPayload{Operation: op, Input: secret, Progress: &progressSecret})
-		if e = t.CreateFlow(ctx, sharedsql.Flow{ID: id, ResourceID: op.ResourceID, Coordinator: coordinator, Epoch: 1, Revision: op.Revision, Body: payload}); e != nil {
+		if e = t.CreateFlow(ctx, sharedsql.Flow{ID: id, ResourceID: op.ResourceID, ResourceKey: databaseResourceKeyFromSubmission(input), Coordinator: coordinator, Epoch: 1, Revision: op.Revision, Body: payload}); e != nil {
 			return e
 		}
 		result, _ := json.Marshal(op)
-		return t.SaveReceipt(ctx, sharedsql.Receipt{Actor: actor, Key: key, Digest: digest, Kind: "operation", ResourceID: op.ID, Result: result})
+		return t.SaveReceipt(ctx, sharedsql.Receipt{Origin: origin, Actor: actor, Key: key, Digest: digest, Kind: "operation", ResourceID: op.ID, Result: result})
 	})
 	if err == nil {
 		n.notifyChange(Change{Resource: "operations"})
@@ -267,7 +270,7 @@ func (n *Node) saveSharedWorkflow(ctx context.Context, op Operation, flow databa
 		}
 		if w := requeststate.Current(ctx); w != nil {
 			body, _ := json.Marshal(op)
-			return t.SaveReceipt(ctx, sharedsql.Receipt{Actor: w.Actor, Key: w.Key, Digest: w.Digest, Kind: "operation", ResourceID: op.ID, Result: body})
+			return t.SaveReceipt(ctx, sharedsql.Receipt{Origin: w.Origin, Actor: w.Actor, Key: w.Key, Digest: w.Digest, Kind: "operation", ResourceID: op.ID, Result: body})
 		}
 		return nil
 	})
@@ -348,7 +351,7 @@ func (n *Node) TransferDatabaseCoordinator(ctx context.Context, id, target strin
 		return ManagedDatabaseCluster{}, err
 	}
 	if w := requeststate.Current(ctx); w != nil {
-		prior, e := s.Receipt(ctx, sharedsql.Receipt{Actor: w.Actor, Key: w.Key, Digest: w.Digest})
+		prior, e := s.Receipt(ctx, sharedsql.Receipt{Origin: w.Origin, Actor: w.Actor, Key: w.Key, Digest: w.Digest})
 		if e == nil {
 			var result ManagedDatabaseCluster
 			e = json.Unmarshal(prior.Result, &result)
@@ -367,7 +370,7 @@ func (n *Node) TransferDatabaseCoordinator(ctx context.Context, id, target strin
 	var result ManagedDatabaseCluster
 	err = s.Transact(ctx, n.ID, false, func(t *sharedsql.Tx) error {
 		if w := requeststate.Current(ctx); w != nil {
-			prior, e := t.Receipt(ctx, sharedsql.Receipt{Actor: w.Actor, Key: w.Key, Digest: w.Digest})
+			prior, e := t.Receipt(ctx, sharedsql.Receipt{Origin: w.Origin, Actor: w.Actor, Key: w.Key, Digest: w.Digest})
 			if e == nil {
 				return json.Unmarshal(prior.Result, &result)
 			}
@@ -402,7 +405,7 @@ func (n *Node) TransferDatabaseCoordinator(ctx context.Context, id, target strin
 		if e == nil {
 			if w := requeststate.Current(ctx); w != nil {
 				body, _ := json.Marshal(result)
-				e = t.SaveReceipt(ctx, sharedsql.Receipt{Actor: w.Actor, Key: w.Key, Digest: w.Digest, Kind: "database", ResourceID: id, Result: body})
+				e = t.SaveReceipt(ctx, sharedsql.Receipt{Origin: w.Origin, Actor: w.Actor, Key: w.Key, Digest: w.Digest, Kind: "database", ResourceID: id, Result: body})
 			}
 		}
 		return e

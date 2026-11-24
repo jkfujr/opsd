@@ -15,11 +15,15 @@ import (
 	"github.com/go-sql-driver/mysql"
 )
 
-const SchemaVersion = 1
+const SchemaVersion = 2
 const MaxConnections = 2
 const MonitorConnections = 4
 
 var ErrConflict = errors.New("共享状态已经变化")
+
+// ErrOutcomeUnknown 表示命中了迁移前的旧回执：归属无法确认，
+// 只能阻止重复执行，原结果需凭操作标识经授权查询。
+var ErrOutcomeUnknown = errors.New("旧回执归属无法确认，请按操作标识查询原结果")
 var ErrUnavailable = errors.New("共享数据库当前不可写")
 var ErrCommitUnknown = errors.New("共享事务提交结果未知，请查询原请求")
 
@@ -35,6 +39,9 @@ type Object struct {
 type Flow struct {
 	ID          string          `json:"id"`
 	ResourceID  string          `json:"resource_id"`
+	// ResourceKey 是比 resource_id 更细的资源标识（如 Galera 身份 + 库名）；
+	// 为空表示该流程不参与细粒度互斥。
+	ResourceKey string          `json:"resource_key,omitempty"`
 	Coordinator string          `json:"coordinator"`
 	Epoch       uint64          `json:"epoch"`
 	Revision    uint64          `json:"revision"`
@@ -42,6 +49,8 @@ type Flow struct {
 	Body        json.RawMessage `json:"body"`
 }
 type Receipt struct {
+	// Origin 是写入时的**已认证来源**；声明操作者只区分来源内的请求。
+	Origin             string
 	Actor, Key, Digest string
 	Kind, ResourceID   string
 	Result             json.RawMessage
@@ -88,8 +97,8 @@ func Open(ctx context.Context, address, user, password, database, cluster string
 var schema = []string{
 	`CREATE TABLE IF NOT EXISTS shared_metadata(id TINYINT PRIMARY KEY,cluster_id VARCHAR(64) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,schema_version INT NOT NULL,phase VARCHAR(16) NOT NULL,write_version BIGINT UNSIGNED NOT NULL DEFAULT 0) ENGINE=InnoDB`,
 	`CREATE TABLE IF NOT EXISTS shared_objects(kind VARCHAR(32) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,id VARCHAR(192) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,identity_key VARCHAR(192) CHARACTER SET ascii COLLATE ascii_bin NULL,revision BIGINT UNSIGNED NOT NULL,body MEDIUMBLOB NOT NULL,PRIMARY KEY(kind,id),UNIQUE KEY identity_owner(kind,identity_key)) ENGINE=InnoDB`,
-	`CREATE TABLE IF NOT EXISTS shared_requests(actor VARCHAR(128) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,request_key VARCHAR(128) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,digest CHAR(64) CHARACTER SET ascii NOT NULL,kind VARCHAR(32) CHARACTER SET ascii NOT NULL,resource_id VARCHAR(192) CHARACTER SET ascii NOT NULL,result MEDIUMBLOB NOT NULL,created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),PRIMARY KEY(actor,request_key)) ENGINE=InnoDB`,
-	`CREATE TABLE IF NOT EXISTS shared_flows(id VARCHAR(128) CHARACTER SET ascii COLLATE ascii_bin PRIMARY KEY,resource_id VARCHAR(128) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,coordinator CHAR(32) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,epoch BIGINT UNSIGNED NOT NULL,revision BIGINT UNSIGNED NOT NULL,lease_until DATETIME(6) NOT NULL,terminal BOOL NOT NULL,body MEDIUMBLOB NOT NULL,KEY active_flows(terminal,lease_until),KEY resource_flows(resource_id,terminal)) ENGINE=InnoDB`,
+	`CREATE TABLE IF NOT EXISTS shared_requests(origin VARCHAR(32) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,actor VARCHAR(128) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,request_key VARCHAR(128) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,digest CHAR(64) CHARACTER SET ascii NOT NULL,kind VARCHAR(32) CHARACTER SET ascii NOT NULL,resource_id VARCHAR(192) CHARACTER SET ascii NOT NULL,result MEDIUMBLOB NOT NULL,created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),PRIMARY KEY(origin,actor,request_key)) ENGINE=InnoDB`,
+	`CREATE TABLE IF NOT EXISTS shared_flows(id VARCHAR(128) CHARACTER SET ascii COLLATE ascii_bin PRIMARY KEY,resource_id VARCHAR(128) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,resource_key VARCHAR(192) CHARACTER SET ascii COLLATE ascii_bin NOT NULL DEFAULT '',coordinator CHAR(32) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,epoch BIGINT UNSIGNED NOT NULL,revision BIGINT UNSIGNED NOT NULL,lease_until DATETIME(6) NOT NULL,terminal BOOL NOT NULL,body MEDIUMBLOB NOT NULL,KEY active_flows(terminal,lease_until),KEY resource_flows(resource_id,terminal),KEY resource_key_flows(resource_key,terminal)) ENGINE=InnoDB`,
 	`CREATE TABLE IF NOT EXISTS shared_records(id VARCHAR(384) CHARACTER SET ascii COLLATE ascii_bin PRIMARY KEY,owner CHAR(32) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,kind VARCHAR(64) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,object_id VARCHAR(192) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,sequence BIGINT UNSIGNED NOT NULL,created_at DATETIME(6) NOT NULL,body MEDIUMBLOB NOT NULL,digest BINARY(32) NOT NULL,UNIQUE KEY source_sequence(owner,sequence),KEY latest_object(owner,kind,object_id,sequence),KEY history_time(kind,created_at,owner)) ENGINE=InnoDB`,
 	`CREATE TABLE IF NOT EXISTS shared_watermarks(owner CHAR(32) CHARACTER SET ascii COLLATE ascii_bin PRIMARY KEY,sequence BIGINT UNSIGNED NOT NULL) ENGINE=InnoDB`,
 }
@@ -244,9 +253,12 @@ func (t *Tx) Import(ctx context.Context, o Object) error {
 }
 func (t *Tx) Receipt(ctx context.Context, r Receipt) (Receipt, error) {
 	var digest string
-	err := t.QueryRowContext(ctx, "SELECT digest,kind,resource_id,result,created_at FROM shared_requests WHERE actor=? AND request_key=?", r.Actor, r.Key).Scan(&digest, &r.Kind, &r.ResourceID, &r.Result, &r.CreatedAt)
+	err := t.QueryRowContext(ctx, "SELECT digest,kind,resource_id,result,created_at FROM shared_requests WHERE origin=? AND actor=? AND request_key=?", r.Origin, r.Actor, r.Key).Scan(&digest, &r.Kind, &r.ResourceID, &r.Result, &r.CreatedAt)
 	if err == nil && r.Digest != "" && digest != r.Digest {
 		return r, ErrConflict
+	}
+	if errors.Is(err, sql.ErrNoRows) {
+		return r, legacyReceipt(ctx, t, r)
 	}
 	return r, err
 }
@@ -255,16 +267,34 @@ func (t *Tx) SaveReceipt(ctx context.Context, r Receipt) error {
 	if !r.CreatedAt.IsZero() {
 		at = r.CreatedAt.UTC()
 	}
-	_, err := t.ExecContext(ctx, "INSERT INTO shared_requests(actor,request_key,digest,kind,resource_id,result,created_at) VALUES(?,?,?,?,?,?,COALESCE(?,CURRENT_TIMESTAMP(6)))", r.Actor, r.Key, r.Digest, r.Kind, r.ResourceID, []byte(r.Result), at)
+	_, err := t.ExecContext(ctx, "INSERT INTO shared_requests(origin,actor,request_key,digest,kind,resource_id,result,created_at) VALUES(?,?,?,?,?,?,?,COALESCE(?,CURRENT_TIMESTAMP(6)))", r.Origin, r.Actor, r.Key, r.Digest, r.Kind, r.ResourceID, []byte(r.Result), at)
 	return err
 }
 func (s *Store) Receipt(ctx context.Context, r Receipt) (Receipt, error) {
 	var digest string
-	err := s.DB.QueryRowContext(ctx, "SELECT digest,kind,resource_id,result,created_at FROM shared_requests WHERE actor=? AND request_key=?", r.Actor, r.Key).Scan(&digest, &r.Kind, &r.ResourceID, &r.Result, &r.CreatedAt)
+	err := s.DB.QueryRowContext(ctx, "SELECT digest,kind,resource_id,result,created_at FROM shared_requests WHERE origin=? AND actor=? AND request_key=?", r.Origin, r.Actor, r.Key).Scan(&digest, &r.Kind, &r.ResourceID, &r.Result, &r.CreatedAt)
 	if err == nil && r.Digest != "" && digest != r.Digest {
 		return r, ErrConflict
 	}
+	if errors.Is(err, sql.ErrNoRows) {
+		return r, legacyReceipt(ctx, s.DB, r)
+	}
 	return r, err
+}
+
+// legacyReceipt 只判断“这条旧键是否已经用过”，不返回旧结果。
+func legacyReceipt(ctx context.Context, q interface {
+	QueryRowContext(context.Context, string, ...any) *sql.Row
+}, r Receipt) error {
+	var exists int
+	err := q.QueryRowContext(ctx, "SELECT 1 FROM shared_requests WHERE origin='' AND actor=? AND request_key=?", r.Actor, r.Key).Scan(&exists)
+	if errors.Is(err, sql.ErrNoRows) {
+		return sql.ErrNoRows
+	}
+	if err != nil {
+		return err
+	}
+	return ErrOutcomeUnknown
 }
 func (t *Tx) CreateFlow(ctx context.Context, f Flow) error {
 	var count int
@@ -274,7 +304,17 @@ func (t *Tx) CreateFlow(ctx context.Context, f Flow) error {
 	if count != 0 && !f.Terminal {
 		return fmt.Errorf("该数据库已有未结束流程")
 	}
-	_, err := t.ExecContext(ctx, "INSERT INTO shared_flows(id,resource_id,coordinator,epoch,revision,lease_until,terminal,body) VALUES(?,?,?,?,?,TIMESTAMPADD(SECOND,15,CURRENT_TIMESTAMP(6)),?,?)", f.ID, f.ResourceID, f.Coordinator, f.Epoch, f.Revision, f.Terminal, []byte(f.Body))
+	// 资源键比集群粒度更细：同一集群里不同库名互不影响，同名库才互斥。
+	if f.ResourceKey != "" && !f.Terminal {
+		var occupied int
+		if err := t.QueryRowContext(ctx, "SELECT count(*) FROM shared_flows WHERE resource_key=? AND terminal=0", f.ResourceKey).Scan(&occupied); err != nil {
+			return err
+		}
+		if occupied != 0 {
+			return fmt.Errorf("该资源已有未结束流程")
+		}
+	}
+	_, err := t.ExecContext(ctx, "INSERT INTO shared_flows(id,resource_id,resource_key,coordinator,epoch,revision,lease_until,terminal,body) VALUES(?,?,?,?,?,?,TIMESTAMPADD(SECOND,15,CURRENT_TIMESTAMP(6)),?,?)", f.ID, f.ResourceID, f.ResourceKey, f.Coordinator, f.Epoch, f.Revision, f.Terminal, []byte(f.Body))
 	return err
 }
 func (s *Store) Flow(ctx context.Context, id string) (Flow, error) {
@@ -410,4 +450,42 @@ func (s *Store) PruneMetrics(ctx context.Context) error {
 		_, err := t.ExecContext(ctx, "DELETE FROM shared_records WHERE kind='metrics' AND created_at<UTC_DATE()-INTERVAL 7 DAY LIMIT 200")
 		return err
 	})
+}
+
+// Migrate 把 v1 的共享库升到 v2。
+//
+// 只能在**停写窗口**内由独立迁移账号执行：先阻断旧写入方的新连接、排空存量会话
+// 与未结束事务，再执行这里的变更，最后核对结构并发布新版本号。
+// ALTER TABLE 会隐式提交，因此这些语句不能包在一个长事务里假装原子。
+func Migrate(ctx context.Context, db *sql.DB, cluster string) error {
+	var version int
+	var current string
+	if err := db.QueryRowContext(ctx, "SELECT cluster_id,schema_version FROM shared_metadata WHERE id=1").Scan(&current, &version); err != nil {
+		return err
+	}
+	if current != cluster {
+		return fmt.Errorf("共享数据库身份不匹配")
+	}
+	if version == SchemaVersion {
+		return nil
+	}
+	if version != 1 {
+		return fmt.Errorf("共享数据库版本 %d 无法直接迁移到 %d", version, SchemaVersion)
+	}
+	steps := []string{
+		// 回执：认证来源进入主键，旧记录的来源为空，只能用于防重。
+		"ALTER TABLE shared_requests ADD COLUMN origin VARCHAR(32) CHARACTER SET ascii COLLATE ascii_bin NOT NULL DEFAULT ''",
+		"ALTER TABLE shared_requests DROP PRIMARY KEY",
+		"ALTER TABLE shared_requests ADD PRIMARY KEY(origin,actor,request_key)",
+		// 流程：细粒度资源键，默认空表示旧流程不参与细粒度互斥。
+		"ALTER TABLE shared_flows ADD COLUMN resource_key VARCHAR(192) CHARACTER SET ascii COLLATE ascii_bin NOT NULL DEFAULT ''",
+		"ALTER TABLE shared_flows ADD KEY resource_key_flows(resource_key,terminal)",
+	}
+	for _, step := range steps {
+		if _, err := db.ExecContext(ctx, step); err != nil {
+			return fmt.Errorf("%s：%w", step, err)
+		}
+	}
+	_, err := db.ExecContext(ctx, "UPDATE shared_metadata SET schema_version=? WHERE id=1", SchemaVersion)
+	return err
 }

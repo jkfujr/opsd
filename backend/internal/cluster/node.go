@@ -608,20 +608,22 @@ func (n *Node) Verify(ctx context.Context, r Record) error {
 	return nil
 }
 
-// backfillDatabaseResourceKeys 为迁移前的在途数据库操作补写资源键。
+// backfillDatabaseResourceKeys 为在途数据库操作**重算**资源键。
+//
+// 两种旧结构都要覆盖：没有键的记录要补，用管理记录 ID 生成的旧键要换。
 //
 // 载荷是加密的，只能逐条解密；解不开就返回错误——宁可拒绝启动，
 // 也不能让占用库名的操作在升级后被当成不存在。
 func (n *Node) backfillDatabaseResourceKeys(ctx context.Context) error {
-	rows, err := n.DB.QueryContext(ctx, "SELECT id,payload FROM queue WHERE kind='database' AND terminal=0 AND resource_key=''")
+	rows, err := n.DB.QueryContext(ctx, "SELECT id,payload,resource_key FROM queue WHERE kind='database' AND terminal=0")
 	if err != nil {
 		return err
 	}
 	type pending struct{ id, key string }
 	var fixes []pending
 	for rows.Next() {
-		var id, raw string
-		if err = rows.Scan(&id, &raw); err != nil {
+		var id, raw, recorded string
+		if err = rows.Scan(&id, &raw, &recorded); err != nil {
 			break
 		}
 		var secret Secret
@@ -633,7 +635,9 @@ func (n *Node) backfillDatabaseResourceKeys(ctx context.Context) error {
 			err = e
 			break
 		}
-		if key := databaseResourceKey("database", plain); key != "" {
+		// 旧版用管理记录 ID 当键；那里必须换成本机读出的 Galera 身份，
+		// 否则升级后同一库名会被当成两个资源。
+		if key := databaseResourceKey("database", plain); key != "" && key != recorded {
 			fixes = append(fixes, pending{id: id, key: key})
 		}
 	}

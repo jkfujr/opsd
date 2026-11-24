@@ -636,3 +636,19 @@ func (n *Node) decideDatabase(ctx context.Context, method string, d OperationDec
 	}
 	return op, e
 }
+
+// databaseResourceKeyFromSubmission 返回提交体的资源键（Galera 身份 + 库名）。
+// 只有建库与删库参与细粒度互斥，其他变更返回空串。
+func databaseResourceKeyFromSubmission(input DatabaseSubmission) string {
+	if input.Change.Kind != "create_database" && input.Change.Kind != "delete_database" {
+		return ""
+	}
+	if input.Change.Database == "" {
+		return ""
+	}
+	cluster := input.Cluster.ClusterID
+	if cluster == "" {
+		cluster = input.Change.Cluster
+	}
+	return cluster + "\x1f" + input.Change.Database
+}

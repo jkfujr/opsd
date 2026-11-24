@@ -272,7 +272,7 @@ func (n *Node) Submit(ctx context.Context, target string, r Request) (Operation,
 		if err := n.sharedWriteAllowed(ctx); err != nil {
 			return Operation{}, sharedFault(err)
 		}
-		return n.createSharedWorkflow(ctx, r)
+		return n.createSharedWorkflow(ctx, r, n.ID)
 	}
 	var out Operation
 	e := n.Call(ctx, target, "submit", r, &out)

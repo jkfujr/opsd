@@ -136,7 +136,13 @@ func migrate(ctx context.Context, db *sql.DB, source fs.FS) error {
 		if err != nil {
 			return err
 		}
-		if _, err := conn.ExecContext(ctx, string(body)); err != nil {
+		// 有些迁移要兼容“已应用过前一版”的库（例如列已经存在），
+		// SQL 本身无法表达 ADD COLUMN IF NOT EXISTS，只能交给 Go 判断。
+		if hook, ok := migrationHooks[names[i]]; ok {
+			if err := hook(ctx, conn); err != nil {
+				return fmt.Errorf("执行迁移 %s：%w", names[i], err)
+			}
+		} else if _, err := conn.ExecContext(ctx, string(body)); err != nil {
 			return fmt.Errorf("执行迁移 %s：%w", names[i], err)
 		}
 		if _, err := conn.ExecContext(ctx, "INSERT INTO schema_migrations(version, name) VALUES (?, ?)", i+1, names[i]); err != nil {
@@ -150,4 +156,34 @@ func migrate(ctx context.Context, db *sql.DB, source fs.FS) error {
 		return fmt.Errorf("提交数据库迁移：%w", err)
 	}
 	return nil
+}
+
+// migrationHooks 处理需要在 Go 里分支的迁移。
+var migrationHooks = map[string]func(context.Context, *sql.Conn) error{
+	"012_queue_resource_key.sql": migrateQueueResourceKey,
+}
+
+// migrateQueueResourceKey 把资源键从 create_key 迁到 resource_key。
+//
+// 两个已推送的结构都要能升级：只跑过 011 的库没有 resource_key，
+// 跑过早期 7515d25 的库已经有这一列——重复 ADD COLUMN 会直接失败。
+func migrateQueueResourceKey(ctx context.Context, conn *sql.Conn) error {
+	var has int
+	if err := conn.QueryRowContext(ctx, "SELECT count(*) FROM pragma_table_info('queue') WHERE name='resource_key'").Scan(&has); err != nil {
+		return err
+	}
+	if has == 0 {
+		if _, err := conn.ExecContext(ctx, "ALTER TABLE queue ADD COLUMN resource_key TEXT NOT NULL DEFAULT ''"); err != nil {
+			return err
+		}
+	}
+	if _, err := conn.ExecContext(ctx, "UPDATE queue SET resource_key = create_key WHERE resource_key = '' AND create_key <> ''"); err != nil {
+		return err
+	}
+	if _, err := conn.ExecContext(ctx, "DROP INDEX IF EXISTS queue_create_key"); err != nil {
+		return err
+	}
+	_, err := conn.ExecContext(ctx, `CREATE UNIQUE INDEX IF NOT EXISTS queue_resource_key
+		ON queue(resource_key) WHERE resource_key <> '' AND terminal = 0`)
+	return err
 }

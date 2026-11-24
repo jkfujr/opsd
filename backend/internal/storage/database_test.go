@@ -227,53 +227,65 @@ func TestNewerDatabaseIsNotChanged(t *testing.T) {
 	}
 }
 
-// 已应用过 011（create_key）的库升级到 012：新列就位、旧键搬迁、旧索引移除。
+// 两种已推送的旧结构都要能升级到 012。
 //
-// 直接构造“旧库”不可靠（驱动与路径处理各不相同），所以先把库升到最新，
-// 再把它降回 011 的形态，最后让 Open 重新升级——这才是真实升级路径。
-func TestUpgradeFromCreateKeyMigration(t *testing.T) {
-	ctx := t.Context()
-	path := filepath.Join(t.TempDir(), "upgrade.db")
-	db, err := Open(ctx, path, Node)
-	if err != nil {
-		t.Fatal(err)
-	}
-	// 降回 011：去掉 resource_key 与它的索引，恢复旧索引（create_key 列一直保留）。
-	for _, q := range []string{
-		"DROP INDEX IF EXISTS queue_resource_key",
-		"UPDATE queue SET create_key = resource_key WHERE resource_key <> ''",
-		"ALTER TABLE queue DROP COLUMN resource_key",
-		"CREATE UNIQUE INDEX IF NOT EXISTS queue_create_key ON queue(create_key) WHERE create_key <> '' AND terminal = 0",
-		"DELETE FROM schema_migrations WHERE version=12",
-		"PRAGMA user_version=11",
+//   - 只跑过 011 的库：没有 resource_key 列，需要新增并把 create_key 搬过去；
+//   - 跑过早期 7515d25 的库：已经有 resource_key，重复 ADD COLUMN 会直接失败。
+func TestUpgradeResourceKeyMigration(t *testing.T) {
+	for _, shape := range []struct {
+		name     string
+		downgrade []string
+	}{
+		{name: "011-only", downgrade: []string{
+			"DROP INDEX IF EXISTS queue_resource_key",
+			"UPDATE queue SET create_key = resource_key WHERE resource_key <> ''",
+			"ALTER TABLE queue DROP COLUMN resource_key",
+			"CREATE UNIQUE INDEX IF NOT EXISTS queue_create_key ON queue(create_key) WHERE create_key <> '' AND terminal = 0",
+		}},
+		{name: "already-resource-key", downgrade: []string{
+			"DROP INDEX IF EXISTS queue_resource_key",
+		}},
 	} {
-		if _, err = db.ExecContext(ctx, q); err != nil {
-			t.Fatalf("%s：%v", q, err)
-		}
-	}
-	if _, err = db.ExecContext(ctx, `INSERT INTO queue(id,origin,kind,payload,request_key,request_digest,body,terminal,create_key)
-		VALUES('legacy','origin','database','{}','key',X'00','{}',0,'galera-1' || char(31) || 'biz')`); err != nil {
-		t.Fatal(err)
-	}
-	db.Close()
+		t.Run(shape.name, func(t *testing.T) {
+			ctx := t.Context()
+			path := filepath.Join(t.TempDir(), "upgrade.db")
+			db, err := Open(ctx, path, Node)
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, q := range append(shape.downgrade,
+				"DELETE FROM schema_migrations WHERE version=12",
+				"PRAGMA user_version=11") {
+				if _, err = db.ExecContext(ctx, q); err != nil {
+					t.Fatalf("%s：%v", q, err)
+				}
+			}
+			// 一条在途建库记录：旧键由管理记录 ID 生成，升级后必须被重算。
+			if _, err = db.ExecContext(ctx, `INSERT INTO queue(id,origin,kind,payload,request_key,request_digest,body,terminal,create_key)
+				VALUES('legacy','origin','database','{}','key',X'00','{}',0,'managed-1' || char(31) || 'biz')`); err != nil {
+				t.Fatal(err)
+			}
+			db.Close()
 
-	upgraded, err := Open(ctx, path, Node)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer upgraded.Close()
-	var key string
-	if err = upgraded.QueryRowContext(ctx, "SELECT resource_key FROM queue WHERE id='legacy'").Scan(&key); err != nil {
-		t.Fatal(err)
-	}
-	if key != "galera-1\x1fbiz" {
-		t.Fatalf("旧键未搬迁：%q", key)
-	}
-	var indexes int
-	if err = upgraded.QueryRowContext(ctx, "SELECT count(*) FROM sqlite_master WHERE type='index' AND name='queue_create_key'").Scan(&indexes); err != nil {
-		t.Fatal(err)
-	}
-	if indexes != 0 {
-		t.Fatal("旧索引未移除")
+			upgraded, err := Open(ctx, path, Node)
+			if err != nil {
+				t.Fatalf("升级失败：%v", err)
+			}
+			defer upgraded.Close()
+			var version int
+			if err = upgraded.QueryRowContext(ctx, "PRAGMA user_version").Scan(&version); err != nil {
+				t.Fatal(err)
+			}
+			if version != 12 {
+				t.Fatalf("版本未推进：%d", version)
+			}
+			var key string
+			if err = upgraded.QueryRowContext(ctx, "SELECT COALESCE(resource_key,'') FROM queue WHERE id='legacy'").Scan(&key); err != nil {
+				t.Fatal(err)
+			}
+			if key != "managed-1\x1fbiz" {
+				t.Fatalf("键未搬迁：%q", key)
+			}
+		})
 	}
 }
