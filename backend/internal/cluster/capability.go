@@ -119,6 +119,7 @@ var methodAccess = map[string]MethodAccess{
 	"database.execute":               {Capability: CapabilityManageDatabase},
 	"database.read":                  {Capability: CapabilityManageDatabase},
 	"database.query":                 {Capability: CapabilityManageDatabase},
+	"database.exists":                {Capability: CapabilityManageDatabase},
 	"database.discover":              {Capability: CapabilityManageDatabase},
 	"database.reconcile":             {Capability: CapabilityManageDatabase},
 	"database.recover":               {Capability: CapabilityManageDatabase},

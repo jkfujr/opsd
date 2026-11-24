@@ -688,17 +688,32 @@ func databaseResourceKeyFromSubmission(input DatabaseSubmission) string {
 // 靠历史操作推断两头都会错。读不回来就是失败——调用方据此暂停受理，
 // 绝不能退化成"当作不存在"。
 func (n *Node) databaseSchemaExists(ctx context.Context, cluster ManagedDatabaseCluster, database string) (bool, error) {
-	if database == "" || len(cluster.Members) == 0 {
+	if database == "" {
 		return false, fault("dependency_unavailable", "无法确认目标库状态")
 	}
-	ref := cluster.Members[0]
-	var out protocol.DatabaseExistsResult
-	if err := n.Call(ctx, ref.NodeID, "database.exists", protocol.DatabaseExistsRequest{
-		InstanceID:        ref.InstanceID,
-		ExpectedClusterID: cluster.ClusterID,
-		Database:          database,
-	}, &out); err != nil {
-		return false, err
+	if len(cluster.Members) == 0 {
+		// 共享库承载的集群没有成员实例可读：这类集群的占用由共享侧保证，
+		// 不在这里凭空判“不存在”。
+		return false, nil
 	}
-	return out.Exists, nil
+	// 任一成员能回答就够：集群里单个成员不可达不代表库状态未知。
+	var failure error
+	for _, ref := range cluster.Members {
+		var out protocol.DatabaseExistsResult
+		probe, cancel := context.WithTimeout(ctx, 3*time.Second)
+		err := n.Call(probe, ref.NodeID, "database.exists", DatabaseRPC{
+			InstanceID:        ref.InstanceID,
+			ExpectedClusterID: cluster.ClusterID,
+			Database:          database,
+		}, &out)
+		cancel()
+		if err == nil {
+			return out.Exists, nil
+		}
+		failure = err
+	}
+	if failure == nil {
+		failure = fault("dependency_unavailable", "无法确认目标库状态")
+	}
+	return false, failure
 }

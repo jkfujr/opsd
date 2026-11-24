@@ -755,10 +755,13 @@ func (m Manager) DatabaseExists(ctx context.Context, c protocol.DatabaseConnecti
 		return false, err
 	}
 	defer s.Close()
-	// 先在同一连接上核对 Galera 身份：连到了别的集群就说明凭据过期，
+	// 已知身份时必须在同一连接上核对：连到了别的集群说明凭据过期，
 	// 此时"库不存在"是不可信的结论。
-	if err := checkGalera(ctx, s, clusterID); err != nil {
-		return false, err
+	// 集群身份还没生成的早期提交没有可比对的基准，仍然照常查库。
+	if clusterID != "" {
+		if err := checkGalera(ctx, s, clusterID); err != nil {
+			return false, err
+		}
 	}
 	found, err := rows(ctx, s, "SELECT SCHEMA_NAME FROM information_schema.SCHEMATA WHERE SCHEMA_NAME=?", database)
 	if err != nil {
