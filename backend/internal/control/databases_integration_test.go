@@ -494,6 +494,19 @@ func TestDatabaseNativeClusterAPIAndDashboard(t *testing.T) {
 	remove = map[string]any{"expected_revision": registered.Revision, "kind": "delete_database", "database": "opsd_ci_business", "proxies": []any{}}
 	op = nativeSubmit(t, c, raw, registered.ID, "delete-db", remove)
 	nativeOperation(t, b, raw, op.ID, protocol.Succeeded)
+	// 放在最后：停掉全部 Galera 成员后，读回必须让 HTTP 入口返回 503，
+	// 且不产生任何操作记录。这是"读回失败即暂停受理"的端到端证据。
+	before := operationCount(t, services[0], "create_database")
+	for _, name := range f.names {
+		_ = exec.Command("docker", "stop", name).Run()
+	}
+	unreachable := map[string]any{"expected_revision": registered.Revision, "kind": "create_database", "database": "opsd_ci_unreachable", "charset": "utf8mb4", "proxies": []any{}}
+	if code := apiCall(t, http.DefaultClient, c.web.URL, "POST", "/api/v2/database-clusters/"+registered.ID+"/changes", raw, "read-back-fails", "", unreachable, nil); code != 503 {
+		t.Fatalf("读回失败应返回 503，实际 %d", code)
+	}
+	if after := operationCount(t, services[0], "create_database"); after != before {
+		t.Fatalf("暂停受理后仍产生了建库操作：%d -> %d", before, after)
+	}
 	output := filepath.Join("..", "..", "..", "artifacts")
 	_ = os.MkdirAll(output, 0755)
 	report, _ := json.MarshalIndent(map[string]any{"galera_members": 3, "proxysql": 2, "api_nodes": 4, "idempotency": true, "partial_recovery": true, "grants": true, "proxy_login": true, "dashboard": true, "proxy_routing": true, "proxy_only_node": true, "active_transaction": true, "proxy_failover": true, "proxy_restart": true, "multiwriter_conflict": true}, "", "  ")
