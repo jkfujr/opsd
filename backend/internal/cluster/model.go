@@ -111,6 +111,10 @@ type Request struct {
 	Kind             string          `json:"kind"`
 	Payload          json.RawMessage `json:"payload"`
 	Key              string          `json:"key,omitempty"`
+	// ResourceObservedSeq 是建库读回时该资源在本地队列里的最大序号。
+	// 受理事务内若发现序号推进，说明读回期间有人改过同一个库，
+	// 那次读回已经过期，必须让调用方重新提交而不是按旧结论受理。
+	ResourceObservedSeq *int64 `json:"-"`
 }
 type Operation struct {
 	Coordinator       string                   `json:"coordinator,omitempty"`

@@ -373,3 +373,41 @@ func TestBackfillResourceKeyForInFlightDatabase(t *testing.T) {
 		t.Fatal("回填后该库名应被占用")
 	}
 }
+
+// 读回与受理之间有人建了同一个库：那次读回已经过期，必须拒绝而不是照样受理。
+func TestCreateRejectedWhenResourceAdvancedDuringReadBack(t *testing.T) {
+	n, _ := openTestNode(t)
+	body := func() json.RawMessage {
+		b, _ := json.Marshal(DatabaseSubmission{
+			Change:  DatabaseChange{Cluster: "managed-1", ExpectedRevision: 1, Kind: "create_database", Database: "biz", Charset: "utf8mb4"},
+			Cluster: ManagedDatabaseCluster{ID: "managed-1", ClusterID: "galera-1", Name: "集群", Coordinator: n.ID, Revision: 1},
+		})
+		return b
+	}
+	// A 读到“不存在”时的序号。
+	var observed int64
+	key := databaseResourceKey("database", body())
+	if err := n.DB.QueryRow("SELECT COALESCE(MAX(seq),0) FROM queue WHERE resource_key=?", key).Scan(&observed); err != nil {
+		t.Fatal(err)
+	}
+	// B 在 A 提交之前建库并结束。
+	b := body()
+	op, err := n.enqueueTx(t.Context(), n.ID, Request{Kind: "database", Key: "b", Payload: b}, nil)
+	if err != nil {
+		t.Fatalf("B 的建库应被受理：%v", err)
+	}
+	if _, err = n.DB.Exec(`UPDATE queue SET terminal=1, body=json_set(body,'$.state','succeeded') WHERE id=?`, op.ID); err != nil {
+		t.Fatal(err)
+	}
+	// 放行 A：它带着过期的读回结论提交。
+	if _, err = n.enqueueTx(t.Context(), n.ID, Request{Kind: "database", Key: "a", Payload: body(), ResourceObservedSeq: &observed}, nil); err == nil || faultCode(err) != "conflict" {
+		t.Fatalf("读回过期时应拒绝，实际 %v", err)
+	}
+	var created int
+	if err = n.DB.QueryRow("SELECT count(*) FROM queue WHERE resource_key=?", key).Scan(&created); err != nil {
+		t.Fatal(err)
+	}
+	if created != 1 {
+		t.Fatalf("拒绝后仍产生了第二条操作：%d", created)
+	}
+}

@@ -627,6 +627,17 @@ func (n *Node) enqueueTx(ctx context.Context, origin string, r Request, related 
 		if inFlight {
 			return Operation{}, fault("conflict", "该数据库已有未结束的操作")
 		}
+		// 读回发生在事务外：期间若有人推进过同一个库，那次读回已经过期，
+		// 按旧结论受理就会在库里已经存在的情况下再建一次。
+		if r.ResourceObservedSeq != nil {
+			var current int64
+			if e := tx.QueryRowContext(ctx, "SELECT COALESCE(MAX(seq),0) FROM queue WHERE resource_key=?", resourceKey).Scan(&current); e != nil {
+				return Operation{}, e
+			}
+			if current > *r.ResourceObservedSeq {
+				return Operation{}, fault("conflict", "该数据库在受理期间已变化，请重新提交")
+			}
+		}
 		if databaseChangeKind(r.Payload) == "create_database" {
 			exists, e := databaseResourceExists(ctx, tx, resourceKey)
 			if e != nil {
