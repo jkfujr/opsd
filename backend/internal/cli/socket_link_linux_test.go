@@ -3,10 +3,13 @@
 package cli
 
 import (
+	"context"
 	"net"
 	"net/http/httptest"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -137,9 +140,37 @@ func TestInstalledNodeAcceptsJoinedPeer(t *testing.T) {
 	if !found {
 		t.Fatal("目录里看不到 B")
 	}
-	var status cluster.SharedStatus
-	if e = a.Call(t.Context(), self.ID, "shared.status", nil, &status); e != nil {
-		t.Fatalf("跨节点只读调用失败：%v", e)
+	var answered cluster.Member
+	if e = a.Call(t.Context(), self.ID, "ping", nil, &answered); e != nil {
+		t.Fatalf("跨节点 ping 失败：%v", e)
 	}
-	t.Logf("链路已通：A(%s) → B(%s, %s)", a.ID, self.ID, "http://"+peer)
+	// ping 只回 n.Self：拿到的必须就是引导阶段记录的那个 B。
+	if answered.ID != self.ID {
+		t.Fatalf("ping 返回的节点不是 B：%s != %s", answered.ID, self.ID)
+	}
+	// 执行器的 Unix Socket 也要能应答，而且必须是**允许的 UID** 发起的：
+	// 测试进程是 root，会被按 UID 拒绝（这正是 A1 的拒绝方式），
+	// 所以让测试二进制自己以 nobody 跑一次只读探测。
+	probeCtx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
+	defer cancel()
+	selfPath, e := os.Executable()
+	if e != nil {
+		t.Fatal(e)
+	}
+	// go 测试二进制在 root 的临时目录里，nobody 无法执行：复制到本例可进的目录。
+	probeBinary := filepath.Join(dir, "probe.test")
+	if e = copyExecutable(selfPath, probeBinary); e != nil {
+		t.Fatal(e)
+	}
+	probe := exec.CommandContext(probeCtx, "runuser", "-u", "nobody", "--", probeBinary,
+		"-test.run", "^TestHelperExecutorReadRPC$", "-test.v")
+	probe.Env = append(os.Environ(), "OPSD_EXECUTOR_PROBE_SOCKET="+socket)
+	output, e := probe.CombinedOutput()
+	if e != nil {
+		t.Fatalf("执行器 Socket 只读调用失败：%v %s", e, output)
+	}
+	if !strings.Contains(string(output), "PASS") {
+		t.Fatalf("执行器只读探测没有通过：%s", output)
+	}
+	t.Logf("链路已通：A(%s) → B(%s, %s)；执行器 Socket 只读调用成功", a.ID, self.ID, "http://"+peer)
 }
