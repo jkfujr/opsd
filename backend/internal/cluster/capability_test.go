@@ -427,3 +427,19 @@ func TestCreateRejectedWhenResourceAdvancedDuringReadBack(t *testing.T) {
 		t.Fatalf("拒绝后仍产生了第二条操作：%d", created)
 	}
 }
+
+// 读回失败必须报错，让受理方暂停；绝不能退化成“当作不存在”。
+func TestReadBackFailsWhenNoMemberAnswers(t *testing.T) {
+	n, _ := openTestNode(t)
+	cluster := ManagedDatabaseCluster{
+		ID: "managed-1", ClusterID: "galera-1",
+		Members: []DatabaseRef{{NodeID: "ffffffffffffffffffffffffffffffff", InstanceID: "inst-1"}},
+	}
+	if _, err := n.databaseSchemaExists(t.Context(), cluster, "biz"); err == nil {
+		t.Fatal("没有成员可答时应返回错误，而不是“不存在”")
+	}
+	// 没有成员实例的集群（共享承载）明确返回“未知为不存在”，由共享侧保证占用。
+	if exists, err := n.databaseSchemaExists(t.Context(), ManagedDatabaseCluster{ID: "managed-1"}, "biz"); err != nil || exists {
+		t.Fatalf("共享承载的集群不应在此判存在：%v %v", exists, err)
+	}
+}
