@@ -405,7 +405,9 @@ func TestInstalledNodeAcceptsJoinedPeer(t *testing.T) {
 	// 已知缺口：实测 90 秒内对端始终读不到原因（操作停在 applying）。
 	// 我猜过的"迟到回复去重"不是原因——加 sameOperationError 后仍然失败，
 	// 所以先跳过并留在这里，避免用一个未验证的修复冒充解决。
-	t.Skip("已知缺口：执行器启动失败的原因没有到达父操作，待定位")
+	if os.Getenv("OPSD_DIAG") == "" {
+		t.Skip("已知缺口：执行器启动失败的原因没有到达父操作；设置 OPSD_DIAG=1 观察")
+	}
 	failingDB := "opsd_link_fail_" + strings.ToLower(identity.Random()[:6])
 	failingKey := "socket-nounit-" + identity.Random()[:8]
 	failingHash := sha256.Sum256([]byte(a.ID + "\x00" + actor + "\x00" + failingKey))
@@ -427,6 +429,14 @@ func TestInstalledNodeAcceptsJoinedPeer(t *testing.T) {
 		}
 	}
 	if reason == "" {
+		// 诊断：把队列行与回执原文都带出来，看清服务端到底停在哪。
+		if origin, state, e := queueRow(t.Context(), filepath.Join(data, "node.db"), failingKey); e == nil {
+			t.Logf("诊断：失败操作 origin=%s state=%s", origin, state)
+		}
+		if body, e := queueBody(t.Context(), filepath.Join(data, "node.db"), failingKey); e == nil {
+			t.Logf("诊断：失败操作队列体 %s", body)
+		}
+		t.Logf("诊断：回执原文 %s", rawOperation(t, client, aWeb.URL, broken.location))
 		t.Fatal("单元缺失时对端读不到任何失败原因（操作看起来仍在进行中）")
 	}
 	t.Logf("单元缺失时对端读到失败原因：%s", reason)
@@ -645,4 +655,25 @@ func operationError(t *testing.T, client *http.Client, web, location string) str
 		return ""
 	}
 	return op.Error.Code + "：" + op.Error.Message
+}
+
+// rawOperation 原样返回回执查询的响应体，用于诊断。
+func rawOperation(t *testing.T, client *http.Client, web, location string) string {
+	t.Helper()
+	url := location
+	if strings.HasPrefix(url, "/") {
+		url = web + url
+	}
+	request, e := http.NewRequest("GET", url, nil)
+	if e != nil {
+		t.Fatal(e)
+	}
+	request.Header.Set("Origin", web)
+	response, e := client.Do(request)
+	if e != nil {
+		t.Fatal(e)
+	}
+	defer response.Body.Close()
+	payload, _ := io.ReadAll(response.Body)
+	return fmt.Sprintf("%d %s", response.StatusCode, payload)
 }
