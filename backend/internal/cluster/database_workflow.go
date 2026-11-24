@@ -691,10 +691,12 @@ func (n *Node) databaseSchemaExists(ctx context.Context, cluster ManagedDatabase
 	if database == "" {
 		return false, fault("dependency_unavailable", "无法确认目标库状态")
 	}
-	if len(cluster.Members) == 0 {
-		// 共享库承载的集群没有成员实例可读：这类集群的占用由共享侧保证，
-		// 不在这里凭空判“不存在”。
-		return false, nil
+	if len(cluster.Members) == 0 || cluster.ClusterID == "" {
+		// 没有已登记成员或没有集群身份就无法读回：暂停受理，
+		// 绝不退化成“不存在”。共享模式同样要在这里读回——
+		// shared_flows 的资源键只记录 OPSD 自己的在途操作，
+		// 外部 DDL 不会写进去。
+		return false, fault("dependency_unavailable", "无法确认目标库状态")
 	}
 	// 任一成员能回答就够：集群里单个成员不可达不代表库状态未知。
 	var failure error

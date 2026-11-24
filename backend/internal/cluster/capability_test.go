@@ -438,8 +438,9 @@ func TestReadBackFailsWhenNoMemberAnswers(t *testing.T) {
 	if _, err := n.databaseSchemaExists(t.Context(), cluster, "biz"); err == nil {
 		t.Fatal("没有成员可答时应返回错误，而不是“不存在”")
 	}
-	// 没有成员实例的集群（共享承载）明确返回“未知为不存在”，由共享侧保证占用。
-	if exists, err := n.databaseSchemaExists(t.Context(), ManagedDatabaseCluster{ID: "managed-1"}, "biz"); err != nil || exists {
-		t.Fatalf("共享承载的集群不应在此判存在：%v %v", exists, err)
+	// 缺少成员或集群身份同样只能报错：外部建的库不会写进 shared_flows，
+	// 因此共享模式也必须在成员侧读回。
+	if _, err := n.databaseSchemaExists(t.Context(), ManagedDatabaseCluster{ID: "managed-1"}, "biz"); err == nil {
+		t.Fatal("缺少成员时应返回错误")
 	}
 }
