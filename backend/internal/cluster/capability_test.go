@@ -255,53 +255,86 @@ func TestCreateDatabaseKeyIsUniqueWhileInFlight(t *testing.T) {
 	}
 }
 
-// 建库 → 删除 → 重建：删除成功后库名释放，可以再次受理。
+// 建库 → 删库 → 重建：走真实受理路径，删库不被“已存在”挡住，删完可以重建。
 func TestDatabaseResourceFreedAfterDelete(t *testing.T) {
 	n, _ := openTestNode(t)
-	body := func(kind string) json.RawMessage {
-		b, _ := json.Marshal(DatabaseSubmission{
-			Change:  DatabaseChange{Cluster: "cluster-1", Kind: kind, Database: "biz"},
-			Cluster: ManagedDatabaseCluster{ID: "managed-1", ClusterID: "galera-1"},
+	submit := func(kind, idempotencyKey string) error {
+		body, _ := json.Marshal(DatabaseSubmission{
+			Change:  DatabaseChange{Cluster: "managed-1", ExpectedRevision: 1, Kind: kind, Database: "biz", Charset: "utf8mb4"},
+			Cluster: ManagedDatabaseCluster{ID: "managed-1", ClusterID: "galera-1", Name: "集群", Coordinator: n.ID, Revision: 1},
 		})
-		return b
-	}
-	insert := func(id, action string, terminal int, state string) error {
-		op := Operation{Action: action, OperationRecord: protocol.OperationRecord{ID: id, State: protocol.OperationState(state)}}
-		raw, _ := json.Marshal(op)
-		key := databaseResourceKey("database", body(action))
-		_, err := n.DB.Exec(`INSERT INTO queue(id,origin,actor,kind,payload,request_key,request_digest,body,terminal,resource_key)
-			VALUES(?,?,'','database','{}','',X'00',?,?,?)`, id, n.ID, string(raw), terminal, key)
+		_, err := n.enqueueTx(t.Context(), n.ID, Request{Kind: "database", Key: idempotencyKey, Payload: body}, nil)
 		return err
 	}
-	// 建库成功后占用同名库。
-	if err := insert("create-1", "create_database", 1, "succeeded"); err != nil {
-		t.Fatal(err)
+	finish := func(action string) {
+		if _, err := n.DB.Exec(`UPDATE queue SET terminal=1, body=json_set(body,'$.state','succeeded','$.action',?)
+			WHERE json_extract(body,'$.action')=? OR resource_key LIKE '%'`, action, action); err != nil {
+			t.Fatal(err)
+		}
 	}
-	if !occupiedNow(t, n, databaseResourceKey("database", body("create_database"))) {
-		t.Fatal("建库成功后应占用")
+	key := "galera-1\x1fbiz"
+	if err := submit("create_database", "create-1"); err != nil {
+		t.Fatalf("首次建库应被受理：%v", err)
 	}
-	// 删除成功后释放。
-	if err := insert("delete-1", "delete_database", 1, "succeeded"); err != nil {
-		t.Fatal(err)
+	if inFlight, _ := databaseInFlightNow(t, n, key); !inFlight {
+		t.Fatal("建库在途应占用资源")
 	}
-	if occupiedNow(t, n, databaseResourceKey("database", body("create_database"))) {
-		t.Fatal("删除成功后应释放")
+	finish("create_database")
+	if exists, _ := databaseExistsNow(t, n, key); !exists {
+		t.Fatal("建库成功后应视为已存在")
+	}
+	// 已存在时必须拒绝再次建库。
+	if err := submit("create_database", "create-2"); err == nil || faultCode(err) != "conflict" {
+		t.Fatalf("库已存在时应拒绝建库，实际 %v", err)
+	}
+	// 删库不能被“已存在”挡住。
+	if err := submit("delete_database", "delete-1"); err != nil {
+		t.Fatalf("已存在时应允许删库：%v", err)
+	}
+	finish("delete_database")
+	if exists, _ := databaseExistsNow(t, n, key); exists {
+		t.Fatal("删库成功后应释放库名")
+	}
+	if err := submit("create_database", "create-3"); err != nil {
+		t.Fatalf("删库后应允许重建：%v", err)
 	}
 }
 
-// occupiedNow 在一个只读事务里查询资源占用。
-func occupiedNow(t *testing.T, n *Node, key string) bool {
+func databaseInFlightNow(t *testing.T, n *Node, key string) (bool, error) {
 	t.Helper()
 	tx, err := n.DB.BeginTx(t.Context(), nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer tx.Rollback()
-	occupied, err := databaseResourceOccupied(t.Context(), tx, key)
+	return databaseResourceInFlight(t.Context(), tx, key)
+}
+
+func databaseExistsNow(t *testing.T, n *Node, key string) (bool, error) {
+	t.Helper()
+	tx, err := n.DB.BeginTx(t.Context(), nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	return occupied
+	defer tx.Rollback()
+	return databaseResourceExists(t.Context(), tx, key)
+}
+
+// occupiedNow 报告该资源是否被占用（在途或已存在）。
+func occupiedNow(t *testing.T, n *Node, key string) bool {
+	t.Helper()
+	inFlight, err := databaseInFlightNow(t, n, key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if inFlight {
+		return true
+	}
+	exists, err := databaseExistsNow(t, n, key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return exists
 }
 
 // 迁移前的在途建库记录没有资源键：启动时解密载荷补齐，否则升级后会漏占库名。

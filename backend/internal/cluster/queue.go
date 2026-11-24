@@ -618,12 +618,23 @@ func (n *Node) enqueueTx(ctx context.Context, origin string, r Request, related 
 	// 换入口或换键都不该再产生第二个建库操作。
 	resourceKey := databaseResourceKey(r.Kind, r.Payload)
 	if resourceKey != "" {
-		occupied, e := databaseResourceOccupied(ctx, tx, resourceKey)
+		// 两种动作都要求同资源没有在途操作；只有建库还要看库是否已经存在。
+		// 删库如果在“已存在”上也被拒绝，正常的删除就永远做不了。
+		inFlight, e := databaseResourceInFlight(ctx, tx, resourceKey)
 		if e != nil {
 			return Operation{}, e
 		}
-		if occupied {
-			return Operation{}, fault("conflict", "该数据库已有在途或已完成的创建操作")
+		if inFlight {
+			return Operation{}, fault("conflict", "该数据库已有未结束的操作")
+		}
+		if databaseChangeKind(r.Payload) == "create_database" {
+			exists, e := databaseResourceExists(ctx, tx, resourceKey)
+			if e != nil {
+				return Operation{}, e
+			}
+			if exists {
+				return Operation{}, fault("conflict", "该数据库已存在，删除后才可重建")
+			}
 		}
 	}
 	if r.Kind == "compose_register" {
@@ -1820,28 +1831,42 @@ func databaseResourceKey(kind string, payload json.RawMessage) string {
 	return cluster + "\x1f" + submission.Change.Database
 }
 
-// databaseResourceOccupied 报告同一集群同一库名是否已占用。
-//
-// 占用条件：存在在途的建库/删库，或最近一次成功的动作仍是建库。
-// 建库成功后又被成功删除的，允许重建。
-func databaseResourceOccupied(ctx context.Context, tx *sql.Tx, key string) (bool, error) {
-	var inFlight int
-	if err := tx.QueryRowContext(ctx, "SELECT count(*) FROM queue WHERE resource_key=? AND terminal=0", key).Scan(&inFlight); err != nil {
+// databaseChangeKind 取出数据库变更的动作名；非数据库载荷返回空串。
+func databaseChangeKind(payload json.RawMessage) string {
+	var submission struct {
+		Change struct {
+			Kind string `json:"kind"`
+		} `json:"change"`
+	}
+	if json.Unmarshal(payload, &submission) != nil {
+		return ""
+	}
+	return submission.Change.Kind
+}
+
+// databaseResourceInFlight 报告同一资源是否有未结束的操作。
+// 建库与删库都受此约束：同一时刻只允许一个动作推进这个库。
+func databaseResourceInFlight(ctx context.Context, tx *sql.Tx, key string) (bool, error) {
+	var count int
+	if err := tx.QueryRowContext(ctx, "SELECT count(*) FROM queue WHERE resource_key=? AND terminal=0", key).Scan(&count); err != nil {
 		return false, err
 	}
-	if inFlight > 0 {
-		return true, nil
-	}
-	var latestAction string
+	return count > 0, nil
+}
+
+// databaseResourceExists 报告同一资源最近一次成功的动作是否仍是建库。
+// 建库成功后被成功删除的，允许重建。
+func databaseResourceExists(ctx context.Context, tx *sql.Tx, key string) (bool, error) {
+	var latest string
 	err := tx.QueryRowContext(ctx, `SELECT json_extract(body,'$.action') FROM queue
 		WHERE resource_key=? AND terminal=1 AND json_extract(body,'$.state')='succeeded'
 		  AND json_extract(body,'$.action') IN ('create_database','delete_database')
-		ORDER BY seq DESC LIMIT 1`, key).Scan(&latestAction)
+		ORDER BY seq DESC LIMIT 1`, key).Scan(&latest)
 	if errors.Is(err, sql.ErrNoRows) {
 		return false, nil
 	}
 	if err != nil {
 		return false, err
 	}
-	return latestAction == "create_database", nil
+	return latest == "create_database", nil
 }

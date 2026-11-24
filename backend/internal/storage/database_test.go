@@ -34,7 +34,7 @@ func TestOpenAndReopen(t *testing.T) {
 					}
 				}
 				// 各库的迁移数量各自独立：节点库新增了队列分桶迁移。
-				expectedVersion := map[Kind]int{Node: 11, Executor: 8, Metrics: 1}[kind]
+				expectedVersion := map[Kind]int{Node: 12, Executor: 8, Metrics: 1}[kind]
 				if count != expectedVersion || version != expectedVersion || sync != 2 || foreign != 1 || mode != "wal" {
 					t.Fatalf("数据库配置或迁移错误：记录=%d 版本=%d 同步=%d 外键=%d 日志=%s", count, version, sync, foreign, mode)
 				}
@@ -224,5 +224,56 @@ func TestNewerDatabaseIsNotChanged(t *testing.T) {
 	}
 	if version != 99 || value != "保留" || mode != "delete" {
 		t.Fatalf("较新数据库被修改：%d %s %s", version, value, mode)
+	}
+}
+
+// 已应用过 011（create_key）的库升级到 012：新列就位、旧键搬迁、旧索引移除。
+//
+// 直接构造“旧库”不可靠（驱动与路径处理各不相同），所以先把库升到最新，
+// 再把它降回 011 的形态，最后让 Open 重新升级——这才是真实升级路径。
+func TestUpgradeFromCreateKeyMigration(t *testing.T) {
+	ctx := t.Context()
+	path := filepath.Join(t.TempDir(), "upgrade.db")
+	db, err := Open(ctx, path, Node)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// 降回 011：去掉 resource_key 与它的索引，恢复旧索引（create_key 列一直保留）。
+	for _, q := range []string{
+		"DROP INDEX IF EXISTS queue_resource_key",
+		"UPDATE queue SET create_key = resource_key WHERE resource_key <> ''",
+		"ALTER TABLE queue DROP COLUMN resource_key",
+		"CREATE UNIQUE INDEX IF NOT EXISTS queue_create_key ON queue(create_key) WHERE create_key <> '' AND terminal = 0",
+		"DELETE FROM schema_migrations WHERE version=12",
+		"PRAGMA user_version=11",
+	} {
+		if _, err = db.ExecContext(ctx, q); err != nil {
+			t.Fatalf("%s：%v", q, err)
+		}
+	}
+	if _, err = db.ExecContext(ctx, `INSERT INTO queue(id,origin,kind,payload,request_key,request_digest,body,terminal,create_key)
+		VALUES('legacy','origin','database','{}','key',X'00','{}',0,'galera-1' || char(31) || 'biz')`); err != nil {
+		t.Fatal(err)
+	}
+	db.Close()
+
+	upgraded, err := Open(ctx, path, Node)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer upgraded.Close()
+	var key string
+	if err = upgraded.QueryRowContext(ctx, "SELECT resource_key FROM queue WHERE id='legacy'").Scan(&key); err != nil {
+		t.Fatal(err)
+	}
+	if key != "galera-1\x1fbiz" {
+		t.Fatalf("旧键未搬迁：%q", key)
+	}
+	var indexes int
+	if err = upgraded.QueryRowContext(ctx, "SELECT count(*) FROM sqlite_master WHERE type='index' AND name='queue_create_key'").Scan(&indexes); err != nil {
+		t.Fatal(err)
+	}
+	if indexes != 0 {
+		t.Fatal("旧索引未移除")
 	}
 }
