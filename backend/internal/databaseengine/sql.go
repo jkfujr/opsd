@@ -746,7 +746,7 @@ func SortedPrivileges(p []string) []string {
 //
 // 走与其它读取相同的连接与集群校验，但不枚举全部库、不汇总表大小：
 // 受理建库只需要这一个事实，读不到就是失败，不能退化成"当作不存在"。
-func (m Manager) DatabaseExists(ctx context.Context, c protocol.DatabaseConnection, database string) (bool, error) {
+func (m Manager) DatabaseExists(ctx context.Context, c protocol.DatabaseConnection, clusterID, database string) (bool, error) {
 	if database == "" {
 		return false, fmt.Errorf("缺少数据库名")
 	}
@@ -755,6 +755,11 @@ func (m Manager) DatabaseExists(ctx context.Context, c protocol.DatabaseConnecti
 		return false, err
 	}
 	defer s.Close()
+	// 先在同一连接上核对 Galera 身份：连到了别的集群就说明凭据过期，
+	// 此时"库不存在"是不可信的结论。
+	if err := checkGalera(ctx, s, clusterID); err != nil {
+		return false, err
+	}
 	found, err := rows(ctx, s, "SELECT SCHEMA_NAME FROM information_schema.SCHEMATA WHERE SCHEMA_NAME=?", database)
 	if err != nil {
 		return false, err

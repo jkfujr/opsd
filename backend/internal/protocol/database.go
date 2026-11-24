@@ -159,20 +159,32 @@ func (*DatabaseRead) Kind() Kind { return "database.read" }
 
 // DatabaseExists 只回答"这个库现在是否存在"，不读取内容、不建连接池。
 // 受理建库前用它做一次实时读回：失败就暂停受理，而不是凭历史推断。
+// DatabaseExists 是执行器侧的查询：连接由目标节点从本机凭据解出后填入。
 type DatabaseExists struct {
 	Connection DatabaseConnection `json:"connection"`
 	ClusterID  string             `json:"cluster_id,omitempty"`
 	Database   string             `json:"database"`
 }
 
-func (*DatabaseExists) Kind() Kind { return "database.exists" }
+func (*DatabaseExists) Kind() Kind { return "database.exists.query" }
 func (*DatabaseExists) isPayload() {}
+
+// DatabaseExistsRequest 是跨节点的请求：只带标识，不传凭据。
+type DatabaseExistsRequest struct {
+	InstanceID        string `json:"instance_id"`
+	InstanceRevision  uint64 `json:"instance_revision,omitempty"`
+	ExpectedClusterID string `json:"expected_cluster_id,omitempty"`
+	Database          string `json:"database"`
+}
+
+func (*DatabaseExistsRequest) Kind() Kind { return "database.exists" }
+func (*DatabaseExistsRequest) isPayload() {}
 
 type DatabaseExistsResult struct {
 	Exists bool `json:"exists"`
 }
 
-func (*DatabaseExistsResult) Kind() Kind { return "database.exists" }
+func (*DatabaseExistsResult) Kind() Kind { return "database.exists.result" }
 func (*DatabaseExistsResult) isPayload() {}
 func (*DatabaseRead) isPayload() {}
 

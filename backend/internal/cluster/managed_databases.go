@@ -535,6 +535,8 @@ func (n *Node) databaseDispatch(ctx context.Context, origin, method string, body
 			return n.cachedManagedDatabaseRead(ctx, request.InstanceID, request.Scope)
 		}
 		return n.managedDatabaseRead(ctx, request.InstanceID, request.Backups, request.User, request.Host, request)
+	case "database.exists":
+		return n.managedDatabaseExists(ctx, request)
 	case "database.proxy_routing.read":
 		return n.readProxyRouting(ctx, request.InstanceID, request.Hostgroups)
 	case "database.proxy_routing.state":
@@ -617,6 +619,7 @@ type DatabaseRPC struct {
 	InstanceID        string                         `json:"instance_id"`
 	InstanceRevision  uint64                         `json:"instance_revision"`
 	ExpectedClusterID string                         `json:"expected_cluster_id"`
+	Database          string                         `json:"database,omitempty"`
 	Actor             string                         `json:"actor"`
 	ResourceID        string                         `json:"resource_id"`
 	OperationID       string                         `json:"operation_id"`
@@ -634,3 +637,27 @@ func (n *Node) ManagedDatabaseStatus(ctx context.Context, c ManagedDatabaseClust
 }
 
 func validateManagedDatabaseKind(kind string) bool { return strings.HasPrefix(kind, "database.") }
+
+// managedDatabaseExists 只回答本机实例上该库是否存在。
+//
+// 连接凭据留在本机：对端只给实例标识、预期集群身份与库名。
+func (n *Node) managedDatabaseExists(ctx context.Context, request DatabaseRPC) (protocol.Payload, error) {
+	connection, err := n.databaseConnection(ctx, request.InstanceID, request.InstanceRevision)
+	if err != nil {
+		return nil, err
+	}
+	// 预期身份交给执行器一并校验：它在同一连接上核对 Galera 状态。
+	reply, err := n.executeRead(ctx, &protocol.DatabaseExists{
+		Connection: connection,
+		ClusterID:  request.ExpectedClusterID,
+		Database:   request.Database,
+	})
+	if err != nil {
+		return nil, err
+	}
+	result, ok := reply.(*protocol.DatabaseExistsResult)
+	if !ok {
+		return nil, fmt.Errorf("数据库存在性应答无效")
+	}
+	return result, nil
+}

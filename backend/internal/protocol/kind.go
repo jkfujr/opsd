@@ -48,6 +48,12 @@ func newPayload(kind Kind) (Payload, error) {
 		return &DatabaseRead{}, nil
 	case "database.read.result":
 		return &DatabaseReadResult{}, nil
+	case "database.exists":
+		return &DatabaseExistsRequest{}, nil
+	case "database.exists.query":
+		return &DatabaseExists{}, nil
+	case "database.exists.result":
+		return &DatabaseExistsResult{}, nil
 	case "database.proxy_routing.read":
 		return &ProxyRoutingRead{}, nil
 	case "database.proxy_routing.result":

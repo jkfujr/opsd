@@ -99,7 +99,7 @@ func (s *Services) Handle(ctx context.Context, payload protocol.Payload) (protoc
 	case *protocol.DatabaseRead:
 		return s.readDatabase(ctx, *body)
 	case *protocol.DatabaseExists:
-		exists, err := (databaseengine.Manager{}).DatabaseExists(ctx, body.Connection, body.Database)
+		exists, err := (databaseengine.Manager{}).DatabaseExists(ctx, body.Connection, body.ClusterID, body.Database)
 		return &protocol.DatabaseExistsResult{Exists: exists}, err
 	case *protocol.ProxyRoutingRead:
 		value, err := (databaseengine.Manager{}).ReadProxyRouting(ctx, body.Connection, body.Hostgroups)

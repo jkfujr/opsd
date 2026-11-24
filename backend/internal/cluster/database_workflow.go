@@ -674,16 +674,11 @@ func (n *Node) databaseSchemaExists(ctx context.Context, cluster ManagedDatabase
 		return false, fault("dependency_unavailable", "无法确认目标库状态")
 	}
 	ref := cluster.Members[0]
-	connection, err := n.databaseConnection(ctx, ref.InstanceID)
-	if err != nil {
-		return false, err
-	}
-	connection.Kind = "galera"
 	var out protocol.DatabaseExistsResult
-	if err = n.Call(ctx, ref.NodeID, "database.exists", protocol.DatabaseExists{
-		Connection: connection,
-		ClusterID:  cluster.ClusterID,
-		Database:   database,
+	if err := n.Call(ctx, ref.NodeID, "database.exists", protocol.DatabaseExistsRequest{
+		InstanceID:        ref.InstanceID,
+		ExpectedClusterID: cluster.ClusterID,
+		Database:          database,
 	}, &out); err != nil {
 		return false, err
 	}
