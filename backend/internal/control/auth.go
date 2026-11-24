@@ -184,7 +184,7 @@ func (s *Server) ChangeAccount(w http.ResponseWriter, r *http.Request, _ httpapi
 	if !s.body(w, r, &body) {
 		return
 	}
-	writeRequest := *writeIdentity(r)
+	writeRequest := *s.writeIdentity(r)
 	var op cluster.Operation
 	prior, receiptErr := s.node.RequestReceipt(r.Context(), s.node.ID, writeRequest)
 	if receiptErr == nil && prior.Operation != nil {

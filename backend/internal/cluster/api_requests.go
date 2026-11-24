@@ -113,7 +113,7 @@ func (n *Node) apiOperationDecision(ctx context.Context, request operationDecisi
 			if err != nil {
 				return Operation{}, err
 			}
-			prior, err := s.Receipt(ctx, sharedsql.Receipt{Actor: request.Write.Actor, Key: request.Write.Key, Digest: request.Write.Digest})
+			prior, err := s.Receipt(ctx, sharedsql.Receipt{Origin: request.Write.Origin, Actor: request.Write.Actor, Key: request.Write.Key, Digest: request.Write.Digest})
 			if err == nil {
 				var op Operation
 				err = json.Unmarshal(prior.Result, &op)
@@ -191,7 +191,10 @@ func (n *Node) RequestReceipt(ctx context.Context, target string, request reques
 				}
 				return out, nil
 			}
-			if errors.Is(err, sharedsql.ErrConflict) {
+			// 只有"确实没有这条回执"才能继续往下查；
+			// 旧回执（来源为空）返回 outcome_unknown，冲突返回冲突——
+			// 这两种都必须原样透出，否则会被误报成"没有记录"。
+			if !errors.Is(err, sql.ErrNoRows) {
 				return RequestReceipt{}, sharedFault(err)
 			}
 		}

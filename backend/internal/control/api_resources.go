@@ -72,13 +72,13 @@ func (s *Server) DecideOperation(w http.ResponseWriter, r *http.Request, id stri
 	var op cluster.Operation
 	var e error
 	if input.Action == "cancel" {
-		op, e = s.node.CallOperationDecision(r.Context(), id, "operation.cancel", cluster.OperationDecision{ID: id, ExpectedRevision: uint64(input.ExpectedRevision)}, writeIdentity(r))
+		op, e = s.node.CallOperationDecision(r.Context(), id, "operation.cancel", cluster.OperationDecision{ID: id, ExpectedRevision: uint64(input.ExpectedRevision)}, s.writeIdentity(r))
 	} else {
 		decision := cluster.OperationDecision{ID: id, ExpectedRevision: uint64(input.ExpectedRevision)}
 		if input.AcceptCurrent != nil {
 			decision.AcceptCurrent = *input.AcceptCurrent
 		}
-		op, e = s.node.CallOperationDecision(r.Context(), id, "operation."+string(input.Action), decision, writeIdentity(r))
+		op, e = s.node.CallOperationDecision(r.Context(), id, "operation."+string(input.Action), decision, s.writeIdentity(r))
 	}
 	s.resultError(w, r, 200, convertHTTP[httpapi.Operation](op), e)
 }
@@ -173,8 +173,13 @@ func (s *Server) GetThemeSelection(w http.ResponseWriter, r *http.Request) {
 	s.setETag(w, r, revision)
 	write(w, 200, httpapi.ThemeSelectionState{InstallationId: selection, EffectiveInstallationId: effective, Revision: int64(revision), BuiltinUrl: "/__opsd/builtin/"})
 }
-func writeIdentity(r *http.Request) *requeststate.Write {
-	return &requeststate.Write{Actor: actor(r), Key: r.Header.Get("Idempotency-Key"), Digest: requestFingerprint(r)}
+// writeIdentity 组装这次写入的幂等身份。
+//
+// Origin 必须填**已认证来源**：本地入口就是本节点 ID。回执按
+// (origin, actor, key) 归属，缺了它查询与保存会落到不同桶——
+// 查不到自己的回执，还可能命中迁移前来源为空的旧行。
+func (s *Server) writeIdentity(r *http.Request) *requeststate.Write {
+	return &requeststate.Write{Origin: s.node.ID, Actor: actor(r), Key: r.Header.Get("Idempotency-Key"), Digest: requestFingerprint(r)}
 }
 func (s *Server) GetRequestReceipt(w http.ResponseWriter, r *http.Request, key string, p httpapi.GetRequestReceiptParams) {
 	value, e := s.node.RequestReceipt(r.Context(), p.NodeId, requeststate.Write{Actor: actor(r), Key: key})

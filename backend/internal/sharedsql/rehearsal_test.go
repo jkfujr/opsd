@@ -66,6 +66,7 @@ func TestStopWriteRehearsal(t *testing.T) {
 	t.Cleanup(func() {
 		cleaner, e := sql.Open("mysql", dsn)
 		if e != nil {
+			t.Errorf("清理演练账号时无法连接：%v", e)
 			return
 		}
 		defer cleaner.Close()
@@ -145,7 +146,16 @@ func TestStopWriteRehearsal(t *testing.T) {
 	}
 	t.Logf("步骤 4：未提交事务仍在（%d），版本仍为 %d", trx, version)
 
-	// 5) 回滚并关闭写连接，确认会话与事务都归零后才允许迁移。
+	// 5) 先确认这个账号的会话**确实可见**，再回滚关闭并断言归零——
+	//    否则"查不到会话"可能因为账号名写错，而归零永远成立。
+	var visible int
+	if err = admin.QueryRowContext(ctx, "SELECT COUNT(*) FROM information_schema.PROCESSLIST WHERE USER=?", account).Scan(&visible); err != nil {
+		t.Fatal(err)
+	}
+	if visible == 0 {
+		t.Fatalf("查询账号 %s 应能看到自己的会话，实际 0", account)
+	}
+	t.Logf("步骤 5a：账号 %s 有 %d 个会话可见", account, visible)
 	if err = writeTx.Rollback(); err != nil {
 		t.Fatal(err)
 	}
@@ -153,7 +163,7 @@ func TestStopWriteRehearsal(t *testing.T) {
 	deadline := time.Now().Add(20 * time.Second)
 	for {
 		var sessions, transactions int
-		if err = admin.QueryRowContext(ctx, "SELECT COUNT(*) FROM information_schema.PROCESSLIST WHERE USER='opsd_write'").Scan(&sessions); err != nil {
+		if err = admin.QueryRowContext(ctx, "SELECT COUNT(*) FROM information_schema.PROCESSLIST WHERE USER=?", account).Scan(&sessions); err != nil {
 			t.Fatalf("读取 PROCESSLIST 失败：%v", err)
 		}
 		if err = admin.QueryRowContext(ctx, "SELECT COUNT(*) FROM information_schema.INNODB_TRX").Scan(&transactions); err != nil {

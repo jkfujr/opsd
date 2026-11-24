@@ -44,7 +44,7 @@ func (s *Server) SaveStorageTarget(w http.ResponseWriter, r *http.Request, id st
 	input := convertHTTP[objectstore.Input](body)
 	input.ID, input.Revision = id, expectedRevision(r)
 	var out objectstore.Target
-	err := s.node.Call(r.Context(), input.NodeID, "storage.save", cluster.StorageCommand{Input: &input, Write: writeIdentity(r)}, &out)
+	err := s.node.Call(r.Context(), input.NodeID, "storage.save", cluster.StorageCommand{Input: &input, Write: s.writeIdentity(r)}, &out)
 	if err == nil {
 		s.setETag(w, r, out.Revision)
 	}
@@ -64,7 +64,7 @@ func (s *Server) CheckStorageTarget(w http.ResponseWriter, r *http.Request, id s
 		return
 	}
 	var out objectstore.Check
-	err = s.node.Call(r.Context(), target.NodeID, "storage.check", cluster.StorageCommand{ID: id, Prefix: body.Prefix, Revision: target.Revision, Write: writeIdentity(r)}, &out)
+	err = s.node.Call(r.Context(), target.NodeID, "storage.check", cluster.StorageCommand{ID: id, Prefix: body.Prefix, Revision: target.Revision, Write: s.writeIdentity(r)}, &out)
 	s.setETag(w, r, target.Revision)
 	s.resultError(w, r, 200, out, err)
 }

@@ -26,7 +26,7 @@ func (s *Server) CreateAPIToken(w http.ResponseWriter, r *http.Request, node str
 		return
 	}
 	var out httpapi.APITokenCreated
-	e := s.node.Call(r.Context(), node, "api_token.create", cluster.TokenCommand{Write: writeIdentity(r), Input: convertHTTP[apiauth.Input](input)}, &out)
+	e := s.node.Call(r.Context(), node, "api_token.create", cluster.TokenCommand{Write: s.writeIdentity(r), Input: convertHTTP[apiauth.Input](input)}, &out)
 	if e == nil {
 		w.Header().Set("Location", httpapi.APIBasePath+"/nodes/"+node+"/api-tokens/"+out.Token.Id)
 	}
@@ -64,6 +64,6 @@ func (s *Server) RegenerateAPIToken(w http.ResponseWriter, r *http.Request, node
 		return
 	}
 	var out httpapi.APITokenCreated
-	e := s.node.Call(r.Context(), node, "api_token.regenerate", cluster.TokenCommand{Write: writeIdentity(r), ID: id, Input: apiauth.Input{Revision: uint64(input.ExpectedRevision)}}, &out)
+	e := s.node.Call(r.Context(), node, "api_token.regenerate", cluster.TokenCommand{Write: s.writeIdentity(r), ID: id, Input: apiauth.Input{Revision: uint64(input.ExpectedRevision)}}, &out)
 	s.resultError(w, r, 200, out, e)
 }

@@ -180,7 +180,7 @@ func (s *Server) saveDatabaseDefinition(w http.ResponseWriter, r *http.Request, 
 	}
 	var receipt *requeststate.Write
 	if create {
-		receipt = writeIdentity(r)
+		receipt = s.writeIdentity(r)
 	}
 	e := s.node.Call(r.Context(), c.Coordinator, "database.cluster.save", cluster.DatabaseRPC{Cluster: c, Write: receipt}, &out)
 	status := 200

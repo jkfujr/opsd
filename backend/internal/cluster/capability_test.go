@@ -484,8 +484,10 @@ func TestRetryReturnsOriginalWhileStillInFlight(t *testing.T) {
 	if _, err = n.enqueue(t.Context(), n.ID, Request{Kind: "database", Key: "same", Actor: "account:1", InputDigest: other, Payload: payload()}); err == nil || faultCode(err) != "conflict" {
 		t.Fatalf("同键换参数应冲突，实际 %v", err)
 	}
-	// 换来源用同一个键是另一桶：不被回执命中所阻。
-	if _, err = n.enqueue(t.Context(), n.ID, Request{Kind: "database", Key: "same", Actor: "account:2", InputDigest: digest, Payload: payload()}); err == nil || faultCode(err) != "conflict" {
+	// 换**来源**（不是换操作者）用同一个键：属于另一个桶，不能被上面的回执命中，
+	// 因而会被在途挡住。
+	otherOrigin := strings.Repeat("c", 32)
+	if _, err = n.enqueue(t.Context(), otherOrigin, Request{Kind: "database", Key: "same", Actor: "account:1", InputDigest: digest, Payload: payload()}); err == nil || faultCode(err) != "conflict" {
 		t.Fatalf("换来源应作为新请求（此时被在途挡住），实际 %v", err)
 	}
 }

@@ -58,7 +58,7 @@ func (s *Server) InstallTheme(w http.ResponseWriter, r *http.Request, _ httpapi.
 	if !s.themeReady(w, r) {
 		return
 	}
-	r = r.WithContext(requeststate.With(r.Context(), writeIdentity(r)))
+	r = r.WithContext(requeststate.With(r.Context(), s.writeIdentity(r)))
 	media, _, _ := mime.ParseMediaType(r.Header.Get("Content-Type"))
 	if media == "application/zip" {
 		s.uploadTheme(w, r)

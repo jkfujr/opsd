@@ -44,7 +44,7 @@ func (s *Server) RevokeNode(w http.ResponseWriter, r *http.Request, id string, _
 	if !s.body(w, r, &input) {
 		return
 	}
-	if e := s.node.RevokeRevision(requeststate.With(r.Context(), writeIdentity(r)), id, uint64(input.ExpectedRevision)); e != nil {
+	if e := s.node.RevokeRevision(requeststate.With(r.Context(), s.writeIdentity(r)), id, uint64(input.ExpectedRevision)); e != nil {
 		s.operationError(w, r, e)
 		return
 	}
@@ -73,7 +73,7 @@ func (s *Server) CreateEnrollmentToken(w http.ResponseWriter, r *http.Request, _
 			return
 		}
 	}
-	token, id, expires, e := s.node.Token(requeststate.With(r.Context(), writeIdentity(r)))
+	token, id, expires, e := s.node.Token(requeststate.With(r.Context(), s.writeIdentity(r)))
 	if e != nil {
 		s.operationError(w, r, e)
 		return

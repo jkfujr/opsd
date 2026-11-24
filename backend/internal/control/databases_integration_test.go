@@ -261,10 +261,14 @@ func nativeSubmit(t *testing.T, entry *apiNode, raw, id, key string, change map[
 // queueCount 数协调节点**自己**队列里该资源键的操作数。
 // operationCount 查的是执行器侧的 operations，两者不是一回事：
 // 受理被拒时执行器那边本来就不会有记录，必须查协调节点的 queue。
-func queueCount(t *testing.T, node *apiNode, resourceKey string) int {
+// requestKeyCount 数协调节点队列里该幂等键的行数。
+//
+// 比按 resource_key 查更严：误入队时若漏写 resource_key，按资源键查同样是 0，
+// 会把"错误入队"看成"没有入队"。
+func requestKeyCount(t *testing.T, node *apiNode, key string) int {
 	t.Helper()
 	var count int
-	if e := node.node.DB.QueryRow("SELECT count(*) FROM queue WHERE resource_key=?", resourceKey).Scan(&count); e != nil {
+	if e := node.node.DB.QueryRow("SELECT count(*) FROM queue WHERE request_key=?", key).Scan(&count); e != nil {
 		t.Fatal(e)
 	}
 	return count
@@ -524,8 +528,9 @@ func TestDatabaseNativeClusterAPIAndDashboard(t *testing.T) {
 	if after := operationCount(t, services[0], "create_database"); after != before {
 		t.Fatalf("暂停受理后仍产生了建库操作：%d -> %d", before, after)
 	}
-	// 受理被拒时协调节点必须**零入队**：执行器侧没记录并不代表没受理。
-	if queued := queueCount(t, c, strings.Join([]string{registered.ClusterID, "opsd_ci_unreachable"}, "\x1f")); queued != 0 {
+	// 受理被拒时**协调节点**必须零入队：执行器侧没记录并不代表没受理。
+	// 这个集群登记的协调节点是 a；查 c 会看不出 a 的错误入队。
+	if queued := requestKeyCount(t, a, "read-back-fails"); queued != 0 {
 		t.Fatalf("暂停受理后协调节点仍有入队：%d", queued)
 	}
 	output := filepath.Join("..", "..", "..", "artifacts")

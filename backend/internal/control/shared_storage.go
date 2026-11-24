@@ -60,7 +60,7 @@ func (s *Server) SaveSharedConsoles(w http.ResponseWriter, r *http.Request, _ ht
 	if !s.body(w, r, &input) {
 		return
 	}
-	value, err := s.node.SaveSharedConsoles(requeststate.With(r.Context(), writeIdentity(r)), convertHTTP[cluster.SharedConsoles](input))
+	value, err := s.node.SaveSharedConsoles(requeststate.With(r.Context(), s.writeIdentity(r)), convertHTTP[cluster.SharedConsoles](input))
 	s.resultError(w, r, http.StatusOK, convertHTTP[httpapi.SharedConsoles](value), err)
 }
 
@@ -69,7 +69,7 @@ func (s *Server) InitializeSharedStorage(w http.ResponseWriter, r *http.Request,
 	if !s.body(w, r, &input) {
 		return
 	}
-	op, err := s.node.StartSharedInitialization(requeststate.With(r.Context(), writeIdentity(r)), convertHTTP[cluster.SharedInitialize](input), r.Header.Get("Idempotency-Key"))
+	op, err := s.node.StartSharedInitialization(requeststate.With(r.Context(), s.writeIdentity(r)), convertHTTP[cluster.SharedInitialize](input), r.Header.Get("Idempotency-Key"))
 	if err == nil {
 		w.Header().Set("Location", httpapi.APIBasePath+"/operations/"+op.ID)
 	}
@@ -93,6 +93,6 @@ func (s *Server) ChangeDatabaseCoordinator(w http.ResponseWriter, r *http.Reques
 	if !s.body(w, r, &input) {
 		return
 	}
-	c, err := s.node.TransferDatabaseCoordinator(requeststate.With(r.Context(), writeIdentity(r)), id, input.Coordinator, uint64(input.ExpectedRevision))
+	c, err := s.node.TransferDatabaseCoordinator(requeststate.With(r.Context(), s.writeIdentity(r)), id, input.Coordinator, uint64(input.ExpectedRevision))
 	s.resultError(w, r, http.StatusOK, convertHTTP[httpapi.ManagedDatabaseCluster](c), err)
 }

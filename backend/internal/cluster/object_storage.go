@@ -160,7 +160,7 @@ func (n *Node) saveStorageTarget(ctx context.Context, input objectstore.Input, w
 	if err != nil {
 		return t, err
 	}
-	receipt := sharedsql.Receipt{Actor: write.Actor, Key: write.Key, Digest: write.Digest}
+	receipt := sharedsql.Receipt{Origin: write.Origin, Actor: write.Actor, Key: write.Key, Digest: write.Digest}
 	if prior, e := s.Receipt(ctx, receipt); e == nil {
 		e = json.Unmarshal(prior.Result, &t)
 		return t, e

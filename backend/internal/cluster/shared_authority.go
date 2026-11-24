@@ -208,7 +208,7 @@ func (n *Node) sharedToken(ctx context.Context) (string, string, time.Time, erro
 	}{Hash: hex.EncodeToString(Digest(token)), Expires: expires}
 	err = s.Transact(ctx, n.ID, false, func(t *sharedsql.Tx) error {
 		if w := requeststate.Current(ctx); w != nil {
-			prior, e := t.Receipt(ctx, sharedsql.Receipt{Actor: w.Actor, Key: w.Key, Digest: w.Digest})
+			prior, e := t.Receipt(ctx, sharedsql.Receipt{Origin: w.Origin, Actor: w.Actor, Key: w.Key, Digest: w.Digest})
 			if e == nil {
 				var result struct {
 					ID string `json:"id"`
@@ -221,7 +221,7 @@ func (n *Node) sharedToken(ctx context.Context) (string, string, time.Time, erro
 				return e
 			}
 			body, _ := json.Marshal(map[string]any{"id": id, "expires_at": expires})
-			if e = t.SaveReceipt(ctx, sharedsql.Receipt{Actor: w.Actor, Key: w.Key, Digest: w.Digest, Kind: "enrollment", ResourceID: id, Result: body}); e != nil {
+			if e = t.SaveReceipt(ctx, sharedsql.Receipt{Origin: w.Origin, Actor: w.Actor, Key: w.Key, Digest: w.Digest, Kind: "enrollment", ResourceID: id, Result: body}); e != nil {
 				return e
 			}
 		}
@@ -295,7 +295,7 @@ func (n *Node) sharedRevoke(ctx context.Context, id string, expected *uint64) er
 	r.Signature = ed25519.Sign(n.signing, revocationBytes(r))
 	err = s.Transact(ctx, n.ID, false, func(t *sharedsql.Tx) error {
 		if w := requeststate.Current(ctx); w != nil {
-			_, e := t.Receipt(ctx, sharedsql.Receipt{Actor: w.Actor, Key: w.Key, Digest: w.Digest})
+			_, e := t.Receipt(ctx, sharedsql.Receipt{Origin: w.Origin, Actor: w.Actor, Key: w.Key, Digest: w.Digest})
 			if e == nil {
 				return nil
 			}
@@ -323,7 +323,7 @@ func (n *Node) sharedRevoke(ctx context.Context, id string, expected *uint64) er
 		}
 		if w := requeststate.Current(ctx); w != nil {
 			body, _ := json.Marshal(map[string]string{"id": id})
-			return t.SaveReceipt(ctx, sharedsql.Receipt{Actor: w.Actor, Key: w.Key, Digest: w.Digest, Kind: "node", ResourceID: id, Result: body})
+			return t.SaveReceipt(ctx, sharedsql.Receipt{Origin: w.Origin, Actor: w.Actor, Key: w.Key, Digest: w.Digest, Kind: "node", ResourceID: id, Result: body})
 		}
 		return nil
 	})
@@ -342,7 +342,7 @@ func (n *Node) sharedSaveDatabase(ctx context.Context, c ManagedDatabaseCluster)
 	err = s.Transact(ctx, n.ID, false, func(t *sharedsql.Tx) error {
 		c = original
 		if w := requeststate.Current(ctx); w != nil {
-			prior, e := t.Receipt(ctx, sharedsql.Receipt{Actor: w.Actor, Key: w.Key, Digest: w.Digest})
+			prior, e := t.Receipt(ctx, sharedsql.Receipt{Origin: w.Origin, Actor: w.Actor, Key: w.Key, Digest: w.Digest})
 			if e == nil {
 				return json.Unmarshal(prior.Result, &c)
 			}
@@ -394,7 +394,7 @@ func (n *Node) sharedSaveDatabase(ctx context.Context, c ManagedDatabaseCluster)
 			return e
 		}
 		if w := requeststate.Current(ctx); w != nil {
-			return t.SaveReceipt(ctx, sharedsql.Receipt{Actor: w.Actor, Key: w.Key, Digest: w.Digest, Kind: "database", ResourceID: c.ID, Result: o.Body})
+			return t.SaveReceipt(ctx, sharedsql.Receipt{Origin: w.Origin, Actor: w.Actor, Key: w.Key, Digest: w.Digest, Kind: "database", ResourceID: c.ID, Result: o.Body})
 		}
 		return nil
 	})

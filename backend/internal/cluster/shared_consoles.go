@@ -83,7 +83,7 @@ func (n *Node) SaveSharedConsoles(ctx context.Context, input SharedConsoles) (Sh
 			return e
 		}
 		if w := requeststate.Current(ctx); w != nil {
-			return t.SaveReceipt(ctx, sharedsql.Receipt{Actor: w.Actor, Key: w.Key, Digest: w.Digest, Kind: "consoles", ResourceID: "management", Result: object.Body})
+			return t.SaveReceipt(ctx, sharedsql.Receipt{Origin: w.Origin, Actor: w.Actor, Key: w.Key, Digest: w.Digest, Kind: "consoles", ResourceID: "management", Result: object.Body})
 		}
 		return nil
 	})

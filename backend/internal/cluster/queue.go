@@ -297,9 +297,12 @@ func (n *Node) enqueue(ctx context.Context, origin string, r Request) (Operation
 			return prior, nil
 		}
 	}
-	observed, e := n.prepareDatabaseTarget(ctx, r)
+	observed, prior, e := n.prepareDatabaseTarget(ctx, origin, r)
 	if e != nil {
 		return Operation{}, e
+	}
+	if prior != nil {
+		return *prior, nil
 	}
 	// 测试缝：读回结束、登记之前的位置。生产环境为 nil。
 	if n.acceptPause != nil && observed != nil {
@@ -338,10 +341,10 @@ func (n *Node) priorOperation(ctx context.Context, origin, actor, key, digest st
 //
 // 读回放在入口节点是错的：真正写库的是受理节点，窗口也在这里；
 // 入口拿到的结论未必对应当前这次写入。
-func (n *Node) prepareDatabaseTarget(ctx context.Context, r Request) (*int64, error) {
+func (n *Node) prepareDatabaseTarget(ctx context.Context, origin string, r Request) (*int64, *Operation, error) {
 	key := databaseResourceKey(r.Kind, r.Payload)
 	if key == "" {
-		return nil, nil
+		return nil, nil, nil
 	}
 	// 1) 在途数与资源版本用**一条**查询读取：两次读之间资源可能变过，
 	//    那会让"没有在途"与"版本是 X"这两个结论来自不同快照。
@@ -350,23 +353,30 @@ func (n *Node) prepareDatabaseTarget(ctx context.Context, r Request) (*int64, er
 	if e := n.DB.QueryRowContext(ctx,
 		"SELECT COALESCE(SUM(terminal=0),0), COALESCE(MAX(seq),0) FROM queue WHERE resource_key=?",
 		key).Scan(&inFlight, &seq); e != nil {
-		return nil, e
+		return nil, nil, e
 	}
 	if inFlight > 0 {
-		return nil, fault("conflict", "该数据库已有未结束的操作")
+		// 并发同参重试：两份请求都首查未命中，第一份先入队，第二份走到这里。
+		// 返回冲突前再按原来源、键、摘要查一次——第一份此刻已登记，
+		// 这次提交应当原样返回它，而不是把重试变成一次失败。
+		if prior, hit, e := n.priorOperation(ctx, origin, r.Actor, r.Key, r.InputDigest); e == nil && hit {
+			return nil, &prior, nil
+		}
+		return nil, nil, fault("conflict", "该数据库已有未结束的操作")
 	}
+	// 2) 记下读回前的资源版本，事务内据此判断读回是否已经过期。
 	// 3) 建库还要向真实集群读回：库里可能是外部建的。
 	if databaseChangeKind(r.Payload) == "create_database" {
 		cluster, database := databaseTarget(r.Payload)
 		exists, e := n.databaseSchemaExists(ctx, cluster, database)
 		if e != nil {
-			return nil, fault("dependency_unavailable", "无法确认目标库状态，已暂停受理")
+			return nil, nil, fault("dependency_unavailable", "无法确认目标库状态，已暂停受理")
 		}
 		if exists {
-			return nil, fault("conflict", "该数据库已存在，删除后才可重建")
+			return nil, nil, fault("conflict", "该数据库已存在，删除后才可重建")
 		}
 	}
-	return &seq, nil
+	return &seq, nil, nil
 }
 func (n *Node) enqueueTx(ctx context.Context, origin string, r Request, related func(*sql.Tx, Operation) error) (Operation, error) {
 	return n.enqueueTxObserved(ctx, origin, r, related, nil)
