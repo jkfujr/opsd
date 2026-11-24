@@ -258,6 +258,18 @@ func nativeSubmit(t *testing.T, entry *apiNode, raw, id, key string, change map[
 	}
 	return op
 }
+// queueCount 数协调节点**自己**队列里该资源键的操作数。
+// operationCount 查的是执行器侧的 operations，两者不是一回事：
+// 受理被拒时执行器那边本来就不会有记录，必须查协调节点的 queue。
+func queueCount(t *testing.T, node *apiNode, resourceKey string) int {
+	t.Helper()
+	var count int
+	if e := node.node.DB.QueryRow("SELECT count(*) FROM queue WHERE resource_key=?", resourceKey).Scan(&count); e != nil {
+		t.Fatal(e)
+	}
+	return count
+}
+
 func operationCount(t *testing.T, s *databaseServices, kind string) int {
 	t.Helper()
 	var count int
@@ -501,11 +513,20 @@ func TestDatabaseNativeClusterAPIAndDashboard(t *testing.T) {
 		_ = exec.Command("docker", "stop", name).Run()
 	}
 	unreachable := map[string]any{"expected_revision": registered.Revision, "kind": "create_database", "database": "opsd_ci_unreachable", "charset": "utf8mb4", "proxies": []any{}}
-	if code := apiCall(t, http.DefaultClient, c.web.URL, "POST", "/api/v2/database-clusters/"+registered.ID+"/changes", raw, "read-back-fails", "", unreachable, nil); code != 503 {
+	var problem map[string]any
+	if code := apiCall(t, http.DefaultClient, c.web.URL, "POST", "/api/v2/database-clusters/"+registered.ID+"/changes", raw, "read-back-fails", "", unreachable, &problem); code != 503 {
 		t.Fatalf("读回失败应返回 503，实际 %d", code)
+	}
+	// 状态码之外还要核对问题代码：暂停受理必须明确是依赖不可用。
+	if problem["code"] != "dependency_unavailable" {
+		t.Fatalf("读回失败的问题代码应为 dependency_unavailable，实际 %v", problem["code"])
 	}
 	if after := operationCount(t, services[0], "create_database"); after != before {
 		t.Fatalf("暂停受理后仍产生了建库操作：%d -> %d", before, after)
+	}
+	// 受理被拒时协调节点必须**零入队**：执行器侧没记录并不代表没受理。
+	if queued := queueCount(t, c, strings.Join([]string{registered.ClusterID, "opsd_ci_unreachable"}, "\x1f")); queued != 0 {
+		t.Fatalf("暂停受理后协调节点仍有入队：%d", queued)
 	}
 	output := filepath.Join("..", "..", "..", "artifacts")
 	_ = os.MkdirAll(output, 0755)

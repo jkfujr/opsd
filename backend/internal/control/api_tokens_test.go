@@ -145,8 +145,11 @@ func apiCall(t *testing.T, client *http.Client, base, method, path, raw, key, cs
 	}
 	validateTestResponse(t, request, response)
 	defer response.Body.Close()
-	if response.StatusCode < 400 && out != nil {
-		if e = json.NewDecoder(response.Body).Decode(out); e != nil {
+	if out != nil {
+		e = json.NewDecoder(response.Body).Decode(out)
+		// 成功响应必须能解析；错误响应解析失败不致命（可能不是 JSON），
+		// 但能解析时要把问题体交给调用方核对。
+		if e != nil && response.StatusCode < 400 {
 			t.Fatal(e)
 		}
 	}
