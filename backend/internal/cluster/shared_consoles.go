@@ -45,7 +45,7 @@ func (n *Node) SaveSharedConsoles(ctx context.Context, input SharedConsoles) (Sh
 	var result SharedConsoles
 	err = store.Transact(ctx, n.ID, false, func(t *sharedsql.Tx) error {
 		if w := requeststate.Current(ctx); w != nil {
-			prior, e := t.Receipt(ctx, sharedsql.Receipt{Actor: w.Actor, Key: w.Key, Digest: w.Digest})
+			prior, e := t.Receipt(ctx, sharedsql.Receipt{Origin: w.Origin, Actor: w.Actor, Key: w.Key, Digest: w.Digest})
 			if e == nil {
 				return json.Unmarshal(prior.Result, &result)
 			}

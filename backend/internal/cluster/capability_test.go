@@ -449,3 +449,43 @@ func TestCreateRejectedWhenResourceAdvancedDuringReadBack(t *testing.T) {
 		t.Fatalf("拒绝后仍产生了第二条操作：%d", created)
 	}
 }
+
+// 同来源、同键、同参的重试必须原样返回原操作——即使原操作仍在途。
+// 先查回执再读库，否则重试会变成 409（在途）或 503（成员离线）这样的新失败。
+func TestRetryReturnsOriginalWhileStillInFlight(t *testing.T) {
+	n, _ := openTestNode(t)
+	n.Executor = &schemaExecutor{}
+	seedDatabaseInstance(t, n, "inst-1")
+	payload := func() json.RawMessage {
+		b, _ := json.Marshal(DatabaseSubmission{
+			Change: DatabaseChange{Cluster: "managed-1", ExpectedRevision: 1, Kind: "create_database", Database: "biz", Charset: "utf8mb4"},
+			Cluster: ManagedDatabaseCluster{
+				ID: "managed-1", ClusterID: "galera-1", Name: "集群", Coordinator: n.ID, Revision: 1,
+				Members: []DatabaseRef{{NodeID: n.ID, InstanceID: "inst-1"}},
+			},
+		})
+		return b
+	}
+	digest := strings.Repeat("a", 64)
+	first, err := n.enqueue(t.Context(), n.ID, Request{Kind: "database", Key: "same", Actor: "account:1", InputDigest: digest, Payload: payload()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	// 原操作仍在途：按旧行为重试会拿到 409。
+	retry, err := n.enqueue(t.Context(), n.ID, Request{Kind: "database", Key: "same", Actor: "account:1", InputDigest: digest, Payload: payload()})
+	if err != nil {
+		t.Fatalf("重试应返回原操作，实际 %v", err)
+	}
+	if retry.ID != first.ID {
+		t.Fatalf("重试应命中同一操作：%s != %s", retry.ID, first.ID)
+	}
+	// 同一个键换参数仍是冲突。
+	other := strings.Repeat("b", 64)
+	if _, err = n.enqueue(t.Context(), n.ID, Request{Kind: "database", Key: "same", Actor: "account:1", InputDigest: other, Payload: payload()}); err == nil || faultCode(err) != "conflict" {
+		t.Fatalf("同键换参数应冲突，实际 %v", err)
+	}
+	// 换来源用同一个键是另一桶：不被回执命中所阻。
+	if _, err = n.enqueue(t.Context(), n.ID, Request{Kind: "database", Key: "same", Actor: "account:2", InputDigest: digest, Payload: payload()}); err == nil || faultCode(err) != "conflict" {
+		t.Fatalf("换来源应作为新请求（此时被在途挡住），实际 %v", err)
+	}
+}

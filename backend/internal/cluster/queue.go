@@ -282,6 +282,21 @@ func (n *Node) enqueue(ctx context.Context, origin string, r Request) (Operation
 	if r.Kind == "database" && n.sharedEnabled() {
 		return Operation{}, fault("unsupported", "请通过共享数据库受理流程")
 	}
+	// 回执最先查：同来源、同键、同参的重试必须原样返回原操作，
+	// 不能因为原操作仍在途（409）或成员离线（503）而变成一次新失败。
+	// 事务内仍会再查一次，这里的快路径只省掉多余的读库。
+	// 只在有服务端摘要时走快路径：摘要能证明"同参"，没有摘要就无法排除
+	// "同键换参数"，那是事务内（按动作类型）才能判断的事。
+	if r.Key != "" && r.InputDigest != "" {
+		actor := r.Actor
+		prior, hit, e := n.priorOperation(ctx, origin, actor, r.Key, r.InputDigest)
+		if e != nil {
+			return Operation{}, e
+		}
+		if hit {
+			return prior, nil
+		}
+	}
 	observed, e := n.prepareDatabaseTarget(ctx, r)
 	if e != nil {
 		return Operation{}, e
@@ -291,6 +306,32 @@ func (n *Node) enqueue(ctx context.Context, origin string, r Request) (Operation
 		n.acceptPause()
 	}
 	return n.enqueueTxObserved(ctx, origin, r, nil, observed)
+}
+
+// priorOperation 按已认证来源、操作者、请求键查已受理的操作。
+//
+// 摘要不一致说明同一个键被用于另一份参数，按冲突处理；
+// 摘要为空（未提供服务端摘要）时只按键命中，与事务内一致。
+func (n *Node) priorOperation(ctx context.Context, origin, actor, key, digest string) (Operation, bool, error) {
+	var body string
+	var recorded []byte
+	err := n.DB.QueryRowContext(ctx,
+		"SELECT body,request_digest FROM queue WHERE origin=? AND actor=? AND request_key=?",
+		origin, actor, key).Scan(&body, &recorded)
+	if err == sql.ErrNoRows {
+		return Operation{}, false, nil
+	}
+	if err != nil {
+		return Operation{}, false, err
+	}
+	if digest != "" && hex.EncodeToString(recorded) != digest {
+		return Operation{}, false, fault("conflict", "同一请求不能使用不同参数")
+	}
+	var prior Operation
+	if e := json.Unmarshal([]byte(body), &prior); e != nil {
+		return Operation{}, false, e
+	}
+	return prior, true, nil
 }
 
 // prepareDatabaseTarget 在**受理节点**上完成读回前的两件事与读回本身。

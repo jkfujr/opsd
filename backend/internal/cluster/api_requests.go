@@ -174,7 +174,9 @@ func (n *Node) RequestReceipt(ctx context.Context, target string, request reques
 	}
 	if n.sharedActive() {
 		if store, err := n.sharedStore(ctx); err == nil {
-			prior, err := store.Receipt(ctx, sharedsql.Receipt{Actor: request.Actor, Key: request.Key, Digest: request.Digest})
+			// Origin 必传：回执按来源归属，漏传会查不到新版回执，
+			// 还可能把迁移前的空来源记录当成有效回执返回。
+			prior, err := store.Receipt(ctx, sharedsql.Receipt{Origin: request.Origin, Actor: request.Actor, Key: request.Key, Digest: request.Digest})
 			if err == nil {
 				out := RequestReceipt{Key: request.Key, Owner: n.ID, Actor: request.Actor, State: "completed", CreatedAt: prior.CreatedAt, Kind: prior.Kind, ResourceID: prior.ResourceID, Secret: prior.Kind == "enrollment"}
 				var op Operation
