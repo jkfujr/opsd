@@ -302,18 +302,17 @@ func (n *Node) prepareDatabaseTarget(ctx context.Context, r Request) (*int64, er
 	if key == "" {
 		return nil, nil
 	}
-	// 1) 先判在途：已有同资源操作时不必读回，直接冲突。
+	// 1) 在途数与资源版本用**一条**查询读取：两次读之间资源可能变过，
+	//    那会让"没有在途"与"版本是 X"这两个结论来自不同快照。
 	var inFlight int
-	if e := n.DB.QueryRowContext(ctx, "SELECT count(*) FROM queue WHERE resource_key=? AND terminal=0", key).Scan(&inFlight); e != nil {
+	var seq int64
+	if e := n.DB.QueryRowContext(ctx,
+		"SELECT COALESCE(SUM(terminal=0),0), COALESCE(MAX(seq),0) FROM queue WHERE resource_key=?",
+		key).Scan(&inFlight, &seq); e != nil {
 		return nil, e
 	}
 	if inFlight > 0 {
 		return nil, fault("conflict", "该数据库已有未结束的操作")
-	}
-	// 2) 记下读回前的资源版本，事务内据此判断读回是否已经过期。
-	var seq int64
-	if e := n.DB.QueryRowContext(ctx, "SELECT COALESCE(MAX(seq),0) FROM queue WHERE resource_key=?", key).Scan(&seq); e != nil {
-		return nil, e
 	}
 	// 3) 建库还要向真实集群读回：库里可能是外部建的。
 	if databaseChangeKind(r.Payload) == "create_database" {
