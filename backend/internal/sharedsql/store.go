@@ -460,6 +460,9 @@ func (s *Store) PruneMetrics(ctx context.Context) error {
 // 只能在**停写窗口**内由独立迁移账号执行：先阻断旧写入方的新连接、排空存量会话
 // 与未结束事务，再执行这里的变更，最后核对结构并发布新版本号。
 // ALTER TABLE 会隐式提交，因此这些语句不能包在一个长事务里假装原子。
+//
+// 顺序上有一点必须守住：**先核对、先处理旧在途流程，最后才发布 v2**。
+// 一旦版本号写上去，旧写入方会被拒绝，而新版还没准备好就再也回不去了。
 func Migrate(ctx context.Context, db *sql.DB, cluster string) error {
 	var version int
 	var current string
@@ -489,6 +492,42 @@ func Migrate(ctx context.Context, db *sql.DB, cluster string) error {
 			return fmt.Errorf("%s：%w", step, err)
 		}
 	}
+	// DDL 之后、发布之前的核对：结构不对就不要把版本写上去。
+	if err := verifyV2(ctx, db); err != nil {
+		return err
+	}
+	// 旧的在途流程没有资源键，新版无法判断库名是否被占用。
+	// 停写窗口内它们本应已经结束；仍然存在就必须先排空，不能带着空键上线。
+	var pending int
+	if err := db.QueryRowContext(ctx, "SELECT count(*) FROM shared_flows WHERE terminal=0 AND resource_key=''").Scan(&pending); err != nil {
+		return err
+	}
+	if pending != 0 {
+		return fmt.Errorf("仍有 %d 个未结束的旧流程缺少资源键，请先排空后再发布 v2", pending)
+	}
 	_, err := db.ExecContext(ctx, "UPDATE shared_metadata SET schema_version=? WHERE id=1", SchemaVersion)
 	return err
+}
+
+// verifyV2 核对 v2 的结构：列、主键与索引都在，才允许发布版本号。
+func verifyV2(ctx context.Context, db *sql.DB) error {
+	var count int
+	for _, check := range []struct {
+		query string
+		args  []any
+		what  string
+	}{
+		{"SELECT count(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='shared_requests' AND COLUMN_NAME='origin'", nil, "shared_requests.origin"},
+		{"SELECT count(*) FROM information_schema.STATISTICS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='shared_requests' AND INDEX_NAME='PRIMARY' AND COLUMN_NAME='origin' AND SEQ_IN_INDEX=1", nil, "shared_requests 主键首选列"},
+		{"SELECT count(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='shared_flows' AND COLUMN_NAME='resource_key'", nil, "shared_flows.resource_key"},
+		{"SELECT count(*) FROM information_schema.STATISTICS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='shared_flows' AND INDEX_NAME='resource_key_flows'", nil, "shared_flows.resource_key_flows"},
+	} {
+		if err := db.QueryRowContext(ctx, check.query, check.args...).Scan(&count); err != nil {
+			return err
+		}
+		if count == 0 {
+			return fmt.Errorf("结构核对失败：缺少 %s", check.what)
+		}
+	}
+	return nil
 }
