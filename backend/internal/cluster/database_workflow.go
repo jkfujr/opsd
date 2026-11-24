@@ -146,23 +146,8 @@ func (n *Node) SubmitDatabaseChange(ctx context.Context, change DatabaseChange, 
 	// 建库前实时读回：已存在则 409，读不回来则暂停受理（503）。
 	// 这一步在事务外做——读回是网络调用，不该占着写事务。
 	// 共享启用时由共享受理入口负责，这里不再读第二次。
-	var observed *int64
-	if change.Kind == "create_database" && !n.sharedEnabled() {
-		exists, e := n.databaseSchemaExists(ctx, c, change.Database)
-		if e != nil {
-			return Operation{}, fault("dependency_unavailable", "无法确认目标库状态，已暂停受理")
-		}
-		if exists {
-			return Operation{}, fault("conflict", "该数据库已存在，删除后才可重建")
-		}
-		// 记下读回那一刻该资源的序号，受理事务据此判断读回是否已经过期。
-		var seq int64
-		key := databaseResourceKey("database", mustJSON(DatabaseSubmission{Change: change, Cluster: c}))
-		if e = n.DB.QueryRowContext(ctx, "SELECT COALESCE(MAX(seq),0) FROM queue WHERE resource_key=?", key).Scan(&seq); e != nil {
-			return Operation{}, e
-		}
-		observed = &seq
-	}
+	// 读回与资源观察都在**受理节点**完成（见 enqueue）：入口节点读回覆盖不到
+	// 受理节点上的窗口，拿到的只会是过期结论。
 	if change.Kind == "configure_proxy_routes" && c.ProxyRouting == nil {
 		if e = n.requireProxyRoutingSupport(ctx); e != nil {
 			return Operation{}, e
@@ -194,7 +179,7 @@ func (n *Node) SubmitDatabaseChange(ctx context.Context, change DatabaseChange, 
 		return Operation{}, e
 	}
 	body, _ := json.Marshal(input)
-	return n.Submit(ctx, c.Coordinator, Request{Actor: actor, Kind: "database", Payload: body, Key: key, InputDigest: digest, ResourceObservedSeq: observed})
+	return n.Submit(ctx, c.Coordinator, Request{Actor: actor, Kind: "database", Payload: body, Key: key, InputDigest: digest})
 }
 func (n *Node) buildDatabaseWorkflow(ctx context.Context, id string, input DatabaseSubmission) (databaseWorkflow, error) {
 	if input.Change.Deployment != nil {
@@ -718,4 +703,13 @@ func (n *Node) databaseSchemaExists(ctx context.Context, cluster ManagedDatabase
 		failure = fault("dependency_unavailable", "无法确认目标库状态")
 	}
 	return false, failure
+}
+
+// databaseTarget 从受理载荷里取出目标集群与库名。
+func databaseTarget(payload json.RawMessage) (ManagedDatabaseCluster, string) {
+	var submission DatabaseSubmission
+	if json.Unmarshal(payload, &submission) != nil {
+		return ManagedDatabaseCluster{}, ""
+	}
+	return submission.Cluster, submission.Change.Database
 }

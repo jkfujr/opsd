@@ -68,7 +68,15 @@ func (n *Node) createSharedWorkflow(ctx context.Context, r Request, origin strin
 	if err != sql.ErrNoRows {
 		return Operation{}, sharedFault(err)
 	}
-	// 建库前实时读回，规则与本机受理一致：已存在 409，读不回来暂停受理。
+	// 顺序与本机受理一致：先判在途并记下资源版本，再读回，最后在事务内复查。
+	resourceKey := databaseResourceKeyFromSubmission(input)
+	inFlight, observed, err := s.FlowResourceState(ctx, resourceKey)
+	if err != nil {
+		return Operation{}, sharedFault(err)
+	}
+	if inFlight > 0 {
+		return Operation{}, fault("conflict", "该数据库已有未结束的操作")
+	}
 	if input.Change.Kind == "create_database" {
 		exists, e := n.databaseSchemaExists(ctx, input.Cluster, input.Change.Database)
 		if e != nil {
@@ -154,7 +162,16 @@ func (n *Node) createSharedWorkflow(ctx context.Context, r Request, origin strin
 			return e
 		}
 		payload, _ := json.Marshal(sharedFlowPayload{Operation: op, Input: secret, Progress: &progressSecret})
-		if e = t.CreateFlow(ctx, sharedsql.Flow{ID: id, ResourceID: op.ResourceID, ResourceKey: databaseResourceKeyFromSubmission(input), Coordinator: coordinator, Epoch: 1, Revision: op.Revision, Body: payload}); e != nil {
+		// 读回在事务外：期间若该资源被推进过，那次读回已经过期，
+		// 按旧结论登记就会在库已存在的情况下再建一次。
+		if inFlight, total, e := t.FlowResourceState(ctx, resourceKey); e != nil {
+			return e
+		} else if inFlight > 0 {
+			return fault("conflict", "该数据库已有未结束的操作")
+		} else if total > observed {
+			return fault("conflict", "该数据库在受理期间已变化，请重新提交")
+		}
+		if e = t.CreateFlow(ctx, sharedsql.Flow{ID: id, ResourceID: op.ResourceID, ResourceKey: resourceKey, Coordinator: coordinator, Epoch: 1, Revision: op.Revision, Body: payload}); e != nil {
 			return e
 		}
 		result, _ := json.Marshal(op)

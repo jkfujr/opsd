@@ -282,9 +282,57 @@ func (n *Node) enqueue(ctx context.Context, origin string, r Request) (Operation
 	if r.Kind == "database" && n.sharedEnabled() {
 		return Operation{}, fault("unsupported", "请通过共享数据库受理流程")
 	}
-	return n.enqueueTx(ctx, origin, r, nil)
+	observed, e := n.prepareDatabaseTarget(ctx, r)
+	if e != nil {
+		return Operation{}, e
+	}
+	// 测试缝：读回结束、登记之前的位置。生产环境为 nil。
+	if n.acceptPause != nil && observed != nil {
+		n.acceptPause()
+	}
+	return n.enqueueTxObserved(ctx, origin, r, nil, observed)
+}
+
+// prepareDatabaseTarget 在**受理节点**上完成读回前的两件事与读回本身。
+//
+// 读回放在入口节点是错的：真正写库的是受理节点，窗口也在这里；
+// 入口拿到的结论未必对应当前这次写入。
+func (n *Node) prepareDatabaseTarget(ctx context.Context, r Request) (*int64, error) {
+	key := databaseResourceKey(r.Kind, r.Payload)
+	if key == "" {
+		return nil, nil
+	}
+	// 1) 先判在途：已有同资源操作时不必读回，直接冲突。
+	var inFlight int
+	if e := n.DB.QueryRowContext(ctx, "SELECT count(*) FROM queue WHERE resource_key=? AND terminal=0", key).Scan(&inFlight); e != nil {
+		return nil, e
+	}
+	if inFlight > 0 {
+		return nil, fault("conflict", "该数据库已有未结束的操作")
+	}
+	// 2) 记下读回前的资源版本，事务内据此判断读回是否已经过期。
+	var seq int64
+	if e := n.DB.QueryRowContext(ctx, "SELECT COALESCE(MAX(seq),0) FROM queue WHERE resource_key=?", key).Scan(&seq); e != nil {
+		return nil, e
+	}
+	// 3) 建库还要向真实集群读回：库里可能是外部建的。
+	if databaseChangeKind(r.Payload) == "create_database" {
+		cluster, database := databaseTarget(r.Payload)
+		exists, e := n.databaseSchemaExists(ctx, cluster, database)
+		if e != nil {
+			return nil, fault("dependency_unavailable", "无法确认目标库状态，已暂停受理")
+		}
+		if exists {
+			return nil, fault("conflict", "该数据库已存在，删除后才可重建")
+		}
+	}
+	return &seq, nil
 }
 func (n *Node) enqueueTx(ctx context.Context, origin string, r Request, related func(*sql.Tx, Operation) error) (Operation, error) {
+	return n.enqueueTxObserved(ctx, origin, r, related, nil)
+}
+
+func (n *Node) enqueueTxObserved(ctx context.Context, origin string, r Request, related func(*sql.Tx, Operation) error, observed *int64) (Operation, error) {
 	// origin 是**已认证来源节点**，r.Actor 只是声明操作者：
 	// 声明只用于同一来源内的幂等分桶，不参与授权，也不能跨来源命中别人的键。
 	actor := r.Actor
@@ -629,12 +677,12 @@ func (n *Node) enqueueTx(ctx context.Context, origin string, r Request, related 
 		}
 		// 读回发生在事务外：期间若有人推进过同一个库，那次读回已经过期，
 		// 按旧结论受理就会在库里已经存在的情况下再建一次。
-		if r.ResourceObservedSeq != nil {
+		if observed != nil {
 			var current int64
 			if e := tx.QueryRowContext(ctx, "SELECT COALESCE(MAX(seq),0) FROM queue WHERE resource_key=?", resourceKey).Scan(&current); e != nil {
 				return Operation{}, e
 			}
-			if current > *r.ResourceObservedSeq {
+			if current > *observed {
 				return Operation{}, fault("conflict", "该数据库在受理期间已变化，请重新提交")
 			}
 		}

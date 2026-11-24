@@ -239,7 +239,14 @@ func TestSharedJoinKeepsBindingAfterCoordinatorHandoff(t *testing.T) {
 
 func TestSharedMigrationExportKeepsCiphertextAndOriginalReceipt(t *testing.T) {
 	n, _ := openTestNode(t)
-	c := ManagedDatabaseCluster{ID: NewOperationID(n.ID), Coordinator: n.ID, ClusterID: "galera", Revision: 1, Name: "业务集群"}
+	// 建库受理要向真实集群读回，所以这条定义要有一个已登记成员，
+	// 执行器替身负责回答"库不存在"。
+	n.Executor = &schemaExecutor{}
+	seedDatabaseInstance(t, n, "inst-export")
+	c := ManagedDatabaseCluster{
+		ID: NewOperationID(n.ID), Coordinator: n.ID, ClusterID: "galera", Revision: 1, Name: "业务集群",
+		Members: []DatabaseRef{{NodeID: n.ID, InstanceID: "inst-export"}},
+	}
 	input := DatabaseSubmission{Cluster: c, Change: DatabaseChange{Cluster: c.ID, ExpectedRevision: 1, Kind: "create_database", Database: "business", Charset: "utf8mb4"}}
 	digest := sha256.Sum256([]byte("原始请求"))
 	op, err := n.enqueue(t.Context(), n.ID, Request{Kind: "database", Key: "original", Actor: "account:" + n.ID + ":1", InputDigest: hex.EncodeToString(digest[:]), Payload: payload(input)})

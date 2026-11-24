@@ -645,3 +645,58 @@ func TestOperationIDBelongsToItsOrigin(t *testing.T) {
 		t.Fatalf("原记录被影响：%v %v", got, err)
 	}
 }
+
+// schemaExecutor 让测试节点能回答 database.exists，并可控制答复与时序。
+type schemaExecutor struct {
+	lostExecutor
+	mu sync.Mutex
+	// exists 是当前"库是否存在"的回答；gate 非空时答复先挂起，
+	// 用于构造"读回发生在另一条操作之前"的并发窗口。
+	exists bool
+	gate   chan struct{}
+	asked  chan string
+}
+
+func (e *schemaExecutor) Call(ctx context.Context, p protocol.Payload) (protocol.Payload, error) {
+	if q, ok := p.(*protocol.DatabaseExists); ok {
+		if e.asked != nil {
+			select {
+			case e.asked <- q.Database:
+			default:
+			}
+		}
+		if e.gate != nil {
+			<-e.gate
+		}
+		e.mu.Lock()
+		defer e.mu.Unlock()
+		return &protocol.DatabaseExistsResult{Exists: e.exists}, nil
+	}
+	return e.lostExecutor.Call(ctx, p)
+}
+
+// setExists 改变后续读回的回答。
+func (e *schemaExecutor) setExists(exists bool) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	e.exists = exists
+}
+
+// seedDatabaseInstance 写入一条实例凭据，让 database.exists 能在本机解析出连接。
+// 执行器替身并不真正连库，这里只需要一条结构合法的记录。
+func seedDatabaseInstance(t *testing.T, n *Node, id string) {
+	t.Helper()
+	connection, err := json.Marshal(protocol.DatabaseConnection{Kind: "galera", Address: "127.0.0.1:3306", Username: "root", Password: "x"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	sealed, err := seal(connection, []string{n.age.Recipient().String()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw, _ := json.Marshal(sealed)
+	if _, err = n.DB.Exec(`INSERT INTO managed_database_instances(id,body,connection) VALUES(?,?,?)`,
+		id, `{"id":"`+id+`","revision":1}`, string(raw)); err != nil {
+		t.Fatal(err)
+	}
+}

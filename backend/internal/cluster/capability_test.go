@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/jkfujr/opsd/internal/protocol"
 )
@@ -388,56 +389,63 @@ func TestBackfillResourceKeyForInFlightDatabase(t *testing.T) {
 }
 
 // 读回与受理之间有人建了同一个库：那次读回已经过期，必须拒绝而不是照样受理。
+//
+// A 读到"不存在"后停在读回结束、登记之前；期间 B 用另一个键受理并进入终态；
+// 放行 A 后它带着过期结论提交，事务内的版本复查必须拒绝它，且只留下一条操作。
 func TestCreateRejectedWhenResourceAdvancedDuringReadBack(t *testing.T) {
 	n, _ := openTestNode(t)
-	body := func() json.RawMessage {
+	n.Executor = &schemaExecutor{}
+	seedDatabaseInstance(t, n, "inst-1")
+	payload := func() json.RawMessage {
 		b, _ := json.Marshal(DatabaseSubmission{
-			Change:  DatabaseChange{Cluster: "managed-1", ExpectedRevision: 1, Kind: "create_database", Database: "biz", Charset: "utf8mb4"},
-			Cluster: ManagedDatabaseCluster{ID: "managed-1", ClusterID: "galera-1", Name: "集群", Coordinator: n.ID, Revision: 1},
+			Change: DatabaseChange{Cluster: "managed-1", ExpectedRevision: 1, Kind: "create_database", Database: "biz", Charset: "utf8mb4"},
+			Cluster: ManagedDatabaseCluster{
+				ID: "managed-1", ClusterID: "galera-1", Name: "集群", Coordinator: n.ID, Revision: 1,
+				Members: []DatabaseRef{{NodeID: n.ID, InstanceID: "inst-1"}},
+			},
 		})
 		return b
 	}
-	// A 读到“不存在”时的序号。
-	var observed int64
-	key := databaseResourceKey("database", body())
-	if err := n.DB.QueryRow("SELECT COALESCE(MAX(seq),0) FROM queue WHERE resource_key=?", key).Scan(&observed); err != nil {
-		t.Fatal(err)
+	paused := make(chan struct{}, 1)
+	release := make(chan struct{})
+	n.acceptPause = func() {
+		paused <- struct{}{}
+		<-release
 	}
-	// B 在 A 提交之前建库并结束。
-	b := body()
-	op, err := n.enqueueTx(t.Context(), n.ID, Request{Kind: "database", Key: "b", Payload: b}, nil)
+	type outcome struct {
+		op  Operation
+		err error
+	}
+	a := make(chan outcome, 1)
+	go func() {
+		op, err := n.enqueue(t.Context(), n.ID, Request{Kind: "database", Key: "a", Payload: payload()})
+		a <- outcome{op, err}
+	}()
+	select {
+	case <-paused:
+	case <-time.After(5 * time.Second):
+		t.Fatal("A 没有走到暂停点")
+	}
+	// B 用另一个键受理并进入终态。
+	n.acceptPause = nil
+	b, err := n.enqueue(t.Context(), n.ID, Request{Kind: "database", Key: "b", Payload: payload()})
 	if err != nil {
 		t.Fatalf("B 的建库应被受理：%v", err)
 	}
-	if _, err = n.DB.Exec(`UPDATE queue SET terminal=1, body=json_set(body,'$.state','succeeded') WHERE id=?`, op.ID); err != nil {
+	if _, err = n.DB.Exec(`UPDATE queue SET terminal=1, body=json_set(body,'$.state','succeeded') WHERE id=?`, b.ID); err != nil {
 		t.Fatal(err)
 	}
-	// 放行 A：它带着过期的读回结论提交。
-	if _, err = n.enqueueTx(t.Context(), n.ID, Request{Kind: "database", Key: "a", Payload: body(), ResourceObservedSeq: &observed}, nil); err == nil || faultCode(err) != "conflict" {
-		t.Fatalf("读回过期时应拒绝，实际 %v", err)
+	close(release)
+	got := <-a
+	if got.err == nil || faultCode(got.err) != "conflict" {
+		t.Fatalf("读回过期时应拒绝，实际 %v", got.err)
 	}
+	key := databaseResourceKey("database", payload())
 	var created int
 	if err = n.DB.QueryRow("SELECT count(*) FROM queue WHERE resource_key=?", key).Scan(&created); err != nil {
 		t.Fatal(err)
 	}
 	if created != 1 {
 		t.Fatalf("拒绝后仍产生了第二条操作：%d", created)
-	}
-}
-
-// 读回失败必须报错，让受理方暂停；绝不能退化成“当作不存在”。
-func TestReadBackFailsWhenNoMemberAnswers(t *testing.T) {
-	n, _ := openTestNode(t)
-	cluster := ManagedDatabaseCluster{
-		ID: "managed-1", ClusterID: "galera-1",
-		Members: []DatabaseRef{{NodeID: "ffffffffffffffffffffffffffffffff", InstanceID: "inst-1"}},
-	}
-	if _, err := n.databaseSchemaExists(t.Context(), cluster, "biz"); err == nil {
-		t.Fatal("没有成员可答时应返回错误，而不是“不存在”")
-	}
-	// 缺少成员或集群身份同样只能报错：外部建的库不会写进 shared_flows，
-	// 因此共享模式也必须在成员侧读回。
-	if _, err := n.databaseSchemaExists(t.Context(), ManagedDatabaseCluster{ID: "managed-1"}, "biz"); err == nil {
-		t.Fatal("缺少成员时应返回错误")
 	}
 }

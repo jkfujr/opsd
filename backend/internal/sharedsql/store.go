@@ -457,6 +457,27 @@ func (s *Store) PruneMetrics(ctx context.Context) error {
 	})
 }
 
+// FlowResourceState 返回该资源键上有多少流程、其中多少未结束。
+//
+// 未结束的数量用来判在途冲突；总数单调增加，可当作"资源版本"，
+// 用来判断一次读回是否已经过期（读回发生在共享事务之外）。
+func (s *Store) FlowResourceState(ctx context.Context, key string) (inFlight, total int, err error) {
+	if key == "" {
+		return 0, 0, nil
+	}
+	err = s.DB.QueryRowContext(ctx, `SELECT COALESCE(SUM(terminal=0),0), COUNT(*) FROM shared_flows WHERE resource_key=?`, key).Scan(&inFlight, &total)
+	return inFlight, total, err
+}
+
+// TxFlowResourceState 是 FlowResourceState 的事务内版本，用于受理事务复查。
+func (t *Tx) FlowResourceState(ctx context.Context, key string) (inFlight, total int, err error) {
+	if key == "" {
+		return 0, 0, nil
+	}
+	err = t.QueryRowContext(ctx, `SELECT COALESCE(SUM(terminal=0),0), COUNT(*) FROM shared_flows WHERE resource_key=?`, key).Scan(&inFlight, &total)
+	return inFlight, total, err
+}
+
 // Migrate 把 v1 的共享库升到 v2。
 //
 // 只能在**停写窗口**内由独立迁移账号执行：先阻断旧写入方的新连接、排空存量会话

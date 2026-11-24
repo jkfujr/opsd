@@ -31,6 +31,8 @@ type Options struct {
 	Now                          func() time.Time
 }
 type Node struct {
+	// acceptPause 只供测试构造"读回后、登记前"的并发窗口，生产环境保持 nil。
+	acceptPause          func()
 	DB                   *sql.DB
 	ID                   string
 	Key                  identity.Key
@@ -238,6 +240,7 @@ func Open(ctx context.Context, path string, o Options) (*Node, error) {
 		db.Close()
 		return nil, e
 	}
+	n.acceptPause = nil
 	n.networkWake = make(chan struct{}, 1)
 	n.maintenanceWake = make(chan struct{}, 1)
 	n.ctx, n.cancel = context.WithCancel(ctx)
