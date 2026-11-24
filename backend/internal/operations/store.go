@@ -294,7 +294,7 @@ func (s Store) Save(ctx context.Context, l *Local) error {
 		return e
 	}
 	defer tx.Rollback()
-	result, e := tx.ExecContext(ctx, "UPDATE operations SET record=?,recipe=?,component_state=?,container_state=?,database_state=?,terminal=?,boot_id=?,deadline_ns=?,next_step=?,intent_step=? WHERE id=? AND json_extract(record,'$.revision')=?", string(r), string(recipe), string(component), string(container), string(database), Terminal(l.Record.State), l.BootID, l.DeadlineNS, l.NextStep, l.IntentStep, l.Record.ID, previous)
+	result, e := tx.ExecContext(ctx, "UPDATE operations SET start_error='',record=?,recipe=?,component_state=?,container_state=?,database_state=?,terminal=?,boot_id=?,deadline_ns=?,next_step=?,intent_step=? WHERE id=? AND json_extract(record,'$.revision')=?", string(r), string(recipe), string(component), string(container), string(database), Terminal(l.Record.State), l.BootID, l.DeadlineNS, l.NextStep, l.IntentStep, l.Record.ID, previous)
 	if e != nil {
 		return e
 	}
@@ -383,7 +383,7 @@ func (s Store) Keep(ctx context.Context, id string, revision uint64, clock func(
 	if e != nil {
 		return l, e
 	}
-	if _, e = c.ExecContext(ctx, "UPDATE operations SET record=?,terminal=1 WHERE id=?", string(data), id); e != nil {
+	if _, e = c.ExecContext(ctx, "UPDATE operations SET start_error='',record=?,terminal=1 WHERE id=?", string(data), id); e != nil {
 		return l, e
 	}
 	if l.Action != nil && l.Action.FirewallConfig != nil && !l.Action.FirewallConfig.Automatic {

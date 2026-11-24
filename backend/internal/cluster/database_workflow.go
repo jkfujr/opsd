@@ -393,12 +393,13 @@ func (n *Node) advanceDatabase(ctx context.Context, op *Operation, plain []byte)
 		*op = restored
 	}
 	flow, e := n.loadDatabaseWorkflow(ctx, op.ID)
-	attention := func(err error) {
+	setAttention := func(code, message string) {
 		op.State = protocol.AttentionRequired
-		op.Error = &protocol.Error{Code: "dependency_unavailable", Message: err.Error()}
+		op.Error = &protocol.Error{Code: code, Message: message}
 		flow.Request = ""
 		_ = n.persistDatabaseWorkflow(ctx, op, flow)
 	}
+	attention := func(err error) { setAttention("dependency_unavailable", err.Error()) }
 	if e == sql.ErrNoRows || e == nil && !flow.Built && flow.Request == "recover" {
 		var input DatabaseSubmission
 		if json.Unmarshal(plain, &input) != nil {
@@ -424,7 +425,9 @@ func (n *Node) advanceDatabase(ctx context.Context, op *Operation, plain []byte)
 	} else if e != nil {
 		return
 	}
-	if op.State == protocol.AttentionRequired && flow.Request == "" {
+	// 启动停滞时执行器仍会重试原 ID，父操作继续读取这个步骤。
+	waitingForStart := op.State == protocol.AttentionRequired && op.Error != nil && op.Error.Code == "operation_start_failed"
+	if op.State == protocol.AttentionRequired && flow.Request == "" && !waitingForStart {
 		return
 	}
 	if !flow.Built && flow.Request == "resolve" {
@@ -547,6 +550,14 @@ func (n *Node) advanceDatabase(ctx context.Context, op *Operation, plain []byte)
 		_ = n.persistDatabaseWorkflow(ctx, op, flow)
 		return
 	}
+	if record.State == protocol.Prepared && record.Error != nil && record.Error.Code == "operation_start_failed" {
+		if waitingForStart && flow.Request == "" && priorRevision == record.Revision && sameOperationError(op.Error, record.Error) {
+			return
+		}
+		step.State = "unknown"
+		setAttention(record.Error.Code, record.Error.Message)
+		return
+	}
 	if flow.Request == "resolve" {
 		if record.State != protocol.AttentionRequired && record.State != protocol.Accepted && !operations.Terminal(record.State) {
 			attention(fmt.Errorf("目标步骤仍在执行"))
@@ -612,7 +623,13 @@ func (n *Node) advanceDatabase(ctx context.Context, op *Operation, plain []byte)
 		attention(fmt.Errorf("数据库步骤已结束，请核对原操作"))
 		return
 	}
-	if priorRevision != record.Revision {
+	if waitingForStart {
+		step.State = "applying"
+		op.State = protocol.Applying
+		op.Error = nil
+		flow.Request = ""
+	}
+	if waitingForStart || priorRevision != record.Revision {
 		_ = n.persistDatabaseWorkflow(ctx, op, flow)
 	}
 }

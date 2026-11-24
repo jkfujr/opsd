@@ -203,7 +203,7 @@ func (s *Services) Handle(ctx context.Context, payload protocol.Payload) (protoc
 			unlock()
 			return nil, e
 		}
-		_, created, e := s.Engine.Store.Receive(ctx, body.OperationID, body.ContractVersion, body.Action, boot)
+		local, created, e := s.Engine.Store.Receive(ctx, body.OperationID, body.ContractVersion, body.Action, boot)
 		unlock()
 		if errors.Is(e, operations.ErrBusy) {
 			return nil, &firewall.Fault{Code: "not_accepted_busy", Message: e.Error()}
@@ -212,7 +212,7 @@ func (s *Services) Handle(ctx context.Context, payload protocol.Payload) (protoc
 			return nil, e
 		}
 		if created {
-			_ = s.startOperation(context.WithoutCancel(ctx), body.OperationID)
+			_ = s.startOperation(context.WithoutCancel(ctx), local.Record, false)
 		}
 		r, e := s.Engine.Record(ctx, body.OperationID)
 		return &protocol.OperationUpdated{Record: r}, e
@@ -225,7 +225,7 @@ func (s *Services) Handle(ctx context.Context, payload protocol.Payload) (protoc
 			return nil, e
 		}
 		var startError string
-		if e = s.Engine.Store.DB.QueryRowContext(ctx, "SELECT start_error FROM operations WHERE id=?", body.OperationID).Scan(&startError); e != nil {
+		if e = s.Engine.Store.DB.QueryRowContext(ctx, "SELECT CASE WHEN terminal=0 AND json_extract(record,'$.revision')=? THEN start_error ELSE '' END FROM operations WHERE id=?", r.Revision, body.OperationID).Scan(&startError); e != nil {
 			return nil, e
 		}
 		if startError != "" {
@@ -292,11 +292,24 @@ func (s *Services) request(ctx context.Context, id, kind string, revision uint64
 	r, e := s.Engine.Record(ctx, id)
 	return &protocol.OperationUpdated{Record: r}, e
 }
+const operationStartTimeout = 45 * time.Second
+
+type preparedRevision struct {
+	id       string
+	revision uint64
+}
+
 func (s *Services) Recover(ctx context.Context) error {
+	_, err := s.recoverOperations(ctx, nil, time.Now)
+	return err
+}
+
+func (s *Services) recoverOperations(ctx context.Context, previous map[preparedRevision]time.Time, now func() time.Time) (map[preparedRevision]time.Time, error) {
 	ids, e := s.Engine.Store.Pending(ctx)
 	if e != nil {
-		return e
+		return previous, e
 	}
+	current := make(map[preparedRevision]time.Time)
 	var failures []error
 	for _, id := range ids {
 		// 待人工核对的操作不能被无条件重派：它等待的是人，不是重试。
@@ -312,28 +325,48 @@ func (s *Services) Recover(ctx context.Context) error {
 		if local.Record.State == protocol.AttentionRequired && !manualRequest(local) {
 			continue
 		}
-		if e = s.startOperation(ctx, id); e != nil {
+		stalled := false
+		if local.Record.State == protocol.Prepared {
+			key := preparedRevision{id, local.Record.Revision}
+			at := now()
+			since, ok := previous[key]
+			if !ok {
+				since = at
+			}
+			current[key] = since
+			stalled = at.Sub(since) >= operationStartTimeout
+		}
+		if e = s.startOperation(ctx, local.Record, stalled); e != nil {
 			failures = append(failures, fmt.Errorf("恢复操作 %s：%w", id, e))
 		}
 	}
-	return errors.Join(failures...)
+	return current, errors.Join(failures...)
 }
 
-func (s *Services) startOperation(ctx context.Context, id string) error {
-	err := s.Start(ctx, id)
-	message := ""
+func (s *Services) startOperation(ctx context.Context, record protocol.OperationRecord, stalled bool) error {
+	err := s.Start(ctx, record.ID)
+	if err == nil && !stalled {
+		return nil
+	}
+	var message string
 	if err != nil {
 		message = err.Error()
+	} else {
+		message = fmt.Sprintf("操作服务 opsd-operation@%s.service 停在 prepared，修订号 %d 已有 %v 未推进", record.ID, record.Revision, operationStartTimeout)
 	}
-	_, saveErr := s.Engine.Store.DB.ExecContext(ctx, "UPDATE operations SET start_error=? WHERE id=? AND terminal=0", message, id)
+	// 执行进程可能已经推进。超时提示也应保留同一修订上更具体的启动错误。
+	_, saveErr := s.Engine.Store.DB.ExecContext(ctx, `UPDATE operations SET start_error=?
+		WHERE id=? AND terminal=0 AND json_extract(record,'$.revision')=? AND (start_error='' OR ?)`,
+		message, record.ID, record.Revision, err != nil)
 	return errors.Join(err, saveErr)
 }
 
 func (s *Services) MaintainOperations(ctx context.Context) {
 	ticker := time.NewTicker(5 * time.Second)
 	defer ticker.Stop()
+	var previous map[preparedRevision]time.Time
 	for {
-		_ = s.Recover(ctx)
+		previous, _ = s.recoverOperations(ctx, previous, time.Now)
 		select {
 		case <-ctx.Done():
 			return

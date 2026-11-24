@@ -402,15 +402,9 @@ func TestInstalledNodeAcceptsJoinedPeer(t *testing.T) {
 	// 启动失败必须能被对端读到：第二次建库**故意不建单元**，
 	// 执行器启动不了，A 侧应看到失败原因，而不是一直显示进行中。
 	//
-	// 根因（已用探针取证，见提交说明）：
-	//   执行器用 `systemctl start --no-block` 拉起写操作，而 --no-block 对
-	//   **不存在的单元也返回 0**（实测 exit=0，单元随后异步失败），
-	//   于是 start_error 一直是空、记录停在 prepared，
-	//   父操作查到 prepared 又没有对应分支，就永远显示"进行中"。
-	// 修法方向：启动后核对单元是否真的加载/启动（LoadState/ActiveState），
-	// 把"单元不存在"变成一条真实的启动错误。
+	// 异步启动受理后，持续停在同一 prepared 修订的步骤应向原回执报告启动错误。
 	if os.Getenv("OPSD_DIAG") == "" {
-		t.Skip("已知缺口：--no-block 吞掉单元启动失败，原因到不了父操作；设置 OPSD_DIAG=1 观察")
+		t.Skip("设置 OPSD_DIAG=1 验证异步启动停滞")
 	}
 	failingDB := "opsd_link_fail_" + strings.ToLower(identity.Random()[:6])
 	failingKey := "socket-nounit-" + identity.Random()[:8]
@@ -654,16 +648,12 @@ func operationError(t *testing.T, client *http.Client, web, location string) str
 	}
 	defer response.Body.Close()
 	payload, _ := io.ReadAll(response.Body)
-	var op struct {
-		Error *struct {
-			Code    string `json:"code"`
-			Message string `json:"message"`
-		} `json:"error"`
-	}
+	var op protocol.OperationRecord
 	if e = json.Unmarshal(payload, &op); e != nil {
 		return ""
 	}
-	if op.Error == nil || op.Error.Code == "" {
+	if response.StatusCode != http.StatusOK || op.State != protocol.AttentionRequired ||
+		op.Error == nil || op.Error.Code != "operation_start_failed" || op.Error.Message == "" {
 		return ""
 	}
 	return op.Error.Code + "：" + op.Error.Message

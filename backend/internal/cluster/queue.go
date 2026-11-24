@@ -1272,7 +1272,7 @@ func (n *Node) advanceFiltered(filter string, args ...any) {
 	if record == nil || record.ID != id {
 		return
 	}
-	if record.Revision+1 == op.Revision && record.State == op.State && phase == "submitted" {
+	if record.Revision+1 == op.Revision && record.State == op.State && phase == "submitted" && sameOperationError(record.Error, op.Error) {
 		return
 	}
 	op.OperationRecord = *record
@@ -1280,6 +1280,15 @@ func (n *Node) advanceFiltered(filter string, args ...any) {
 	op.ResultPendingSync = false
 	_ = n.saveOperation(ctx, &op, "submitted")
 }
+
+func sameOperationError(a, b *protocol.Error) bool {
+	if a == nil || b == nil {
+		return a == b
+	}
+	// 节点在保存时补充 RequestID。
+	return a.Code == b.Code && a.Message == b.Message
+}
+
 func (n *Node) applyLocal(ctx context.Context, kind string, plain []byte, op *Operation) error {
 	if kind == "monitoring_config" {
 		return n.advanceArchive(ctx, op, plain)
