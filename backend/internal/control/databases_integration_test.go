@@ -378,12 +378,21 @@ func TestDatabaseNativeClusterAPIAndDashboard(t *testing.T) {
 	restartEntry := stopDatabaseEntry(t, c)
 	nativeOperation(t, b, raw, op.ID, protocol.Succeeded)
 	restartEntry(services[2])
-	same := nativeSubmit(t, b, raw, registered.ID, "create-db", change)
-	if same.ID != op.ID || operationCount(t, services[0], "create_database") != 1 {
-		t.Fatal("跨入口重复创建了数据库")
+	// 原入口同键同参：返回原操作。
+	if same := nativeSubmit(t, c, raw, registered.ID, "create-db", change); same.ID != op.ID {
+		t.Fatal("原入口同键没有返回原操作")
+	}
+	// 另一入口提交同一资源：资源已被占用，拒绝且不产生新操作。
+	if code := apiCall(t, http.DefaultClient, b.web.URL, "POST", "/api/v2/database-clusters/"+registered.ID+"/changes", raw, "create-db", "", change, nil); code != 409 {
+		t.Fatal("跨入口重复创建未被拒绝", code)
+	}
+	if operationCount(t, services[0], "create_database") != 1 {
+		t.Fatal("拒绝后仍产生了建库操作")
 	}
 	change["database"] = "other"
-	if code := apiCall(t, http.DefaultClient, b.web.URL, "POST", "/api/v2/database-clusters/"+registered.ID+"/changes", raw, "create-db", "", change, nil); code != 409 {
+	// 同一个键、不同的库：必须由**原入口**判定冲突；换入口时键属于另一个来源，
+	// 那次是新的提交而不是重试。
+	if code := apiCall(t, http.DefaultClient, c.web.URL, "POST", "/api/v2/database-clusters/"+registered.ID+"/changes", raw, "create-db", "", change, nil); code != 409 {
 		t.Fatal("同一请求接受了其他库", code)
 	}
 	for _, connection := range f.galera {

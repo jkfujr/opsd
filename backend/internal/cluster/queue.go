@@ -614,6 +614,18 @@ func (n *Node) enqueueTx(ctx context.Context, origin string, r Request, related 
 			return Operation{}, priorErr
 		}
 	}
+	// 建库按**资源**判重，与回执键无关：回执键按已认证来源隔离后，
+	// 换入口或换键都不该再产生第二个建库操作。
+	createKey := createDatabaseKey(r.Kind, r.Payload)
+	if createKey != "" {
+		occupied, e := createDatabaseOccupied(ctx, tx, createKey)
+		if e != nil {
+			return Operation{}, e
+		}
+		if occupied {
+			return Operation{}, fault("conflict", "该数据库已有在途或已完成的创建操作")
+		}
+	}
 	if r.Kind == "compose_register" {
 		var selection ComposeSelection
 		if e = json.Unmarshal(r.Payload, &selection); e == nil {
@@ -704,7 +716,7 @@ func (n *Node) enqueueTx(ctx context.Context, origin string, r Request, related 
 		}
 	}
 	b, _ := json.Marshal(op)
-	result, e := tx.ExecContext(ctx, "INSERT INTO queue(id,origin,actor,kind,payload,request_key,request_digest,body,terminal,phase) VALUES(?,?,?,?,?,?,?,?,?,?)", r.ID, origin, actor, r.Kind, string(payload), r.Key, digest[:], string(b), operations.Terminal(op.State), phase)
+	result, e := tx.ExecContext(ctx, "INSERT INTO queue(id,origin,actor,kind,payload,request_key,request_digest,body,terminal,phase,create_key) VALUES(?,?,?,?,?,?,?,?,?,?,?)", r.ID, origin, actor, r.Kind, string(payload), r.Key, digest[:], string(b), operations.Terminal(op.State), phase, createKey)
 	if e != nil {
 		return op, e
 	}
@@ -1771,4 +1783,53 @@ func (n *Node) authorizeSubmit(ctx context.Context, origin string, body json.Raw
 		return false
 	}
 	return n.Capabilities.Allowed(origin, request.Kind)
+}
+
+// createDatabaseKey 返回建库操作的资源键（集群 + 库名）；非建库返回空串。
+//
+// 载荷是加密存放的，所以这里在受理时就算好明文键并存进 create_key 列。
+func createDatabaseKey(kind string, payload json.RawMessage) string {
+	if kind != "database" {
+		return ""
+	}
+	var submission struct {
+		Change struct {
+			Cluster  string `json:"cluster_id"`
+			Kind     string `json:"kind"`
+			Database string `json:"database"`
+		} `json:"change"`
+	}
+	if json.Unmarshal(payload, &submission) != nil {
+		return ""
+	}
+	if submission.Change.Kind != "create_database" || submission.Change.Database == "" {
+		return ""
+	}
+	return submission.Change.Cluster + "\x1f" + submission.Change.Database
+}
+
+// createDatabaseOccupied 报告同一集群同一库名是否已占用。
+//
+// 占用条件：存在在途建库操作，或最近一次成功的建库/删库仍是建库。
+// 建库成功后又成功删除的，允许重建。
+func createDatabaseOccupied(ctx context.Context, tx *sql.Tx, createKey string) (bool, error) {
+	var inFlight int
+	if err := tx.QueryRowContext(ctx, "SELECT count(*) FROM queue WHERE create_key=? AND terminal=0", createKey).Scan(&inFlight); err != nil {
+		return false, err
+	}
+	if inFlight > 0 {
+		return true, nil
+	}
+	var latestAction string
+	err := tx.QueryRowContext(ctx, `SELECT json_extract(body,'$.action') FROM queue
+		WHERE (create_key=? OR json_extract(body,'$.action')='drop_database')
+		  AND terminal=1 AND json_extract(body,'$.state')='succeeded'
+		ORDER BY seq DESC LIMIT 1`, createKey).Scan(&latestAction)
+	if errors.Is(err, sql.ErrNoRows) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	return latestAction == "create_database", nil
 }

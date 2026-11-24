@@ -210,3 +210,44 @@ func TestStreamMethodsNeedTheirOwnCapability(t *testing.T) {
 		t.Error("回执能力不应连带放行上传")
 	}
 }
+
+// 建库资源键：只为 create_database 生成，且包含集群与库名。
+func TestCreateDatabaseKey(t *testing.T) {
+	body, _ := json.Marshal(DatabaseSubmission{
+		Change:  DatabaseChange{Cluster: "cluster-1", Kind: "create_database", Database: "biz"},
+		Cluster: ManagedDatabaseCluster{ID: "cluster-1"},
+	})
+	if key := createDatabaseKey("database", body); key != "cluster-1\x1fbiz" {
+		t.Fatalf("资源键不符合预期：%q", key)
+	}
+	other, _ := json.Marshal(DatabaseSubmission{Change: DatabaseChange{Cluster: "cluster-1", Kind: "drop_database", Database: "biz"}})
+	if key := createDatabaseKey("database", other); key != "" {
+		t.Fatalf("非建库操作不应占用资源：%q", key)
+	}
+	if key := createDatabaseKey("task_run", body); key != "" {
+		t.Fatalf("其他品种不应占用建库资源：%q", key)
+	}
+}
+
+// 同一资源键只允许一个在途建库操作，由唯一索引保证（并发也不需要应用侧先查后写）。
+func TestCreateDatabaseKeyIsUniqueWhileInFlight(t *testing.T) {
+	n, _ := openTestNode(t)
+	insert := func(id string, terminal int) error {
+		_, err := n.DB.Exec(`INSERT INTO queue(id,origin,actor,kind,payload,request_key,request_digest,body,terminal,create_key)
+			VALUES(?,?,'','database','{}','',X'00','{}',?,'cluster-1' || char(31) || 'biz')`, id, n.ID, terminal)
+		return err
+	}
+	if err := insert("op-1", 0); err != nil {
+		t.Fatalf("首个在途建库应可写入：%v", err)
+	}
+	if err := insert("op-2", 0); err == nil {
+		t.Fatal("第二个在途建库应被唯一索引拒绝")
+	}
+	// 首个结束后，可以受理新的建库。
+	if _, err := n.DB.Exec("UPDATE queue SET terminal=1 WHERE id='op-1'"); err != nil {
+		t.Fatal(err)
+	}
+	if err := insert("op-2", 0); err != nil {
+		t.Fatalf("资源释放后应可再次受理：%v", err)
+	}
+}

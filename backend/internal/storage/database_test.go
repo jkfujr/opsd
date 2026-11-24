@@ -34,7 +34,7 @@ func TestOpenAndReopen(t *testing.T) {
 					}
 				}
 				// 各库的迁移数量各自独立：节点库新增了队列分桶迁移。
-				expectedVersion := map[Kind]int{Node: 10, Executor: 8, Metrics: 1}[kind]
+				expectedVersion := map[Kind]int{Node: 11, Executor: 8, Metrics: 1}[kind]
 				if count != expectedVersion || version != expectedVersion || sync != 2 || foreign != 1 || mode != "wal" {
 					t.Fatalf("数据库配置或迁移错误：记录=%d 版本=%d 同步=%d 外键=%d 日志=%s", count, version, sync, foreign, mode)
 				}
