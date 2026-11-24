@@ -402,11 +402,15 @@ func TestInstalledNodeAcceptsJoinedPeer(t *testing.T) {
 	// 启动失败必须能被对端读到：第二次建库**故意不建单元**，
 	// 执行器启动不了，A 侧应看到失败原因，而不是一直显示进行中。
 	//
-	// 已知缺口：实测 90 秒内对端始终读不到原因（操作停在 applying）。
-	// 我猜过的"迟到回复去重"不是原因——加 sameOperationError 后仍然失败，
-	// 所以先跳过并留在这里，避免用一个未验证的修复冒充解决。
+	// 根因（已用探针取证，见提交说明）：
+	//   执行器用 `systemctl start --no-block` 拉起写操作，而 --no-block 对
+	//   **不存在的单元也返回 0**（实测 exit=0，单元随后异步失败），
+	//   于是 start_error 一直是空、记录停在 prepared，
+	//   父操作查到 prepared 又没有对应分支，就永远显示"进行中"。
+	// 修法方向：启动后核对单元是否真的加载/启动（LoadState/ActiveState），
+	// 把"单元不存在"变成一条真实的启动错误。
 	if os.Getenv("OPSD_DIAG") == "" {
-		t.Skip("已知缺口：执行器启动失败的原因没有到达父操作；设置 OPSD_DIAG=1 观察")
+		t.Skip("已知缺口：--no-block 吞掉单元启动失败，原因到不了父操作；设置 OPSD_DIAG=1 观察")
 	}
 	failingDB := "opsd_link_fail_" + strings.ToLower(identity.Random()[:6])
 	failingKey := "socket-nounit-" + identity.Random()[:8]
@@ -437,8 +441,13 @@ func TestInstalledNodeAcceptsJoinedPeer(t *testing.T) {
 			t.Logf("诊断：失败操作队列体 %s", body)
 		}
 		t.Logf("诊断：回执原文 %s", rawOperation(t, client, aWeb.URL, broken.location))
-		if os.Getenv("OPSD_TRACE") != "" {
-			t.Logf("诊断：B 的节点日志 %s", node.log.String())
+		t.Logf("诊断：B 的节点日志 %s", node.log.String())
+		if rows, e := executorOperations(t.Context(), filepath.Join(execDir, "executor.db")); e == nil {
+			for _, row := range rows {
+				t.Logf("诊断：执行器记录 %s", row)
+			}
+		} else {
+			t.Logf("诊断：读取执行器库失败 %v", e)
 		}
 		t.Fatal("单元缺失时对端读不到任何失败原因（操作看起来仍在进行中）")
 	}
@@ -679,4 +688,33 @@ func rawOperation(t *testing.T, client *http.Client, web, location string) strin
 	defer response.Body.Close()
 	payload, _ := io.ReadAll(response.Body)
 	return fmt.Sprintf("%d %s", response.StatusCode, payload)
+}
+
+// executorOperations 列出执行器库里的操作及其启动错误。
+func executorOperations(ctx context.Context, path string) ([]string, error) {
+	db, e := storage.ReadOnly(ctx, path)
+	if e != nil {
+		return nil, e
+	}
+	defer db.Close()
+	// 执行器库只存 record JSON 与 start_error，状态要从 record 里解。
+	rows, e := db.Query("SELECT id,record,COALESCE(start_error,'') FROM operations ORDER BY rowid DESC LIMIT 8")
+	if e != nil {
+		return nil, e
+	}
+	defer rows.Close()
+	var out []string
+	for rows.Next() {
+		var id, record, startError string
+		if e = rows.Scan(&id, &record, &startError); e != nil {
+			return nil, e
+		}
+		var parsed struct {
+			State    string `json:"state"`
+			Revision uint64 `json:"revision"`
+		}
+		_ = json.Unmarshal([]byte(record), &parsed)
+		out = append(out, fmt.Sprintf("id=%s state=%s rev=%d start_error=%q", id[len(id)-12:], parsed.State, parsed.Revision, startError))
+	}
+	return out, rows.Err()
 }
