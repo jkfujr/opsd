@@ -227,25 +227,57 @@ func TestNewerDatabaseIsNotChanged(t *testing.T) {
 	}
 }
 
-// 两种已推送的旧结构都要能升级到 012。
+// 两种已推送的 011 都要能升级到 012，而且它们结构并不相同：
 //
-//   - 只跑过 011 的库：没有 resource_key 列，需要新增并把 create_key 搬过去；
-//   - 跑过早期 7515d25 的库：已经有 resource_key，重复 ADD COLUMN 会直接失败。
+//   - cf661ca 的 011：只有 create_key（键由管理记录 ID 生成）；
+//   - 7515d25 的 011：只有 resource_key（没有 create_key）。
+//
+// 每条用例按对应版本的**真实结构**重建，再经节点启动完成升级。
 func TestUpgradeResourceKeyMigration(t *testing.T) {
-	for _, shape := range []struct {
-		name     string
-		downgrade []string
+	shapes := []struct {
+		name      string
+		prepare   func(ctx context.Context, db *sql.DB) error
+		wantKey   string
 	}{
-		{name: "011-only", downgrade: []string{
-			"DROP INDEX IF EXISTS queue_resource_key",
-			"UPDATE queue SET create_key = resource_key WHERE resource_key <> ''",
-			"ALTER TABLE queue DROP COLUMN resource_key",
-			"CREATE UNIQUE INDEX IF NOT EXISTS queue_create_key ON queue(create_key) WHERE create_key <> '' AND terminal = 0",
-		}},
-		{name: "already-resource-key", downgrade: []string{
-			"DROP INDEX IF EXISTS queue_resource_key",
-		}},
-	} {
+		{
+			name: "011-create-key-only",
+			prepare: func(ctx context.Context, db *sql.DB) error {
+				for _, q := range []string{
+					"DROP INDEX IF EXISTS queue_resource_key",
+					"ALTER TABLE queue DROP COLUMN resource_key",
+					"CREATE UNIQUE INDEX IF NOT EXISTS queue_create_key ON queue(create_key) WHERE create_key <> '' AND terminal = 0",
+				} {
+					if _, err := db.ExecContext(ctx, q); err != nil {
+						return err
+					}
+				}
+				_, err := db.ExecContext(ctx, `INSERT INTO queue(id,origin,kind,payload,request_key,request_digest,body,terminal,create_key)
+					VALUES('legacy','origin','database','{}','key',X'00','{}',0,'managed-1' || char(31) || 'biz')`)
+				return err
+			},
+			wantKey: "managed-1\x1fbiz",
+		},
+		{
+			name: "011-resource-key-only",
+			prepare: func(ctx context.Context, db *sql.DB) error {
+				// 7515d25 的 011 没有 create_key：整列删掉才符合那版结构。
+				for _, q := range []string{
+					"DROP INDEX IF EXISTS queue_resource_key",
+					"ALTER TABLE queue DROP COLUMN create_key",
+					"CREATE UNIQUE INDEX IF NOT EXISTS queue_resource_key ON queue(resource_key) WHERE resource_key <> '' AND terminal = 0",
+				} {
+					if _, err := db.ExecContext(ctx, q); err != nil {
+						return err
+					}
+				}
+				_, err := db.ExecContext(ctx, `INSERT INTO queue(id,origin,kind,payload,request_key,request_digest,body,terminal,resource_key)
+					VALUES('legacy','origin','database','{}','key',X'00','{}',0,'managed-1' || char(31) || 'biz')`)
+				return err
+			},
+			wantKey: "managed-1\x1fbiz",
+		},
+	}
+	for _, shape := range shapes {
 		t.Run(shape.name, func(t *testing.T) {
 			ctx := t.Context()
 			path := filepath.Join(t.TempDir(), "upgrade.db")
@@ -253,17 +285,16 @@ func TestUpgradeResourceKeyMigration(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			for _, q := range append(shape.downgrade,
+			if err = shape.prepare(ctx, db); err != nil {
+				t.Fatal(err)
+			}
+			for _, q := range []string{
 				"DELETE FROM schema_migrations WHERE version=12",
-				"PRAGMA user_version=11") {
+				"PRAGMA user_version=11",
+			} {
 				if _, err = db.ExecContext(ctx, q); err != nil {
 					t.Fatalf("%s：%v", q, err)
 				}
-			}
-			// 一条在途建库记录：旧键由管理记录 ID 生成，升级后必须被重算。
-			if _, err = db.ExecContext(ctx, `INSERT INTO queue(id,origin,kind,payload,request_key,request_digest,body,terminal,create_key)
-				VALUES('legacy','origin','database','{}','key',X'00','{}',0,'managed-1' || char(31) || 'biz')`); err != nil {
-				t.Fatal(err)
 			}
 			db.Close()
 
@@ -283,8 +314,8 @@ func TestUpgradeResourceKeyMigration(t *testing.T) {
 			if err = upgraded.QueryRowContext(ctx, "SELECT COALESCE(resource_key,'') FROM queue WHERE id='legacy'").Scan(&key); err != nil {
 				t.Fatal(err)
 			}
-			if key != "managed-1\x1fbiz" {
-				t.Fatalf("键未搬迁：%q", key)
+			if key != shape.wantKey {
+				t.Fatalf("键不符合预期：%q", key)
 			}
 		})
 	}

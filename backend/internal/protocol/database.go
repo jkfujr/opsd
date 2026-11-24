@@ -156,6 +156,24 @@ type DatabaseRead struct {
 }
 
 func (*DatabaseRead) Kind() Kind { return "database.read" }
+
+// DatabaseExists 只回答"这个库现在是否存在"，不读取内容、不建连接池。
+// 受理建库前用它做一次实时读回：失败就暂停受理，而不是凭历史推断。
+type DatabaseExists struct {
+	Connection DatabaseConnection `json:"connection"`
+	ClusterID  string             `json:"cluster_id,omitempty"`
+	Database   string             `json:"database"`
+}
+
+func (*DatabaseExists) Kind() Kind { return "database.exists" }
+func (*DatabaseExists) isPayload() {}
+
+type DatabaseExistsResult struct {
+	Exists bool `json:"exists"`
+}
+
+func (*DatabaseExistsResult) Kind() Kind { return "database.exists" }
+func (*DatabaseExistsResult) isPayload() {}
 func (*DatabaseRead) isPayload() {}
 
 type DatabaseReadResult struct {

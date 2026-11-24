@@ -498,6 +498,10 @@ func sharedFault(err error) error {
 	if errors.Is(err, sharedsql.ErrConflict) {
 		return fault("conflict", err.Error())
 	}
+	// 同资源已有未结束流程是**冲突**，不是依赖故障：要等它结束才能重试。
+	if errors.Is(err, sharedsql.ErrResourceBusy) {
+		return fault("conflict", err.Error())
+	}
 	// 迁移前的旧回执无法确认归属：只阻止重复执行，不返回旧结果。
 	if errors.Is(err, sharedsql.ErrOutcomeUnknown) {
 		return fault("outcome_unknown", err.Error())

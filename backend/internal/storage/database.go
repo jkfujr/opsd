@@ -163,27 +163,42 @@ var migrationHooks = map[string]func(context.Context, *sql.Conn) error{
 	"012_queue_resource_key.sql": migrateQueueResourceKey,
 }
 
-// migrateQueueResourceKey 把资源键从 create_key 迁到 resource_key。
+// migrateQueueResourceKey 把资源键迁到 resource_key。
 //
-// 两个已推送的结构都要能升级：只跑过 011 的库没有 resource_key，
-// 跑过早期 7515d25 的库已经有这一列——重复 ADD COLUMN 会直接失败。
+// 两个已推送的结构都要能升级，且它们的 011 并不相同：
+//   - cf661ca 的 011 只有 create_key；
+//   - 7515d25 的 011 只有 resource_key（没有 create_key）。
+// 所以每一列都要先确认存在再用，不能假设 create_key 一定在。
 func migrateQueueResourceKey(ctx context.Context, conn *sql.Conn) error {
-	var has int
-	if err := conn.QueryRowContext(ctx, "SELECT count(*) FROM pragma_table_info('queue') WHERE name='resource_key'").Scan(&has); err != nil {
+	has := func(column string) (bool, error) {
+		var count int
+		err := conn.QueryRowContext(ctx, "SELECT count(*) FROM pragma_table_info('queue') WHERE name=?", column).Scan(&count)
+		return count > 0, err
+	}
+	hasResource, err := has("resource_key")
+	if err != nil {
 		return err
 	}
-	if has == 0 {
+	if !hasResource {
 		if _, err := conn.ExecContext(ctx, "ALTER TABLE queue ADD COLUMN resource_key TEXT NOT NULL DEFAULT ''"); err != nil {
 			return err
 		}
 	}
-	if _, err := conn.ExecContext(ctx, "UPDATE queue SET resource_key = create_key WHERE resource_key = '' AND create_key <> ''"); err != nil {
+	hasCreate, err := has("create_key")
+	if err != nil {
 		return err
+	}
+	// 列是刚刚加的，这里要重新确认存在性，不能用加列之前的结果。
+	hasResource = true
+	if hasCreate && hasResource {
+		if _, err := conn.ExecContext(ctx, "UPDATE queue SET resource_key = create_key WHERE resource_key = '' AND create_key <> ''"); err != nil {
+			return err
+		}
 	}
 	if _, err := conn.ExecContext(ctx, "DROP INDEX IF EXISTS queue_create_key"); err != nil {
 		return err
 	}
-	_, err := conn.ExecContext(ctx, `CREATE UNIQUE INDEX IF NOT EXISTS queue_resource_key
+	_, err = conn.ExecContext(ctx, `CREATE UNIQUE INDEX IF NOT EXISTS queue_resource_key
 		ON queue(resource_key) WHERE resource_key <> '' AND terminal = 0`)
 	return err
 }

@@ -741,3 +741,23 @@ func SortedPrivileges(p []string) []string {
 	sort.Strings(out)
 	return slices.Compact(out)
 }
+
+// DatabaseExists 只读地回答"该库是否存在"。
+//
+// 走与其它读取相同的连接与集群校验，但不枚举全部库、不汇总表大小：
+// 受理建库只需要这一个事实，读不到就是失败，不能退化成"当作不存在"。
+func (m Manager) DatabaseExists(ctx context.Context, c protocol.DatabaseConnection, database string) (bool, error) {
+	if database == "" {
+		return false, fmt.Errorf("缺少数据库名")
+	}
+	s, err := connect(ctx, c)
+	if err != nil {
+		return false, err
+	}
+	defer s.Close()
+	found, err := rows(ctx, s, "SELECT SCHEMA_NAME FROM information_schema.SCHEMATA WHERE SCHEMA_NAME=?", database)
+	if err != nil {
+		return false, err
+	}
+	return len(found) > 0, nil
+}

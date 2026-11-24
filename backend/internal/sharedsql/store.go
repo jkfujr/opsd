@@ -24,6 +24,9 @@ var ErrConflict = errors.New("共享状态已经变化")
 // ErrOutcomeUnknown 表示命中了迁移前的旧回执：归属无法确认，
 // 只能阻止重复执行，原结果需凭操作标识经授权查询。
 var ErrOutcomeUnknown = errors.New("旧回执归属无法确认，请按操作标识查询原结果")
+
+// ErrResourceBusy 表示同一资源已有未结束的流程；调用方应映射成冲突，而不是依赖故障。
+var ErrResourceBusy = errors.New("该资源已有未结束流程")
 var ErrUnavailable = errors.New("共享数据库当前不可写")
 var ErrCommitUnknown = errors.New("共享事务提交结果未知，请查询原请求")
 
@@ -302,7 +305,7 @@ func (t *Tx) CreateFlow(ctx context.Context, f Flow) error {
 		return err
 	}
 	if count != 0 && !f.Terminal {
-		return fmt.Errorf("该数据库已有未结束流程")
+		return ErrResourceBusy
 	}
 	// 资源键比集群粒度更细：同一集群里不同库名互不影响，同名库才互斥。
 	if f.ResourceKey != "" && !f.Terminal {
@@ -311,7 +314,7 @@ func (t *Tx) CreateFlow(ctx context.Context, f Flow) error {
 			return err
 		}
 		if occupied != 0 {
-			return fmt.Errorf("该资源已有未结束流程")
+			return ErrResourceBusy
 		}
 	}
 	_, err := t.ExecContext(ctx, "INSERT INTO shared_flows(id,resource_id,resource_key,coordinator,epoch,revision,lease_until,terminal,body) VALUES(?,?,?,?,?,?,TIMESTAMPADD(SECOND,15,CURRENT_TIMESTAMP(6)),?,?)", f.ID, f.ResourceID, f.ResourceKey, f.Coordinator, f.Epoch, f.Revision, f.Terminal, []byte(f.Body))

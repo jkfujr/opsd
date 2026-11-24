@@ -143,6 +143,17 @@ func (n *Node) SubmitDatabaseChange(ctx context.Context, change DatabaseChange, 
 	if c.Revision != change.ExpectedRevision {
 		return Operation{}, fault("conflict", "数据库集群配置已经变化")
 	}
+	// 建库前实时读回：已存在则 409，读不回来则暂停受理（503）。
+	// 这一步在事务外做——读回是网络调用，不该占着写事务。
+	if change.Kind == "create_database" {
+		exists, e := n.databaseSchemaExists(ctx, c, change.Database)
+		if e != nil {
+			return Operation{}, fault("dependency_unavailable", "无法确认目标库状态，已暂停受理")
+		}
+		if exists {
+			return Operation{}, fault("conflict", "该数据库已存在，删除后才可重建")
+		}
+	}
 	if change.Kind == "configure_proxy_routes" && c.ProxyRouting == nil {
 		if e = n.requireProxyRoutingSupport(ctx); e != nil {
 			return Operation{}, e
@@ -651,4 +662,30 @@ func databaseResourceKeyFromSubmission(input DatabaseSubmission) string {
 		cluster = input.Change.Cluster
 	}
 	return cluster + "\x1f" + input.Change.Database
+}
+
+// databaseSchemaExists 实时读回目标集群上该库是否存在。
+//
+// 受理建库前必须问真实集群：库里可能是 OPSD 之外建的，也可能被外部删掉，
+// 靠历史操作推断两头都会错。读不回来就是失败——调用方据此暂停受理，
+// 绝不能退化成"当作不存在"。
+func (n *Node) databaseSchemaExists(ctx context.Context, cluster ManagedDatabaseCluster, database string) (bool, error) {
+	if database == "" || len(cluster.Members) == 0 {
+		return false, fault("dependency_unavailable", "无法确认目标库状态")
+	}
+	ref := cluster.Members[0]
+	connection, err := n.databaseConnection(ctx, ref.InstanceID)
+	if err != nil {
+		return false, err
+	}
+	connection.Kind = "galera"
+	var out protocol.DatabaseExistsResult
+	if err = n.Call(ctx, ref.NodeID, "database.exists", protocol.DatabaseExists{
+		Connection: connection,
+		ClusterID:  cluster.ClusterID,
+		Database:   database,
+	}, &out); err != nil {
+		return false, err
+	}
+	return out.Exists, nil
 }

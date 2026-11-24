@@ -68,6 +68,16 @@ func (n *Node) createSharedWorkflow(ctx context.Context, r Request, origin strin
 	if err != sql.ErrNoRows {
 		return Operation{}, sharedFault(err)
 	}
+	// 建库前实时读回，规则与本机受理一致：已存在 409，读不回来暂停受理。
+	if input.Change.Kind == "create_database" {
+		exists, e := n.databaseSchemaExists(ctx, input.Cluster, input.Change.Database)
+		if e != nil {
+			return Operation{}, fault("dependency_unavailable", "无法确认目标库状态，已暂停受理")
+		}
+		if exists {
+			return Operation{}, fault("conflict", "该数据库已存在，删除后才可重建")
+		}
+	}
 	coordinator := input.Cluster.Coordinator
 	probe, cancel := context.WithTimeout(ctx, 2*time.Second)
 	err = n.Call(probe, coordinator, "ping", nil, nil)
