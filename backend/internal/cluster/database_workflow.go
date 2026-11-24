@@ -361,6 +361,53 @@ func databaseActionName(kind string) string {
 	}
 	return map[string]string{"create_database": "创建库", "delete_database": "删除库", "create_user": "创建账号", "password": "修改密码", "delete_user": "删除账号", "grant": "授权", "revoke": "撤权", "proxy_upsert": "同步代理账号", "proxy_disable": "停用代理账号", "proxy_delete": "删除代理账号", "proxy_route": "应用代理路由"}[kind]
 }
+func waitingForDatabaseStart(op *Operation) bool {
+	return op.State == protocol.AttentionRequired && op.Error != nil && op.Error.Code == "operation_start_failed"
+}
+
+func checkDatabaseStartDecision(op *Operation, method string, d OperationDecision) error {
+	if op.Subject == "database" && method == "operation.resolve" && d.AcceptCurrent && waitingForDatabaseStart(op) {
+		return fault("conflict", "原步骤仍可能启动，请等待原操作更新后再接受现状")
+	}
+	return nil
+}
+
+func retryDatabaseStartRead(op *Operation, err error) bool {
+	if !waitingForDatabaseStart(op) {
+		return false
+	}
+	switch wireError(err).Code {
+	case "node_unavailable", "dependency_unavailable", "node_busy":
+		return true
+	}
+	return false
+}
+
+func (n *Node) observeDatabaseStart(ctx context.Context, op *Operation, flow *databaseWorkflow, child protocol.OperationRecord) bool {
+	step := &flow.Steps[flow.Index]
+	if child.State == protocol.Prepared && child.Error != nil && child.Error.Code == "operation_start_failed" {
+		if waitingForDatabaseStart(op) && step.Revision == child.Revision && sameOperationError(op.Error, child.Error) {
+			return true
+		}
+		step.State, step.Revision = "unknown", child.Revision
+		op.State = protocol.AttentionRequired
+		op.Error = &protocol.Error{Code: child.Error.Code, Message: child.Error.Message}
+		_ = n.persistDatabaseWorkflow(ctx, op, *flow)
+		return true
+	}
+	// 旧版本已受理的接受现状决定仍跟踪原步骤，直到它可处理或已结束。
+	if waitingForDatabaseStart(op) && (flow.Request == "resolve" || flow.Request == "resolving") {
+		if operations.Terminal(child.State) {
+			step.Revision = child.Revision
+			op.State, op.Error = protocol.ResolvedManually, nil
+			_ = n.persistDatabaseWorkflow(ctx, op, *flow)
+			return true
+		}
+		return child.State != protocol.AttentionRequired && child.State != protocol.Accepted
+	}
+	return false
+}
+
 func (n *Node) advanceDatabase(ctx context.Context, op *Operation, plain []byte) {
 	if n.sharedEnabled() {
 		if !n.sharedActive() {
@@ -393,13 +440,12 @@ func (n *Node) advanceDatabase(ctx context.Context, op *Operation, plain []byte)
 		*op = restored
 	}
 	flow, e := n.loadDatabaseWorkflow(ctx, op.ID)
-	setAttention := func(code, message string) {
+	attention := func(err error) {
 		op.State = protocol.AttentionRequired
-		op.Error = &protocol.Error{Code: code, Message: message}
+		op.Error = &protocol.Error{Code: "dependency_unavailable", Message: err.Error()}
 		flow.Request = ""
 		_ = n.persistDatabaseWorkflow(ctx, op, flow)
 	}
-	attention := func(err error) { setAttention("dependency_unavailable", err.Error()) }
 	if e == sql.ErrNoRows || e == nil && !flow.Built && flow.Request == "recover" {
 		var input DatabaseSubmission
 		if json.Unmarshal(plain, &input) != nil {
@@ -426,7 +472,10 @@ func (n *Node) advanceDatabase(ctx context.Context, op *Operation, plain []byte)
 		return
 	}
 	// 启动停滞时执行器仍会重试原 ID，父操作继续读取这个步骤。
-	waitingForStart := op.State == protocol.AttentionRequired && op.Error != nil && op.Error.Code == "operation_start_failed"
+	waitingForStart := waitingForDatabaseStart(op)
+	if waitingForStart && flow.Request == "recover" {
+		flow.Request = ""
+	}
 	if op.State == protocol.AttentionRequired && flow.Request == "" && !waitingForStart {
 		return
 	}
@@ -493,6 +542,9 @@ func (n *Node) advanceDatabase(ctx context.Context, op *Operation, plain []byte)
 	var result protocol.OperationQueryResult
 	e = n.Call(ctx, step.Ref.NodeID, "database.query", request, &result)
 	if e != nil {
+		if retryDatabaseStartRead(op, e) {
+			return
+		}
 		attention(e)
 		return
 	}
@@ -520,9 +572,12 @@ func (n *Node) advanceDatabase(ctx context.Context, op *Operation, plain []byte)
 	}
 	record := *result.Record
 	step.Children = record.Steps
+	op.LastObservedAt = record.LastObservedAt
+	if n.observeDatabaseStart(ctx, op, &flow, record) {
+		return
+	}
 	priorRevision := step.Revision
 	step.Revision = record.Revision
-	op.LastObservedAt = record.LastObservedAt
 	if (flow.Request == "resolve" || flow.Request == "resolving") && operations.Terminal(record.State) {
 		op.State = protocol.ResolvedManually
 		op.Error = nil
@@ -548,14 +603,6 @@ func (n *Node) advanceDatabase(ctx context.Context, op *Operation, plain []byte)
 		op.State = protocol.Applying
 		op.Error = nil
 		_ = n.persistDatabaseWorkflow(ctx, op, flow)
-		return
-	}
-	if record.State == protocol.Prepared && record.Error != nil && record.Error.Code == "operation_start_failed" {
-		if waitingForStart && flow.Request == "" && priorRevision == record.Revision && sameOperationError(op.Error, record.Error) {
-			return
-		}
-		step.State = "unknown"
-		setAttention(record.Error.Code, record.Error.Message)
 		return
 	}
 	if flow.Request == "resolve" {
@@ -637,13 +684,20 @@ func (n *Node) decideDatabase(ctx context.Context, method string, d OperationDec
 	if op.Revision != d.ExpectedRevision || op.State != protocol.AttentionRequired {
 		return op, fault("conflict", "数据库操作阶段已经变化")
 	}
+	if err := checkDatabaseStartDecision(&op, method, d); err != nil {
+		return op, err
+	}
 	flow, e := n.loadDatabaseWorkflow(ctx, op.ID)
 	if e != nil {
 		return op, e
 	}
 	switch method {
 	case "operation.recover":
-		flow.Request = "recover"
+		if waitingForDatabaseStart(&op) {
+			flow.Request = ""
+		} else {
+			flow.Request = "recover"
+		}
 	case "operation.resolve":
 		if !d.AcceptCurrent {
 			return op, fault("invalid_request", "请确认接受当前状态")

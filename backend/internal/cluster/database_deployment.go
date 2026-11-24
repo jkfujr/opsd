@@ -690,6 +690,9 @@ func (n *Node) advanceDeploymentFirewall(ctx context.Context, op *Operation, flo
 	}
 	var child Operation
 	if err := n.Call(ctx, step.Ref.NodeID, "operation.get", step.ID, &child); err != nil {
+		if retryDatabaseStartRead(op, err) {
+			return
+		}
 		if flow.Request == "recover" {
 			step.State = "pending"
 			flow.Request = ""
@@ -702,13 +705,19 @@ func (n *Node) advanceDeploymentFirewall(ctx context.Context, op *Operation, flo
 		return
 	}
 	step.Children = child.Steps
+	if n.observeDatabaseStart(ctx, op, flow, child.OperationRecord) {
+		return
+	}
+	priorRevision := step.Revision
+	step.Revision = child.Revision
 	if child.State == protocol.AwaitingConfirmation {
 		var updated Operation
 		if err := n.Call(ctx, step.Ref.NodeID, "operation.confirm", OperationDecision{ID: child.ID, ExpectedRevision: child.Revision}, &updated); err != nil {
 			attention(err)
 			return
 		}
-	} else if child.State == protocol.Succeeded {
+	}
+	if child.State == protocol.Succeeded {
 		step.State = "completed"
 		flow.Index++
 		flow.Request = ""
@@ -735,6 +744,12 @@ func (n *Node) advanceDeploymentFirewall(ctx context.Context, op *Operation, flo
 	} else if child.State == protocol.ResolvedManually {
 		op.State = protocol.ResolvedManually
 		op.Error = nil
+	} else if waitingForDatabaseStart(op) {
+		step.State = "applying"
+		op.State, op.Error = protocol.Applying, nil
+		flow.Request = ""
+	} else if priorRevision == child.Revision {
+		return
 	}
 	_ = n.persistDatabaseWorkflow(ctx, op, *flow)
 }

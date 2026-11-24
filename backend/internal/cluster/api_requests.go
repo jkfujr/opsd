@@ -148,6 +148,10 @@ func (n *Node) apiOperationDecision(ctx context.Context, request operationDecisi
 	if op.Revision != request.Decision.ExpectedRevision {
 		return op, fault("conflict", "操作已经改变，请重新读取")
 	}
+	// 已知的冲突先返回，避免同键重试读到结果未知的空回执。
+	if e = checkDatabaseStartDecision(&op, request.Method, request.Decision); e != nil {
+		return op, e
+	}
 	if e = requeststate.Save(ctx, n.DB, requeststate.Receipt{Write: request.Write, Kind: "operation", ResourceID: op.ID, Result: json.RawMessage(`{}`), CreatedAt: n.Now().UTC()}); e != nil {
 		return op, e
 	}
