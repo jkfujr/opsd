@@ -3,7 +3,11 @@
 package cli
 
 import (
+	"bytes"
 	"context"
+	"io"
+	"net/http"
+	"net/http/cookiejar"
 	"encoding/json"
 	"errors"
 	"net"
@@ -16,6 +20,8 @@ import (
 	"time"
 
 	"github.com/jkfujr/opsd/internal/cluster"
+	"github.com/jkfujr/opsd/internal/control"
+	"github.com/jkfujr/opsd/internal/databaseengine"
 	"github.com/jkfujr/opsd/internal/installation"
 	"github.com/jkfujr/opsd/internal/identity"
 	"github.com/jkfujr/opsd/internal/localstate"
@@ -51,7 +57,11 @@ func TestInstalledNodeAcceptsJoinedPeer(t *testing.T) {
 	// B 主动回连时就拨不到 A。
 	aListen := freeAddress(t)
 	a, e := cluster.Open(t.Context(), filepath.Join(dir, "a", "node.db"), cluster.Options{
-		Config:   cluster.Config{Listen: aListen, Address: "http://" + aListen},
+		// Console/API 必须显式开：EnforceListenerState 会拒绝"控制台未开"的请求。
+		Config: cluster.Config{
+			Name: "A", Listen: aListen, Address: "http://" + aListen,
+			Console: true, API: true, Region: "测试",
+		},
 		Username: "admin", Password: "test-password", Entrance: "/signin",
 	})
 	if e != nil {
@@ -60,6 +70,15 @@ func TestInstalledNodeAcceptsJoinedPeer(t *testing.T) {
 	defer a.Close()
 	aPeer := httptest.NewServer(a.PeerHandler())
 	defer aPeer.Close()
+	// A 的 HTTP 入口：拒绝轮必须走真实控制台，才能排除"节点 RPC 拒绝"与
+	// "HTTP 层拒绝"之间的差异。
+	aServer, e := control.New(t.Context(), a.DB, control.Options{Node: a, EnforceListenerState: true})
+	if e != nil {
+		t.Fatal(e)
+	}
+	defer aServer.Close()
+	aWeb := httptest.NewServer(aServer.Handler())
+	defer aWeb.Close()
 
 	// B：先在本进程建立身份（拿公钥与接入码），再交给二进制启动。
 	bootstrap, e := cluster.Open(t.Context(), filepath.Join(data, "node.db"), cluster.Options{
@@ -74,6 +93,42 @@ func TestInstalledNodeAcceptsJoinedPeer(t *testing.T) {
 		t.Fatal(e)
 	}
 	token, _, _, e := bootstrap.Token(t.Context())
+	if e != nil {
+		t.Fatal(e)
+	}
+	// 引导阶段就登记实例与集群定义：重启成二进制后 A 仍可读，
+	// 而拒绝轮里 A 只被授予 read_operations，不能自己写。
+	galera := startGaleraFixture(t)
+	connection := galera.connection()
+	password := connection.Password
+	// 走公开的 RPC 入口，不碰未导出的内部方法。
+	var instance cluster.DatabaseInstance
+	e = bootstrap.Call(t.Context(), bootstrap.ID, "database.instance.save", cluster.DatabaseRPC{
+		Instance: cluster.DatabaseInstanceInput{
+			DatabaseInstance: cluster.DatabaseInstance{
+				ID: "galera", Name: "MariaDB", Kind: "galera",
+				Address: connection.Address, Username: connection.Username,
+			},
+			Password: &password,
+		},
+	}, &instance)
+	if e != nil {
+		t.Fatal(e)
+	}
+	galeraState, e := (databaseengine.Manager{}).Read(t.Context(), connection)
+	if e != nil {
+		t.Fatal(e)
+	}
+	var registered cluster.ManagedDatabaseCluster
+	e = bootstrap.Call(t.Context(), bootstrap.ID, "database.cluster.save", cluster.DatabaseRPC{
+		Cluster: cluster.ManagedDatabaseCluster{
+			ID: cluster.NewOperationID(bootstrap.ID), Name: "跨节点验收", Coordinator: bootstrap.ID,
+			ClusterID: galeraState.ClusterID, Members: []cluster.DatabaseRef{{
+				NodeID: bootstrap.ID, InstanceID: instance.ID, Name: instance.Name, Address: instance.Address,
+			}},
+			Proxies: []cluster.DatabaseRef{},
+		},
+	}, &registered)
 	if e != nil {
 		t.Fatal(e)
 	}
@@ -182,25 +237,17 @@ func TestInstalledNodeAcceptsJoinedPeer(t *testing.T) {
 	}
 	t.Logf("链路已通：A(%s) → B(%s, %s)；执行器 Socket 只读调用成功", a.ID, self.ID, "http://"+peer)
 
-	// 第二步：B 未授予 manage_database 时，A 的数据库提交必须被拒，且 B 零入队。
-	payload, e := json.Marshal(cluster.DatabaseSubmission{
-		Change: cluster.DatabaseChange{Cluster: "missing", ExpectedRevision: 1, Kind: "create_database", Database: "opsd_link_refused", Charset: "utf8mb4"},
-		Cluster: cluster.ManagedDatabaseCluster{
-			ID: "missing", Coordinator: self.ID, ClusterID: "galera", Revision: 1, Name: "占位",
-			Members: []cluster.DatabaseRef{}, Proxies: []cluster.DatabaseRef{},
-		},
-	})
-	if e != nil {
-		t.Fatal(e)
-	}
+	// 第二步：B 未授予 manage_database 时，A 经**真实 HTTP 入口**提交必须被拒，
+	// 且 B 零入队。走 HTTP 才能排除"节点 RPC 拒绝"与"HTTP 层拒绝"的差异。
 	key := "socket-refused-" + identity.Random()[:8]
-	if _, e = a.Submit(t.Context(), self.ID, cluster.Request{
-		ID: cluster.NewOperationID(a.ID), Kind: "database", Key: key,
-		Actor: "account:" + a.ID + ":1", Payload: payload,
-	}); e == nil {
-		t.Fatal("未授予 manage_database 的提交不应被受理")
-	} else if code := clusterFaultCode(e); code != "forbidden" {
-		t.Fatalf("应以 forbidden 拒绝，实际 %s（%v）", code, e)
+	client, csrf := adminSession(t, aWeb.URL)
+	code, problem := submitCreate(t, client, csrf, aWeb.URL, registered.ID, registered.Revision, "opsd_link_refused", key)
+	if code != 403 {
+		t.Fatalf("未授予 manage_database 时应返回 403，实际 %d", code)
+	}
+	// 403 也可能来自 CSRF 或会话问题：必须核对问题码是授权拒绝。
+	if problem != "forbidden" {
+		t.Fatalf("问题码应为 forbidden，实际 %q", problem)
 	}
 	// 被拒的请求不能在 B 的队列里留下任何行——在线只读读取 B 的库。
 	queued, e := queueRows(t.Context(), filepath.Join(data, "node.db"), key)
@@ -234,4 +281,74 @@ func clusterFaultCode(err error) string {
 		return f.Code
 	}
 	return ""
+}
+
+// adminSession 登录 A 的控制台，返回可复用客户端与 CSRF 令牌。
+func adminSession(t *testing.T, web string) (*http.Client, string) {
+	t.Helper()
+	jar, e := cookiejar.New(nil)
+	if e != nil {
+		t.Fatal(e)
+	}
+	client := &http.Client{Jar: jar}
+	body, _ := json.Marshal(map[string]string{"username": "admin", "password": "test-password", "entrance": "/signin"})
+	request, e := http.NewRequest("POST", web+"/api/v2/auth/sessions", bytes.NewReader(body))
+	if e != nil {
+		t.Fatal(e)
+	}
+	request.Header.Set("Content-Type", "application/json")
+	request.Header.Set("Origin", web)
+	response, e := client.Do(request)
+	if e != nil {
+		t.Fatal(e)
+	}
+	defer response.Body.Close()
+	payload, _ := io.ReadAll(response.Body)
+	if response.StatusCode != 201 {
+		t.Fatalf("管理员登录失败：%d %s", response.StatusCode, payload)
+	}
+	var session struct {
+		CsrfToken string `json:"csrf_token"`
+	}
+	if e = json.Unmarshal(payload, &session); e != nil {
+		t.Fatal(e)
+	}
+	if session.CsrfToken == "" {
+		t.Fatalf("登录响应里没有 CSRF 令牌：%s", payload)
+	}
+	return client, session.CsrfToken
+}
+
+// submitCreate 经 A 的真实 HTTP 入口提交一次建库，返回状态码与问题码。
+func submitCreate(t *testing.T, client *http.Client, csrf, web, clusterID string, revision uint64, database, key string) (int, string) {
+	t.Helper()
+	body, e := json.Marshal(map[string]any{
+		"expected_revision": revision,
+		"kind":              "create_database",
+		"database":          database,
+		"charset":           "utf8mb4",
+		"proxies":           []any{},
+	})
+	if e != nil {
+		t.Fatal(e)
+	}
+	request, e := http.NewRequest("POST", web+"/api/v2/database-clusters/"+clusterID+"/changes", bytes.NewReader(body))
+	if e != nil {
+		t.Fatal(e)
+	}
+	request.Header.Set("Content-Type", "application/json")
+	request.Header.Set("Origin", web)
+	request.Header.Set("X-CSRF-Token", csrf)
+	request.Header.Set("Idempotency-Key", key)
+	response, e := client.Do(request)
+	if e != nil {
+		t.Fatal(e)
+	}
+	defer response.Body.Close()
+	payload, _ := io.ReadAll(response.Body)
+	var problem struct {
+		Code string `json:"code"`
+	}
+	_ = json.Unmarshal(payload, &problem)
+	return response.StatusCode, problem.Code
 }
