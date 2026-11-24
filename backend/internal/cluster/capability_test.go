@@ -2,8 +2,11 @@ package cluster
 
 import (
 	"encoding/json"
+	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/jkfujr/opsd/internal/protocol"
 )
 
 // 默认允许的只有约定的四项，其余方法零值必须是"拒绝"。
@@ -217,14 +220,14 @@ func TestCreateDatabaseKey(t *testing.T) {
 		Change:  DatabaseChange{Cluster: "cluster-1", Kind: "create_database", Database: "biz"},
 		Cluster: ManagedDatabaseCluster{ID: "cluster-1"},
 	})
-	if key := createDatabaseKey("database", body); key != "cluster-1\x1fbiz" {
+	if key := databaseResourceKey("database", body); key != "cluster-1\x1fbiz" {
 		t.Fatalf("资源键不符合预期：%q", key)
 	}
 	other, _ := json.Marshal(DatabaseSubmission{Change: DatabaseChange{Cluster: "cluster-1", Kind: "drop_database", Database: "biz"}})
-	if key := createDatabaseKey("database", other); key != "" {
+	if key := databaseResourceKey("database", other); key != "" {
 		t.Fatalf("非建库操作不应占用资源：%q", key)
 	}
-	if key := createDatabaseKey("task_run", body); key != "" {
+	if key := databaseResourceKey("task_run", body); key != "" {
 		t.Fatalf("其他品种不应占用建库资源：%q", key)
 	}
 }
@@ -233,8 +236,8 @@ func TestCreateDatabaseKey(t *testing.T) {
 func TestCreateDatabaseKeyIsUniqueWhileInFlight(t *testing.T) {
 	n, _ := openTestNode(t)
 	insert := func(id string, terminal int) error {
-		_, err := n.DB.Exec(`INSERT INTO queue(id,origin,actor,kind,payload,request_key,request_digest,body,terminal,create_key)
-			VALUES(?,?,'','database','{}','',X'00','{}',?,'cluster-1' || char(31) || 'biz')`, id, n.ID, terminal)
+		_, err := n.DB.Exec(`INSERT INTO queue(id,origin,actor,kind,payload,request_key,request_digest,body,terminal,resource_key)
+			VALUES(?,?,'','database','{}','',X'00','{}',?,'galera-1' || char(31) || 'biz')`, id, n.ID, terminal)
 		return err
 	}
 	if err := insert("op-1", 0); err != nil {
@@ -249,5 +252,91 @@ func TestCreateDatabaseKeyIsUniqueWhileInFlight(t *testing.T) {
 	}
 	if err := insert("op-2", 0); err != nil {
 		t.Fatalf("资源释放后应可再次受理：%v", err)
+	}
+}
+
+// 建库 → 删除 → 重建：删除成功后库名释放，可以再次受理。
+func TestDatabaseResourceFreedAfterDelete(t *testing.T) {
+	n, _ := openTestNode(t)
+	body := func(kind string) json.RawMessage {
+		b, _ := json.Marshal(DatabaseSubmission{
+			Change:  DatabaseChange{Cluster: "cluster-1", Kind: kind, Database: "biz"},
+			Cluster: ManagedDatabaseCluster{ID: "managed-1", ClusterID: "galera-1"},
+		})
+		return b
+	}
+	insert := func(id, action string, terminal int, state string) error {
+		op := Operation{Action: action, OperationRecord: protocol.OperationRecord{ID: id, State: protocol.OperationState(state)}}
+		raw, _ := json.Marshal(op)
+		key := databaseResourceKey("database", body(action))
+		_, err := n.DB.Exec(`INSERT INTO queue(id,origin,actor,kind,payload,request_key,request_digest,body,terminal,resource_key)
+			VALUES(?,?,'','database','{}','',X'00',?,?,?)`, id, n.ID, string(raw), terminal, key)
+		return err
+	}
+	// 建库成功后占用同名库。
+	if err := insert("create-1", "create_database", 1, "succeeded"); err != nil {
+		t.Fatal(err)
+	}
+	if !occupiedNow(t, n, databaseResourceKey("database", body("create_database"))) {
+		t.Fatal("建库成功后应占用")
+	}
+	// 删除成功后释放。
+	if err := insert("delete-1", "delete_database", 1, "succeeded"); err != nil {
+		t.Fatal(err)
+	}
+	if occupiedNow(t, n, databaseResourceKey("database", body("create_database"))) {
+		t.Fatal("删除成功后应释放")
+	}
+}
+
+// occupiedNow 在一个只读事务里查询资源占用。
+func occupiedNow(t *testing.T, n *Node, key string) bool {
+	t.Helper()
+	tx, err := n.DB.BeginTx(t.Context(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer tx.Rollback()
+	occupied, err := databaseResourceOccupied(t.Context(), tx, key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return occupied
+}
+
+// 迁移前的在途建库记录没有资源键：启动时解密载荷补齐，否则升级后会漏占库名。
+func TestBackfillResourceKeyForInFlightDatabase(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "backfill.db")
+	n, err := Open(t.Context(), path, Options{Password: "test-password"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	payload, _ := json.Marshal(DatabaseSubmission{
+		Change:  DatabaseChange{Cluster: "managed-1", Kind: "create_database", Database: "biz"},
+		Cluster: ManagedDatabaseCluster{ID: "managed-1", ClusterID: "galera-1"},
+	})
+	sealed, err := seal(payload, []string{n.age.Recipient().String()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw, _ := json.Marshal(sealed)
+	op := Operation{Action: "create_database", OperationRecord: protocol.OperationRecord{ID: "legacy-create", State: protocol.Accepted}}
+	body, _ := json.Marshal(op)
+	// 模拟迁移前的记录：resource_key 为空。
+	if _, err = n.DB.Exec(`INSERT INTO queue(id,origin,actor,kind,payload,request_key,request_digest,body,terminal,resource_key)
+		VALUES('legacy-create',?,'','database',?,'',X'00',?,0,'')`, n.ID, string(raw), string(body)); err != nil {
+		t.Fatal(err)
+	}
+	if err = n.Close(); err != nil {
+		t.Fatal(err)
+	}
+	// 重新打开触发回填。
+	n2, err := Open(t.Context(), path, Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer n2.Close()
+	if occupiedNow(t, n2, "galera-1\x1fbiz") == false {
+		t.Fatal("回填后该库名应被占用")
 	}
 }

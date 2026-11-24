@@ -614,11 +614,11 @@ func (n *Node) enqueueTx(ctx context.Context, origin string, r Request, related 
 			return Operation{}, priorErr
 		}
 	}
-	// 建库按**资源**判重，与回执键无关：回执键按已认证来源隔离后，
+	// 建库/删库按**资源**判重，与回执键无关：回执键按已认证来源隔离后，
 	// 换入口或换键都不该再产生第二个建库操作。
-	createKey := createDatabaseKey(r.Kind, r.Payload)
-	if createKey != "" {
-		occupied, e := createDatabaseOccupied(ctx, tx, createKey)
+	resourceKey := databaseResourceKey(r.Kind, r.Payload)
+	if resourceKey != "" {
+		occupied, e := databaseResourceOccupied(ctx, tx, resourceKey)
 		if e != nil {
 			return Operation{}, e
 		}
@@ -716,7 +716,7 @@ func (n *Node) enqueueTx(ctx context.Context, origin string, r Request, related 
 		}
 	}
 	b, _ := json.Marshal(op)
-	result, e := tx.ExecContext(ctx, "INSERT INTO queue(id,origin,actor,kind,payload,request_key,request_digest,body,terminal,phase,create_key) VALUES(?,?,?,?,?,?,?,?,?,?,?)", r.ID, origin, actor, r.Kind, string(payload), r.Key, digest[:], string(b), operations.Terminal(op.State), phase, createKey)
+	result, e := tx.ExecContext(ctx, "INSERT INTO queue(id,origin,actor,kind,payload,request_key,request_digest,body,terminal,phase,resource_key) VALUES(?,?,?,?,?,?,?,?,?,?,?)", r.ID, origin, actor, r.Kind, string(payload), r.Key, digest[:], string(b), operations.Terminal(op.State), phase, resourceKey)
 	if e != nil {
 		return op, e
 	}
@@ -1785,10 +1785,11 @@ func (n *Node) authorizeSubmit(ctx context.Context, origin string, body json.Raw
 	return n.Capabilities.Allowed(origin, request.Kind)
 }
 
-// createDatabaseKey 返回建库操作的资源键（集群 + 库名）；非建库返回空串。
+// databaseResourceKey 返回数据库资源的对账键（Galera 集群身份 + 库名）。
 //
-// 载荷是加密存放的，所以这里在受理时就算好明文键并存进 create_key 列。
-func createDatabaseKey(kind string, payload json.RawMessage) string {
+// 载荷是加密存放的，所以受理时就算好明文键并存进 resource_key 列。
+// 建库与删库共用同一个键：删除在途时也占用资源，删除成功后才释放。
+func databaseResourceKey(kind string, payload json.RawMessage) string {
 	if kind != "database" {
 		return ""
 	}
@@ -1798,23 +1799,34 @@ func createDatabaseKey(kind string, payload json.RawMessage) string {
 			Kind     string `json:"kind"`
 			Database string `json:"database"`
 		} `json:"change"`
+		Cluster struct {
+			ClusterID string `json:"cluster_id"`
+		} `json:"cluster"`
 	}
 	if json.Unmarshal(payload, &submission) != nil {
 		return ""
 	}
-	if submission.Change.Kind != "create_database" || submission.Change.Database == "" {
+	if submission.Change.Kind != "create_database" && submission.Change.Kind != "delete_database" {
 		return ""
 	}
-	return submission.Change.Cluster + "\x1f" + submission.Change.Database
+	if submission.Change.Database == "" {
+		return ""
+	}
+	// Galera 集群身份才是跨节点稳定的资源标识，管理记录的 ID 不作键。
+	cluster := submission.Cluster.ClusterID
+	if cluster == "" {
+		cluster = submission.Change.Cluster
+	}
+	return cluster + "\x1f" + submission.Change.Database
 }
 
-// createDatabaseOccupied 报告同一集群同一库名是否已占用。
+// databaseResourceOccupied 报告同一集群同一库名是否已占用。
 //
-// 占用条件：存在在途建库操作，或最近一次成功的建库/删库仍是建库。
-// 建库成功后又成功删除的，允许重建。
-func createDatabaseOccupied(ctx context.Context, tx *sql.Tx, createKey string) (bool, error) {
+// 占用条件：存在在途的建库/删库，或最近一次成功的动作仍是建库。
+// 建库成功后又被成功删除的，允许重建。
+func databaseResourceOccupied(ctx context.Context, tx *sql.Tx, key string) (bool, error) {
 	var inFlight int
-	if err := tx.QueryRowContext(ctx, "SELECT count(*) FROM queue WHERE create_key=? AND terminal=0", createKey).Scan(&inFlight); err != nil {
+	if err := tx.QueryRowContext(ctx, "SELECT count(*) FROM queue WHERE resource_key=? AND terminal=0", key).Scan(&inFlight); err != nil {
 		return false, err
 	}
 	if inFlight > 0 {
@@ -1822,9 +1834,9 @@ func createDatabaseOccupied(ctx context.Context, tx *sql.Tx, createKey string) (
 	}
 	var latestAction string
 	err := tx.QueryRowContext(ctx, `SELECT json_extract(body,'$.action') FROM queue
-		WHERE (create_key=? OR json_extract(body,'$.action')='drop_database')
-		  AND terminal=1 AND json_extract(body,'$.state')='succeeded'
-		ORDER BY seq DESC LIMIT 1`, createKey).Scan(&latestAction)
+		WHERE resource_key=? AND terminal=1 AND json_extract(body,'$.state')='succeeded'
+		  AND json_extract(body,'$.action') IN ('create_database','delete_database')
+		ORDER BY seq DESC LIMIT 1`, key).Scan(&latestAction)
 	if errors.Is(err, sql.ErrNoRows) {
 		return false, nil
 	}

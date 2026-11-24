@@ -271,6 +271,13 @@ func Open(ctx context.Context, path string, o Options) (*Node, error) {
 			return nil, err
 		}
 	}
+	// 迁移前的在途建库/删库记录没有资源键：解密载荷补齐，
+	// 否则它们不占用库名，升级窗口内可能被重复受理。
+	if e = n.backfillDatabaseResourceKeys(ctx); e != nil {
+		n.cancel()
+		db.Close()
+		return nil, e
+	}
 	if m, err := n.Self(ctx); err == nil && m.ManagementVersion < protocol.SharedManagementVersion {
 		actual, err := n.Config(ctx)
 		if err != nil {
@@ -597,6 +604,50 @@ func (n *Node) Verify(ctx context.Context, r Record) error {
 	}
 	if r.Cluster != n.cluster || r.Sequence == 0 || n.Revoked(ctx, r.Owner) || !ed25519.Verify(key, recordBytes(r), r.Signature) || r.ID != fmt.Sprintf("%s~%s~%s~%020d", r.Owner, r.Kind, r.Object, r.Sequence) {
 		return fault("conflict", "数据签名或来源无效")
+	}
+	return nil
+}
+
+// backfillDatabaseResourceKeys 为迁移前的在途数据库操作补写资源键。
+//
+// 载荷是加密的，只能逐条解密；解不开就返回错误——宁可拒绝启动，
+// 也不能让占用库名的操作在升级后被当成不存在。
+func (n *Node) backfillDatabaseResourceKeys(ctx context.Context) error {
+	rows, err := n.DB.QueryContext(ctx, "SELECT id,payload FROM queue WHERE kind='database' AND terminal=0 AND resource_key=''")
+	if err != nil {
+		return err
+	}
+	type pending struct{ id, key string }
+	var fixes []pending
+	for rows.Next() {
+		var id, raw string
+		if err = rows.Scan(&id, &raw); err != nil {
+			break
+		}
+		var secret Secret
+		if err = json.Unmarshal([]byte(raw), &secret); err != nil {
+			break
+		}
+		plain, e := unseal(secret, n.age)
+		if e != nil {
+			err = e
+			break
+		}
+		if key := databaseResourceKey("database", plain); key != "" {
+			fixes = append(fixes, pending{id: id, key: key})
+		}
+	}
+	if err == nil {
+		err = rows.Err()
+	}
+	rows.Close()
+	if err != nil {
+		return err
+	}
+	for _, fix := range fixes {
+		if _, e := n.DB.ExecContext(ctx, "UPDATE queue SET resource_key=? WHERE id=?", fix.key, fix.id); e != nil {
+			return e
+		}
 	}
 	return nil
 }
