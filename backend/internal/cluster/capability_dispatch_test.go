@@ -1,10 +1,14 @@
 package cluster
 
 import (
+	"database/sql"
 	"encoding/json"
+	"path/filepath"
 	"testing"
 
 	"github.com/jkfujr/opsd/internal/protocol"
+	"github.com/jkfujr/opsd/internal/requeststate"
+	"github.com/jkfujr/opsd/internal/sharedsql"
 )
 
 // 目标侧授权按已认证来源节点生效：默认拒绝、授予放行、撤销再拒绝，
@@ -106,6 +110,81 @@ func TestMissingOperationAuthorization(t *testing.T) {
 		if faultCode(err) != tc.code || result.ID != "" {
 			t.Fatalf("%s 应返回 %s 且无操作内容，实际 %v，内容 %+v", tc.method, tc.code, err, result)
 		}
+	}
+}
+
+func TestWrappedDecisionRejectsAmbiguousOperation(t *testing.T) {
+	source, _ := openTestNode(t)
+	target, _ := openTestNode(t)
+	joinTest(t, target, source)
+	target.Capabilities[source.ID] = map[Capability]bool{CapabilityManageFirewall: true}
+	allowed := Operation{OperationRecord: protocol.OperationRecord{ID: NewOperationID(target.ID), State: protocol.Accepted, Revision: 1}, Subject: "firewall_config"}
+	protected := Operation{OperationRecord: protocol.OperationRecord{ID: NewOperationID(target.ID), State: protocol.Accepted, Revision: 1}, Subject: "database"}
+	for _, op := range []Operation{allowed, protected} {
+		if _, err := target.DB.ExecContext(t.Context(), "INSERT INTO queue(id,origin,kind,payload,request_key,request_digest,body) VALUES(?,?,?,'{}','',?,?)", op.ID, source.ID, op.Subject, []byte{}, string(payload(op))); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// 仅发送有歧义的标识，省略动作和写入回执。
+	var result Operation
+	err := source.Call(t.Context(), target.ID, "api.operation.decision", map[string]any{"id": allowed.ID, "decision": OperationDecision{ID: protected.ID}}, &result)
+	if faultCode(err) != "invalid_request" || result.ID != "" {
+		t.Errorf("歧义载荷应在处理前拒绝，得到 %v", err)
+	}
+	current, err := target.operation(t.Context(), protected.ID)
+	if err != nil || current.Revision != protected.Revision || current.State != protected.State {
+		t.Fatal("受保护操作发生变化", current, err)
+	}
+	decision := OperationDecision{ID: allowed.ID, ExpectedRevision: allowed.Revision}
+	write := requeststate.Write{Actor: "test", Key: "cancel-allowed", Digest: "normal-decision"}
+	result, err = source.CallOperationDecision(t.Context(), allowed.ID, "operation.cancel", decision, &write)
+	if err != nil || result.ID != allowed.ID || result.State != protocol.Rejected {
+		t.Fatal("正常决定未执行", result, err)
+	}
+}
+
+func TestRemoteSharedDecisionUsesCurrentCoordinator(t *testing.T) {
+	source, _ := openTestNode(t)
+	coordinator, _ := openTestNode(t)
+	joinTest(t, coordinator, source)
+	db, err := sql.Open("sqlite", filepath.Join(t.TempDir(), "shared.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { db.Close() })
+	if _, err = db.Exec(`CREATE TABLE shared_flows(id,resource_id,coordinator,epoch,revision,terminal,body);
+		CREATE TABLE shared_requests(origin,actor,request_key,digest,kind,resource_id,result,created_at);`); err != nil {
+		t.Fatal(err)
+	}
+	for _, node := range []*Node{source, coordinator} {
+		node.shared = &sharedsql.Store{DB: db, Cluster: source.cluster}
+		node.sharedLocal = &SharedLocal{Phase: "active"}
+	}
+	op := Operation{OperationRecord: protocol.OperationRecord{ID: NewOperationID(source.ID), State: protocol.Succeeded, Revision: 2}, Subject: "database"}
+	if _, err = db.Exec("INSERT INTO shared_flows VALUES(?,?,?,?,?,?,?)", op.ID, "cluster", coordinator.ID, 2, op.Revision, true, payload(sharedFlowPayload{Operation: op})); err != nil {
+		t.Fatal(err)
+	}
+	decision := OperationDecision{ID: op.ID, ExpectedRevision: op.Revision}
+	write := requeststate.Write{Actor: "test", Key: "shared-decision", Digest: "shared-operation"}
+	result, err := source.CallOperationDecision(t.Context(), op.ID, "operation.cancel", decision, &write)
+	if err != nil || result.ID != op.ID || result.Coordinator != coordinator.ID || result.State != op.State {
+		t.Errorf("当前协调节点未处理原共享操作：%v", err)
+	}
+	request := operationDecisionRequest{Method: "operation.cancel", Decision: decision, Write: write}
+	coordinator.Capabilities[source.ID] = map[Capability]bool{CapabilityReadOperations: true}
+	if err = source.Call(t.Context(), coordinator.ID, "api.operation.decision", request, nil); faultCode(err) != "forbidden" {
+		t.Fatalf("没有品种能力时应拒绝，得到 %v", err)
+	}
+	coordinator.Capabilities[source.ID] = map[Capability]bool{CapabilityManageDatabase: true}
+	op.CoordinatorEpoch, op.Coordinator = 2, coordinator.ID
+	if _, err = coordinator.DB.ExecContext(t.Context(), "INSERT INTO queue(id,origin,kind,payload,request_key,request_digest,body,terminal) VALUES(?,?,?,'{}','',?,?,1)", op.ID, source.ID, op.Subject, []byte{}, string(payload(op))); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = db.Exec("UPDATE shared_flows SET coordinator=?,epoch=3 WHERE id=?", source.ID, op.ID); err != nil {
+		t.Fatal(err)
+	}
+	if err = source.Call(t.Context(), coordinator.ID, "api.operation.decision", request, nil); faultCode(err) != "forbidden" {
+		t.Fatalf("旧协调节点的本机副本应被拒绝，得到 %v", err)
 	}
 }
 

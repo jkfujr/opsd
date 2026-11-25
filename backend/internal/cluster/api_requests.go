@@ -106,15 +106,29 @@ func (n *Node) CallOperationDecision(ctx context.Context, id, method string, dec
 func (n *Node) apiOperationDecision(ctx context.Context, request operationDecisionRequest) (Operation, error) {
 	n.apiDecisionMu.Lock()
 	defer n.apiDecisionMu.Unlock()
-	local, localErr := n.operation(ctx, request.Decision.ID)
+	id, origin := request.Decision.ID, request.Write.Origin
+	local, localErr := n.operation(ctx, id)
+	if localErr != nil && !errors.Is(localErr, sql.ErrNoRows) {
+		if origin == n.ID {
+			return Operation{}, localErr
+		}
+		return Operation{}, errAdvanceDenied
+	}
 	if n.sharedActive() && (localErr != nil || local.CoordinatorEpoch > 0) {
-		if _, err := n.sharedOperation(ctx, request.Decision.ID); err == nil {
+		if op, err := n.sharedOperation(ctx, id); err == nil {
+			// 共享库的当前代际优先于任何本机副本。
+			if op.ID != id || op.CoordinatorEpoch == 0 || op.Coordinator != n.ID || !n.authorizeAdvance(origin, op) {
+				return Operation{}, errAdvanceDenied
+			}
 			s, err := n.sharedStore(ctx)
 			if err != nil {
 				return Operation{}, err
 			}
 			prior, err := s.Receipt(ctx, sharedsql.Receipt{Origin: request.Write.Origin, Actor: request.Write.Actor, Key: request.Write.Key, Digest: request.Write.Digest})
 			if err == nil {
+				if prior.ResourceID != id {
+					return Operation{}, errAdvanceDenied
+				}
 				var op Operation
 				err = json.Unmarshal(prior.Result, &op)
 				return op, err
@@ -124,11 +138,26 @@ func (n *Node) apiOperationDecision(ctx context.Context, request operationDecisi
 			}
 			return n.sharedWorkflowDecision(requeststate.With(ctx, &request.Write), request.Method, request.Decision)
 		} else if !errors.Is(err, sql.ErrNoRows) {
+			if origin != n.ID {
+				return Operation{}, errAdvanceDenied
+			}
 			return Operation{}, sharedFault(err)
 		}
 	}
+	if operationOwner(id) != n.ID || local.CoordinatorEpoch > 0 {
+		return Operation{}, errAdvanceDenied
+	}
+	if localErr != nil && origin != n.ID {
+		return Operation{}, localErr
+	}
+	if localErr == nil && !n.authorizeAdvance(origin, local) {
+		return Operation{}, errAdvanceDenied
+	}
 	prior, e := requeststate.Lookup(ctx, n.DB, request.Write)
 	if e == nil {
+		if prior.ResourceID != id {
+			return Operation{}, errAdvanceDenied
+		}
 		var op Operation
 		if json.Unmarshal(prior.Result, &op) == nil && op.ID != "" {
 			return op, nil
@@ -141,10 +170,10 @@ func (n *Node) apiOperationDecision(ctx context.Context, request operationDecisi
 	if e != sql.ErrNoRows {
 		return Operation{}, e
 	}
-	op, e := n.operation(ctx, request.Decision.ID)
-	if e != nil {
-		return op, e
+	if localErr != nil {
+		return local, localErr
 	}
+	op := local
 	if op.Revision != request.Decision.ExpectedRevision {
 		return op, fault("conflict", "操作已经改变，请重新读取")
 	}

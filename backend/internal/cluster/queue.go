@@ -1,6 +1,7 @@
 package cluster
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"database/sql"
@@ -8,6 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"sort"
 	"strings"
 	"sync"
@@ -31,20 +33,10 @@ func (n *Node) dispatch(ctx context.Context, origin, method string, body json.Ra
 		n.logDenied(origin, method, "来源节点无权执行此操作")
 		return nil, fault("forbidden", "来源节点无权执行此操作")
 	}
-	// 推进已有操作的请求继承"原操作及其资源"的权限。
-	if access, ok := Access(method); ok {
-		if access.InnerAction && !n.authorizeSubmit(ctx, origin, body) {
-			n.logDenied(origin, method, "来源节点无权提交此操作")
-			return nil, fault("forbidden", "来源节点无权提交此操作")
-		}
-		if access.Advance {
-			if err := n.authorizeAdvance(ctx, origin, body); err != nil {
-				if !errors.Is(err, sql.ErrNoRows) {
-					n.logDenied(origin, method, err.Error())
-				}
-				return nil, err
-			}
-		}
+	access, _ := Access(method)
+	if access.InnerAction && !n.authorizeSubmit(ctx, origin, body) {
+		n.logDenied(origin, method, "来源节点无权提交此操作")
+		return nil, fault("forbidden", "来源节点无权提交此操作")
 	}
 	if n.sharedEnabled() && origin != n.ID {
 		m, err := n.Member(ctx, origin)
@@ -54,6 +46,13 @@ func (n *Node) dispatch(ctx context.Context, origin, method string, body json.Ra
 		if m.ManagementVersion < protocol.SharedManagementVersion && method != "ping" && method != "directory" {
 			return nil, fault("unsupported", "节点版本不支持共享管理")
 		}
+	}
+	if access.Advance {
+		result, err := n.dispatchAdvance(ctx, origin, method, body)
+		if err == errAdvanceDenied || err == errAdvanceRequest {
+			n.logDenied(origin, method, err.Error())
+		}
+		return result, err
 	}
 	if strings.HasPrefix(method, "shared.") {
 		return n.sharedDispatch(ctx, origin, method, body)
@@ -103,15 +102,6 @@ func (n *Node) dispatch(ctx context.Context, origin, method string, body json.Ra
 		}
 		request.Origin = origin
 		return n.requestReceipt(ctx, origin, request)
-	case "api.operation.decision":
-		var request operationDecisionRequest
-		if e := json.Unmarshal(body, &request); e != nil {
-			return nil, e
-		}
-		// 回执按已认证来源归属。Write.Origin 是 json:"-"（内部状态不进载荷），
-		// 编码后必然为空，所以在这里按调度层给出的来源回填。
-		request.Write.Origin = origin
-		return n.apiOperationDecision(ctx, request)
 	case "containers.read", "container.inspect", "container.logs":
 		return n.containerDispatch(ctx, method, body)
 	case "public_addresses.read":
@@ -179,12 +169,6 @@ func (n *Node) dispatch(ctx context.Context, origin, method string, body json.Ra
 			return nil, e
 		}
 		return n.enqueue(ctx, origin, r)
-	case "operation.get":
-		var id string
-		if e := json.Unmarshal(body, &id); e != nil {
-			return nil, e
-		}
-		return n.operation(ctx, id)
 	case "operation.list":
 		var q ListQuery
 		if e := json.Unmarshal(body, &q); e != nil {
@@ -193,21 +177,6 @@ func (n *Node) dispatch(ctx context.Context, origin, method string, body json.Ra
 		// 来源由成员通道给出，载荷不能影响它。
 		q.Origin = origin
 		return n.localOperations(ctx, q)
-	case "operation.cancel":
-		var id string
-		if e := json.Unmarshal(body, &id); e != nil {
-			return nil, e
-		}
-		if op, e := n.operation(ctx, id); e == nil && op.Subject == "task_run" {
-			return n.cancelTask(ctx, id)
-		}
-		return n.cancelQueued(ctx, id)
-	case "operation.confirm", "operation.recover", "operation.resolve":
-		var request OperationDecision
-		if e := json.Unmarshal(body, &request); e != nil {
-			return nil, e
-		}
-		return n.decide(ctx, method, request)
 	case "firewall.read":
 		var p protocol.FirewallRead
 		if e := json.Unmarshal(body, &p); e != nil {
@@ -1882,52 +1851,76 @@ func (n *Node) authorize(origin, method string) bool {
 	return n.Capabilities.Allowed(origin, method)
 }
 
-// authorizeAdvance 按原操作所属的动作判定推进权限。
-// 尚未受理的本节点操作返回未找到，供协调节点判断能否提交原步骤。
-func (n *Node) authorizeAdvance(ctx context.Context, origin string, body json.RawMessage) error {
-	// 本节点自身的本地推进不受来源授权限制，与 authorize 保持一致。
-	if origin == n.ID {
-		return nil
+var (
+	errAdvanceDenied  = fault("forbidden", "来源节点无权推进此操作")
+	errAdvanceRequest = fault("invalid_request", "操作推进请求无效")
+)
+
+func (n *Node) dispatchAdvance(ctx context.Context, origin, method string, body json.RawMessage) (any, error) {
+	var request operationDecisionRequest
+	var value any
+	switch method {
+	case "operation.get", "operation.cancel":
+		value = &request.Decision.ID
+	case "operation.confirm", "operation.recover", "operation.resolve":
+		value = &request.Decision
+	case "api.operation.decision":
+		value = &request
+	default:
+		return nil, errAdvanceRequest
 	}
-	denied := fault("forbidden", "来源节点无权推进此操作")
-	id, ok := operationIDFromBody(body)
-	if !ok || operationOwner(id) != n.ID || !operations.ValidID(id) {
-		return denied
+	decoder := json.NewDecoder(bytes.NewReader(body))
+	decoder.DisallowUnknownFields()
+	if decoder.Decode(value) != nil || decoder.Decode(new(any)) != io.EOF {
+		return nil, errAdvanceRequest
+	}
+	id := request.Decision.ID
+	owner := operationOwner(id)
+	if owner == "" || !operations.ValidID(id) {
+		return nil, errAdvanceDenied
+	}
+	if method == "api.operation.decision" {
+		switch request.Method {
+		case "operation.cancel", "operation.confirm", "operation.recover", "operation.resolve":
+		default:
+			return nil, errAdvanceRequest
+		}
+		// 回执归属取自已认证来源。
+		request.Write.Origin = origin
+		return n.apiOperationDecision(ctx, request)
+	}
+	if owner != n.ID {
+		return nil, errAdvanceDenied
 	}
 	op, err := n.operation(ctx, id)
-	if errors.Is(err, sql.ErrNoRows) {
-		return err
-	}
 	if err != nil {
-		return denied
+		if origin == n.ID || errors.Is(err, sql.ErrNoRows) {
+			return nil, err
+		}
+		return nil, errAdvanceDenied
 	}
-	access, known := Access(op.Subject)
-	if !known || access.Capability == "" || !n.Capabilities.Allowed(origin, op.Subject) {
-		return denied
+	if (op.CoordinatorEpoch > 0 && method != "operation.get") || !n.authorizeAdvance(origin, op) {
+		return nil, errAdvanceDenied
 	}
-	return nil
+	switch method {
+	case "operation.get":
+		return op, nil
+	case "operation.cancel":
+		if op.Subject == "task_run" {
+			return n.cancelTask(ctx, id)
+		}
+		return n.cancelQueued(ctx, id)
+	default:
+		return n.decide(ctx, method, request.Decision)
+	}
 }
 
-// operationIDFromBody 按各路径**实际使用的类型**取出操作标识，
-// 与处理器解析同一字段，避免授权判定的对象与真正推进的对象不一致。
-//
-//	operation.cancel           裸字符串
-//	operation.confirm/recover/resolve  OperationDecision{ID}
-//	api.operation.decision     operationDecisionRequest{Decision.ID}
-func operationIDFromBody(body json.RawMessage) (string, bool) {
-	var id string
-	if err := json.Unmarshal(body, &id); err == nil && id != "" {
-		return id, true
+func (n *Node) authorizeAdvance(origin string, op Operation) bool {
+	if origin == n.ID {
+		return true
 	}
-	var decision OperationDecision
-	if err := json.Unmarshal(body, &decision); err == nil && decision.ID != "" {
-		return decision.ID, true
-	}
-	var wrapped operationDecisionRequest
-	if err := json.Unmarshal(body, &wrapped); err == nil && wrapped.Decision.ID != "" {
-		return wrapped.Decision.ID, true
-	}
-	return "", false
+	access, known := Access(op.Subject)
+	return known && access.Capability != "" && n.Capabilities.Allowed(origin, op.Subject)
 }
 
 // authorizeSubmit 按载荷里的内层动作品种判定提交权限。
