@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"path/filepath"
+	"slices"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -50,6 +52,53 @@ func TestConfigUsesCurrentIdentityAndKeepsConfirmedCache(t *testing.T) {
 	got, err := s.Config(t.Context())
 	if err != nil || got != c {
 		t.Fatal("共享库停止后丢失确认配置", got, err)
+	}
+}
+
+func TestArchiveKeepsHostAndDockerWhenDatabaseTimesOut(t *testing.T) {
+	cluster := "cluster"
+	s := testService(t, &cluster)
+	s.runtime.Config.Enabled = true
+	started := make(chan struct{})
+	finished := make(chan error, 1)
+	s.Source = Source{
+		Host: func(context.Context, string) (protocol.MonitoringResult, error) {
+			return protocol.MonitoringResult{Metrics: protocol.Metrics{CollectedAt: time.Now().UTC(), CPUCores: 4}}, nil
+		},
+		Docker: func(context.Context) (protocol.ResourceMetrics, error) {
+			return protocol.ResourceMetrics{Docker: &protocol.DockerState{State: "ready", CheckedAt: time.Now().UTC()}, Metrics: []protocol.ResourceMetric{{Metric: "opsd_docker_up", Value: 1}}}, nil
+		},
+		Databases: func(ctx context.Context) (protocol.ResourceMetrics, error) {
+			close(started)
+			<-ctx.Done()
+			return protocol.ResourceMetrics{}, ctx.Err()
+		},
+	}
+	buffer, err := s.Buffer(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	go func() { finished <- s.Sample(t.Context(), buffer) }()
+	<-started
+	for s.CurrentHost() == nil || s.CurrentDocker() == nil {
+		select {
+		case err = <-finished:
+			t.Fatal("数据库超时前未独立发布宿主及容器缓存", err)
+		case <-time.After(time.Millisecond):
+		}
+	}
+	err = <-finished
+	if err == nil || !strings.Contains(err.Error(), "database: context deadline exceeded") {
+		t.Fatal("未报告数据库采集超时", err)
+	}
+	batches, err := buffer.Pending(t.Context(), s.NodeID, s.Now())
+	if err != nil || len(batches) != 1 {
+		t.Fatal(batches, err)
+	}
+	for _, name := range []string{"opsd_node_cpu_cores", "opsd_docker_up"} {
+		if !slices.ContainsFunc(batches[0].Samples, func(m metricsstore.Sample) bool { return m.Metric == name }) {
+			t.Fatal("归档丢失正常指标", name, batches[0])
+		}
 	}
 }
 

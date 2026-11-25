@@ -12,11 +12,17 @@ import (
 )
 
 func (s *Services) resourceMetrics(ctx context.Context, r protocol.ResourceMetricsRead) (protocol.Payload, error) {
+	if r.DatabasesOnly {
+		// 先结束慢查询，给已完成的数据库指标留出回传时间。
+		read, cancel := context.WithTimeout(ctx, 550*time.Millisecond)
+		defer cancel()
+		ctx = read
+	}
 	out := &protocol.ResourceMetrics{At: time.Now().UTC(), Metrics: []protocol.ResourceMetric{}, Errors: []string{}}
 	var mu sync.Mutex
 	var wg sync.WaitGroup
 	slots := make(chan struct{}, 4)
-	if s.Docker != nil {
+	if s.Docker != nil && !r.DatabasesOnly {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()

@@ -45,7 +45,7 @@ func Aggregate(readings []Reading, now time.Time) Summary {
 	var mu, mt, du, dt uint64
 	var rx, tx float64
 	for _, reading := range readings {
-		if reading.Metrics == nil || (reading.State != "ready" && reading.State != "partial") {
+		if reading.Metrics == nil || (reading.State != "ready" && reading.State != "partial" && reading.Read.DataAt == nil) {
 			continue
 		}
 		m := reading.Metrics

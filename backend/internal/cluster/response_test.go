@@ -198,6 +198,28 @@ func TestSharedCurrentReadsReturnQueuedAndReuseActiveRefresh(t *testing.T) {
 	}
 }
 
+func TestMetricsReadStartsWhileOtherReadSlotsAreFull(t *testing.T) {
+	n, _ := openTestNode(t)
+	n.current = map[string]*currentRead{}
+	n.readSlots = make(chan struct{}, 8)
+	n.metricsReadSlots = make(chan struct{}, 8)
+	for range cap(n.readSlots) {
+		n.readSlots <- struct{}{}
+	}
+	n.Executor = &metricExecutor{}
+	deadline := time.Now().Add(time.Second)
+	for {
+		reading := n.Reading(t.Context(), n.ID)
+		if reading.Read.State == "ready" && reading.Metrics != nil {
+			return
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("其他读请求占满名额后概览无法刷新", reading)
+		}
+		time.Sleep(time.Millisecond)
+	}
+}
+
 func TestDirectoryUnchangedSkipsEventsAndConnectionsAreReused(t *testing.T) {
 	a, _ := openTestNode(t)
 	b, _ := openTestNode(t)

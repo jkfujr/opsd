@@ -64,7 +64,8 @@ type Errors struct {
 
 type Source struct {
 	Host      func(context.Context, string) (protocol.MonitoringResult, error)
-	Resources func(context.Context) (protocol.ResourceMetrics, error)
+	Docker    func(context.Context) (protocol.ResourceMetrics, error)
+	Databases func(context.Context) (protocol.ResourceMetrics, error)
 }
 
 type Dependencies struct {

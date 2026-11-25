@@ -43,4 +43,9 @@ func TestAggregateWeightedAndPartial(t *testing.T) {
 	if *value.Metrics.CPUUsage != 65 || *value.Metrics.MemoryUsed != 200 || *value.Metrics.MemoryTotal != 400 || value.Metrics.DiskTotal != nil || value.ValidNodes.CPU != 2 || value.ValidNodes.Network != 1 {
 		t.Fatalf("汇总口径错误：%+v", value)
 	}
+	at := time.Now().Add(-time.Minute)
+	value = Aggregate([]Reading{{State: "ready", Metrics: &a}, {State: "timeout", Read: protocol.ReadStatus{State: "timeout", DataAt: &at}, Metrics: &b}}, time.Now())
+	if value.Metrics.CPUUsage == nil || *value.Metrics.CPUUsage != 65 || value.ValidNodes.CPU != 2 {
+		t.Fatal("读取超时后汇总丢弃了最近有效值", value)
+	}
 }

@@ -45,12 +45,18 @@ func (n *Node) newTelemetry(directory string) *telemetry.Service {
 			return ""
 		}, Shared: sharedFault, Wire: wireError},
 		Executor: n.executeRead,
-		Source:   telemetry.Source{Host: n.collect, Resources: n.collectTelemetryResources},
-		Changed:  func() { n.notifyChange(Change{Resource: "monitoring"}) },
+		Source: telemetry.Source{
+			Host: n.collect,
+			Docker: func(ctx context.Context) (protocol.ResourceMetrics, error) {
+				return n.readTelemetryResources(ctx, &protocol.ResourceMetricsRead{})
+			},
+			Databases: n.collectTelemetryDatabases,
+		},
+		Changed: func() { n.notifyChange(Change{Resource: "monitoring"}) },
 	})
 }
 
-func (n *Node) collectTelemetryResources(ctx context.Context) (protocol.ResourceMetrics, error) {
+func (n *Node) collectTelemetryDatabases(ctx context.Context) (protocol.ResourceMetrics, error) {
 	var resources protocol.ResourceMetrics
 	connections := map[string]protocol.DatabaseConnection{}
 	clusters, err := n.DatabaseClusters(ctx)
@@ -76,21 +82,30 @@ func (n *Node) collectTelemetryResources(ctx context.Context) (protocol.Resource
 			connections[ref.InstanceID] = connection
 		}
 	}
-	if n.Executor == nil {
+	if len(connections) == 0 {
 		return resources, nil
 	}
-	reply, err := n.Executor.Call(ctx, &protocol.ResourceMetricsRead{Connections: connections})
+	value, err := n.readTelemetryResources(ctx, &protocol.ResourceMetricsRead{Connections: connections, DatabasesOnly: true})
 	if err != nil {
 		return resources, err
 	}
+	value.Errors = append(resources.Errors, value.Errors...)
+	return value, nil
+}
+
+func (n *Node) readTelemetryResources(ctx context.Context, request *protocol.ResourceMetricsRead) (protocol.ResourceMetrics, error) {
+	if n.Executor == nil {
+		return protocol.ResourceMetrics{}, nil
+	}
+	reply, err := n.Executor.Call(ctx, request)
+	if err != nil {
+		return protocol.ResourceMetrics{}, err
+	}
 	value, ok := reply.(*protocol.ResourceMetrics)
 	if !ok {
-		return resources, fmt.Errorf("资源指标应答无效")
+		return protocol.ResourceMetrics{}, fmt.Errorf("资源指标应答无效")
 	}
-	connectionErrors := resources.Errors
-	resources = *value
-	resources.Errors = append(connectionErrors, resources.Errors...)
-	return resources, nil
+	return *value, nil
 }
 
 type telemetryParent struct {

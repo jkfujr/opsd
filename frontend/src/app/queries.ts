@@ -8,23 +8,28 @@ import type {
 import { createStore, useStore } from '../lib/store';
 import { useVisible } from '../lib/hooks';
 
-// ── 实时历史：每次概览读取都记入环形缓冲，用于火花线与瞬时趋势 ─────────
+// ── 实时历史：按实际采集时间记入环形缓冲 ─────────────────────────
 const SIZE = 48;
 export interface LivePoint { t: number; cpu?: number; mem?: number; disk?: number; rx?: number; tx?: number }
 export const live = createStore<Record<string, LivePoint[]>>({});
 
 function record(overview: Overview) {
-  const t = Date.parse(overview.updated_at) || Date.now();
   live.set((prev) => {
     const next = { ...prev };
     const push = (key: string, p: LivePoint) => {
       const list = prev[key] ?? [];
-      if (list.length && list[list.length - 1]!.t >= p.t) return;
+      if (list.length && list[list.length - 1]!.t >= p.t) return false;
       next[key] = [...list.slice(-(SIZE - 1)), p];
+      return true;
     };
-    const m = overview.summary.metrics;
-    push('__cluster', point(t, m));
-    for (const n of overview.nodes) if (n.reading.metrics) push(n.node.id, point(Date.parse(n.reading.metrics.collected_at) || t, n.reading.metrics));
+    let hasNewSample = false;
+    for (const { node, reading } of overview.nodes) {
+      if (!node.connected || reading.read.state !== 'ready' || !reading.metrics) continue;
+      const at = Date.parse(reading.metrics.collected_at);
+      if (!Number.isFinite(at)) continue;
+      if (push(node.id, point(at, reading.metrics))) hasNewSample = true;
+    }
+    if (hasNewSample) push('__cluster', point(Date.parse(overview.updated_at) || Date.now(), overview.summary.metrics));
     return next;
   });
 }

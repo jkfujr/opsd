@@ -4,8 +4,8 @@ import { AnimatePresence, motion } from 'motion/react';
 import { useQuery } from '@tanstack/react-query';
 import { Database, KeyRound, Plus, Trash2, UserPlus, ExternalLink, Shield, Ellipsis, Lock } from 'lucide-react';
 import { call, enc, get } from '../api/http';
-import type { DatabaseBackupList, DatabaseChange, DatabaseProxySelection, ManagedDatabaseMember, ManagedDatabaseStatus, Operation } from '../api/types';
-import { useDatabaseStatus } from '../app/queries';
+import type { DatabaseBackupList, DatabaseChange, DatabaseProxySelection, ManagedDatabaseMember, ManagedDatabaseStatus, NodeStatus, Operation } from '../api/types';
+import { useDatabaseStatus, useNodes } from '../app/queries';
 import { useCommand } from '../app/commands';
 import { confirm } from '../app/confirm';
 import { ago, bytes, fullTime, n0 } from '../lib/format';
@@ -54,15 +54,17 @@ export function DatabaseDetail() {
 }
 
 function Members({ d }: { d?: ManagedDatabaseStatus }) {
+  const nodes = useNodes();
   if (!d) return <Card pad><Skeleton height={160} /></Card>;
+  const directory = new Map(nodes.data?.items.map((node) => [node.id, node]));
   return (
     <div className="stack">
       <Card>
         <CardHead title="Galera 成员" sub={`${d.members.length} 个`} />
         <div className="table-wrap">
           <table className="table">
-            <thead><tr><th>成员</th><th>状态</th><th className="num-cell">集群</th><th className="num-cell">连接</th><th className="num-cell hide-sm">收 / 发队列</th><th className="num-cell hide-sm">流控</th><th className="hide-sm">采集</th></tr></thead>
-            <tbody>{d.members.map((m) => <MemberRow key={`${m.node_id}/${m.instance_id}`} m={m} />)}</tbody>
+            <thead><tr><th>成员</th><th>节点</th><th>状态</th><th className="num-cell">集群</th><th className="num-cell">连接</th><th className="num-cell hide-sm">收 / 发队列</th><th className="num-cell hide-sm">流控</th><th className="hide-sm">采集</th></tr></thead>
+            <tbody>{d.members.map((m) => <MemberRow key={`${m.node_id}/${m.instance_id}`} m={m} node={directory.get(m.node_id)} />)}</tbody>
           </table>
         </div>
       </Card>
@@ -89,11 +91,12 @@ function Members({ d }: { d?: ManagedDatabaseStatus }) {
   );
 }
 
-function MemberRow({ m }: { m: ManagedDatabaseMember }) {
+function MemberRow({ m, node }: { m: ManagedDatabaseMember; node?: NodeStatus }) {
   const s = m.status;
   return (
     <tr>
       <td><div className="col" style={{ gap: 0 }}><strong style={{ fontWeight: 560 }}>{m.name}</strong><span className="mono muted" style={{ fontSize: 12 }}>{m.address}</span></div></td>
+      <td><div className="col" style={{ gap: 0 }}><span title={m.node_id}>{node?.name || m.node_id.slice(0, 12)}</span>{node?.address && <span className="mono muted" style={{ fontSize: 12 }}>{node.address}</span>}</div></td>
       <td><div className="row wrap" style={{ gap: 4 }}><Badge tone={memberTone(m)} dot>{memberLabel(m)}</Badge>{s.read_only && <Tag>read_only</Tag>}</div></td>
       <td className="num-cell">{s.cluster_size ?? '—'}</td>
       <td className="num-cell">{s.connections !== undefined ? `${n0(s.connections)}${s.max_connections ? ` / ${n0(s.max_connections)}` : ''}` : '—'}</td>

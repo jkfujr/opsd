@@ -12,7 +12,7 @@ import (
 type runtime struct {
 	Config        metricsstore.Config
 	Host          *protocol.MonitoringResult
-	Resources     *protocol.ResourceMetrics
+	Docker        *protocol.DockerState
 	LastUpload    time.Time
 	LastReceive   time.Time
 	SamplingError string
@@ -98,9 +98,9 @@ func (s *Service) CurrentHost() *protocol.MonitoringResult {
 func (s *Service) CurrentDocker() *protocol.DockerState {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	resources := s.runtime.Resources
-	if s.runtime.Config.Enabled && resources != nil && resources.Docker != nil && s.Now().Sub(resources.Docker.CheckedAt) >= 0 && s.Now().Sub(resources.Docker.CheckedAt) < 1500*time.Millisecond {
-		return resources.Docker
+	docker := s.runtime.Docker
+	if s.runtime.Config.Enabled && docker != nil && s.Now().Sub(docker.CheckedAt) >= 0 && s.Now().Sub(docker.CheckedAt) < 1500*time.Millisecond {
+		return docker
 	}
 	return nil
 }

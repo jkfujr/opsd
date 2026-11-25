@@ -302,12 +302,20 @@ function PeerTrust() {
               return (
                 <div key={n.node_id} className="trust-row">
                   <div className="row"><Dot tone={tone} live={n.state === 'pending'} /><strong className="ellipsis" style={{ fontWeight: 580 }}>{names.get(n.node_id) ?? n.node_id.slice(0, 12)}</strong></div>
-                  {(['ipv4', 'ipv6'] as const).map((f) => (
-                    <div key={f} className="col" style={{ gap: 2, minWidth: 0 }}>
-                      <span className="dim" style={{ fontSize: 11.5 }}>{f.toUpperCase()} · {fam(f).length} 个来源</span>
-                      <span className="mono ellipsis" style={{ fontSize: 12 }} title={fam(f).map((r) => r.address).join(', ')}>{fam(f).slice(0, 3).map((r) => r.address).filter(Boolean).join(', ') || '—'}</span>
-                    </div>
-                  ))}
+                  {(['ipv4', 'ipv6'] as const).map((f) => {
+                    const rules = fam(f);
+                    return (
+                      <div key={f} className="trust-family col">
+                        <span className="dim" style={{ fontSize: 11.5 }}>{f.toUpperCase()} · {rules.filter((rule) => rule.address).length} 个地址</span>
+                        {rules.length ? <ul className="trust-addresses">{rules.map((rule) => (
+                          <li key={rule.address ?? rule.members[0]?.id}>
+                            <span className="mono">{rule.address || '未获取地址'}</span>
+                            {(rule.members.length > 1 || !rule.address) && <span className="muted">{rule.members.length > 1 && '共享 · '}{rule.members.map((member) => member.name || member.id.slice(0, 12)).join('、')}</span>}
+                          </li>
+                        ))}</ul> : <span className="muted">—</span>}
+                      </div>
+                    );
+                  })}
                   <Badge tone={tone}>{{ pending: '同步中', in_sync: '已生效', failed: '失败', disabled: '未开启', offline: '离线' }[n.state]}</Badge>
                 </div>
               );

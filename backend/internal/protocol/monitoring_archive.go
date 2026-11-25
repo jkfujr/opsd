@@ -64,7 +64,8 @@ func (*MonitoringState) Kind() Kind { return "monitoring.deployment.state" }
 func (*MonitoringState) isPayload() {}
 
 type ResourceMetricsRead struct {
-	Connections map[string]DatabaseConnection `json:"connections"`
+	Connections   map[string]DatabaseConnection `json:"connections"`
+	DatabasesOnly bool                          `json:"databases_only,omitempty"`
 }
 
 func (*ResourceMetricsRead) Kind() Kind { return "monitoring.resources.read" }

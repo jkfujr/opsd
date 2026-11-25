@@ -92,6 +92,7 @@ type Node struct {
 	databaseReads        map[string]*managedDatabaseReadEntry
 	current              map[string]*currentRead
 	readSlots            chan struct{}
+	metricsReadSlots     chan struct{}
 	telemetry            *telemetry.Service
 }
 

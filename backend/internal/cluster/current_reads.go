@@ -26,6 +26,7 @@ func (n *Node) CurrentRead(ctx context.Context, target, method string, body, out
 	if n.current == nil {
 		n.current = map[string]*currentRead{}
 		n.readSlots = make(chan struct{}, 8)
+		n.metricsReadSlots = make(chan struct{}, 8)
 	}
 	entry := n.current[key]
 	if entry == nil {
@@ -49,9 +50,13 @@ func (n *Node) CurrentRead(ctx context.Context, target, method string, body, out
 		status.State = "stale"
 	}
 	if !entry.running && !n.closed && n.ctx.Err() == nil {
+		slots := n.readSlots
+		if method == "metrics" {
+			slots = n.metricsReadSlots
+		}
 		entry.running = true
 		n.wg.Add(1)
-		go n.refreshCurrent(entry, target, method, b, interval)
+		go n.refreshCurrent(entry, slots, target, method, b, interval)
 	}
 	n.mu.Unlock()
 	if len(value) > 0 && out != nil {
@@ -60,12 +65,12 @@ func (n *Node) CurrentRead(ctx context.Context, target, method string, body, out
 	return status
 }
 
-func (n *Node) refreshCurrent(entry *currentRead, target, method string, body json.RawMessage, interval time.Duration) {
+func (n *Node) refreshCurrent(entry *currentRead, slots chan struct{}, target, method string, body json.RawMessage, interval time.Duration) {
 	defer n.wg.Done()
 	defer func() { n.mu.Lock(); entry.running = false; n.mu.Unlock() }()
 	for {
 		select {
-		case n.readSlots <- struct{}{}:
+		case slots <- struct{}{}:
 		case <-n.ctx.Done():
 			return
 		}
@@ -81,11 +86,13 @@ func (n *Node) refreshCurrent(entry *currentRead, target, method string, body js
 		err := n.Call(ctx, target, method, body, &result)
 		timedOut := ctx.Err() == context.DeadlineExceeded
 		cancel()
-		<-n.readSlots
+		<-slots
 		n.mu.Lock()
 		if err == nil {
-			entry.completed = n.Now()
 			completed := currentDataTime(result, n.Now().UTC())
+			if method != "metrics" || entry.status.DataAt == nil || !completed.Equal(*entry.status.DataAt) {
+				entry.completed = n.Now()
+			}
 			entry.value = result
 			entry.status = ReadStatus{State: "ready", DataAt: &completed, AttemptedAt: &at}
 		} else {
@@ -94,6 +101,10 @@ func (n *Node) refreshCurrent(entry *currentRead, target, method string, body js
 				entry.status.State = "offline"
 			}
 			entry.status.Error = wireError(err)
+			if method == "metrics" && entry.status.Error.Code == "forbidden" {
+				entry.value = nil
+				entry.status.DataAt = nil
+			}
 			if timedOut {
 				entry.status.State = "timeout"
 			}

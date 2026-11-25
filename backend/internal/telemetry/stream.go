@@ -81,12 +81,38 @@ func (s *Service) sampleLoop() {
 }
 func (s *Service) Sample(ctx context.Context, buffer *metricsstore.Buffer) error {
 	var host protocol.MonitoringResult
-	var resources protocol.ResourceMetrics
-	var hostErr, resourceErr error
+	var docker, databases protocol.ResourceMetrics
+	var hostErr, dockerErr, databasesErr error
 	var wg sync.WaitGroup
-	wg.Add(2)
-	go func() { defer wg.Done(); host, hostErr = s.Source.Host(ctx, "archive") }()
-	go func() { defer wg.Done(); resources, resourceErr = s.Source.Resources(ctx) }()
+	wg.Add(3)
+	go func() {
+		defer wg.Done()
+		read, cancel := context.WithTimeout(ctx, 600*time.Millisecond)
+		defer cancel()
+		host, hostErr = s.Source.Host(read, "archive")
+		if hostErr == nil && !host.Metrics.CollectedAt.IsZero() {
+			s.mu.Lock()
+			s.runtime.Host = &host
+			s.mu.Unlock()
+		}
+	}()
+	go func() {
+		defer wg.Done()
+		read, cancel := context.WithTimeout(ctx, 600*time.Millisecond)
+		defer cancel()
+		docker, dockerErr = s.Source.Docker(read)
+		if dockerErr == nil && docker.Docker != nil && docker.Docker.State == "ready" {
+			s.mu.Lock()
+			s.runtime.Docker = docker.Docker
+			s.mu.Unlock()
+		}
+	}()
+	go func() {
+		defer wg.Done()
+		read, cancel := context.WithTimeout(ctx, 750*time.Millisecond)
+		defer cancel()
+		databases, databasesErr = s.Source.Databases(read)
+	}()
 	wg.Wait()
 	at := s.Now().UTC()
 	if hostErr == nil && !host.Metrics.CollectedAt.IsZero() {
@@ -114,13 +140,18 @@ func (s *Service) Sample(ctx context.Context, buffer *metricsstore.Buffer) error
 		}
 		b.Errors = append(b.Errors, m.Errors...)
 	}
-	if resourceErr != nil {
-		b.Errors = append(b.Errors, "resources: "+resourceErr.Error())
-	} else {
-		for _, m := range resources.Metrics {
+	for _, source := range []struct {
+		name   string
+		result protocol.ResourceMetrics
+		err    error
+	}{{"containers", docker, dockerErr}, {"database", databases, databasesErr}} {
+		if source.err != nil {
+			b.Errors = append(b.Errors, source.name+": "+source.err.Error())
+		}
+		for _, m := range source.result.Metrics {
 			emit(m.Metric, m.ResourceID, m.Backend, m.Value)
 		}
-		b.Errors = append(b.Errors, resources.Errors...)
+		b.Errors = append(b.Errors, source.result.Errors...)
 	}
 	if len(b.Errors) > 32 {
 		b.Errors = b.Errors[:32]
@@ -134,14 +165,6 @@ func (s *Service) Sample(ctx context.Context, buffer *metricsstore.Buffer) error
 	if appended.Sequence == 0 {
 		return fmt.Errorf("采集时钟发生变化，已保留数据缺口")
 	}
-	s.mu.Lock()
-	if hostErr == nil {
-		s.runtime.Host = &host
-	}
-	if resourceErr == nil {
-		s.runtime.Resources = &resources
-	}
-	s.mu.Unlock()
 	if len(b.Errors) > 0 {
 		return errors.New(strings.Join(b.Errors, "；"))
 	}

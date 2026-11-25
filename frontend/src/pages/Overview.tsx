@@ -6,8 +6,8 @@ import type { OverviewNode } from '../api/types';
 import { useLive, useOverview } from '../app/queries';
 import { useSession } from '../app/session';
 import { openDock } from '../app/ops';
-import { bytes, initials, pct, rate, ratio, ago } from '../lib/format';
-import { operationTitle, usageTone, readProblem } from '../lib/status';
+import { bytes, initials, pct, rate, ratio, ago, fullTime } from '../lib/format';
+import { operationTitle, usageTone, readLabel } from '../lib/status';
 import { useNow } from '../lib/hooks';
 import { Spark } from '../ui/charts';
 import { Badge, Button, Card, Dot, Empty, ErrorNotice, Meter, Notice, SearchInput, Segmented, Skeleton, Ticker, itemVariants, listVariants } from '../ui/kit';
@@ -46,6 +46,8 @@ export function Overview() {
   const diskP = ratio(s?.disk_used, s?.disk_total);
   const urgent = (data?.pending_operations ?? []).filter((o) => o.state === 'awaiting_confirmation' || o.state === 'attention_required');
   const offline = (data?.nodes ?? []).filter((n) => !n.node.revoked_at && !n.node.connected);
+  const delayed = (data?.nodes ?? []).filter((n) => n.reading.metrics && (!n.node.connected || n.reading.read.state !== 'ready'));
+  const longestDelay = delayed.reduce((age, n) => Math.max(age, lagSeconds(n, now)), 0);
   const greeting = greet(now);
 
   return (
@@ -66,12 +68,13 @@ export function Overview() {
       </motion.section>
 
       {query.isError && !data && <ErrorNotice error={query.error} retry={() => void query.refetch()} />}
+      {delayed.length > 0 && <div className="row"><Badge tone="warn">{delayed.length} 个节点数据滞后 · 最长 {longestDelay} 秒</Badge></div>}
 
       <motion.div className="kpis" variants={listVariants} initial="hidden" animate="show">
         <Kpi icon={<Cpu />} label="CPU" value={s?.cpu_usage} format={(x) => x.toFixed(1)} unit="%" sub={v ? `${v.cpu} 个节点 · ${s?.cpu_cores ?? 0} 核` : undefined} spark={cluster?.map((p) => p.cpu ?? null)} max={100} loading={!data} />
         <Kpi icon={<MemoryStick />} label="内存" value={memP} format={(x) => x.toFixed(1)} unit="%" sub={s ? `${bytes(s.memory_used)} / ${bytes(s.memory_total)}` : undefined} spark={cluster?.map((p) => p.mem ?? null)} max={100} loading={!data} />
         <Kpi icon={<HardDrive />} label="磁盘" value={diskP} format={(x) => x.toFixed(1)} unit="%" sub={s ? `${bytes(s.disk_used)} / ${bytes(s.disk_total)}` : undefined} spark={cluster?.map((p) => p.disk ?? null)} max={100} loading={!data} />
-        <Kpi icon={<Network />} label="网络" value={s?.network_rx !== undefined || s?.network_tx !== undefined ? (s?.network_rx ?? 0) + (s?.network_tx ?? 0) : undefined} format={(x) => rate(x)} sub={s ? <><span><ArrowDown width={12} height={12} /> {rate(s.network_rx)}</span><span><ArrowUp width={12} height={12} /> {rate(s.network_tx)}</span></> : undefined} spark={cluster?.map((p) => (p.rx ?? 0) + (p.tx ?? 0))} loading={!data} />
+        <Kpi icon={<Network />} label="网络" value={s?.network_rx !== undefined || s?.network_tx !== undefined ? (s?.network_rx ?? 0) + (s?.network_tx ?? 0) : undefined} format={(x) => rate(x)} sub={s ? <><span><ArrowDown width={12} height={12} /> {rate(s.network_rx)}</span><span><ArrowUp width={12} height={12} /> {rate(s.network_tx)}</span></> : undefined} spark={cluster?.map((p) => p.rx === undefined && p.tx === undefined ? null : (p.rx ?? 0) + (p.tx ?? 0))} loading={!data} />
       </motion.div>
 
       <AnimatePresence>
@@ -105,7 +108,7 @@ export function Overview() {
         ) : (
           <motion.div className="fleet" variants={listVariants} initial="hidden" animate="show" layout>
             <AnimatePresence initial={false}>
-              {nodes.map((n) => <NodeCard key={n.node.id} item={n} onOpen={() => navigate(`/nodes/${encodeURIComponent(n.node.id)}`)} />)}
+              {nodes.map((n) => <NodeCard key={n.node.id} item={n} now={now} onOpen={() => navigate(`/nodes/${encodeURIComponent(n.node.id)}`)} />)}
             </AnimatePresence>
           </motion.div>
         )}
@@ -146,13 +149,18 @@ function pad(values?: (number | null)[], size = 32) {
   return [...Array.from({ length: size - v.length }, () => null), ...v];
 }
 
-function NodeCard({ item, onOpen }: { item: OverviewNode; onOpen: () => void }) {
+function lagSeconds({ reading }: OverviewNode, now: number) {
+  return Math.max(0, Math.floor((now - Date.parse(reading.read.data_at ?? reading.metrics?.collected_at ?? '')) / 1000) || 0);
+}
+
+function NodeCard({ item, now, onOpen }: { item: OverviewNode; now: number; onOpen: () => void }) {
   const { node, reading } = item;
   const m = reading.metrics;
   const history = useLive(node.id);
   const mem = ratio(m?.memory_used, m?.memory_total);
   const disk = ratio(m?.disk_used, m?.disk_total);
-  const problem = readProblem(reading.read) ?? reading.error;
+  const problem = !node.connected ? readLabel.offline : reading.read.state !== 'ready' ? readLabel[reading.read.state] : reading.state === 'partial' ? '部分指标不可用' : undefined;
+  const delayed = m && (!node.connected || reading.read.state !== 'ready');
   const tone = !node.connected ? 'idle' : problem ? 'warn' : 'ok';
   return (
     <motion.div layout variants={itemVariants} exit={{ opacity: 0, scale: 0.96 }} transition={{ layout: { type: 'spring', stiffness: 400, damping: 36 } }}>
@@ -166,7 +174,7 @@ function NodeCard({ item, onOpen }: { item: OverviewNode; onOpen: () => void }) 
           {node.local && <Badge outline>本机</Badge>}
           <Dot tone={tone} live={node.connected && !problem} />
         </div>
-        {node.connected && m ? (
+        {m ? (
           <>
             <div style={{ margin: '-4px -16px 0' }}><Spark values={pad(history?.map((p) => p.cpu ?? null), 28)} max={100} height={34} tone={usageTone(m.cpu_usage) === 'bad' ? 'var(--bad)' : usageTone(m.cpu_usage) === 'warn' ? 'var(--warn)' : 'var(--accent)'} /></div>
             <div className="nc-metrics">
@@ -176,8 +184,9 @@ function NodeCard({ item, onOpen }: { item: OverviewNode; onOpen: () => void }) 
             </div>
           </>
         ) : (
-          <div className="muted" style={{ fontSize: 13, minHeight: 78, display: 'grid', placeItems: 'center' }}>{node.connected ? problem ?? '等待采集' : `离线${node.last_seen_at ? ` · ${ago(node.last_seen_at)}` : ''}`}</div>
+          <div className="muted" style={{ fontSize: 13, minHeight: 78, display: 'grid', placeItems: 'center' }}>{node.connected ? reading.error || problem || '等待采集' : `离线${node.last_seen_at ? ` · ${ago(node.last_seen_at, now)}` : ''}`}</div>
         )}
+        {m && problem && <div><Badge tone="warn" title={[reading.error, fullTime(m.collected_at)].filter(Boolean).join(' · ')}>{problem}{delayed && ` · 数据滞后 ${lagSeconds(item, now)} 秒`}</Badge></div>}
         <div className="nc-foot">
           {m && <span className="net"><ArrowDown /> {rate(m.network_rx)}</span>}
           {m && <span className="net"><ArrowUp /> {rate(m.network_tx)}</span>}

@@ -87,6 +87,28 @@ func TestFirewallConfigOperationAuthorization(t *testing.T) {
 	}
 }
 
+func TestMissingOperationAuthorization(t *testing.T) {
+	source, _ := openTestNode(t)
+	target, _ := openTestNode(t)
+	joinTest(t, target, source)
+	for _, tc := range []struct {
+		method string
+		body   any
+		code   string
+	}{
+		{"operation.get", NewOperationID(target.ID), "not_found"},
+		{"operation.cancel", NewOperationID(target.ID), "not_found"},
+		{"operation.get", NewOperationID(source.ID), "forbidden"},
+		{"operation.get", "invalid-id", "forbidden"},
+	} {
+		var result Operation
+		err := source.Call(t.Context(), target.ID, tc.method, tc.body, &result)
+		if faultCode(err) != tc.code || result.ID != "" {
+			t.Fatalf("%s 应返回 %s 且无操作内容，实际 %v，内容 %+v", tc.method, tc.code, err, result)
+		}
+	}
+}
+
 // faultCode 取出错误里的故障码；非 Fault 返回空串。
 func faultCode(err error) string {
 	if f, ok := err.(*Fault); ok {
