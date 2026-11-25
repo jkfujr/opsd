@@ -72,14 +72,15 @@ function Members({ d }: { d?: ManagedDatabaseStatus }) {
         <Card>
           <CardHead title="ProxySQL" sub={`${d.proxies.length} 个`} />
           <div className="table-wrap">
-            <table className="table">
-              <thead><tr><th>代理</th><th>状态</th><th className="num-cell">连接</th><th className="hide-sm">地址</th><th className="hide-sm">采集</th></tr></thead>
+            <table className="table db-proxy-table">
+              <thead><tr><th>代理</th><th>节点</th><th>管理地址</th><th>状态</th><th className="num-cell hide-sm">连接</th><th className="hide-sm">采集</th></tr></thead>
               <tbody>{d.proxies.map((m) => (
                 <tr key={`${m.node_id}/${m.instance_id}`}>
                   <td><strong style={{ fontWeight: 560 }}>{m.name}</strong></td>
+                  <td><ProxyNode node={directory.get(m.node_id)} nodeID={m.node_id} /></td>
+                  <td className="mono muted">{m.address || '—'}</td>
                   <td><Badge tone={memberTone(m)} dot>{memberLabel(m)}</Badge></td>
-                  <td className="num-cell">{m.status.connections !== undefined ? n0(m.status.connections) : '—'}</td>
-                  <td className="hide-sm mono muted" style={{ fontSize: 12.5 }}>{m.address}</td>
+                  <td className="num-cell hide-sm">{m.status.connections !== undefined ? n0(m.status.connections) : '—'}</td>
                   <td className="hide-sm muted" style={{ fontSize: 12.5 }}>{m.status.read.data_at ? ago(m.status.read.data_at) : '—'}</td>
                 </tr>
               ))}</tbody>
@@ -89,6 +90,15 @@ function Members({ d }: { d?: ManagedDatabaseStatus }) {
       )}
     </div>
   );
+}
+
+function ProxyNode({ node, nodeID }: { node?: NodeStatus; nodeID: string }) {
+  const address = node?.address;
+  let host = address;
+  if (address) {
+    try { host = new URL(address).hostname; } catch { /* 既有节点可能保存裸地址。 */ }
+  }
+  return <span className="db-proxy-node"><span title={nodeID}>{node?.name || nodeID.slice(0, 12)}</span>{host && <span className="mono muted" title={address}>{host}</span>}</span>;
 }
 
 function MemberRow({ m, node }: { m: ManagedDatabaseMember; node?: NodeStatus }) {
@@ -259,14 +269,16 @@ function randomPassword() {
 
 function Proxies({ id }: { id: string }) {
   const q = useDatabaseStatus(id, 'proxies');
+  const nodes = useNodes();
   if (q.isError) return <ErrorNotice error={q.error} retry={() => void q.refetch()} />;
   if (!q.data) return <Card pad><Skeleton height={160} /></Card>;
   if (!q.data.proxies.length) return <Card><Empty title="没有登记代理">集群还没有登记 ProxySQL。</Empty></Card>;
+  const directory = new Map(nodes.data?.items.map((node) => [node.id, node]));
   return (
     <div className="stack">
       {q.data.proxies.map((p) => (
         <Card key={`${p.node_id}/${p.instance_id}`}>
-          <CardHead title={p.name} sub={p.address} actions={<Badge tone={memberTone(p)} dot>{memberLabel(p)}</Badge>} />
+          <CardHead title={p.name} sub={<span className="db-proxy-node"><ProxyNode node={directory.get(p.node_id)} nodeID={p.node_id} /><span>管理地址 <span className="mono">{p.address || '—'}</span></span></span>} actions={<Badge tone={memberTone(p)} dot>{memberLabel(p)}</Badge>} />
           {p.status.pending_changes && <div className="card-body" style={{ paddingBottom: 0 }}><Notice tone="warn">代理存在未应用到运行层的差异。</Notice></div>}
           <div className="table-wrap">
             <table className="table">

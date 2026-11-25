@@ -46,8 +46,7 @@ export function Overview() {
   const diskP = ratio(s?.disk_used, s?.disk_total);
   const urgent = (data?.pending_operations ?? []).filter((o) => o.state === 'awaiting_confirmation' || o.state === 'attention_required');
   const offline = (data?.nodes ?? []).filter((n) => !n.node.revoked_at && !n.node.connected);
-  const delayed = (data?.nodes ?? []).filter((n) => n.reading.metrics && (!n.node.connected || n.reading.read.state !== 'ready'));
-  const longestDelay = delayed.reduce((age, n) => Math.max(age, lagSeconds(n, now)), 0);
+  const cachedCount = data?.nodes.filter(({ node, reading }) => !node.revoked_at && reading.metrics && (!node.connected || reading.read.state !== 'ready')).length ?? 0;
   const greeting = greet(now);
 
   return (
@@ -68,7 +67,7 @@ export function Overview() {
       </motion.section>
 
       {query.isError && !data && <ErrorNotice error={query.error} retry={() => void query.refetch()} />}
-      {delayed.length > 0 && <div className="row"><Badge tone="warn">{delayed.length} 个节点数据滞后 · 最长 {longestDelay} 秒</Badge></div>}
+      {cachedCount > 0 && <div className="row"><Badge tone="warn">{cachedCount} 个节点使用上次读数</Badge></div>}
 
       <motion.div className="kpis" variants={listVariants} initial="hidden" animate="show">
         <Kpi icon={<Cpu />} label="CPU" value={s?.cpu_usage} format={(x) => x.toFixed(1)} unit="%" sub={v ? `${v.cpu} 个节点 · ${s?.cpu_cores ?? 0} 核` : undefined} spark={cluster?.map((p) => p.cpu ?? null)} max={100} loading={!data} />
@@ -149,19 +148,18 @@ function pad(values?: (number | null)[], size = 32) {
   return [...Array.from({ length: size - v.length }, () => null), ...v];
 }
 
-function lagSeconds({ reading }: OverviewNode, now: number) {
-  return Math.max(0, Math.floor((now - Date.parse(reading.read.data_at ?? reading.metrics?.collected_at ?? '')) / 1000) || 0);
-}
-
 function NodeCard({ item, now, onOpen }: { item: OverviewNode; now: number; onOpen: () => void }) {
   const { node, reading } = item;
   const m = reading.metrics;
   const history = useLive(node.id);
   const mem = ratio(m?.memory_used, m?.memory_total);
   const disk = ratio(m?.disk_used, m?.disk_total);
-  const problem = !node.connected ? readLabel.offline : reading.read.state !== 'ready' ? readLabel[reading.read.state] : reading.state === 'partial' ? '部分指标不可用' : undefined;
-  const delayed = m && (!node.connected || reading.read.state !== 'ready');
-  const tone = !node.connected ? 'idle' : problem ? 'warn' : 'ok';
+  const state = reading.read.state;
+  const failed = state === 'timeout' || state === 'error';
+  const offline = !node.connected || state === 'offline';
+  const cached = m && (offline || state !== 'ready');
+  const problem = failed ? readLabel[state] : offline ? readLabel.offline : state === 'stale' ? '数据未更新' : state !== 'ready' ? readLabel[state] : reading.state === 'partial' ? '部分指标不可用' : undefined;
+  const tone = failed ? 'bad' : offline ? 'idle' : problem ? 'warn' : 'ok';
   return (
     <motion.div layout variants={itemVariants} exit={{ opacity: 0, scale: 0.96 }} transition={{ layout: { type: 'spring', stiffness: 400, damping: 36 } }}>
       <Card hoverable className="node-card" data-offline={!node.connected} onClick={onOpen} role="link" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter') onOpen(); }}>
@@ -186,7 +184,10 @@ function NodeCard({ item, now, onOpen }: { item: OverviewNode; now: number; onOp
         ) : (
           <div className="muted" style={{ fontSize: 13, minHeight: 78, display: 'grid', placeItems: 'center' }}>{node.connected ? reading.error || problem || '等待采集' : `离线${node.last_seen_at ? ` · ${ago(node.last_seen_at, now)}` : ''}`}</div>
         )}
-        {m && problem && <div><Badge tone="warn" title={[reading.error, fullTime(m.collected_at)].filter(Boolean).join(' · ')}>{problem}{delayed && ` · 数据滞后 ${lagSeconds(item, now)} 秒`}</Badge></div>}
+        {m && problem && <div className="row wrap">
+          <Badge tone={tone} title={reading.error || undefined}>{problem}</Badge>
+          {cached && m.collected_at && <span className="muted">采集于 <time dateTime={m.collected_at}>{fullTime(m.collected_at)}</time></span>}
+        </div>}
         <div className="nc-foot">
           {m && <span className="net"><ArrowDown /> {rate(m.network_rx)}</span>}
           {m && <span className="net"><ArrowUp /> {rate(m.network_tx)}</span>}

@@ -168,18 +168,23 @@ tr:hover .row-actions, .row-actions:focus-within { opacity: 1; }
 .action-chip.reject { background: var(--warn-soft); color: var(--warn); }
 .action-chip.default { background: var(--idle-soft); color: var(--text-3); }
 
-.trust-matrix { display: grid; gap: 8px; }
-.trust-row { display: grid; grid-template-columns: minmax(140px, 1fr) repeat(2, minmax(0, 1.2fr)) auto; gap: 12px; align-items: start; padding: 10px 16px; border-bottom: 1px solid var(--line); }
-.trust-row:last-child { border-bottom: 0; }
-.trust-family { gap: 4px; min-width: 0; }
-.trust-addresses { list-style: none; margin: 0; padding: 0; display: grid; gap: 5px; }
-.trust-addresses li { display: grid; gap: 1px; padding: 4px 7px; border-radius: var(--r-sm); background: var(--surface-2); font-size: 12px; overflow-wrap: anywhere; }
-@media (max-width: 800px) {
-  .trust-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .trust-row > :last-child { grid-column: 2; grid-row: 1; justify-self: end; }
+.trust-table td, .db-proxy-table td, .db-proxy-node { overflow-wrap: anywhere; }
+.db-proxy-node { display: grid; gap: 2px; }
+.db-proxy-node .mono { font-size: 12px; }
+@media (max-width: 760px) {
+  .trust-table, .db-proxy-table { table-layout: fixed; }
+  .trust-table th, .trust-table td, .db-proxy-table th, .db-proxy-table td { padding-inline: 8px; }
+  .trust-table th, .db-proxy-table th { white-space: normal; }
+  .trust-address-table th:first-child { width: 52px; }
+  .trust-table:not(.trust-address-table) th:first-child, .db-proxy-table th:nth-child(2) { width: 34%; }
 }
 @media (max-width: 480px) {
-  .trust-family { grid-column: span 2; }
+  .db-proxy-table th:first-child, .db-proxy-table td:first-child { display: none; }
+  .db-proxy-table th:nth-child(2) { width: auto; }
+  .db-proxy-table th:nth-child(3) { width: 118px; }
+  .db-proxy-table th:nth-child(4) { width: 72px; }
+  .db-proxy-table td:nth-child(3), .trust-address-table td:nth-child(2) { font-size: 12px; }
+  .trust-address-table th:nth-child(2) { width: 54%; }
 }
 
 /* ── 数据库 ───────────────────────────────────────────── */

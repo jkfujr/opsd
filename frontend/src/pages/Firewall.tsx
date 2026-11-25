@@ -277,6 +277,20 @@ function PeerTrust() {
     onConflict: () => void policy.refetch(),
   });
   const enabled = policy.data?.value.enabled ?? false;
+  const addresses = new Map<string, { family: string; address?: string; members: Map<string, string> }>();
+  for (const node of status.data?.nodes ?? []) {
+    for (const rule of node.rules) {
+      const key = `${rule.family}/${rule.address ?? ''}`;
+      let row = addresses.get(key);
+      if (!row) {
+        row = { family: rule.family, address: rule.address, members: new Map() };
+        addresses.set(key, row);
+      }
+      for (const member of rule.members) {
+        if (!row.members.has(member.id) || member.name) row.members.set(member.id, names.get(member.id) || member.name || member.id.slice(0, 12));
+      }
+    }
+  }
   return (
     <div className="stack">
       {policy.isError && <ErrorNotice error={policy.error} retry={() => void policy.refetch()} />}
@@ -293,37 +307,43 @@ function PeerTrust() {
         </div>
       </Card>
       <Card>
-        <CardHead title="逐节点状态" sub={status.data ? `策略版本 ${status.data.policy.version.counter}` : undefined} />
+        <CardHead title="互信地址" />
         {status.isError ? <div className="card-body"><ErrorNotice error={status.error} retry={() => void status.refetch()} /></div> : !status.data ? <div className="card-body"><Skeleton height={120} /></div> : (
-          <div>
-            {status.data.nodes.map((n) => {
-              const tone = n.state === 'in_sync' ? 'ok' : n.state === 'failed' ? 'bad' : n.state === 'offline' || n.state === 'disabled' ? 'idle' : 'info';
-              const fam = (f: 'ipv4' | 'ipv6') => n.rules.filter((r) => r.family === f);
-              return (
-                <div key={n.node_id} className="trust-row">
-                  <div className="row"><Dot tone={tone} live={n.state === 'pending'} /><strong className="ellipsis" style={{ fontWeight: 580 }}>{names.get(n.node_id) ?? n.node_id.slice(0, 12)}</strong></div>
-                  {(['ipv4', 'ipv6'] as const).map((f) => {
-                    const rules = fam(f);
-                    return (
-                      <div key={f} className="trust-family col">
-                        <span className="dim" style={{ fontSize: 11.5 }}>{f.toUpperCase()} · {rules.filter((rule) => rule.address).length} 个地址</span>
-                        {rules.length ? <ul className="trust-addresses">{rules.map((rule) => (
-                          <li key={rule.address ?? rule.members[0]?.id}>
-                            <span className="mono">{rule.address || '未获取地址'}</span>
-                            {(rule.members.length > 1 || !rule.address) && <span className="muted">{rule.members.length > 1 && '共享 · '}{rule.members.map((member) => member.name || member.id.slice(0, 12)).join('、')}</span>}
-                          </li>
-                        ))}</ul> : <span className="muted">—</span>}
-                      </div>
-                    );
-                  })}
-                  <Badge tone={tone}>{{ pending: '同步中', in_sync: '已生效', failed: '失败', disabled: '未开启', offline: '离线' }[n.state]}</Badge>
-                </div>
-              );
-            })}
-            {!status.data.nodes.length && <Empty title="没有节点状态" />}
-          </div>
+          addresses.size ? <div className="table-wrap">
+            <table className="table trust-table trust-address-table">
+              <thead><tr><th>地址族</th><th>地址</th><th>关联成员</th></tr></thead>
+              <tbody>{[...addresses].sort(([a], [b]) => a.localeCompare(b)).map(([key, row]) => (
+                <tr key={key}>
+                  <td>{row.family.toUpperCase()}</td>
+                  <td className={row.address ? 'mono' : 'muted'}>{row.address || '未获取地址'}</td>
+                  <td>{row.address && row.members.size > 1 && <span className="muted">共享 · </span>}{[...row.members.values()].join('、') || '—'}</td>
+                </tr>
+              ))}</tbody>
+            </table>
+          </div> : <Empty title="暂无互信地址" />
         )}
       </Card>
+      {status.data && !status.isError && <Card>
+        <CardHead title="逐节点状态" sub={`目标策略版本 ${status.data.policy.version.counter}`} />
+        {status.data.nodes.length ? <div className="table-wrap">
+          <table className="table trust-table">
+            <thead><tr><th>节点</th><th>策略版本</th><th>已应用 / 目标</th><th>状态</th></tr></thead>
+            <tbody>
+            {status.data.nodes.map((n) => {
+              const tone = n.state === 'in_sync' ? 'ok' : n.state === 'failed' ? 'bad' : n.state === 'offline' || n.state === 'disabled' ? 'idle' : 'info';
+              return (
+                <tr key={n.node_id}>
+                  <td><strong>{names.get(n.node_id) ?? n.node_id.slice(0, 12)}</strong></td>
+                  <td className="num">{n.state === 'offline' ? '—' : n.policy_version.counter}</td>
+                  <td className="num">{n.state === 'offline' ? '—' : `${n.applied_revision} / ${n.target_revision}`}</td>
+                  <td><Badge tone={tone} dot>{{ pending: '同步中', in_sync: '已生效', failed: '失败', disabled: '未开启', offline: '离线' }[n.state]}</Badge></td>
+                </tr>
+              );
+            })}
+            </tbody>
+          </table>
+        </div> : <Empty title="没有节点状态" />}
+      </Card>}
     </div>
   );
 }
