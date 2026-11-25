@@ -9,7 +9,12 @@ import { useCommand } from '../app/commands';
 import { useSession } from '../app/session';
 import { ago, bytes, n0 } from '../lib/format';
 import { Badge, Button, Card, Dialog, Dot, Empty, ErrorNotice, Field, Input, Notice, PageHead, Skeleton, Tag, itemVariants, listVariants } from '../ui/kit';
-import type { Tone } from '../lib/status';
+import { readLabel, readTone, type Tone } from '../lib/status';
+
+const memberStateLabel: Record<string, string> = {
+  queued: '等待读取', reading: '读取中', stale: '数据过期', timeout: '读取超时', error: '读取失败',
+  offline: '离线', unavailable: '不可用', mismatch: '身份不一致', unknown: '未知', ready: '正常',
+};
 
 export function memberTone(m: ManagedDatabaseMember): Tone {
   const s = m.status;
@@ -30,7 +35,25 @@ export function memberLabel(m: ManagedDatabaseMember) {
     if (s.read_only) return '只读';
     return '正常';
   }
-  return ({ queued: '等待读取', reading: '读取中', stale: '数据过期', timeout: '读取超时', error: '读取失败', offline: '离线', unavailable: '不可用', mismatch: '身份不一致', unknown: '未知', ready: '正常' } as Record<string, string>)[s.state] ?? s.state;
+  return memberStateLabel[s.state] ?? s.state;
+}
+
+export function proxyStatus(m: ManagedDatabaseMember): { label: string; tone: Tone; pending: boolean } {
+  const s = m.status;
+  const read = s.read.state;
+  if (read === 'timeout' || read === 'error' || read === 'offline' || read === 'stale') {
+    return { label: readLabel[read], tone: read === 'stale' ? 'warn' : readTone(s.read), pending: false };
+  }
+  if (s.error) return { label: s.error.message, tone: 'bad', pending: false };
+  if (s.state !== 'ready') {
+    const label = s.state === 'unknown' && (read === 'queued' || read === 'reading') ? readLabel[read] : memberStateLabel[s.state] ?? s.state;
+    const tone = s.state === 'offline' || s.state === 'unavailable' ? 'idle'
+      : s.state === 'timeout' || s.state === 'error' || s.state === 'mismatch' ? 'bad' : 'info';
+    return { label, tone, pending: false };
+  }
+  if (s.pending_changes === true) return { label: '待应用', tone: 'warn', pending: true };
+  if (s.pending_changes === false) return { label: '已同步', tone: 'ok', pending: false };
+  return { label: '未知', tone: 'idle', pending: false };
 }
 export function clusterHealth(d: ManagedDatabaseStatus) {
   const known = d.members.filter((m) => m.status.read.data_at || m.status.state === 'ready');
@@ -102,7 +125,10 @@ function ClusterCard({ d, onOpen }: { d: ManagedDatabaseStatus; onOpen: () => vo
         </div>
         <div className="db-members">
           {d.members.map((m) => <span key={`${m.node_id}/${m.instance_id}`} className="db-member" title={memberLabel(m)}><Dot tone={memberTone(m)} />{m.name}</span>)}
-          {d.proxies.map((p) => <span key={`p${p.node_id}/${p.instance_id}`} className="db-member" title={memberLabel(p)}><Dot tone={memberTone(p)} />{p.name}<Tag>proxy</Tag></span>)}
+          {d.proxies.map((p) => {
+            const status = proxyStatus(p);
+            return <span key={`p${p.node_id}/${p.instance_id}`} className="db-member" title={status.label}><Dot tone={status.tone} />{p.name}<Tag>proxy</Tag></span>;
+          })}
         </div>
         <div className="row muted" style={{ fontSize: 12.5 }}><span className="grow">协调节点 {d.cluster.coordinator.slice(0, 10)}</span><ArrowRight width={14} height={14} /></div>
       </Card>

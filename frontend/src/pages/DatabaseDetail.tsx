@@ -10,7 +10,7 @@ import { useCommand } from '../app/commands';
 import { confirm } from '../app/confirm';
 import { ago, bytes, fullTime, n0 } from '../lib/format';
 import { Badge, Button, Card, CardHead, Dialog, Dot, Empty, ErrorNotice, Field, IconButton, Input, Menu, Notice, Select, Skeleton, Tabs, Tag } from '../ui/kit';
-import { clusterHealth, memberLabel, memberTone } from './Databases';
+import { clusterHealth, memberLabel, memberTone, proxyStatus } from './Databases';
 
 type Tab = 'health' | 'schemas' | 'users' | 'proxies' | 'backups';
 
@@ -74,16 +74,19 @@ function Members({ d }: { d?: ManagedDatabaseStatus }) {
           <div className="table-wrap">
             <table className="table db-proxy-table">
               <thead><tr><th>代理</th><th>节点</th><th>管理地址</th><th>状态</th><th className="num-cell hide-sm">连接</th><th className="hide-sm">采集</th></tr></thead>
-              <tbody>{d.proxies.map((m) => (
+              <tbody>{d.proxies.map((m) => {
+                const status = proxyStatus(m);
+                return (
                 <tr key={`${m.node_id}/${m.instance_id}`}>
                   <td><strong style={{ fontWeight: 560 }}>{m.name}</strong></td>
                   <td><ProxyNode node={directory.get(m.node_id)} nodeID={m.node_id} /></td>
                   <td className="mono muted">{m.address || '—'}</td>
-                  <td><Badge tone={memberTone(m)} dot>{memberLabel(m)}</Badge></td>
+                  <td><Badge tone={status.tone} dot>{status.label}</Badge></td>
                   <td className="num-cell hide-sm">{m.status.connections !== undefined ? n0(m.status.connections) : '—'}</td>
                   <td className="hide-sm muted" style={{ fontSize: 12.5 }}>{m.status.read.data_at ? ago(m.status.read.data_at) : '—'}</td>
                 </tr>
-              ))}</tbody>
+                );
+              })}</tbody>
             </table>
           </div>
         </Card>
@@ -276,10 +279,12 @@ function Proxies({ id }: { id: string }) {
   const directory = new Map(nodes.data?.items.map((node) => [node.id, node]));
   return (
     <div className="stack">
-      {q.data.proxies.map((p) => (
+      {q.data.proxies.map((p) => {
+        const status = proxyStatus(p);
+        return (
         <Card key={`${p.node_id}/${p.instance_id}`}>
-          <CardHead title={p.name} sub={<span className="db-proxy-node"><ProxyNode node={directory.get(p.node_id)} nodeID={p.node_id} /><span>管理地址 <span className="mono">{p.address || '—'}</span></span></span>} actions={<Badge tone={memberTone(p)} dot>{memberLabel(p)}</Badge>} />
-          {p.status.pending_changes && <div className="card-body" style={{ paddingBottom: 0 }}><Notice tone="warn">代理存在未应用到运行层的差异。</Notice></div>}
+          <CardHead title={p.name} sub={<span className="db-proxy-node"><ProxyNode node={directory.get(p.node_id)} nodeID={p.node_id} /><span>管理地址 <span className="mono">{p.address || '—'}</span></span></span>} actions={<Badge tone={status.tone} dot>{status.label}</Badge>} />
+          {status.pending && <div className="card-body" style={{ paddingBottom: 0 }}><Notice tone="warn">代理账号在配置层、运行层或磁盘层存在差异。</Notice></div>}
           <div className="table-wrap">
             <table className="table">
               <thead><tr><th>主机组</th><th>后端</th><th>状态</th><th className="num-cell">使用 / 空闲</th><th className="num-cell hide-sm">错误</th><th className="num-cell hide-sm">延迟</th></tr></thead>
@@ -297,7 +302,8 @@ function Proxies({ id }: { id: string }) {
           </div>
           {!!p.status.proxy_users?.length && <div className="card-body row wrap" style={{ gap: 6 }}>{p.status.proxy_users.map((u) => <Tag key={u.name}>{u.name} → {u.hostgroup}{u.active ? '' : '（停用）'}</Tag>)}</div>}
         </Card>
-      ))}
+        );
+      })}
     </div>
   );
 }

@@ -92,7 +92,10 @@ func (n *Node) readManagedDatabaseGroup(ctx context.Context, c ManagedDatabaseCl
 	out := make([]ManagedDatabaseMember, len(all))
 	for i, ref := range all {
 		selectedScope := scope
-		if scope == "proxies" && i < len(c.Members) || scope != "proxies" && i >= len(c.Members) {
+		if i >= len(c.Members) {
+			// 列表、成员页和代理页共用包含账号层差异的读取。
+			selectedScope = "proxies"
+		} else if scope == "proxies" {
 			selectedScope = "health"
 		}
 		var result protocol.DatabaseReadResult
