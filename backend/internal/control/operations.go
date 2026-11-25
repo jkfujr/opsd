@@ -91,7 +91,15 @@ func (s *Server) writeFirewallConfig(w http.ResponseWriter, r *http.Request, id 
 	var op cluster.Operation
 	if e == nil {
 		op, e = s.node.GetOperation(r.Context(), saved.OperationID)
-		w.Header().Set("Location", httpapi.APIBasePath+"/operations/"+saved.OperationID)
+		location := httpapi.APIBasePath + "/operations/" + saved.OperationID
+		w.Header().Set("Location", location)
+		if e != nil {
+			outcome := httpapi.ProblemOutcomeUnknown
+			problem := newProblem(r, http.StatusGatewayTimeout, "outcome_unknown", "防火墙配置已受理，暂无法跟踪结果")
+			problem.Outcome, problem.OperationId, problem.ResourceUrl = &outcome, &saved.OperationID, &location
+			writeProblem(w, problem)
+			return
+		}
 	}
 	s.resultError(w, r, 202, convertHTTP[httpapi.Operation](op), e)
 }

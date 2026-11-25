@@ -105,6 +105,7 @@ var methodAccess = map[string]MethodAccess{
 
 	// —— 防火墙 / 组件 ——
 	"firewall":                      {Capability: CapabilityManageFirewall},
+	"firewall_config":               {Capability: CapabilityManageFirewall},
 	"firewall.plan":                 {Capability: CapabilityManageFirewall},
 	"firewall.preview":              {Capability: CapabilityManageFirewall},
 	"firewall.read":                 {Capability: CapabilityManageFirewall},

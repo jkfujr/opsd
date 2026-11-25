@@ -79,7 +79,8 @@ func TestFirewallConfigHTTPReadsAndAtomicSave(t *testing.T) {
 		}
 		validateTestResponse(t, r, res)
 		defer res.Body.Close()
-		if out != nil && res.StatusCode < 400 {
+		_, readProblem := out.(*httpapi.Problem)
+		if out != nil && (res.StatusCode < 400 || readProblem) {
 			if err = json.NewDecoder(res.Body).Decode(out); err != nil {
 				t.Fatal(err)
 			}
@@ -125,6 +126,18 @@ func TestFirewallConfigHTTPReadsAndAtomicSave(t *testing.T) {
 	}
 	if operations != 1 || configs != 1 {
 		t.Fatal("配置、操作及上传记录没有一次提交", operations, configs)
+	}
+	if _, err = n.DB.Exec(`UPDATE queue SET terminal=1;
+		CREATE TRIGGER unreadable_operation AFTER UPDATE OF body ON queue WHEN NEW.kind='firewall_config'
+		BEGIN UPDATE queue SET body=json_set(NEW.body,'$.revision','unreadable') WHERE id=NEW.id; END;`); err != nil {
+		t.Fatal(err)
+	}
+	patch.ExpectedRevision, patch.Change.Action = 2, "deny"
+	var problem httpapi.Problem
+	if code := request("POST", path+"/changes", "accepted-without-followup", patch, &problem); code != 504 ||
+		problem.Code != "outcome_unknown" || problem.Outcome == nil || *problem.Outcome != httpapi.ProblemOutcomeUnknown ||
+		problem.OperationId == nil || *problem.OperationId == "" {
+		t.Fatal("已受理但读取失败时应保留原操作", code, problem)
 	}
 	slices.Sort(durations)
 	t.Logf("本机配置 GET 服务端耗时（25 次）：中位数 %s，P95 %s，最大 %s；执行器调用 %d", durations[12], durations[23], durations[24], x.calls)

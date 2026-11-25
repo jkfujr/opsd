@@ -53,7 +53,8 @@ export function useCommand<V = void, R = unknown>(options: CommandOptions<V, R>)
         o.onConflict?.();
       } else if (isUnknown(reason)) {
         rememberRequest(key, node, label);
-        toast(`${label}结果未知`, 'warn', { detail: '已保留原请求，可在操作坞核对，不会自动重发', sticky: false });
+        const message = reason instanceof ApiError && reason.operationId ? errorText(reason) : `${label}结果未知`;
+        toast(message, 'warn', { detail: '已保留原请求，可在操作坞核对，不会自动重发', sticky: false });
       } else if (needsReread(reason)) {
         toast(`${label}：${errorText(reason)}`, 'warn', o.onConflict ? { action: { label: '重新读取', run: o.onConflict } } : {});
         o.onConflict?.();
