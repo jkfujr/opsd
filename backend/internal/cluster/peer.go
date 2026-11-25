@@ -86,6 +86,9 @@ func (n *Node) accept(w http.ResponseWriter, r *http.Request) {
 			e = fault("forbidden", "节点未加入或已撤销")
 		} else if m.Cluster != n.cluster {
 			e = fault("forbidden", "集群身份不匹配")
+		} else if hello.Stream == "terminal" && !n.Capabilities[m.ID][CapabilityTerminal] {
+			e = fault("forbidden", "来源节点无权打开终端")
+			n.logDenied(m.ID, "terminal")
 		}
 	}
 	if e != nil {

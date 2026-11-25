@@ -59,6 +59,9 @@ func (n *Node) Terminal(ctx context.Context, target string) (protocol.TerminalSt
 	if err != nil {
 		return fail(err)
 	}
+	if denied, ok := reply.Payload.(*protocol.PeerReply); ok && reply.ReplyTo == id && denied.Error != nil {
+		return fail(fault(denied.Error.Code, denied.Error.Message))
+	}
 	hello, ok := reply.Payload.(*protocol.PeerHello)
 	var remote Member
 	if !ok || reply.ReplyTo != id || json.Unmarshal(hello.Member, &remote) != nil || remote.ID != target || remote.Public != m.Public || remote.Cluster != n.cluster || validateMember(remote) != nil {
