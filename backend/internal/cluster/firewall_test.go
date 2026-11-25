@@ -40,6 +40,40 @@ func TestFirewallChecksKeepOnlyActualStateChanges(t *testing.T) {
 	}
 }
 
+func TestInactiveNFTBlocksRuleCreationAndReadsEnabledRevision(t *testing.T) {
+	n, _ := openTestNode(t)
+	ctx := t.Context()
+	active := false
+	empty := protocol.FirewallDefinition{Backend: "nftables", Rules: []protocol.ManagedRule{}, DefaultPolicies: []protocol.ManagedPolicy{}}
+	x := &configExecutor{inspection: protocol.FirewallInspected{
+		Backend: "nftables", ServiceActive: &active, InSync: true,
+		Target: &protocol.FirewallTarget{Revision: 6, Configuration: empty},
+	}}
+	n.Executor = x
+	n.checkFirewall(ctx)
+	_, err := n.writeFirewall(ctx, n.ID, FirewallWrite{Key: "inactive", ExpectedRevision: 6, Change: &protocol.FirewallChange{
+		Kind: "add_rule", Rule: &protocol.RuleSpec{Family: protocol.IPv4, Protocol: "tcp", Port: "49321", Action: "allow"},
+	}}, false)
+	if err == nil || err.Error() != "请先启用防火墙，再添加入站规则" {
+		t.Fatalf("未提供启用引导：%v", err)
+	}
+	active = true
+	enabled := empty
+	enabled.DefaultPolicies = []protocol.ManagedPolicy{{Family: protocol.IPv4, Chain: "inet/filter/input", Action: "allow"}}
+	x.inspection.Target = &protocol.FirewallTarget{Revision: 7, Configuration: enabled}
+	n.checkFirewall(ctx)
+	state, err := n.FirewallConfig(ctx)
+	if err != nil || state.Revision != 7 || state.ConfirmedRevision != 7 || len(state.DefaultPolicies) != 1 || state.State != "in_sync" {
+		t.Fatalf("启用版本未同步：%+v %v", state, err)
+	}
+	saved, err := n.writeFirewall(ctx, n.ID, FirewallWrite{Key: "active", ExpectedRevision: 7, Change: &protocol.FirewallChange{
+		Kind: "add_rule", Rule: &protocol.RuleSpec{Family: protocol.IPv4, Protocol: "tcp", Port: "49321", Action: "allow"},
+	}}, false)
+	if err != nil || len(saved.Configuration.Rules) != 1 || saved.Configuration.Rules[0].Chain != "inet/filter/input" {
+		t.Fatalf("未定位启用后的入站链：%+v %v", saved, err)
+	}
+}
+
 func TestFirewallCleanupKeepsChangesLatestAndPendingRecords(t *testing.T) {
 	n, _ := openTestNode(t)
 	ctx := t.Context()

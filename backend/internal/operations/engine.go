@@ -523,11 +523,27 @@ func (e *Engine) install(ctx context.Context, l *Local, boot string) error {
 	if err := e.Store.Save(ctx, l); err != nil {
 		return err
 	}
+	enable := l.Action.Component.Enable
+	if enable && e.NativeLock != nil {
+		unlock, err := e.NativeLock(ctx)
+		if err != nil {
+			return e.attention(ctx, l, err)
+		}
+		defer unlock()
+	}
+	if enable {
+		if err := e.checkNFTEnable(ctx, l); err != nil {
+			return e.attention(ctx, l, err)
+		}
+	}
 	if err := e.Install(ctx, l, func() error { return e.Store.Save(ctx, l) }); err != nil {
 		if ctx.Err() != nil {
 			return ctx.Err()
 		}
 		return e.attention(ctx, l, err)
+	}
+	if enable && l.ComponentState.Stage == "nft_enabled" {
+		return e.confirmNFTEnable(ctx, l)
 	}
 	return e.end(ctx, l, protocol.Succeeded, nil)
 }

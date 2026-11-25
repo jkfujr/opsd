@@ -211,6 +211,16 @@ func ChangeConfiguration(before protocol.FirewallDefinition, c protocol.Firewall
 		} else {
 			if d.Backend == "ufw" {
 				r.Chain = ufwPrefix(r.Spec.Family) + "-user-input"
+			} else if d.Backend == "nftables" && r.Chain == "" && r.Zone == "" {
+				for _, policy := range d.DefaultPolicies {
+					if policy.Family != r.Spec.Family {
+						continue
+					}
+					if r.Chain != "" && r.Chain != policy.Chain {
+						return d, Unsupported("请选择规则所属的入站链")
+					}
+					r.Chain = policy.Chain
+				}
 			}
 			d.Rules = append(d.Rules, r)
 			if c.BeforeRuleID != "" {

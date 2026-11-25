@@ -54,7 +54,7 @@ function NodeFirewall({ nodeId }: { nodeId: string }) {
   const q = useFirewallStatus(nodeId);
   const s = q.data;
   const [editing, setEditing] = useState<ManagedRule | 'new' | null>(null);
-  const [adopting, setAdopting] = useState(false);
+  const [adopting, setAdopting] = useState<'adopt' | 'switch' | null>(null);
   const change = useCommand<{ change: ManagedFirewallChange; label: string }, Operation>({
     label: (v) => v.label,
     node: nodeId,
@@ -62,32 +62,43 @@ function NodeFirewall({ nodeId }: { nodeId: string }) {
     onSuccess: () => { setEditing(null); invalidateResource('firewall'); },
     onConflict: () => void q.refetch(),
   });
-  const install = useCommand<'ufw' | 'firewalld' | 'nftables', Operation>({
-    label: '安装防火墙组件',
+  const install = useCommand<{ backend: 'ufw' | 'firewalld' | 'nftables'; enable?: boolean }, Operation>({
+    label: ({ enable }) => enable ? '启用防火墙' : '安装防火墙组件',
     node: nodeId,
-    run: async (backend, key) => (await call<Operation>('POST', `/nodes/${enc(nodeId)}/firewall/actions`, { key, body: { action: 'install', backend, expected_revision: s?.revision ?? 0 } })).data,
+    run: async ({ backend, enable }, key) => (await call<Operation>('POST', `/nodes/${enc(nodeId)}/firewall/actions`, { key, body: { action: 'install', backend, enable, expected_revision: s?.revision ?? 0 } })).data,
+    onConflict: () => void q.refetch(),
   });
 
   if (q.isError) return <ErrorNotice error={q.error} retry={() => void q.refetch()} />;
   if (!s) return <div className="stack"><div className="fw-status">{Array.from({ length: 4 }, (_, i) => <Card key={i} className="fw-stat"><Skeleton width="40%" /><Skeleton width="70%" height={20} /></Card>)}</div><Card pad><Skeleton height={200} /></Card></div>;
-  const [label, tone] = stateLabel[s.state];
+  const absent = s.backend === 'none';
+  const inactive = s.service_active === false;
+  const [label, tone] = absent ? (['未安装', 'idle'] as const) : inactive ? (['未启用', 'warn'] as const) : stateLabel[s.state];
   const caps = s.capabilities;
-  const canEdit = caps.edit_rules.supported;
+  const canEdit = !inactive && caps.edit_rules.supported;
+  const enable = async () => {
+    if (await confirm({
+      title: '启用 nftables？',
+      body: '确认前请保存当前规则集并核对管理通道。启用会立即生效，入站默认放行，并显式放行 SSH 22、OPSD 8444 和控制台 65533。',
+      danger: true,
+      confirmLabel: '确认启用',
+    })) void install.run({ backend: 'nftables', enable: true });
+  };
   return (
     <div className="stack">
       <div className="fw-status">
         <Card className="fw-stat"><span className="label">后端</span><span className="value">{backendLabel[s.backend] ?? s.backend}{s.service_active !== undefined && <Badge tone={s.service_active ? 'ok' : 'warn'}>{s.service_active ? '运行中' : '未启用'}</Badge>}</span></Card>
-        <Card className="fw-stat"><span className="label">应用状态</span><span className="value"><Dot tone={tone} live={s.state === 'applying' || s.state === 'awaiting_confirmation'} />{label}</span></Card>
+        <Card className="fw-stat"><span className="label">{absent || inactive ? '防火墙状态' : '应用状态'}</span><span className="value"><Dot tone={tone} live={!inactive && (s.state === 'applying' || s.state === 'awaiting_confirmation')} />{label}</span></Card>
         <Card className="fw-stat"><span className="label">配置版本</span><span className="value num">{s.revision}{s.confirmed_revision !== s.revision && <span className="muted" style={{ fontSize: 12.5, fontWeight: 500 }}>已确认 {s.confirmed_revision}</span>}</span></Card>
         <Card className="fw-stat"><span className="label">最近检查</span><span className="value" style={{ fontSize: 14 }}>{s.checked_at ? ago(s.checked_at) : '—'}<IconButton size="sm" label="刷新" onClick={() => void q.refetch()}>{q.isFetching ? <Spinner size={14} /> : <RefreshCw />}</IconButton></span></Card>
       </div>
-      {s.error && <Notice tone="bad" title="应用失败">{s.error.message}</Notice>}
+      {s.error && <Notice tone="bad" title={inactive ? '配置检查失败' : '应用失败'}>{s.error.message}</Notice>}
       {s.migration && s.migration.state !== 'in_sync' && <Notice tone={s.migration.state === 'failed' ? 'bad' : 'info'} title="互信规则转交">{s.migration.state === 'failed' ? s.migration.error?.message ?? '转交失败' : '正在把与成员地址相同的放行规则转交给集群互信。'}</Notice>}
       {(s.backend === 'none' || !caps.read.supported) && (
         <Card>
-          <CardHead title="未检测到可管理的防火墙" sub={caps.read.reason ?? '安装组件后才能管理入站规则；组件安装后不会自动启用。'} />
+          <CardHead title={absent ? '安装防火墙' : '防火墙不可用'} sub={caps.read.reason} />
           {caps.install.supported && <div className="card-body row wrap">
-            {(['ufw', 'firewalld', 'nftables'] as const).map((b) => <Button key={b} icon={<Download />} busy={install.busy} onClick={async () => { if (await confirm({ title: `安装 ${backendLabel[b]}？`, body: '通过本机软件包管理器安装；安装完成后保持停用，由你决定何时启用。', confirmLabel: '安装' })) void install.run(b); }}>{backendLabel[b]}</Button>)}
+            {(['ufw', 'firewalld', 'nftables'] as const).map((b) => <Button key={b} icon={<Download />} busy={install.busy} onClick={async () => { if (await confirm({ title: `安装 ${backendLabel[b]}？`, body: '安装完成后保持停用。', confirmLabel: '安装' })) void install.run({ backend: b }); }}>{backendLabel[b]}</Button>)}
           </div>}
         </Card>
       )}
@@ -95,10 +106,12 @@ function NodeFirewall({ nodeId }: { nodeId: string }) {
         <>
           <Policies s={s} disabled={!caps.default_policy.supported || change.busy} onChange={(p, action) => void change.run({ label: '修改默认策略', change: { kind: 'set_default_policy', action, chain: p.chain, zone: p.zone } })} />
           <Card>
-            <CardHead title="入站规则" sub={canEdit ? (caps.reorder.supported ? '拖动左侧手柄调整顺序；规则自上而下匹配' : '规则自上而下匹配') : caps.edit_rules.reason} actions={
+            <CardHead title="入站规则" sub={inactive ? (caps.enable.supported ? '启用防火墙后即可添加入站规则。' : '请先在节点上启用防火墙。') : caps.edit_rules.reason} actions={
               <>
-                <Button size="sm" variant="ghost" icon={<ScanSearch />} onClick={() => setAdopting(true)}>接纳现场配置</Button>
-                <Button size="sm" variant="primary" icon={<Plus />} disabled={!canEdit} onClick={() => setEditing('new')}>添加规则</Button>
+                <Button size="sm" variant="ghost" icon={<ScanSearch />} onClick={() => setAdopting('adopt')}>接纳现场配置</Button>
+                {!inactive && <Button size="sm" variant="ghost" onClick={() => setAdopting('switch')}>更换后端</Button>}
+                {inactive ? caps.enable.supported && s.backend === 'nftables' && <Button size="sm" variant="primary" icon={<ShieldCheck />} busy={install.busy} onClick={() => void enable()}>启用防火墙</Button>
+                  : <Button size="sm" variant="primary" icon={<Plus />} disabled={!canEdit} onClick={() => setEditing('new')}>添加规则</Button>}
               </>
             } />
             <RuleList rules={s.rules} canEdit={canEdit} canReorder={caps.reorder.supported && canEdit} busy={change.busy}
@@ -109,11 +122,11 @@ function NodeFirewall({ nodeId }: { nodeId: string }) {
           </Card>
         </>
       )}
-      <RuleDialog open={editing !== null} rule={editing === 'new' ? undefined : editing ?? undefined} busy={change.busy} onClose={() => setEditing(null)} onSubmit={(spec) => {
+      <RuleDialog open={canEdit && editing !== null} rule={editing === 'new' ? undefined : editing ?? undefined} busy={change.busy} onClose={() => setEditing(null)} onSubmit={(spec) => {
         if (editing === 'new') void change.run({ label: '添加规则', change: { kind: 'add_rule', rule: spec } });
         else if (editing) void change.run({ label: '修改规则', change: { kind: 'edit_rule', rule_id: editing.id, rule: spec, chain: editing.chain, zone: editing.zone } });
       }} />
-      <AdoptDialog open={adopting} onClose={() => setAdopting(false)} nodeId={nodeId} />
+      <AdoptDialog open={adopting !== null} switching={adopting === 'switch'} onClose={() => setAdopting(null)} nodeId={nodeId} />
     </div>
   );
 }
@@ -225,7 +238,7 @@ function RuleDialog({ open, rule, busy, onClose, onSubmit }: { open: boolean; ru
   );
 }
 
-function AdoptDialog({ open, onClose, nodeId }: { open: boolean; onClose: () => void; nodeId: string }) {
+function AdoptDialog({ open, switching, onClose, nodeId }: { open: boolean; switching: boolean; onClose: () => void; nodeId: string }) {
   const preview = useQuery({ queryKey: ['firewall', nodeId, 'adoption'], queryFn: ({ signal }) => get<FirewallAdoption>(`/nodes/${enc(nodeId)}/firewall/adoption`, { signal }), enabled: open, staleTime: 0, gcTime: 0 });
   const adopt = useCommand<void, Operation>({
     label: '接纳当前防火墙配置',
@@ -236,8 +249,9 @@ function AdoptDialog({ open, onClose, nodeId }: { open: boolean; onClose: () => 
   });
   const d = preview.data;
   return (
-    <Dialog open={open} onClose={onClose} width={720} title="接纳现场配置" sub="读取节点当前的原生防火墙配置，将其保存为 OPSD 的已确认版本；现场规则保持不变。"
-      footer={<><Button variant="ghost" onClick={onClose}>取消</Button><Button variant="primary" busy={adopt.busy} disabled={!d} onClick={() => void adopt.run()}>接纳此配置</Button></>}>
+    <Dialog open={open} onClose={onClose} width={720} title={switching ? '更换防火墙后端' : '接纳现场配置'}
+      footer={<><Button variant="ghost" onClick={onClose}>取消</Button>{switching && <Button variant="ghost" busy={preview.isFetching} onClick={() => void preview.refetch()}>重新检测</Button>}<Button variant="primary" busy={adopt.busy} disabled={!d || preview.isFetching} onClick={() => void adopt.run()}>接纳此配置</Button></>}>
+      {switching && <Notice tone="info">在节点上切换防火墙服务后，重新检测并接纳新后端。</Notice>}
       {preview.isError && <ErrorNotice error={preview.error} retry={() => void preview.refetch()} />}
       {!d ? <Skeleton height={160} /> : (
         <>

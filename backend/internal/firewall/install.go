@@ -3,8 +3,9 @@ package firewall
 import (
 	"context"
 	"fmt"
-	"github.com/jkfujr/opsd/internal/protocol"
 	"strings"
+
+	"github.com/jkfujr/opsd/internal/protocol"
 )
 
 type InstallState struct {
@@ -12,6 +13,7 @@ type InstallState struct {
 	Stage            string           `json:"stage"`
 	MaskOwned        bool             `json:"mask_owned"`
 	AlreadyInstalled bool             `json:"already_installed"`
+	NFTSource        *SourceEdit      `json:"nft_source,omitempty"`
 }
 
 func (m *Manager) installable() bool {

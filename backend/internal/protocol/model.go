@@ -246,6 +246,7 @@ type ComponentAction struct {
 	Action           string  `json:"action"`
 	Backend          Backend `json:"backend,omitempty"`
 	Version          string  `json:"version,omitempty"`
+	Enable           bool    `json:"enable,omitempty"`
 }
 
 type AddressObservation struct {

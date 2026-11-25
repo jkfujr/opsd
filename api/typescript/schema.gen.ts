@@ -3119,6 +3119,8 @@ export interface components {
             /** @enum {string} */
             action: "install" | "sync" | "adopt_current";
             backend?: components["schemas"]["Backend"];
+            /** @description 确认立即启用已经安装的 nftables */
+            enable?: boolean;
             /** Format: int64 */
             expected_revision: number;
             fingerprint?: string;

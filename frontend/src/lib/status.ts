@@ -47,7 +47,7 @@ const actionLabel: Record<string, Record<string, string>> = {
   database_step: { deploy_database: '部署数据库', proxy_route: '应用代理路由', proxy_upsert: '同步代理账号', proxy_disable: '停用代理账号', proxy_delete: '删除代理账号' },
   firewall: { add_rule: '添加规则', edit_rule: '修改规则', delete_rule: '删除规则', move_rule: '调整规则顺序', set_default_policy: '修改默认策略', set_enabled: '启停防火墙' },
   firewall_config: { adopt_current: '接纳当前配置', add_rule: '添加规则', edit_rule: '修改规则', delete_rule: '删除规则', move_rule: '调整规则顺序', set_default_policy: '修改默认策略' },
-  component: { install: '安装防火墙组件' },
+  component: { install: '安装防火墙组件', enable: '启用防火墙' },
 };
 
 export function operationTitle(op: Operation) {

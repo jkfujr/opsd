@@ -91,8 +91,8 @@ func (m *Manager) Detect(ctx context.Context) (protocol.Backend, error) {
 	if m.Host.Exists("/etc/firewalld/zones") && m.Host.LookPath("firewall-offline-cmd") {
 		configured = append(configured, "firewalld")
 	}
-	if m.Host.Exists("/etc/nftables.conf") && m.Host.LookPath("nft") {
-		if b, e := m.Host.Read("/etc/nftables.conf"); e == nil && strings.Contains(string(b), "chain ") {
+	if m.Host.LookPath("nft") {
+		if b, e := m.Host.Read(nftConfig); e == nil && strings.Contains(string(b), "chain ") {
 			configured = append(configured, "nftables")
 		}
 	}
@@ -101,6 +101,11 @@ func (m *Manager) Detect(ctx context.Context) (protocol.Backend, error) {
 	}
 	if len(configured) == 1 {
 		return configured[0], nil
+	}
+	if m.Host.LookPath("nft") && m.installable() {
+		if b, e := m.Host.Run(ctx, "dpkg-query", "-W", "-f=${Status}", "nftables"); e == nil && strings.TrimSpace(string(b)) == "install ok installed" {
+			return "nftables", nil
+		}
 	}
 	return "none", nil
 }
@@ -128,7 +133,11 @@ func (m *Manager) Read(ctx context.Context) (protocol.FirewallState, error) {
 		return s, nil
 	}
 	a, _ := m.Adapter(backend)
-	return a.Read(ctx)
+	s, err := a.Read(ctx)
+	if backend == "nftables" && s.ServiceActive != nil && !*s.ServiceActive {
+		s.Capabilities.Enable = protocol.Capability{Supported: m.installable()}
+	}
+	return s, err
 }
 func (m *Manager) Preview(ctx context.Context, change protocol.FirewallChange) (protocol.ChangePlan, error) {
 	s, err := m.Read(ctx)

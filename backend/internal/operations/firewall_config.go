@@ -47,6 +47,55 @@ func (s Store) ConfirmedFirewall(ctx context.Context) (protocol.FirewallTarget, 
 	return confirmedFrom(ctx, s.DB)
 }
 
+func (e *Engine) checkNFTEnable(ctx context.Context, l *Local) error {
+	expected := l.Action.Component.ExpectedRevision
+	if expected == nil {
+		return firewall.Conflict("启用请求缺少配置版本")
+	}
+	target, err := e.Store.ConfirmedFirewall(ctx)
+	if err == sql.ErrNoRows && *expected == 0 {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	if target.Revision != *expected || target.Configuration.Backend != "nftables" {
+		return firewall.Conflict("已确认的防火墙配置发生变化")
+	}
+	if len(target.Configuration.DefaultPolicies) != 0 || len(target.Configuration.Rules) != 0 {
+		state, err := e.Manager.Read(ctx)
+		if err != nil {
+			return err
+		}
+		if state.Backend != "nftables" || state.ServiceActive == nil || !*state.ServiceActive {
+			return firewall.Conflict("已确认配置包含现有规则或策略，请在节点上核对后启用")
+		}
+	}
+	return nil
+}
+
+func (e *Engine) confirmNFTEnable(ctx context.Context, l *Local) error {
+	state, err := e.Manager.Read(ctx)
+	if err != nil {
+		return e.attention(ctx, l, err)
+	}
+	definition, err := firewall.ImportNFTBootstrap(state)
+	if err != nil {
+		return e.attention(ctx, l, err)
+	}
+	target := protocol.FirewallTarget{Revision: *l.Action.Component.ExpectedRevision + 1, Configuration: definition}
+	steps, err := e.Manager.PrepareConfiguration(ctx, state, definition)
+	if err != nil {
+		return e.attention(ctx, l, err)
+	}
+	if len(steps) != 0 {
+		return e.attention(ctx, l, firewall.Conflict("管理通道的运行与持久配置不同"))
+	}
+	l.Record.State, l.Record.Error = protocol.Succeeded, nil
+	l.Record.LastObservedAt = &state.CollectedAt
+	return e.Store.save(ctx, l, &target)
+}
+
 func (e *Engine) InspectFirewall(ctx context.Context, importCurrent bool, previewCurrent ...bool) (*protocol.FirewallInspected, error) {
 	s, err := e.Manager.Read(ctx)
 	if err != nil {
@@ -106,6 +155,11 @@ func (e *Engine) InspectFirewall(ctx context.Context, importCurrent bool, previe
 		return result, nil
 	}
 	result.InSync = len(steps) == 0
+	if s.Backend == "nftables" && s.ServiceActive != nil && !*s.ServiceActive {
+		disable := protocol.Capability{Reason: "请先启用防火墙"}
+		result.Capabilities.EditRules, result.Capabilities.Reorder, result.Capabilities.DefaultPolicy = disable, disable, disable
+		return result, nil
+	}
 	if s.Backend == "iptables" {
 		return result, nil
 	}

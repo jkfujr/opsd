@@ -106,6 +106,9 @@ func (n *Node) describeOperation(ctx context.Context, tx firewallQuerier, r Requ
 			return err
 		}
 		op.Action, op.TargetName = action.Action, action.Component
+		if action.Enable {
+			op.Action = "enable"
+		}
 		op.Resource = &OperationResource{Kind: "component", NodeID: n.ID, ID: action.Component}
 	case "firewall":
 		var plan protocol.ChangePlan

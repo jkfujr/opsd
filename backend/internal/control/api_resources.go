@@ -42,8 +42,13 @@ func (s *Server) FirewallAction(w http.ResponseWriter, r *http.Request, id strin
 			s.fail(w, r, 422, "validation_failed", "请选择防火墙后端")
 			return
 		}
+		enable := input.Enable != nil && *input.Enable
+		if enable && *input.Backend != "nftables" {
+			s.fail(w, r, 422, "validation_failed", "此后端需要在节点上启用")
+			return
+		}
 		revision := uint64(input.ExpectedRevision)
-		s.submit(w, r, id, "component", protocol.ComponentAction{Component: "firewall", Action: "install", Backend: protocol.Backend(*input.Backend), ExpectedRevision: &revision}, r.Header.Get("Idempotency-Key"), "")
+		s.submit(w, r, id, "component", protocol.ComponentAction{Component: "firewall", Action: "install", Backend: protocol.Backend(*input.Backend), ExpectedRevision: &revision, Enable: enable}, r.Header.Get("Idempotency-Key"), "")
 	case "sync":
 		if input.ExpectedRevision < 1 {
 			s.fail(w, r, 422, "validation_failed", "缺少配置版本")
@@ -173,6 +178,7 @@ func (s *Server) GetThemeSelection(w http.ResponseWriter, r *http.Request) {
 	s.setETag(w, r, revision)
 	write(w, 200, httpapi.ThemeSelectionState{InstallationId: selection, EffectiveInstallationId: effective, Revision: int64(revision), BuiltinUrl: "/__opsd/builtin/"})
 }
+
 // writeIdentity 组装这次写入的幂等身份。
 //
 // Origin 必须填**已认证来源**：本地入口就是本节点 ID。回执按

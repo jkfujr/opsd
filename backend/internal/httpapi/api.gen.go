@@ -3282,10 +3282,13 @@ type FieldError struct {
 
 // FirewallAction defines model for FirewallAction.
 type FirewallAction struct {
-	Action           FirewallActionAction `json:"action"`
-	Backend          *Backend             `json:"backend,omitempty"`
-	ExpectedRevision int64                `json:"expected_revision"`
-	Fingerprint      *string              `json:"fingerprint,omitempty"`
+	Action  FirewallActionAction `json:"action"`
+	Backend *Backend             `json:"backend,omitempty"`
+
+	// Enable 确认立即启用已经安装的 nftables
+	Enable           *bool   `json:"enable,omitempty"`
+	ExpectedRevision int64   `json:"expected_revision"`
+	Fingerprint      *string `json:"fingerprint,omitempty"`
 }
 
 // FirewallActionAction defines model for FirewallAction.Action.

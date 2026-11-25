@@ -18752,6 +18752,10 @@
           "backend": {
             "$ref": "#/components/schemas/Backend"
           },
+          "enable": {
+            "type": "boolean",
+            "description": "确认立即启用已经安装的 nftables"
+          },
           "expected_revision": {
             "type": "integer",
             "format": "int64",

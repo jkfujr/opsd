@@ -336,6 +336,9 @@ func (action OperationAction) validate() error {
 		if action.Component == nil {
 			return fmt.Errorf("组件操作缺少参数")
 		}
+		if c := action.Component; c.Enable && (c.Component != "firewall" || c.Action != "install" || c.Backend != "nftables" || c.ExpectedRevision == nil) {
+			return fmt.Errorf("启用 nftables 缺少有效组件参数")
+		}
 		return nil
 	default:
 		return fmt.Errorf("未知操作动作：%s", action.Kind)

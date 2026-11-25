@@ -40,15 +40,22 @@ func NewServices(db *sql.DB) *Services {
 		if l.ComponentState == nil {
 			l.ComponentState = &firewall.InstallState{Backend: l.Action.Component.Backend}
 		}
-		return m.Install(ctx, l.ComponentState, func() error {
-			names := map[string]string{"prepared": "准备安装", "mask_intent": "屏蔽目标服务启动", "masked": "目标服务已屏蔽", "installing": "安装软件包", "disabling": "停用目标服务开机启动", "unmasking": "解除本次服务屏蔽", "complete": "组件安装完成"}
+		save := func() error {
+			names := map[string]string{"prepared": "准备安装", "mask_intent": "屏蔽目标服务启动", "masked": "目标服务已屏蔽", "installing": "安装软件包", "disabling": "停用目标服务开机启动", "unmasking": "解除本次服务屏蔽", "complete": "组件安装完成", "nft_enable_prepared": "准备启用 nftables", "nft_enabled": "nftables 已启用"}
 			state := "applying"
-			if l.ComponentState.Stage == "complete" {
+			if l.ComponentState.Stage == "complete" || l.ComponentState.Stage == "nft_enabled" {
 				state = "completed"
+			}
+			if l.Action.Component.Enable && l.ComponentState.Stage == "complete" {
+				names["complete"] = "nftables 已在运行"
 			}
 			l.Record.Steps = []protocol.OperationStep{{Name: names[l.ComponentState.Stage], State: state}}
 			return persist()
-		})
+		}
+		if l.Action.Component.Enable {
+			return m.EnableNFT(ctx, l.ComponentState, save)
+		}
+		return m.Install(ctx, l.ComponentState, save)
 	}
 	return &Services{Engine: engine, Docker: docker, Start: func(ctx context.Context, id string) error {
 		_, e := m.Host.Run(ctx, "systemctl", "start", "--no-block", "opsd-operation@"+id+".service")
@@ -292,6 +299,7 @@ func (s *Services) request(ctx context.Context, id, kind string, revision uint64
 	r, e := s.Engine.Record(ctx, id)
 	return &protocol.OperationUpdated{Record: r}, e
 }
+
 const operationStartTimeout = 45 * time.Second
 
 type preparedRevision struct {

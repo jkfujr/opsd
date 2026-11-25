@@ -159,7 +159,7 @@ func (n *Node) writeFirewall(ctx context.Context, origin string, request Firewal
 		return out, fault("conflict", "配置已经改变，请刷新")
 	}
 	var pending int
-	if e = tx.QueryRowContext(ctx, "SELECT count(*) FROM queue WHERE kind='firewall_config' AND terminal=0").Scan(&pending); e != nil {
+	if e = tx.QueryRowContext(ctx, "SELECT count(*) FROM queue WHERE kind IN ('firewall_config','component') AND terminal=0").Scan(&pending); e != nil {
 		return out, e
 	}
 	if pending > 0 {
@@ -196,6 +196,9 @@ func (n *Node) writeFirewall(ctx context.Context, origin string, request Firewal
 			return out, fault("invalid_request", "防火墙变更过多")
 		}
 		for _, change := range changes {
+			if change.Kind == "add_rule" && state.ServiceActive != nil && !*state.ServiceActive {
+				return out, fault("conflict", "请先启用防火墙，再添加入站规则")
+			}
 			target.Configuration, e = firewall.ChangeConfiguration(target.Configuration, change)
 			if e != nil {
 				return out, e
@@ -437,7 +440,12 @@ func (n *Node) checkFirewall(ctx context.Context) {
 	if e = tx.QueryRowContext(ctx, "SELECT count(*) FROM queue WHERE terminal=0").Scan(&pending); e != nil || pending > 0 {
 		return
 	}
-	if state.Revision == 0 && inspection.Target != nil {
+	// 启用操作在执行器先提交基础链的已确认版本，之后节点读取同一版本。
+	bootstrapped := inspection.Target != nil && inspection.Backend == "nftables" &&
+		inspection.ServiceActive != nil && *inspection.ServiceActive &&
+		state.Revision == state.ConfirmedRevision && len(confirmed.DefaultPolicies) == 0 && len(confirmed.Rules) == 0 &&
+		inspection.Target.Revision == state.Revision+1
+	if inspection.Target != nil && (state.Revision == 0 || bootstrapped) {
 		state.FirewallDefinition = inspection.Target.Configuration
 		state.Revision = inspection.Target.Revision
 		state.ConfirmedRevision = inspection.Target.Revision

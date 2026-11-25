@@ -266,6 +266,14 @@ func (s Store) Reconcile(ctx context.Context, id string) (Local, error) {
 
 // Save 只有持有本机执行锁的进程调用；请求字段由通信进程独立登记。
 func (s Store) Save(ctx context.Context, l *Local) error {
+	var confirmed *protocol.FirewallTarget
+	if l.Record.State == protocol.Succeeded && l.Action != nil && l.Action.FirewallConfig != nil && !l.Action.FirewallConfig.Automatic {
+		confirmed = l.Action.FirewallConfig
+	}
+	return s.save(ctx, l, confirmed)
+}
+
+func (s Store) save(ctx context.Context, l *Local, confirmed *protocol.FirewallTarget) error {
 	previous := l.Record.Revision
 	l.Record.Revision++
 	l.Record.ConfirmationRemainingSeconds = nil
@@ -305,8 +313,8 @@ func (s Store) Save(ctx context.Context, l *Local) error {
 	if n != 1 {
 		return firewall.Conflict("操作状态已改变")
 	}
-	if l.Record.State == protocol.Succeeded && l.Action != nil && l.Action.FirewallConfig != nil && !l.Action.FirewallConfig.Automatic {
-		if e = saveConfirmed(ctx, tx, *l.Action.FirewallConfig); e != nil {
+	if confirmed != nil {
+		if e = saveConfirmed(ctx, tx, *confirmed); e != nil {
 			return e
 		}
 	}

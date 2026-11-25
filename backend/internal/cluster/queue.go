@@ -764,6 +764,9 @@ func (n *Node) enqueueTxObserved(ctx context.Context, origin string, r Request, 
 			if state.Revision != *component.ExpectedRevision {
 				return Operation{}, fault("conflict", "防火墙配置已经改变")
 			}
+			if component.Enable && state.Revision != state.ConfirmedRevision {
+				return Operation{}, fault("conflict", "请先处理未确认的防火墙配置")
+			}
 		}
 	}
 	if r.ExpectedRevision != nil {
@@ -1251,7 +1254,9 @@ func (n *Node) advanceFiltered(filter string, args ...any) {
 	op.OperationRecord = *record
 	op.Revision++
 	op.ResultPendingSync = false
-	_ = n.saveOperation(ctx, &op, "submitted")
+	if err := n.saveOperation(ctx, &op, "submitted"); err == nil && kind == "component" && record.State == protocol.Succeeded {
+		n.checkFirewall(ctx)
+	}
 }
 
 func sameOperationError(a, b *protocol.Error) bool {
