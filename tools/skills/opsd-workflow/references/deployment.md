@@ -43,7 +43,7 @@ update 在停服前使用候选程序执行 `opsd capability check --config`，�
 
 ## 首次元数据迁移
 
-单台停服窗口内运行 `migrate_metadata.py`。入口使用系统盘上的 `/opsd`，沿用原二进制，预检旧路径、进程工件、队列、五成员和容量。停服后用 SQLite Backup API 复制活动库，另复制主题和日志。`*.bak-*` 和 `*.pre-prune-*` 保留在源目录，容量按活动文件、WAL 和临时空间计算。
+单台停服窗口内运行 `migrate_metadata.py`。入口使用系统盘上的 `/opsd`，沿用原二进制，预检旧路径、进程工件、队列、五成员和容量。停服后用 SQLite Backup API 复制活动库，另复制主题和日志。目标活动库及存在的 `-wal`、`-shm` 为 `0600`，权限记录在 `readback.json`。`*.bak-*` 和 `*.pre-prune-*` 保留在源目录，容量按活动文件、WAL 和临时空间计算。
 
 ```bash
 sudo install -d -m 0700 /etc/opsd/storage-root
@@ -53,7 +53,7 @@ sudo python3 tools/skills/opsd-workflow/scripts/migrate_metadata.py \
   --helper backend/internal/installation/storage-check.sh
 ```
 
-目标使用原单元和新增覆盖项。迁移结束后核对记录目录中的预检、五项读回和写事件。切换失败时入口恢复原配置和单元，目标进程曾启动时先把最新数据回灌原目录。失败后从 `result.json` 或 `needs-recovery.json` 读取现场。
+目标使用原单元和新增覆盖项。迁移结束后核对记录目录中的预检、五项读回、控制台配置版本和服务自身的写事件。切换失败时入口恢复原配置和单元，目标进程曾启动时先把最新数据回灌原目录并保留源库原权限。失败后从 `result.json` 或 `needs-recovery.json` 读取现场。
 
 保留两个单元现有的 `StartLimitBurst` 和 `StartLimitIntervalSec`，让 systemd 继续限制日常崩溃后的自动重启。迁移或回滚每次启动前，先确认两服务已停、配置和单元已就位，再按下列顺序执行。方向切换失败后，先记录故障状态，再清除两个单元的失败状态和启动计数。
 

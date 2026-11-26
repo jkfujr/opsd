@@ -168,9 +168,32 @@ def audit_file(path):
     return info
 
 
-def copy_permissions(path, info):
+def copy_permissions(path, info, *, private=False):
     os.chown(path, info.st_uid, info.st_gid)
-    os.chmod(path, stat.S_IMODE(info.st_mode))
+    os.chmod(path, 0o600 if private else stat.S_IMODE(info.st_mode))
+
+
+def private_database_modes(config, *, fix=False):
+    modes = {}
+    for (key, name), required in DATABASES.items():
+        for suffix in ("", "-wal", "-shm"):
+            path = Path(config[key]) / (name + suffix)
+            try:
+                fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+            except FileNotFoundError:
+                require(not required or suffix, f"缺少数据库：{path}")
+                continue
+            try:
+                info = os.fstat(fd)
+                require(stat.S_ISREG(info.st_mode) and info.st_nlink == 1, f"数据库须为独立普通文件：{path}")
+                if fix and stat.S_IMODE(info.st_mode) != 0o600:
+                    os.fchmod(fd, 0o600)
+                    info = os.fstat(fd)
+                require(stat.S_IMODE(info.st_mode) == 0o600, f"数据库权限不是 0600：{path}")
+                modes[str(path)] = {"uid": info.st_uid, "gid": info.st_gid, "mode": "0600"}
+            finally:
+                os.close(fd)
+    return modes
 
 
 def tree_entries(directory):
@@ -215,7 +238,7 @@ def check_space(config):
                                   ROOT if ROOT.exists() else ROOT.parent)}
 
 
-def copy_state(source, destination):
+def copy_state(source, destination, *, private=False):
     verified = {}
     for (key, name), required in DATABASES.items():
         old, new = (Path(config[key]) / name for config in (source, destination))
@@ -228,11 +251,10 @@ def copy_state(source, destination):
         if not new.parent.exists():
             new.parent.mkdir()
             copy_permissions(new.parent, old.parent.stat())
-        if new.exists() or new.is_symlink():
-            audit_file(new)
+        target_info = audit_file(new) if new.exists() or new.is_symlink() else info
         with closing(read_db(old)) as from_db, closing(sqlite3.connect(new, timeout=3)) as to_db:
             from_db.backup(to_db, pages=256, sleep=0.02)
-        copy_permissions(new, info)
+        copy_permissions(new, target_info, private=private)
         state = database_state(new, check=True)
         require(state == database_state(old), f"SQLite schema 或表行数不符：{old} → {new}")
         observed = new.stat()
@@ -281,17 +303,6 @@ def switch_files(config, helper):
     return files
 
 
-def console_write(config):
-    with closing(read_db(Path(config["data_dir"]) / "node.db")) as db:
-        settings = json.loads(db.execute("SELECT config FROM node_identity WHERE id=1").fetchone()[0])
-    enabled = str(bool(settings["console"])).lower()
-    command(config["binary"], "console", f"--enabled={enabled}")
-    after = service_state(config)
-    require(after["config_revision"] > settings["revision"] and after["console"] == settings["console"],
-            "控制台原值写入或读回没有确认")
-    return after
-
-
 @contextmanager
 def observe_paths(record_dir):
     with (record_dir / "file-events.log").open("w+", encoding="utf-8") as events, \
@@ -311,6 +322,7 @@ def observe_paths(record_dir):
             else:
                 raise RuntimeError("inotifywait 未建立目录观察")
             yield
+            require(watcher.poll() is None, "inotifywait 提前退出")
         finally:
             watcher.terminate()
             watcher.wait(timeout=3)
@@ -391,7 +403,7 @@ def migrate_locked(record_dir, helper, expected_name, lab):
                 path.mkdir(mode=0o700)
                 owner = (account.pw_uid, account.pw_gid) if key == "data_dir" else (0, 0)
                 os.chown(path, *owner)
-            copied_state = copy_state(config, next_config)
+            copied_state = copy_state(config, next_config, private=True)
             require(copied_state["node.db"]["node_id"] == baseline["node_id"], "目标节点库身份不符")
             record(record_dir, "copy.json", copied_state)
             copied = True
@@ -412,8 +424,11 @@ def migrate_locked(record_dir, helper, expected_name, lab):
                 finally:
                     target_started = "start" in starts["cutover"]
                 step("switch_and_start")
-                after = console_write(next_config)
+                after = service_state(next_config)
                 validate_readback(baseline, after)
+                for key in ("config_revision", "console"):
+                    require(after[key] == baseline[key], f"切换后节点设置发生变化：{key}")
+                after["database_modes"] = private_database_modes(next_config, fix=True)
                 record(record_dir, "readback.json", after)
                 pids = ",".join(str(process["pid"]) for process in after["processes"].values())
                 opened = command("lsof", "-nP", "-p", pids)
@@ -423,9 +438,16 @@ def migrate_locked(record_dir, helper, expected_name, lab):
                 (record_dir / "open-files.log").write_text(opened + "\n", encoding="utf-8")
                 if lab:
                     lab("written", next_config)
+                new_node_writes = (DESTINATION["data_dir"] + "/node.db MODIFY",
+                                   DESTINATION["data_dir"] + "/node.db-wal MODIFY")
+                for _ in range(50):
+                    events = (record_dir / "file-events.log").read_text(encoding="utf-8").splitlines()
+                    if any(line.startswith(new_node_writes) for line in events):
+                        break
+                    time.sleep(0.1)
             events = (record_dir / "file-events.log").read_text(encoding="utf-8").splitlines()
-            old_events = sum(line.startswith(tuple(SOURCE.values())) for line in events)
-            new_events = sum(line.startswith(DESTINATION["data_dir"] + "/node.db") for line in events)
+            old_events = sum(line.startswith(tuple(path + "/" for path in SOURCE.values())) for line in events)
+            new_events = sum(line.startswith(new_node_writes) for line in events)
             require(old_events == 0, "旧元数据目录有写入事件")
             require(new_events > 0, "缺少新节点库写入事件")
             record(record_dir, "write-counts.json", {"old_path_events": old_events, "new_node_db_events": new_events})
