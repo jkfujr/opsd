@@ -41,6 +41,20 @@ update 在停服前使用候选程序执行 `opsd capability check --config`，�
 
 需要同时备份 SQLite 时，先核对程序盘和节点数据盘对普通用户的可用空间。根分区耗尽会使节点启动时无法扩展 SQLite 共享内存文件。空间不足时，把本批压缩工件及数据库备份放在独立数据盘，跨盘转移后核对内容再移除原副本。
 
+## 首次元数据迁移
+
+单台停服窗口内运行 `migrate_metadata.py`。入口使用系统盘上的 `/opsd`，沿用原二进制，预检旧路径、进程工件、队列、五成员和容量。停服后用 SQLite Backup API 复制活动库，另复制主题和日志。`*.bak-*` 和 `*.pre-prune-*` 保留在源目录，容量按活动文件、WAL 和临时空间计算。
+
+```bash
+sudo install -d -m 0700 /etc/opsd/storage-root
+sudo python3 tools/skills/opsd-workflow/scripts/migrate_metadata.py \
+  --expected-node "$opsd_node_name" \
+  --record "/etc/opsd/storage-root/$opsd_migration_id" \
+  --helper backend/internal/installation/storage-check.sh
+```
+
+目标使用原单元和新增覆盖项。迁移结束后核对记录目录中的预检、五项读回和写事件。切换失败时入口恢复原配置和单元，目标进程曾启动时先把最新数据回灌原目录。失败后从 `result.json` 或 `needs-recovery.json` 读取现场。
+
 ## 来源授权调整
 
 先让全部有效节点运行识别新能力名的版本，逐台确认后再写入新名称。读能力只用于对应的读取方法，既有写能力自动包含对应读能力。预检的「显式」列显示配置原值，「有效」列同时显示推导出的读能力。
