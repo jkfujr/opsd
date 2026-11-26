@@ -4653,6 +4653,50 @@ func (a *strictAPI) CheckStorageTarget(ctx context.Context, request httpapi.Chec
 	return nil, fmt.Errorf("CheckStorageTarget 返回未声明状态 %d", w.status())
 }
 
+func (a *strictAPI) ProbeStorageTarget(ctx context.Context, request httpapi.ProbeStorageTargetRequestObject) (httpapi.ProbeStorageTargetResponseObject, error) {
+	r := strictRequest(ctx)
+	w := newAPIResponse(r)
+	a.server.ProbeStorageTarget(w, r, request.Id, request.Params)
+	a.server.prepareAPIResponse(w, r)
+	switch w.status() {
+	case 200:
+		return strictResponse[httpapi.ProbeStorageTarget200JSONResponse](w)
+	case 400:
+		return strictResponse[httpapi.ProbeStorageTarget400ApplicationProblemPlusJSONResponse](w)
+	case 401:
+		return strictResponse[httpapi.ProbeStorageTarget401ApplicationProblemPlusJSONResponse](w)
+	case 403:
+		return strictResponse[httpapi.ProbeStorageTarget403ApplicationProblemPlusJSONResponse](w)
+	case 404:
+		return strictResponse[httpapi.ProbeStorageTarget404ApplicationProblemPlusJSONResponse](w)
+	case 405:
+		return strictResponse[httpapi.ProbeStorageTarget405ApplicationProblemPlusJSONResponse](w)
+	case 406:
+		return strictResponse[httpapi.ProbeStorageTarget406ApplicationProblemPlusJSONResponse](w)
+	case 409:
+		return strictResponse[httpapi.ProbeStorageTarget409ApplicationProblemPlusJSONResponse](w)
+	case 412:
+		return strictResponse[httpapi.ProbeStorageTarget412ApplicationProblemPlusJSONResponse](w)
+	case 413:
+		return strictResponse[httpapi.ProbeStorageTarget413ApplicationProblemPlusJSONResponse](w)
+	case 415:
+		return strictResponse[httpapi.ProbeStorageTarget415ApplicationProblemPlusJSONResponse](w)
+	case 422:
+		return strictResponse[httpapi.ProbeStorageTarget422ApplicationProblemPlusJSONResponse](w)
+	case 428:
+		return strictResponse[httpapi.ProbeStorageTarget428ApplicationProblemPlusJSONResponse](w)
+	case 429:
+		return strictResponse[httpapi.ProbeStorageTarget429ApplicationProblemPlusJSONResponse](w)
+	case 500:
+		return strictResponse[httpapi.ProbeStorageTarget500ApplicationProblemPlusJSONResponse](w)
+	case 503:
+		return strictResponse[httpapi.ProbeStorageTarget503ApplicationProblemPlusJSONResponse](w)
+	case 504:
+		return strictResponse[httpapi.ProbeStorageTarget504ApplicationProblemPlusJSONResponse](w)
+	}
+	return nil, fmt.Errorf("ProbeStorageTarget 返回未声明状态 %d", w.status())
+}
+
 func (a *strictAPI) ListScheduledTasks(ctx context.Context, request httpapi.ListScheduledTasksRequestObject) (httpapi.ListScheduledTasksResponseObject, error) {
 	r := strictRequest(ctx)
 	w := newAPIResponse(r)

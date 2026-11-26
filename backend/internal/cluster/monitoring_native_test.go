@@ -131,6 +131,7 @@ type archiveNative struct {
 	root      string
 	bin       string
 	endpoint  string
+	ca        string
 	password  string
 	bucket    string
 	prefix    string
@@ -168,6 +169,22 @@ func archiveWait(t *testing.T, label string, timeout time.Duration, check func()
 	t.Fatal(label + "超时")
 }
 
+func (f *archiveNative) certificate(t *testing.T, name, address string) string {
+	t.Helper()
+	dir := filepath.Join(f.root, name)
+	if err := os.Mkdir(dir, 0700); err != nil {
+		t.Fatal(err)
+	}
+	f.command(t, "openssl", "req", "-x509", "-newkey", "rsa:2048", "-nodes", "-days", "1",
+		"-config", "/dev/null", "-subj", "/CN="+name, "-addext", "subjectAltName=IP:"+address,
+		"-addext", "basicConstraints=critical,CA:TRUE", "-keyout", filepath.Join(dir, "private.key"), "-out", filepath.Join(dir, "public.crt"))
+	body, err := os.ReadFile(filepath.Join(dir, "public.crt"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(body)
+}
+
 func startArchiveNative(t *testing.T, n *Node) *archiveNative {
 	t.Helper()
 	if os.Getenv("OPSD_MONITORING_TEST") != "1" || os.Geteuid() != 0 {
@@ -178,7 +195,7 @@ func startArchiveNative(t *testing.T, n *Node) *archiveNative {
 		t.Fatal(err)
 	}
 	projectSum := sha256.Sum256([]byte(n.cluster))
-		// mc 把以 "-" 开头的参数当作开关；base64url 随机串可能以 "-" 开头，
+	// mc 把以 "-" 开头的参数当作开关；base64url 随机串可能以 "-" 开头，
 	// 这里替换成等长等价字符，密码仍不可预测。
 	password := strings.ReplaceAll(identity.Random(), "-", "x")
 	f := &archiveNative{root: t.TempDir(), bin: bin, password: password, bucket: "opsd-monitoring", prefix: "opsd/metrics/" + n.cluster + "/", sqlName: "opsd-monitoring-sql-" + n.ID[:10], component: "opsd-monitoring-" + hex.EncodeToString(projectSum[:6])}
@@ -189,12 +206,13 @@ func startArchiveNative(t *testing.T, n *Node) *archiveNative {
 	}
 	f.command(t, filepath.Join(bin, "minio"), "--version")
 	bridge := f.command(t, "docker", "network", "inspect", "bridge", "--format", "{{(index .IPAM.Config 0).Gateway}}")
-	f.endpoint = "http://" + bridge + ":19000"
+	f.endpoint = "https://" + bridge + ":19000"
+	f.ca = f.certificate(t, "s3-certs", bridge)
 	log, err := os.Create(filepath.Join(f.root, "minio.log"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	minioCmd := exec.Command(filepath.Join(bin, "minio"), "server", filepath.Join(f.root, "s3"), "--address", "0.0.0.0:19000", "--console-address", "127.0.0.1:19001")
+	minioCmd := exec.Command(filepath.Join(bin, "minio"), "server", filepath.Join(f.root, "s3"), "--certs-dir", filepath.Join(f.root, "s3-certs"), "--address", "0.0.0.0:19000", "--console-address", "127.0.0.1:19001")
 	minioCmd.Env = append(os.Environ(), "MINIO_ROOT_USER=opsd-native-root", "MINIO_ROOT_PASSWORD="+f.password)
 	minioCmd.Stdout, minioCmd.Stderr = log, log
 	if err = minioCmd.Start(); err != nil {
@@ -202,7 +220,7 @@ func startArchiveNative(t *testing.T, n *Node) *archiveNative {
 	}
 	f.s3 = minioCmd
 	t.Cleanup(func() { minioCmd.Process.Kill(); minioCmd.Wait(); log.Close() })
-	connection := protocol.S3Connection{Endpoint: f.endpoint, Bucket: f.bucket, Region: "us-east-1", AccessStyle: "path"}
+	connection := protocol.S3Connection{Endpoint: f.endpoint, Bucket: f.bucket, Region: "us-east-1", AccessStyle: "path", CAPEM: f.ca}
 	f.rootS3, err = objectstore.New(connection, protocol.S3Credential{AccessKey: "opsd-native-root", SecretKey: f.password})
 	if err != nil {
 		t.Fatal(err)
@@ -216,6 +234,13 @@ func startArchiveNative(t *testing.T, n *Node) *archiveNative {
 	}
 	mc := func(args ...string) string {
 		return f.command(t, filepath.Join(bin, "mc"), append([]string{"--config-dir", filepath.Join(f.root, "mc")}, args...)...)
+	}
+	mcTrust := filepath.Join(f.root, "mc", "certs", "CAs")
+	if err = os.MkdirAll(mcTrust, 0700); err == nil {
+		err = os.WriteFile(filepath.Join(mcTrust, "opsd-ca.crt"), []byte(f.ca), 0600)
+	}
+	if err != nil {
+		t.Fatal(err)
 	}
 	mc("alias", "set", "native", f.endpoint, "opsd-native-root", f.password)
 	for _, role := range []string{"receive", "store", "compact"} {
@@ -307,14 +332,16 @@ func TestMonitoringNativeS3ThanosAndLoad(t *testing.T) {
 	worker := newArchiveNativeExecutor(t, n)
 	n.Executor = worker
 	t.Log("验证 S3 前缀、凭据与配置持久操作")
-	f.put(t, "files/keep.txt", []byte("保留普通文件"))
 	write := func(key string) *requeststate.Write {
 		return &requeststate.Write{Actor: "account:" + n.ID + ":1", Key: key, Digest: strings.Repeat("a", 64)}
 	}
-	target, err := n.saveStorageTarget(t.Context(), objectstore.Input{Target: objectstore.Target{ID: "s3-native", NodeID: n.ID, Name: "S3 验收", Enabled: true, S3Connection: protocol.S3Connection{Endpoint: f.endpoint, Bucket: f.bucket, Region: "us-east-1", AccessStyle: "path"}}, Credentials: &f.keys}, write("save-target"))
+	input := objectstore.Input{Target: objectstore.Target{ID: "s3-native", NodeID: n.ID, Name: "S3 验收", Enabled: true, S3Connection: protocol.S3Connection{Endpoint: f.endpoint, Bucket: f.bucket, Region: "us-east-1", AccessStyle: "path"}}, Credentials: &f.keys, CAPEM: &f.ca}
+	target, err := n.saveStorageTarget(t.Context(), input, write("save-target"))
 	if err != nil {
 		t.Fatal(err)
 	}
+	f.probeCases(t, n, input, target, write)
+	f.put(t, "files/keep.txt", []byte("保留普通文件"))
 	check, err := n.checkStorageTarget(t.Context(), target.ID, f.prefix, target.Revision, write("check-target"))
 	if err != nil || check.State != "ready" || !check.PrefixRestricted || !check.LifecycleChecked || check.ObjectKey != "" {
 		t.Fatal("S3 受限连接检查失败", check, err)
@@ -354,6 +381,10 @@ func TestMonitoringNativeS3ThanosAndLoad(t *testing.T) {
 	c := currentStatus.Config
 	if _, err = n.saveStorageTarget(t.Context(), objectstore.Input{Target: target, Credentials: &f.keys}, write("replace-active-credentials")); err == nil {
 		t.Fatal("运行中替换了组件凭据")
+	}
+	emptyCA := ""
+	if _, err = n.saveStorageTarget(t.Context(), objectstore.Input{Target: target, CAPEM: &emptyCA}, write("reset-active-ca")); err == nil {
+		t.Fatal("运行中修改了归档信任链")
 	}
 	changed := target
 	changed.Bucket = "another-bucket"
@@ -423,7 +454,7 @@ func TestMonitoringNativeS3ThanosAndLoad(t *testing.T) {
 	next.Executor = newArchiveNativeExecutor(t, next)
 	nextTarget := target
 	nextTarget.ID, nextTarget.NodeID, nextTarget.Revision = "s3-next", next.ID, 0
-	nextTarget, err = next.saveStorageTarget(t.Context(), objectstore.Input{Target: nextTarget, Credentials: &f.keys}, write("save-next-target"))
+	nextTarget, err = next.saveStorageTarget(t.Context(), objectstore.Input{Target: nextTarget, Credentials: &f.keys, CAPEM: &f.ca}, write("save-next-target"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -480,6 +511,48 @@ func TestMonitoringNativeS3ThanosAndLoad(t *testing.T) {
 	if _, err = os.Stat(filepath.Join(c.Directory, "receive", "opsd", "wal")); err != nil {
 		t.Fatal("停用时删除了监控数据", err)
 	}
+}
+
+func (f *archiveNative) probeCases(t *testing.T, n *Node, input objectstore.Input, target objectstore.Target, write func(string) *requeststate.Write) {
+	t.Helper()
+	ctx := t.Context()
+	probe, err := n.probeStorageTarget(ctx, target.ID, f.prefix, target.Revision, write("empty-bucket"))
+	if err != nil || probe.State != "ready" {
+		t.Fatal("空桶探测失败", probe, err)
+	}
+	denied, err := n.probeStorageTarget(ctx, target.ID, "files/", target.Revision, write("denied-prefix"))
+	if err != nil || denied.State != "failed" || denied.Error != "S3 拒绝访问" {
+		t.Fatal("探测未报告列举权限不足", denied, err)
+	}
+	otherCA := f.certificate(t, "other-ca", "127.0.0.1")
+	input.ID, input.CAPEM = "s3-probe", &otherCA
+	listOnly := protocol.S3Credentials{Receive: f.keys.Store, Store: f.keys.Store, Compact: f.keys.Store}
+	input.Credentials = &listOnly
+	separate, err := n.saveStorageTarget(ctx, input, write("save-list-only"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	failed, err := n.probeStorageTarget(ctx, separate.ID, f.prefix, separate.Revision, write("wrong-ca"))
+	if err != nil || failed.State != "failed" || failed.Error != "S3 TLS 证书验证失败" {
+		t.Fatal("错误 CA 的探测结果无效", failed, err)
+	}
+	separate, err = n.saveStorageTarget(ctx, objectstore.Input{Target: separate, CAPEM: &f.ca}, write("fix-ca"))
+	if err != nil || separate.CAPEM != f.ca {
+		t.Fatal("修复 CA 失败", err)
+	}
+	separate, err = n.saveStorageTarget(ctx, objectstore.Input{Target: separate}, write("preserve-ca"))
+	if err != nil || separate.CAPEM != f.ca {
+		t.Fatal("省略 CA 应保留原值", err)
+	}
+	ready, err := n.probeStorageTarget(ctx, separate.ID, f.prefix, separate.Revision, write("list-only"))
+	if err != nil || ready.State != "ready" {
+		t.Fatal("只读列举凭据未通过探测", ready, err)
+	}
+	archive, err := n.checkStorageTarget(ctx, separate.ID, f.prefix, separate.Revision, write("list-only-archive"))
+	if err != nil || archive.State != "failed" || archive.Error != "S3 拒绝访问" {
+		t.Fatal("只读列举凭据错误地通过了归档检查", archive, err)
+	}
+	t.Log("HTTPS S3 空桶列举通过，错误 CA 与越权前缀失败，只读凭据归档检查失败")
 }
 
 func (f *archiveNative) history(t *testing.T, n *Node, c metricsstore.Config) map[string]any {
@@ -677,7 +750,11 @@ func (f *archiveNative) history(t *testing.T, n *Node, c metricsstore.Config) ma
 	}
 	compact := func(retention bool) {
 		t.Helper()
-		args := []string{"run", "--rm", "--user", "65534:65534", "--memory", "2g", "-v", filepath.Join(c.Directory, "compact") + ":/data", "-v", filepath.Join(c.Directory, "compact.yml") + ":/config/objstore.yml:ro", "quay.io/thanos/thanos:" + metricsstore.ThanosVersion}
+		args := []string{"run", "--rm", "--user", "65534:65534", "--memory", "2g",
+			"-v", filepath.Join(c.Directory, "compact") + ":/data",
+			"-v", filepath.Join(c.Directory, "compact.yml") + ":/config/objstore.yml:ro",
+			"-v", filepath.Join(c.Directory, "s3-ca.pem") + ":/config/s3-ca.pem:ro",
+			"quay.io/thanos/thanos:" + metricsstore.ThanosVersion}
 		for _, arg := range compose.Services["compact"].Command {
 			if arg == "--wait" || !retention && strings.HasPrefix(arg, "--retention.") {
 				continue

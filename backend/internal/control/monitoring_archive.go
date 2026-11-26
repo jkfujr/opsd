@@ -16,13 +16,26 @@ import (
 func (s *Server) ListStorageTargets(w http.ResponseWriter, r *http.Request) {
 	items, err := s.node.StorageTargets(r.Context())
 	if err == nil {
+		ctx, cancel := context.WithTimeout(r.Context(), 4*time.Second)
+		defer cancel()
+		var wg sync.WaitGroup
+		slots := make(chan struct{}, 8)
 		for i := range items {
-			var current objectstore.Target
-			s.node.CurrentRead(r.Context(), items[i].NodeID, "storage.get", cluster.StorageCommand{ID: items[i].ID}, &current, 5*time.Second)
-			if current.Revision == items[i].Revision {
-				items[i].Check = current.Check
-			}
+			wg.Go(func() {
+				select {
+				case slots <- struct{}{}:
+					defer func() { <-slots }()
+				case <-ctx.Done():
+					return
+				}
+				item := &items[i]
+				var current objectstore.Target
+				if err := s.node.Call(ctx, item.NodeID, "storage.get", cluster.StorageCommand{ID: item.ID}, &current); err == nil && current.Revision == item.Revision {
+					item.Check, item.ConnectionCheck = current.Check, current.ConnectionCheck
+				}
+			})
 		}
+		wg.Wait()
 	}
 	s.resultError(w, r, 200, map[string]any{"items": items}, err)
 }
@@ -43,8 +56,13 @@ func (s *Server) SaveStorageTarget(w http.ResponseWriter, r *http.Request, id st
 	}
 	input := convertHTTP[objectstore.Input](body)
 	input.ID, input.Revision = id, expectedRevision(r)
+	method := "storage.save"
+	if input.CAPEM != nil {
+		// 旧节点会忽略新字段。CA 写入使用旧节点明确拒绝的方法。
+		method = "storage.save_connection"
+	}
 	var out objectstore.Target
-	err := s.node.Call(r.Context(), input.NodeID, "storage.save", cluster.StorageCommand{Input: &input, Write: s.writeIdentity(r)}, &out)
+	err := s.node.Call(r.Context(), input.NodeID, method, cluster.StorageCommand{Input: &input, Write: s.writeIdentity(r)}, &out)
 	if err == nil {
 		s.setETag(w, r, out.Revision)
 	}
@@ -60,12 +78,32 @@ func (s *Server) CheckStorageTarget(w http.ResponseWriter, r *http.Request, id s
 		s.operationError(w, r, err)
 		return
 	}
-	if !s.checkRevision(w, r, target.Revision) {
+	var out objectstore.Check
+	err = s.node.Call(r.Context(), target.NodeID, "storage.check", cluster.StorageCommand{ID: id, Prefix: body.Prefix, Revision: expectedRevision(r), Write: s.writeIdentity(r)}, &out)
+	if err == nil {
+		s.setETag(w, r, out.TargetRevision)
+	}
+	s.resultError(w, r, 200, out, err)
+}
+func (s *Server) ProbeStorageTarget(w http.ResponseWriter, r *http.Request, id string, _ httpapi.ProbeStorageTargetParams) {
+	var body httpapi.StorageProbeInput
+	if !s.body(w, r, &body) {
 		return
 	}
-	var out objectstore.Check
-	err = s.node.Call(r.Context(), target.NodeID, "storage.check", cluster.StorageCommand{ID: id, Prefix: body.Prefix, Revision: target.Revision, Write: s.writeIdentity(r)}, &out)
-	s.setETag(w, r, target.Revision)
+	target, err := s.node.StorageTarget(r.Context(), id)
+	if err != nil {
+		s.operationError(w, r, err)
+		return
+	}
+	prefix := ""
+	if body.Prefix != nil {
+		prefix = *body.Prefix
+	}
+	var out objectstore.Probe
+	err = s.node.Call(r.Context(), target.NodeID, "storage.probe", cluster.StorageCommand{ID: id, Prefix: prefix, Revision: expectedRevision(r), Write: s.writeIdentity(r)}, &out)
+	if err == nil {
+		s.setETag(w, r, out.TargetRevision)
+	}
 	s.resultError(w, r, 200, out, err)
 }
 func (s *Server) GetMonitoringConfig(w http.ResponseWriter, r *http.Request) {

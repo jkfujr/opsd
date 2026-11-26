@@ -1570,8 +1570,25 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** 检查 S3 连接与监控目录权限 */
+        /** 检查监控归档的 S3 权限 */
         post: operations["checkStorageTarget"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/storage/targets/{id}/probe": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 探测 S3 列举权限 */
+        post: operations["probeStorageTarget"];
         delete?: never;
         options?: never;
         head?: never;
@@ -3588,6 +3605,8 @@ export interface components {
             credentials_available: boolean;
             credential_ref?: string;
             check?: components["schemas"]["StorageCheck"];
+            ca_pem?: string;
+            connection_check?: components["schemas"]["StorageProbe"];
         };
         StorageTargetInput: {
             endpoint: string;
@@ -3600,12 +3619,27 @@ export interface components {
             name: string;
             enabled: boolean;
             credentials?: components["schemas"]["S3Credentials"];
+            /** @description 省略保留原值，空字符串恢复系统信任。仅 HTTPS 支持自定义 CA。 */
+            ca_pem?: string;
         };
         StorageTargetList: {
             items: components["schemas"]["StorageTarget"][];
         };
         StorageCheckInput: {
             prefix: string;
+        };
+        StorageProbe: {
+            /** Format: int64 */
+            target_revision: number;
+            prefix: string;
+            /** @enum {string} */
+            state: "ready" | "failed";
+            /** Format: date-time */
+            checked_at: string;
+            error?: string;
+        };
+        StorageProbeInput: {
+            prefix?: string;
         };
         MonitoringArchiveConfig: {
             /** Format: int64 */
@@ -8490,6 +8524,54 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["StorageCheck"];
+                };
+            };
+            400: components["responses"]["Error400"];
+            401: components["responses"]["Error401"];
+            403: components["responses"]["Error403"];
+            404: components["responses"]["Error404"];
+            405: components["responses"]["Error405"];
+            406: components["responses"]["Error406"];
+            409: components["responses"]["Error409"];
+            412: components["responses"]["Error412"];
+            413: components["responses"]["Error413"];
+            415: components["responses"]["Error415"];
+            422: components["responses"]["Error422"];
+            428: components["responses"]["Error428"];
+            429: components["responses"]["Error429"];
+            500: components["responses"]["Error500"];
+            503: components["responses"]["Error503"];
+            504: components["responses"]["Error504"];
+        };
+    };
+    probeStorageTarget: {
+        parameters: {
+            query?: never;
+            header: {
+                "If-Match": string;
+                "X-CSRF-Token"?: string;
+                "Idempotency-Key": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StorageProbeInput"];
+            };
+        };
+        responses: {
+            /** @description 请求成功 */
+            200: {
+                headers: {
+                    "X-Request-ID": string;
+                    ETag: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StorageProbe"];
                 };
             };
             400: components["responses"]["Error400"];

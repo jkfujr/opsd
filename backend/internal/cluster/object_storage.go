@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"strings"
 	"time"
 
@@ -33,7 +34,7 @@ func (n *Node) storageDispatch(ctx context.Context, origin, method string, body 
 		c.Write.Origin = origin
 	}
 	switch method {
-	case "storage.save":
+	case "storage.save", "storage.save_connection":
 		if c.Input == nil {
 			return nil, fault("invalid_request", "缺少存储目标")
 		}
@@ -50,10 +51,17 @@ func (n *Node) storageDispatch(ctx context.Context, origin, method string, body 
 			} else if e != sql.ErrNoRows {
 				return t, e
 			}
+			if check, e := n.storageConnectionCheck(ctx, t); e != nil {
+				return t, e
+			} else {
+				t.ConnectionCheck = check
+			}
 		}
 		return t, err
 	case "storage.check":
 		return n.checkStorageTarget(ctx, c.ID, c.Prefix, c.Revision, c.Write)
+	case "storage.probe":
+		return n.probeStorageTarget(ctx, c.ID, c.Prefix, c.Revision, c.Write)
 	}
 	return nil, fault("invalid_request", "未知存储操作")
 }
@@ -151,9 +159,6 @@ func (n *Node) saveStorageTarget(ctx context.Context, input objectstore.Input, w
 	n.telemetry.LockConfig()
 	defer n.telemetry.UnlockConfig()
 	t := input.Target
-	if err := t.Validate(); err != nil {
-		return t, fault("invalid_request", err.Error())
-	}
 	if t.NodeID != n.ID {
 		return t, fault("forbidden", "存储目标只能在所属节点保存")
 	}
@@ -185,11 +190,21 @@ func (n *Node) saveStorageTarget(ctx context.Context, input objectstore.Input, w
 	if previous.Revision != t.Revision {
 		return t, fault("precondition_failed", "存储目标已经改变")
 	}
+	t.CAPEM = previous.CAPEM
+	if input.CAPEM != nil {
+		t.CAPEM = *input.CAPEM
+	}
+	if err := t.Validate(); err != nil {
+		return t, fault("invalid_request", err.Error())
+	}
 	var pendingKey string
 	if e := n.DB.QueryRowContext(ctx, "SELECT object_key FROM storage_checks WHERE target_id=?", t.ID).Scan(&pendingKey); e != nil && e != sql.ErrNoRows {
 		return t, e
 	}
-	if pendingKey != "" && previous.S3Connection != t.S3Connection {
+	// 待清理的对象仍在原桶。允许修复信任链以恢复该桶的访问。
+	pendingConnection := t.S3Connection
+	pendingConnection.CAPEM = previous.CAPEM
+	if pendingKey != "" && previous.S3Connection != pendingConnection {
 		return t, fault("conflict", "请先完成原连接检查并清理临时对象")
 	}
 	config, err := n.ArchiveConfig(ctx)
@@ -211,7 +226,7 @@ func (n *Node) saveStorageTarget(ctx context.Context, input objectstore.Input, w
 	if err = checkReference(config); err != nil {
 		return t, err
 	}
-	t.Check = nil
+	t.Check, t.ConnectionCheck = nil, nil
 	t.CredentialRef = previous.CredentialRef
 	t.CredentialsAvailable = previous.CredentialsAvailable
 	if input.Credentials != nil {
@@ -278,6 +293,9 @@ func (n *Node) checkStorageTarget(ctx context.Context, id, prefix string, revisi
 		return out, fault("invalid_request", "连接检查缺少请求标识")
 	}
 	prior, lookupErr := requeststate.Lookup(ctx, n.DB, *write)
+	if errors.Is(lookupErr, requeststate.ErrConflict) || lookupErr == nil && (prior.Kind != "storage_check" || prior.ResourceID != id) {
+		return out, fault("conflict", requeststate.ErrConflict.Error())
+	}
 	if lookupErr == nil {
 		if err := json.Unmarshal(prior.Result, &out); err != nil {
 			return out, err

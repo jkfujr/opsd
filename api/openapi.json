@@ -12461,7 +12461,7 @@
     "/storage/targets/{id}/check": {
       "post": {
         "operationId": "checkStorageTarget",
-        "summary": "检查 S3 连接与监控目录权限",
+        "summary": "检查监控归档的 S3 权限",
         "tags": [
           "storage"
         ],
@@ -12529,6 +12529,146 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/StorageCheck"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-ID": {
+                "schema": {
+                  "type": "string"
+                },
+                "required": true
+              },
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                },
+                "required": true
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "405": {
+            "$ref": "#/components/responses/Error405"
+          },
+          "406": {
+            "$ref": "#/components/responses/Error406"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "412": {
+            "$ref": "#/components/responses/Error412"
+          },
+          "413": {
+            "$ref": "#/components/responses/Error413"
+          },
+          "415": {
+            "$ref": "#/components/responses/Error415"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error422"
+          },
+          "428": {
+            "$ref": "#/components/responses/Error428"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          },
+          "504": {
+            "$ref": "#/components/responses/Error504"
+          }
+        }
+      }
+    },
+    "/storage/targets/{id}/probe": {
+      "post": {
+        "operationId": "probeStorageTarget",
+        "summary": "探测 S3 列举权限",
+        "tags": [
+          "storage"
+        ],
+        "security": [
+          {
+            "SessionCookie": []
+          }
+        ],
+        "x-opsd-access": {
+          "mode": "session",
+          "level": "manage"
+        },
+        "x-opsd-version": "storage-target",
+        "x-opsd-condition": "match",
+        "x-opsd-idempotent": true,
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StorageProbeInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "请求成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StorageProbe"
                 }
               }
             },
@@ -20623,6 +20763,13 @@
           },
           "check": {
             "$ref": "#/components/schemas/StorageCheck"
+          },
+          "ca_pem": {
+            "type": "string",
+            "maxLength": 65536
+          },
+          "connection_check": {
+            "$ref": "#/components/schemas/StorageProbe"
           }
         },
         "required": [
@@ -20673,6 +20820,11 @@
           },
           "credentials": {
             "$ref": "#/components/schemas/S3Credentials"
+          },
+          "ca_pem": {
+            "type": "string",
+            "maxLength": 65536,
+            "description": "省略保留原值，空字符串恢复系统信任。仅 HTTPS 支持自定义 CA。"
           }
         },
         "required": [
@@ -20712,6 +20864,49 @@
         "required": [
           "prefix"
         ]
+      },
+      "StorageProbe": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "target_revision": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "prefix": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "ready",
+              "failed"
+            ]
+          },
+          "checked_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "error": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "target_revision",
+          "prefix",
+          "state",
+          "checked_at"
+        ]
+      },
+      "StorageProbeInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "prefix": {
+            "type": "string",
+            "maxLength": 1024
+          }
+        }
       },
       "MonitoringArchiveConfig": {
         "type": "object",

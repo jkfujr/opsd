@@ -77,6 +77,7 @@ export type StorageTarget = Schemas['StorageTarget'];
 export type StorageTargetList = Schemas['StorageTargetList'];
 export type StorageTargetInput = Schemas['StorageTargetInput'];
 export type StorageCheck = Schemas['StorageCheck'];
+export type StorageProbe = Schemas['StorageProbe'];
 export type ThemeList = Schemas['ThemeList'];
 export type ThemeInstallation = Schemas['ThemeInstallation'];
 export type ThemeSelectionState = Schemas['ThemeSelectionState'];

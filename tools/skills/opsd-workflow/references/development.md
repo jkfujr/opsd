@@ -33,7 +33,7 @@
 
 整套控制台主题由 `backend/internal/consoletheme` 安装和检查，`control/themes.go` 提供管理接口，`server.go` 选择主题及资源；节点迁移保存安装记录和选择，文件位于节点数据目录的 `themes/`。修改前读取 [主题格式与恢复契约](../../../../docs/THEMES.md)。内置恢复入口为 `/__opsd/builtin/`，前端路由的 basename 与 API 根路径分开；原登录地址保留 `?builtin=1`。默认前端 根据实际路径选择业务路由基址；恢复模式的退出及账号修改保留强制内置登录，主题切换后点击“刷新界面”进入普通根路径。完整交互以实际内置资源的浏览器结果为准。
 
-导航定义位于 `frontend/src/app/nav.ts`,共享查询位于 `frontend/src/app/queries.ts`。账号菜单顺序经 v2 `GET/PUT /settings/navigation` 和 `If-Match` 保存到所属节点的 `account_navigation` 表，SSE 的 `navigation` 事件只刷新对应节点查询；编辑器保留未提交版本。账号偏好独立于凭据版本与其他节点账号，修改密码时保留偏好。“存储”的当前入口只展示未接入状态，Silo 功能按后续批次建设。
+导航定义位于 `frontend/src/app/nav.ts`,共享查询位于 `frontend/src/app/queries.ts`。账号菜单顺序经 v2 `GET/PUT /settings/navigation` 和 `If-Match` 保存到所属节点的 `account_navigation` 表，SSE 的 `navigation` 事件只刷新对应节点查询；编辑器保留未提交版本。账号偏好独立于凭据版本与其他节点账号，修改密码时保留偏好。存储页的目标登记、连接探测和归档检查见 [S3 API](../../../../docs/API.md#s3-与集中监控)。
 
 - `DialogContent` 的直接子项使用 Header、Body、Footer；长内容在 Body 滚动。表单放 Body，Footer 的提交按钮用 `form` 关联。
 - 抽屉同样使用 Header、Body、Footer；用框架焦点管理及中文关闭标签。确认框复用 `ui.tsx` 的 `Confirm`。

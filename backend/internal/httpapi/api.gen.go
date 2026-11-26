@@ -2140,6 +2140,24 @@ func (e SharedStorageInitializeDatabase) Valid() bool {
 	}
 }
 
+// Defines values for StorageProbeState.
+const (
+	StorageProbeStateFailed StorageProbeState = "failed"
+	StorageProbeStateReady  StorageProbeState = "ready"
+)
+
+// Valid indicates whether the value is a known member of the StorageProbeState enum.
+func (e StorageProbeState) Valid() bool {
+	switch e {
+	case StorageProbeStateFailed:
+		return true
+	case StorageProbeStateReady:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for StorageStatusState.
 const (
 	StorageStatusStatePending     StorageStatusState = "pending"
@@ -4793,6 +4811,23 @@ type StorageConfigPatch struct {
 	Port    *int    `json:"port,omitempty"`
 }
 
+// StorageProbe defines model for StorageProbe.
+type StorageProbe struct {
+	CheckedAt      time.Time         `json:"checked_at"`
+	Error          *string           `json:"error,omitempty"`
+	Prefix         string            `json:"prefix"`
+	State          StorageProbeState `json:"state"`
+	TargetRevision int64             `json:"target_revision"`
+}
+
+// StorageProbeState defines model for StorageProbe.State.
+type StorageProbeState string
+
+// StorageProbeInput defines model for StorageProbeInput.
+type StorageProbeInput struct {
+	Prefix *string `json:"prefix,omitempty"`
+}
+
 // StorageStatus defines model for StorageStatus.
 type StorageStatus struct {
 	Enabled      bool                `json:"enabled"`
@@ -4809,7 +4844,9 @@ type StorageStatusState string
 type StorageTarget struct {
 	AccessStyle          StorageTargetAccessStyle `json:"access_style"`
 	Bucket               string                   `json:"bucket"`
+	CaPem                *string                  `json:"ca_pem,omitempty"`
 	Check                *StorageCheck            `json:"check,omitempty"`
+	ConnectionCheck      *StorageProbe            `json:"connection_check,omitempty"`
 	CredentialRef        *string                  `json:"credential_ref,omitempty"`
 	CredentialsAvailable bool                     `json:"credentials_available"`
 	DedicatedBucket      bool                     `json:"dedicated_bucket"`
@@ -4827,15 +4864,18 @@ type StorageTargetAccessStyle string
 
 // StorageTargetInput defines model for StorageTargetInput.
 type StorageTargetInput struct {
-	AccessStyle     StorageTargetInputAccessStyle `json:"access_style"`
-	Bucket          string                        `json:"bucket"`
-	Credentials     *S3Credentials                `json:"credentials,omitempty"`
-	DedicatedBucket bool                          `json:"dedicated_bucket"`
-	Enabled         bool                          `json:"enabled"`
-	Endpoint        string                        `json:"endpoint"`
-	Name            string                        `json:"name"`
-	NodeId          string                        `json:"node_id"`
-	Region          string                        `json:"region"`
+	AccessStyle StorageTargetInputAccessStyle `json:"access_style"`
+	Bucket      string                        `json:"bucket"`
+
+	// CaPem 省略保留原值，空字符串恢复系统信任。仅 HTTPS 支持自定义 CA。
+	CaPem           *string        `json:"ca_pem,omitempty"`
+	Credentials     *S3Credentials `json:"credentials,omitempty"`
+	DedicatedBucket bool           `json:"dedicated_bucket"`
+	Enabled         bool           `json:"enabled"`
+	Endpoint        string         `json:"endpoint"`
+	Name            string         `json:"name"`
+	NodeId          string         `json:"node_id"`
+	Region          string         `json:"region"`
 }
 
 // StorageTargetInputAccessStyle defines model for StorageTargetInput.AccessStyle.
@@ -5466,6 +5506,13 @@ type CheckStorageTargetParams struct {
 	IdempotencyKey string  `json:"Idempotency-Key"`
 }
 
+// ProbeStorageTargetParams defines parameters for ProbeStorageTarget.
+type ProbeStorageTargetParams struct {
+	IfMatch        string  `json:"If-Match"`
+	XCSRFToken     *string `json:"X-CSRF-Token,omitempty"`
+	IdempotencyKey string  `json:"Idempotency-Key"`
+}
+
 // ListScheduledTasksParams defines parameters for ListScheduledTasks.
 type ListScheduledTasksParams struct {
 	NodeId *string `form:"node_id,omitempty" json:"node_id,omitempty"`
@@ -5592,6 +5639,9 @@ type SaveStorageTargetJSONRequestBody = StorageTargetInput
 
 // CheckStorageTargetJSONRequestBody defines body for CheckStorageTarget for application/json ContentType.
 type CheckStorageTargetJSONRequestBody = StorageCheckInput
+
+// ProbeStorageTargetJSONRequestBody defines body for ProbeStorageTarget for application/json ContentType.
+type ProbeStorageTargetJSONRequestBody = StorageProbeInput
 
 // AsEntranceChange returns the union data inside the DeploymentChange as a EntranceChange
 func (t DeploymentChange) AsEntranceChange() (EntranceChange, error) {
@@ -6441,9 +6491,12 @@ type ServerInterface interface {
 	// SaveStorageTarget 保存 S3 存储目标
 	// (PUT /storage/targets/{id})
 	SaveStorageTarget(w http.ResponseWriter, r *http.Request, id string, params SaveStorageTargetParams)
-	// CheckStorageTarget 检查 S3 连接与监控目录权限
+	// CheckStorageTarget 检查监控归档的 S3 权限
 	// (POST /storage/targets/{id}/check)
 	CheckStorageTarget(w http.ResponseWriter, r *http.Request, id string, params CheckStorageTargetParams)
+	// ProbeStorageTarget 探测 S3 列举权限
+	// (POST /storage/targets/{id}/probe)
+	ProbeStorageTarget(w http.ResponseWriter, r *http.Request, id string, params ProbeStorageTargetParams)
 	// ListScheduledTasks listScheduledTasks
 	// (GET /tasks)
 	ListScheduledTasks(w http.ResponseWriter, r *http.Request, params ListScheduledTasksParams)
@@ -12204,6 +12257,102 @@ func (siw *ServerInterfaceWrapper) CheckStorageTarget(w http.ResponseWriter, r *
 	handler.ServeHTTP(w, r)
 }
 
+// ProbeStorageTarget operation middleware
+func (siw *ServerInterfaceWrapper) ProbeStorageTarget(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ProbeStorageTargetParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "If-Match" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("If-Match")]; found {
+		var IfMatch string
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "If-Match", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "If-Match", valueList[0], &IfMatch, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "If-Match", Err: err})
+			return
+		}
+
+		params.IfMatch = IfMatch
+
+	} else {
+		err := fmt.Errorf("Header parameter If-Match is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "If-Match", Err: err})
+		return
+	}
+
+	// ------------- Optional header parameter "X-CSRF-Token" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-CSRF-Token")]; found {
+		var XCSRFToken string
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "X-CSRF-Token", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "X-CSRF-Token", valueList[0], &XCSRFToken, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-CSRF-Token", Err: err})
+			return
+		}
+
+		params.XCSRFToken = &XCSRFToken
+
+	}
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey string
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ProbeStorageTarget(w, r, id, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // ListScheduledTasks operation middleware
 func (siw *ServerInterfaceWrapper) ListScheduledTasks(w http.ResponseWriter, r *http.Request) {
 
@@ -12519,6 +12668,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/storage/targets/{id}", wrapper.GetStorageTarget)
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/storage/targets/{id}", wrapper.SaveStorageTarget)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/storage/targets/{id}/check", wrapper.CheckStorageTarget)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/storage/targets/{id}/probe", wrapper.ProbeStorageTarget)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/tasks", wrapper.ListScheduledTasks)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/terminals/{ticket}", wrapper.AttachTerminal)
 
@@ -50965,6 +51115,356 @@ func (response CheckStorageTarget504ApplicationProblemPlusJSONResponse) VisitChe
 	return err
 }
 
+type ProbeStorageTargetRequestObject struct {
+	Id     string `json:"id"`
+	Params ProbeStorageTargetParams
+	Body   *ProbeStorageTargetJSONRequestBody
+}
+
+type ProbeStorageTargetResponseObject interface {
+	VisitProbeStorageTargetResponse(w http.ResponseWriter) error
+}
+
+type ProbeStorageTarget200ResponseHeaders struct {
+	ETag       string
+	XRequestID string
+}
+
+type ProbeStorageTarget200JSONResponse struct {
+	Body    StorageProbe
+	Headers ProbeStorageTarget200ResponseHeaders
+}
+
+func (response ProbeStorageTarget200JSONResponse) VisitProbeStorageTargetResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("ETag", fmt.Sprint(response.Headers.ETag))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ProbeStorageTarget400ApplicationProblemPlusJSONResponse struct {
+	Error400ApplicationProblemPlusJSONResponse
+}
+
+func (response ProbeStorageTarget400ApplicationProblemPlusJSONResponse) VisitProbeStorageTargetResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ProbeStorageTarget401ApplicationProblemPlusJSONResponse struct {
+	Error401ApplicationProblemPlusJSONResponse
+}
+
+func (response ProbeStorageTarget401ApplicationProblemPlusJSONResponse) VisitProbeStorageTargetResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ProbeStorageTarget403ApplicationProblemPlusJSONResponse struct {
+	Error403ApplicationProblemPlusJSONResponse
+}
+
+func (response ProbeStorageTarget403ApplicationProblemPlusJSONResponse) VisitProbeStorageTargetResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ProbeStorageTarget404ApplicationProblemPlusJSONResponse struct {
+	Error404ApplicationProblemPlusJSONResponse
+}
+
+func (response ProbeStorageTarget404ApplicationProblemPlusJSONResponse) VisitProbeStorageTargetResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ProbeStorageTarget405ApplicationProblemPlusJSONResponse struct {
+	Error405ApplicationProblemPlusJSONResponse
+}
+
+func (response ProbeStorageTarget405ApplicationProblemPlusJSONResponse) VisitProbeStorageTargetResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.Allow != nil {
+		w.Header().Set("Allow", fmt.Sprint(*response.Headers.Allow))
+	}
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(405)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ProbeStorageTarget406ApplicationProblemPlusJSONResponse struct {
+	Error406ApplicationProblemPlusJSONResponse
+}
+
+func (response ProbeStorageTarget406ApplicationProblemPlusJSONResponse) VisitProbeStorageTargetResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(406)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ProbeStorageTarget409ApplicationProblemPlusJSONResponse struct {
+	Error409ApplicationProblemPlusJSONResponse
+}
+
+func (response ProbeStorageTarget409ApplicationProblemPlusJSONResponse) VisitProbeStorageTargetResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ProbeStorageTarget412ApplicationProblemPlusJSONResponse struct {
+	Error412ApplicationProblemPlusJSONResponse
+}
+
+func (response ProbeStorageTarget412ApplicationProblemPlusJSONResponse) VisitProbeStorageTargetResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(412)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ProbeStorageTarget413ApplicationProblemPlusJSONResponse struct {
+	Error413ApplicationProblemPlusJSONResponse
+}
+
+func (response ProbeStorageTarget413ApplicationProblemPlusJSONResponse) VisitProbeStorageTargetResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(413)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ProbeStorageTarget415ApplicationProblemPlusJSONResponse struct {
+	Error415ApplicationProblemPlusJSONResponse
+}
+
+func (response ProbeStorageTarget415ApplicationProblemPlusJSONResponse) VisitProbeStorageTargetResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(415)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ProbeStorageTarget422ApplicationProblemPlusJSONResponse struct {
+	Error422ApplicationProblemPlusJSONResponse
+}
+
+func (response ProbeStorageTarget422ApplicationProblemPlusJSONResponse) VisitProbeStorageTargetResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ProbeStorageTarget428ApplicationProblemPlusJSONResponse struct {
+	Error428ApplicationProblemPlusJSONResponse
+}
+
+func (response ProbeStorageTarget428ApplicationProblemPlusJSONResponse) VisitProbeStorageTargetResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(428)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ProbeStorageTarget429ApplicationProblemPlusJSONResponse struct {
+	Error429ApplicationProblemPlusJSONResponse
+}
+
+func (response ProbeStorageTarget429ApplicationProblemPlusJSONResponse) VisitProbeStorageTargetResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.RetryAfter != nil {
+		w.Header().Set("Retry-After", fmt.Sprint(*response.Headers.RetryAfter))
+	}
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(429)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ProbeStorageTarget500ApplicationProblemPlusJSONResponse struct {
+	Error500ApplicationProblemPlusJSONResponse
+}
+
+func (response ProbeStorageTarget500ApplicationProblemPlusJSONResponse) VisitProbeStorageTargetResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ProbeStorageTarget503ApplicationProblemPlusJSONResponse struct {
+	Error503ApplicationProblemPlusJSONResponse
+}
+
+func (response ProbeStorageTarget503ApplicationProblemPlusJSONResponse) VisitProbeStorageTargetResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(503)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ProbeStorageTarget504ApplicationProblemPlusJSONResponse struct {
+	Error504ApplicationProblemPlusJSONResponse
+}
+
+func (response ProbeStorageTarget504ApplicationProblemPlusJSONResponse) VisitProbeStorageTargetResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(504)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type ListScheduledTasksRequestObject struct {
 	Params ListScheduledTasksParams
 }
@@ -51972,9 +52472,12 @@ type StrictServerInterface interface {
 	// SaveStorageTarget 保存 S3 存储目标
 	// (PUT /storage/targets/{id})
 	SaveStorageTarget(ctx context.Context, request SaveStorageTargetRequestObject) (SaveStorageTargetResponseObject, error)
-	// CheckStorageTarget 检查 S3 连接与监控目录权限
+	// CheckStorageTarget 检查监控归档的 S3 权限
 	// (POST /storage/targets/{id}/check)
 	CheckStorageTarget(ctx context.Context, request CheckStorageTargetRequestObject) (CheckStorageTargetResponseObject, error)
+	// ProbeStorageTarget 探测 S3 列举权限
+	// (POST /storage/targets/{id}/probe)
+	ProbeStorageTarget(ctx context.Context, request ProbeStorageTargetRequestObject) (ProbeStorageTargetResponseObject, error)
 	// ListScheduledTasks listScheduledTasks
 	// (GET /tasks)
 	ListScheduledTasks(ctx context.Context, request ListScheduledTasksRequestObject) (ListScheduledTasksResponseObject, error)
@@ -55193,6 +55696,40 @@ func (sh *strictHandler) CheckStorageTarget(w http.ResponseWriter, r *http.Reque
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(CheckStorageTargetResponseObject); ok {
 		if err := validResponse.VisitCheckStorageTargetResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ProbeStorageTarget operation middleware
+func (sh *strictHandler) ProbeStorageTarget(w http.ResponseWriter, r *http.Request, id string, params ProbeStorageTargetParams) {
+	var request ProbeStorageTargetRequestObject
+
+	request.Id = id
+	request.Params = params
+
+	var body ProbeStorageTargetJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ProbeStorageTarget(ctx, request.(ProbeStorageTargetRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ProbeStorageTarget")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ProbeStorageTargetResponseObject); ok {
+		if err := validResponse.VisitProbeStorageTargetResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

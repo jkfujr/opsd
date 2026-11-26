@@ -210,14 +210,15 @@ root 终端先以管理员会话 `POST /nodes/{node_id}/terminal` 创建票据�
 
 | 接口 | 用途及写入条件 |
 |---|---|
-| `GET /storage/targets`、`GET /storage/targets/{id}` | S3 目标和连接检查状态；单项返回 ETag |
-| `PUT /storage/targets/{id}` | 新建用 `If-None-Match: *`，更新用原 `If-Match`；`enabled=false` 停用 |
-| `POST /storage/targets/{id}/check` | 原 `If-Match`、正文 `prefix`；在所属节点持久登记临时对象键，按原请求恢复 |
+| `GET /storage/targets`、`GET /storage/targets/{id}` | 目标连接、公开 `ca_pem`、连接探测 `connection_check` 与归档检查 `check`。单项返回 ETag |
+| `PUT /storage/targets/{id}` | 新建用 `If-None-Match: *`，更新用原 `If-Match`。`enabled=false` 停用。HTTPS 可提交至多 64 KiB 的公开 `ca_pem`。省略保留，空字符串恢复系统信任 |
+| `POST /storage/targets/{id}/probe` | 使用 `Idempotency-Key` 和原 `If-Match`。正文可选 `prefix`。所属节点用 Store 凭据执行 `ListObjectsV2(MaxKeys=1)`，空结果为 `ready`，S3 请求失败返回 `200` 与 `failed`，所属节点不可达返回 `503` |
+| `POST /storage/targets/{id}/check` | 使用 `Idempotency-Key`、原 `If-Match` 和正文 `prefix`。检查归档角色权限与生命周期，所属节点持久登记临时对象键，按原请求恢复 |
 | `GET /monitoring/config`、`PUT /monitoring/config` | 配置 ETag 及条件写入，返回原持久 Operation |
 | `GET /monitoring/status` | 授权节点的采集、缓冲、组件、归档及磁盘状态，可用 `node_id` 筛选 |
 | `GET /monitoring/series` | 受控指标、资源与时间查询，按权限筛选后汇总 |
 
-存储目标与监控配置要求管理员会话；写入继续使用请求键和目标节点规则。S3 凭据按 Receive／Store／Compactor 分别提交，读取只返回 `credential_ref` 和配置状态。检查结果绑定目标版本与前缀，修改后重新检查；正在使用的目标受引用保护。配置启用、停用和迁移通过原操作查询与显式重新处理入口恢复。
+存储目标与监控配置要求管理员会话。S3 凭据按 Receive／Store／Compactor 分别提交，读取返回 `credential_ref` 和配置状态。探测与归档检查分别绑定目标版本及前缀。启用归档使用当期归档检查结果，正在使用的目标受引用保护。配置启用、停用和迁移通过原操作查询与显式重新处理入口恢复。
 
 序列查询要求 `metric`，可选 `node_id`、`resource_id`、UTC `from/to`、`step_seconds` 及 `aggregate=sum|avg`。令牌需要对应的监控、容器或数据库读取权限，数据库实例范围来自已授权集群。默认最近 30 天、约 1200 点；每序列最多 10000 点，总计最多 250000 点，时间范围为最近 365 天。`step_seconds` 是返回点间隔，`source_resolution_seconds` 是允许使用的来源分辨率上限，0 表示原始数据；缩放到一秒后读取原始样本。缺口值为 `null`，S3 等部分读取故障通过 `partial`、`warnings` 和 `missing` 返回。
 

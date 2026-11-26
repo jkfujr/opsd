@@ -109,11 +109,13 @@ var methodAccess = map[string]MethodAccess{
 	"execution.logs": {Capability: CapabilityReadLogs},
 
 	// —— 存储 ——
-	"storage.get":         {Capability: CapabilityReadStorage},
-	"storage.save":        {Capability: CapabilityWriteStorage},
-	"storage.check":       {Capability: CapabilityWriteStorage},
-	"storage.credentials": {Capability: CapabilityWriteStorage},
-	"storage.status":      {Capability: CapabilityReadStorage},
+	"storage.get":             {Capability: CapabilityReadStorage},
+	"storage.save":            {Capability: CapabilityWriteStorage},
+	"storage.save_connection": {Capability: CapabilityWriteStorage},
+	"storage.check":           {Capability: CapabilityWriteStorage},
+	"storage.probe":           {Capability: CapabilityWriteStorage},
+	"storage.credentials":     {Capability: CapabilityWriteStorage},
+	"storage.status":          {Capability: CapabilityReadStorage},
 
 	// —— 防火墙 / 组件 ——
 	"firewall":                         {Capability: CapabilityManageFirewall},

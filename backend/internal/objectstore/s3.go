@@ -4,7 +4,10 @@ package objectstore
 import (
 	"bytes"
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -28,10 +31,12 @@ type Target struct {
 	CredentialsAvailable bool   `json:"credentials_available"`
 	CredentialRef        string `json:"credential_ref,omitempty"`
 	Check                *Check `json:"check,omitempty"`
+	ConnectionCheck      *Probe `json:"connection_check,omitempty"`
 }
 type Input struct {
 	Target
 	Credentials *protocol.S3Credentials `json:"credentials,omitempty"`
+	CAPEM       *string                 `json:"ca_pem,omitempty"`
 }
 type Check struct {
 	TargetRevision   uint64    `json:"target_revision"`
@@ -42,6 +47,14 @@ type Check struct {
 	CheckedAt        time.Time `json:"checked_at"`
 	PrefixRestricted bool      `json:"prefix_restricted"`
 	LifecycleChecked bool      `json:"lifecycle_checked"`
+}
+
+type Probe struct {
+	TargetRevision uint64    `json:"target_revision"`
+	Prefix         string    `json:"prefix"`
+	State          string    `json:"state"`
+	Error          string    `json:"error,omitempty"`
+	CheckedAt      time.Time `json:"checked_at"`
 }
 
 func (t Target) Validate() error {
@@ -61,8 +74,53 @@ func New(c protocol.S3Connection, key protocol.S3Credential) (*minio.Client, err
 	}
 	transport := http.DefaultTransport.(*http.Transport).Clone()
 	transport.ResponseHeaderTimeout = 10 * time.Second
+	if c.CAPEM != "" {
+		pool := x509.NewCertPool()
+		pool.AppendCertsFromPEM([]byte(c.CAPEM))
+		transport.TLSClientConfig = &tls.Config{RootCAs: pool}
+	}
 	return minio.New(u.Host, &minio.Options{Creds: credentials.NewStaticV4(key.AccessKey, key.SecretKey, key.SessionToken), Secure: u.Scheme == "https", Region: c.Region, BucketLookup: lookup, Transport: transport, MaxRetries: 1})
 }
+
+func ProbeConnection(ctx context.Context, target Target, key protocol.S3Credential, prefix string) error {
+	client, err := New(target.S3Connection, key)
+	if err != nil {
+		return err
+	}
+	fetchOwner := false
+	for item := range client.ListObjectsIter(ctx, target.Bucket, minio.ListObjectsOptions{Prefix: prefix, Recursive: true, MaxKeys: 1, FetchOwner: &fetchOwner}) {
+		if item.Err != nil {
+			return connectionError(item.Err)
+		}
+		break
+	}
+	if err = ctx.Err(); err != nil {
+		return connectionError(err)
+	}
+	return nil
+}
+
+// 对象服务应答中的文本可能包含认证资料，状态只保存本地生成的原因。
+func connectionError(err error) error {
+	var x509Err *tls.CertificateVerificationError
+	if errors.As(err, &x509Err) {
+		return errors.New("S3 TLS 证书验证失败")
+	}
+	if errors.Is(err, context.DeadlineExceeded) {
+		return errors.New("S3 连接超时")
+	}
+	switch minio.ToErrorResponse(err).Code {
+	case "AccessDenied", "AllAccessDisabled":
+		return errors.New("S3 拒绝访问")
+	case "InvalidAccessKeyId", "SignatureDoesNotMatch", "ExpiredToken", "InvalidToken":
+		return errors.New("S3 凭据无效或已过期")
+	case "NoSuchBucket":
+		return errors.New("S3 桶不存在")
+	default:
+		return errors.New("S3 请求失败")
+	}
+}
+
 func Read(ctx context.Context, c *minio.Client, bucket, key string) ([]byte, error) {
 	o, err := c.GetObject(ctx, bucket, key, minio.GetObjectOptions{})
 	if err != nil {
@@ -185,7 +243,7 @@ func CheckConnection(ctx context.Context, target Target, keys protocol.S3Credent
 	// PUT 应答未知时读取同一键，确认原内容后继续。
 	actual, readErr := Read(ctx, compact, target.Bucket, key)
 	if readErr != nil && !missing(readErr) {
-		return finish(readErr)
+		return finish(connectionError(readErr))
 	}
 	if readErr == nil && !bytes.Equal(actual, body) {
 		return finish(fmt.Errorf("连接检查对象内容已被修改"))
@@ -195,14 +253,14 @@ func CheckConnection(ctx context.Context, target Target, keys protocol.S3Credent
 		if err != nil {
 			actual, readErr = Read(ctx, compact, target.Bucket, key)
 			if readErr != nil || !bytes.Equal(actual, body) {
-				return finish(err)
+				return finish(connectionError(err))
 			}
 		}
 	}
 	for _, client := range []*minio.Client{receive, store, compact} {
 		actual, e := Read(ctx, client, target.Bucket, key)
 		if e != nil {
-			return finish(e)
+			return finish(connectionError(e))
 		}
 		if !bytes.Equal(actual, body) {
 			return finish(fmt.Errorf("S3 读取内容与检查对象不一致"))
@@ -221,14 +279,14 @@ func CheckConnection(ctx context.Context, target Target, keys protocol.S3Credent
 		return finish(fmt.Errorf("Receive 凭据需要禁用删除权限"))
 	}
 	if _, err = compact.PutObject(ctx, target.Bucket, key, bytes.NewReader(body), int64(len(body)), options); err != nil {
-		return finish(err)
+		return finish(connectionError(err))
 	}
 	for _, client := range []*minio.Client{receive, store, compact} {
 		listCtx, cancel := context.WithCancel(ctx)
 		for item := range client.ListObjects(listCtx, target.Bucket, minio.ListObjectsOptions{Prefix: prefix, MaxKeys: 1}) {
 			if item.Err != nil {
 				cancel()
-				return finish(item.Err)
+				return finish(connectionError(item.Err))
 			}
 			break
 		}
@@ -249,7 +307,7 @@ func CheckConnection(ctx context.Context, target Target, keys protocol.S3Credent
 	out.PrefixRestricted = !target.DedicatedBucket
 	lifecycle, err := compact.GetBucketLifecycle(ctx, target.Bucket)
 	if err != nil && minio.ToErrorResponse(err).Code != "NoSuchLifecycleConfiguration" {
-		return finish(fmt.Errorf("读取桶生命周期失败：%w", err))
+		return finish(fmt.Errorf("读取桶生命周期失败：%w", connectionError(err)))
 	}
 	if lifecycle != nil {
 		for _, rule := range lifecycle.Rules {
@@ -273,7 +331,7 @@ func CheckConnection(ctx context.Context, target Target, keys protocol.S3Credent
 	}
 	out.LifecycleChecked = true
 	if err = compact.RemoveObject(ctx, target.Bucket, key, minio.RemoveObjectOptions{}); err != nil {
-		return finish(err)
+		return finish(connectionError(err))
 	}
 	_, err = compact.StatObject(ctx, target.Bucket, key, minio.StatObjectOptions{})
 	if !missing(err) {

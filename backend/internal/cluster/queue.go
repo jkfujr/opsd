@@ -57,7 +57,8 @@ func (n *Node) dispatch(ctx context.Context, origin, method string, body json.Ra
 	if strings.HasPrefix(method, "shared.") {
 		return n.sharedDispatch(ctx, origin, method, body)
 	}
-	if method == "storage.save" || method == "storage.get" || method == "storage.check" {
+	switch method {
+	case "storage.save", "storage.save_connection", "storage.get", "storage.check", "storage.probe":
 		return n.storageDispatch(ctx, origin, method, body)
 	}
 	if strings.HasPrefix(method, "archive.") {

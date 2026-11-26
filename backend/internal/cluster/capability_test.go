@@ -203,7 +203,7 @@ func TestReadCapabilitiesAreOneWay(t *testing.T) {
 		{CapabilityReadContainers, CapabilityManageContainer, []string{"containers.read", "container.inspect"}, []string{"container"}},
 		{CapabilityReadCompose, CapabilityManageCompose, []string{"compose.list", "compose.registration"}, []string{"compose", "compose_register"}},
 		{CapabilityReadTasks, CapabilityRunTask, []string{"tasks.list", "task.get", "task.runs", "task.runs.page"}, []string{"task.run", "task_run", "task_save"}},
-		{CapabilityReadStorage, CapabilityWriteStorage, []string{"storage.get", "storage.status"}, []string{"storage.save", "storage.check", "storage.credentials"}},
+		{CapabilityReadStorage, CapabilityWriteStorage, []string{"storage.get", "storage.status"}, []string{"storage.save", "storage.save_connection", "storage.check", "storage.probe", "storage.credentials"}},
 		{CapabilityReadDatabase, CapabilityManageDatabase, []string{"database.read", "database.instance.get", "database.cluster.get", "database.proxy_routing.read", "database.proxy_routing.state"}, []string{"database.execute", "database.query", "database.discover", "database.discovery.register", "database.proxy_routing.applied"}},
 	}
 	for _, tc := range tests {

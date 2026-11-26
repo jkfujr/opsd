@@ -44,12 +44,17 @@ func MonitoringFiles(d protocol.MonitoringDeployment) (map[string][]byte, error)
 	}
 	u, _ := url.Parse(d.Storage.Endpoint)
 	files := map[string][]byte{}
+	httpConfig := map[string]any{"response_header_timeout": "10s", "idle_conn_timeout": "90s"}
+	if d.Storage.CAPEM != "" {
+		files["s3-ca.pem"] = []byte(d.Storage.CAPEM)
+		httpConfig["tls_config"] = map[string]string{"ca_file": "/config/s3-ca.pem"}
+	}
 	for name, key := range map[string]protocol.S3Credential{"receive": d.Credentials.Receive, "store": d.Credentials.Store, "compact": d.Credentials.Compact} {
 		lookup := "path"
 		if d.Storage.AccessStyle == "virtual_host" {
 			lookup = "virtual-hosted"
 		}
-		config := map[string]any{"type": "S3", "prefix": strings.TrimSuffix(d.Prefix, "/"), "config": map[string]any{"bucket": d.Storage.Bucket, "endpoint": u.Host, "region": d.Storage.Region, "access_key": key.AccessKey, "secret_key": key.SecretKey, "session_token": key.SessionToken, "insecure": u.Scheme == "http", "bucket_lookup_type": lookup, "max_retries": 1, "http_config": map[string]any{"response_header_timeout": "10s", "idle_conn_timeout": "90s"}}}
+		config := map[string]any{"type": "S3", "prefix": strings.TrimSuffix(d.Prefix, "/"), "config": map[string]any{"bucket": d.Storage.Bucket, "endpoint": u.Host, "region": d.Storage.Region, "access_key": key.AccessKey, "secret_key": key.SecretKey, "session_token": key.SessionToken, "insecure": u.Scheme == "http", "bucket_lookup_type": lookup, "max_retries": 1, "http_config": httpConfig}}
 		data, err := yaml.Marshal(config)
 		if err != nil {
 			return nil, err
@@ -69,7 +74,11 @@ func MonitoringFiles(d protocol.MonitoringDeployment) (map[string][]byte, error)
 		service := map[string]any{"image": "quay.io/thanos/thanos:" + metricsstore.ThanosVersion, "container_name": monitoringProject(d) + "-" + name, "command": commands[name], "restart": "unless-stopped", "user": "65534:65534", "mem_limit": memories[name], "ports": ports[name], "labels": map[string]string{monitoringLabel: d.ClusterID, monitoringSpecLabel: monitoringFingerprint(d), "com.opsd.managed": "monitoring"}, "logging": map[string]any{"driver": "json-file", "options": map[string]string{"max-size": "10m", "max-file": "2"}}}
 		service["networks"] = map[string]any{"default": map[string]any{"aliases": []string{name + ".opsd.invalid"}}}
 		if name != "query" {
-			service["volumes"] = []any{map[string]any{"type": "bind", "source": filepath.Join(d.Directory, name), "target": "/data"}, map[string]any{"type": "bind", "source": filepath.Join(d.Directory, name+".yml"), "target": "/config/objstore.yml", "read_only": true}}
+			volumes := []any{map[string]any{"type": "bind", "source": filepath.Join(d.Directory, name), "target": "/data"}, map[string]any{"type": "bind", "source": filepath.Join(d.Directory, name+".yml"), "target": "/config/objstore.yml", "read_only": true}}
+			if d.Storage.CAPEM != "" {
+				volumes = append(volumes, map[string]any{"type": "bind", "source": filepath.Join(d.Directory, "s3-ca.pem"), "target": "/config/s3-ca.pem", "read_only": true})
+			}
+			service["volumes"] = volumes
 		}
 		services[name] = service
 	}
