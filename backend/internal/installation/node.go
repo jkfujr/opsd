@@ -33,6 +33,7 @@ type NodeFile struct {
 	// SourceCapabilities 是"来源节点 ID → 能力集合"的授权表原始 JSON；
 	// 由节点启动时严格解析，格式或能力名非法即拒绝启动。
 	SourceCapabilities json.RawMessage `json:"source_capabilities,omitempty"`
+	StorageMountUUID   string          `json:"storage_mount_uuid,omitempty"`
 }
 type NodeInstall struct {
 	Account                                               *cluster.AccountChange
@@ -74,11 +75,18 @@ func InstallNode(ctx context.Context, o NodeInstall) (bool, error) {
 		o.Config.AddressMode = "manual"
 	}
 	o.Config.Address = address
-	if e := RefuseUnclaimedServices(o.ConfigPath, "opsd.service", "opsd-executor.service", "opsd-operation@.service", "opsd-recover.service"); e != nil {
+	if e := RefuseUnclaimedServices(o.ConfigPath, "opsd.service", "opsd-executor.service", "opsd-operation@.service", "opsd-recover.service", "opsd-storage-check.service"); e != nil {
 		return false, e
 	}
+	mountUUID, e := checkStorage(ctx, "discover", "")
+	if e != nil {
+		return false, e
+	}
+	if mountUUID != "" && !storageMountUUID.MatchString(mountUUID) {
+		return false, fmt.Errorf("存储根 UUID 格式无效")
+	}
 	if _, e := user.Lookup("opsd"); e != nil {
-		if e = Command(ctx, "useradd", "--system", "--user-group", "--no-create-home", "--home-dir", "/var/lib/opsd/node", "--shell", "/usr/sbin/nologin", "opsd"); e != nil {
+		if e = Command(ctx, "useradd", "--system", "--user-group", "--no-create-home", "--home-dir", storage.NodeDir, "--shell", "/usr/sbin/nologin", "opsd"); e != nil {
 			return false, e
 		}
 	}
@@ -94,16 +102,37 @@ func InstallNode(ctx context.Context, o NodeInstall) (bool, error) {
 	if e != nil {
 		return false, e
 	}
-	f := NodeFile{DataDir: "/var/lib/opsd/node", ExecutorDir: "/var/lib/opsd/executor", Socket: "/run/opsd/executor.sock", ControlSocket: "/run/opsd-node/control.sock", Binary: filepath.Join(o.Directory, "bin", "opsd"), GroupID: gid, UserID: &uid, OperationPolicy: policyJSON(o.AllowArbitraryCode), SourceCapabilities: json.RawMessage("{}")}
-	for _, dir := range []string{filepath.Dir(f.Binary), filepath.Dir(o.ConfigPath), "/var/lib/opsd", f.DataDir, f.ExecutorDir} {
+	f := NodeFile{DataDir: storage.NodeDir, ExecutorDir: storage.ExecutorDir, Socket: "/run/opsd/executor.sock", ControlSocket: "/run/opsd-node/control.sock", Binary: filepath.Join(o.Directory, "bin", "opsd"), GroupID: gid, UserID: &uid, OperationPolicy: policyJSON(o.AllowArbitraryCode), SourceCapabilities: json.RawMessage("{}"), StorageMountUUID: mountUUID}
+	for _, dir := range []string{filepath.Dir(storage.DefaultDatasetDir), storage.DefaultDatasetDir} {
+		if info, err := os.Lstat(dir); err == nil && !info.IsDir() {
+			return false, fmt.Errorf("默认数据根包含非目录：%s", dir)
+		} else if err != nil && !os.IsNotExist(err) {
+			return false, err
+		}
+	}
+	for _, dir := range []string{filepath.Dir(f.Binary), filepath.Dir(o.ConfigPath), storage.MetadataRoot, f.DataDir, f.ExecutorDir, storage.DefaultDatasetDir} {
 		if e = os.MkdirAll(dir, 0755); e != nil {
 			return false, e
 		}
+	}
+	for _, dir := range []string{storage.MetadataRoot, filepath.Dir(storage.DefaultDatasetDir), storage.DefaultDatasetDir} {
+		if e = os.Chown(dir, 0, 0); e != nil {
+			return false, e
+		}
+		if e = os.Chmod(dir, 0755); e != nil {
+			return false, e
+		}
+	}
+	if e = os.Chown(f.ExecutorDir, 0, 0); e != nil {
+		return false, e
 	}
 	if e = os.Chmod(f.ExecutorDir, 0700); e != nil {
 		return false, e
 	}
 	if e = os.Chmod(f.DataDir, 0700); e != nil {
+		return false, e
+	}
+	if e = f.CheckStorage(ctx); e != nil {
 		return false, e
 	}
 	source, e := os.Executable()
@@ -135,7 +164,7 @@ func InstallNode(ctx context.Context, o NodeInstall) (bool, error) {
 		return false, e
 	}
 	for _, file := range files {
-		if e = os.Chown(filepath.Join(f.DataDir, file.Name()), uid, gid); e != nil {
+		if e = os.Lchown(filepath.Join(f.DataDir, file.Name()), uid, gid); e != nil {
 			return false, e
 		}
 	}
@@ -149,6 +178,11 @@ func InstallNode(ctx context.Context, o NodeInstall) (bool, error) {
 	if e = db.Close(); e != nil {
 		return false, e
 	}
+	for _, path := range []string{filepath.Join(f.DataDir, "node.db"), filepath.Join(f.ExecutorDir, "executor.db")} {
+		if e = os.Chmod(path, 0600); e != nil {
+			return false, e
+		}
+	}
 	if e = localstate.Write(o.ConfigPath, f, 0640); e != nil {
 		return false, e
 	}
@@ -159,6 +193,14 @@ func InstallNode(ctx context.Context, o NodeInstall) (bool, error) {
 }
 func activateNode(ctx context.Context, f NodeFile, configPath string, first bool) error {
 	var e error
+	if f.usesMetadataRoot() {
+		if e = f.CheckStorage(ctx); e != nil {
+			return e
+		}
+		if e = f.installStorageCheck(); e != nil {
+			return e
+		}
+	}
 	if filepath.Dir(f.DataDir) == "/var/lib/opsd" {
 		// 代理先准备目录时，父目录可能只有 root 能进入。
 		if e = os.Chmod("/var/lib/opsd", 0755); e != nil {
@@ -192,17 +234,33 @@ func activateNode(ctx context.Context, f NodeFile, configPath string, first bool
 func Units(f NodeFile, configPath string) map[string]string {
 	command := quote(f.Binary)
 	config := " --config " + quote(configPath)
-	return map[string]string{
-		"opsd.service":            "[Unit]\nDescription=OPSD 对等节点\nAfter=network-online.target opsd-executor.service\nWants=network-online.target opsd-executor.service\n\n[Service]\nUser=opsd\nType=notify\nNotifyAccess=main\nTimeoutStartSec=45\nGroup=opsd\nRuntimeDirectory=opsd-node\nRuntimeDirectoryMode=0700\nUMask=0077\nExecStart=" + command + " node" + config + "\nRestart=on-failure\nRestartSec=3\nEnvironment=GOMEMLIMIT=64MiB\nNoNewPrivileges=true\nProtectSystem=strict\nReadWritePaths=" + quote(f.DataDir) + "\n\n[Install]\nWantedBy=multi-user.target\n",
-		"opsd-executor.service":   "[Unit]\nDescription=OPSD 本机执行器\nAfter=network.target opsd-recover.service\n\n[Service]\nUser=root\nType=notify\nNotifyAccess=main\nTimeoutStartSec=45\nGroup=opsd\nUMask=0007\nRuntimeDirectory=opsd\nRuntimeDirectoryMode=0750\nExecStart=" + command + " executor" + config + "\nRestart=on-failure\nRestartSec=3\n\n[Install]\nWantedBy=multi-user.target\n",
-		"opsd-operation@.service": "[Unit]\nDescription=OPSD 本机操作 %i\nAfter=network.target\n\n[Service]\nType=oneshot\nUser=root\nUMask=0077\nExecStart=" + command + " operation" + config + " --id %i\nTimeoutStartSec=infinity\nTimeoutStopSec=30\nKillMode=control-group\nRestart=on-failure\nRestartSec=3\n",
-		"opsd-recover.service":    "[Unit]\nDescription=OPSD 本机操作恢复\nAfter=ufw.service firewalld.service nftables.service\nBefore=opsd-executor.service\n\n[Service]\nType=oneshot\nUser=root\nUMask=0077\nExecStart=" + command + " recover" + config + "\nTimeoutStartSec=infinity\nTimeoutStopSec=30\nKillMode=control-group\n\n[Install]\nWantedBy=multi-user.target\n"}
+	units := make(map[string]string)
+	var nodeMounts, executorMounts string
+	if f.usesMetadataRoot() {
+		checkMounts := ""
+		dependency := "Requires=opsd-storage-check.service\nAfter=opsd-storage-check.service\n"
+		if f.StorageMountUUID != "" {
+			dependency += "BindsTo=opsd.mount\nAfter=opsd.mount\n"
+			checkMounts = "Wants=opsd.mount\nAfter=opsd.mount\n"
+		}
+		nodeMounts = dependency + "RequiresMountsFor=" + quote(f.DataDir) + "\n"
+		executorMounts = dependency + "RequiresMountsFor=" + quote(f.ExecutorDir) + "\n"
+		units["opsd-storage-check.service"] = "[Unit]\nDescription=OPSD 元数据盘自检\n" + checkMounts + "\n[Service]\nType=oneshot\nExecStart=" + quote(f.storageCheckPath()) + " check " + quote(f.StorageMountUUID) + "\n"
+	}
+	units["opsd.service"] = "[Unit]\nDescription=OPSD 对等节点\nAfter=network-online.target opsd-executor.service\nWants=network-online.target opsd-executor.service\n" + nodeMounts + "\n[Service]\nUser=opsd\nType=notify\nNotifyAccess=main\nTimeoutStartSec=45\nGroup=opsd\nRuntimeDirectory=opsd-node\nRuntimeDirectoryMode=0700\nUMask=0077\nExecStart=" + command + " node" + config + "\nRestart=on-failure\nRestartSec=3\nEnvironment=GOMEMLIMIT=64MiB\nNoNewPrivileges=true\nProtectSystem=strict\nReadWritePaths=" + quote(f.DataDir) + "\n\n[Install]\nWantedBy=multi-user.target\n"
+	units["opsd-executor.service"] = "[Unit]\nDescription=OPSD 本机执行器\nAfter=network.target opsd-recover.service\n" + executorMounts + "\n[Service]\nUser=root\nType=notify\nNotifyAccess=main\nTimeoutStartSec=45\nGroup=opsd\nUMask=0007\nRuntimeDirectory=opsd\nRuntimeDirectoryMode=0750\nExecStart=" + command + " executor" + config + "\nRestart=on-failure\nRestartSec=3\n\n[Install]\nWantedBy=multi-user.target\n"
+	units["opsd-operation@.service"] = "[Unit]\nDescription=OPSD 本机操作 %i\nAfter=network.target\n" + executorMounts + "\n[Service]\nType=oneshot\nUser=root\nUMask=0077\nExecStart=" + command + " operation" + config + " --id %i\nTimeoutStartSec=infinity\nTimeoutStopSec=30\nKillMode=control-group\nRestart=on-failure\nRestartSec=3\n"
+	units["opsd-recover.service"] = "[Unit]\nDescription=OPSD 本机操作恢复\nAfter=ufw.service firewalld.service nftables.service\nBefore=opsd-executor.service\n" + executorMounts + "\n[Service]\nType=oneshot\nUser=root\nUMask=0077\nExecStart=" + command + " recover" + config + "\nTimeoutStartSec=infinity\nTimeoutStopSec=30\nKillMode=control-group\n\n[Install]\nWantedBy=multi-user.target\n"
+	return units
 }
 func NodePaths(configPath string) (NodeFile, error) {
 	var f NodeFile
 	e := localstate.Read(configPath, &f)
 	if e == nil && (f.DataDir == "" || f.ExecutorDir == "" || f.Socket == "") {
 		e = fmt.Errorf("节点安装配置不完整")
+	}
+	if e == nil && f.StorageMountUUID != "" && (!f.usesMetadataRoot() || !storageMountUUID.MatchString(f.StorageMountUUID)) {
+		e = fmt.Errorf("存储根 UUID 配置无效")
 	}
 	return f, e
 }

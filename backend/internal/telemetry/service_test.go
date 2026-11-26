@@ -35,11 +35,13 @@ func testService(t *testing.T, cluster *string) *Service {
 func TestConfigUsesCurrentIdentityAndKeepsConfirmedCache(t *testing.T) {
 	cluster := "before-join"
 	s := testService(t, &cluster)
+	s.directory = storage.NodeDir
 	cluster = "after-join"
 	c, err := s.Config(t.Context())
-	if err != nil || c.Prefix != metricsstore.DefaultConfig(cluster).Prefix {
+	if err != nil || c.Prefix != metricsstore.DefaultConfig(cluster).Prefix || c.Directory != storage.DefaultDatasetDir+"/archive" {
 		t.Fatal(c, err)
 	}
+	c.Directory = metricsstore.DefaultConfig(cluster).Directory
 	c.Revision, c.State = 3, "ready"
 	if err = s.CacheConfig(t.Context(), c); err != nil {
 		t.Fatal(err)

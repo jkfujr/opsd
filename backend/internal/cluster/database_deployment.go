@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"net"
 	"net/url"
+	"path"
 	"slices"
 	"strconv"
 	"strings"
@@ -18,6 +19,7 @@ import (
 	"github.com/jkfujr/opsd/internal/identity"
 	"github.com/jkfujr/opsd/internal/protocol"
 	"github.com/jkfujr/opsd/internal/requeststate"
+	"github.com/jkfujr/opsd/internal/storage"
 )
 
 type DatabaseDeploymentTargetInput struct {
@@ -51,6 +53,18 @@ type databaseDeploymentTarget struct {
 	Deployment  protocol.DatabaseDeployment `json:"deployment"`
 	Fingerprint string                      `json:"fingerprint"`
 }
+type databaseDeploymentCheck struct {
+	protocol.DatabaseDeploymentEnvironment
+	Directory string `json:"resolved_directory,omitempty"`
+}
+
+func (n *Node) databaseDeploymentDirectory(id string) string {
+	if n.executorDir == storage.ExecutorDir {
+		return path.Join(storage.ExecutorDir, "databases", id)
+	}
+	return path.Join(storage.LegacyDatabaseDir, id)
+}
+
 type DatabaseDeploymentNetwork struct {
 	NodeID   string        `json:"node_id"`
 	Source   string        `json:"source"`
@@ -326,7 +340,7 @@ func (n *Node) previewDatabaseDeployment(ctx context.Context, input DatabaseDepl
 		}
 		value.Directory = target.Directory
 		if value.Directory == "" {
-			value.Directory = "/var/lib/opsd/databases/" + value.ID
+			value.Directory = path.Join(storage.LegacyDatabaseDir, value.ID)
 		}
 		value.Connection.Address = net.JoinHostPort("127.0.0.1", strconv.Itoa(value.SQLPort))
 		if value.Kind == "proxysql" {
@@ -353,10 +367,15 @@ func (n *Node) previewDatabaseDeployment(ctx context.Context, input DatabaseDepl
 				target.Deployment.ReachableSeeds = append(target.Deployment.ReachableSeeds, net.JoinHostPort(backend.Host, strconv.Itoa(backend.Port)))
 			}
 		}
-		var env protocol.DatabaseDeploymentEnvironment
-		err := n.Call(ctx, target.Ref.NodeID, "database.deployment.check", DatabaseRPC{Action: protocol.DatabaseAction{Deployment: &target.Deployment}}, &env)
+		var env databaseDeploymentCheck
+		err := n.Call(ctx, target.Ref.NodeID, "database.deployment.check", DatabaseRPC{
+			Action: protocol.DatabaseAction{Deployment: &target.Deployment}, DefaultDirectory: input.Targets[index].Directory == "",
+		}, &env)
 		if err != nil {
 			env.Problems = append(env.Problems, err.Error())
+		}
+		if env.Directory != "" {
+			target.Deployment.Directory = env.Directory
 		}
 		if dataBytes > 0 && env.FreeBytes < dataBytes*2+512*1024*1024 {
 			env.Problems = append(env.Problems, "可用空间不足以保存已有数据与同步临时文件")

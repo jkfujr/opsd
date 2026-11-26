@@ -6,7 +6,15 @@
 
 从实际实例配置读取 `binary`、`data_dir`、`executor_dir` 等路径，不把默认路径当成现场事实。检查节点队列和 root 操作中 `terminal=0` 的记录；有未结束操作时停止更新。普通用户与 root 服务使用同一程序，程序更新只停止和恢复两者。已授权的 CouchDB 命名迁移按下节单独执行。
 
-默认实例的 `/var/lib/opsd` 需允许普通用户进入，节点和执行器私有目录保持 `0700`。代理先准备目录后再安装节点时，安装激活会恢复默认父目录的 `0755` 权限。普通用户服务启动失败先读取 systemd 日志及实际目录权限；自定义目录沿用现场配置。
+新装使用 `/opsd`（`root:root 0755`），节点目录 `/opsd/node` 为 `opsd:opsd 0700`，执行器目录 `/opsd/executor` 为 `root:root 0700`，默认大文件根为 `/opsd/datasets/data`。新受管数据库默认写入 `/opsd/executor/databases`，监控首次配置默认归档目录为 `/opsd/datasets/data/archive`。
+
+已有实例沿用配置中的两条目录及受管组件的已登记绑定。节点单元只放行有效 `data_dir` 和运行目录 `/run/opsd-node`。带旧默认路径的实例在激活时继续修正 `/var/lib/opsd` 的入口权限为 `0755`。
+
+独立盘安装前先准备 `opsd.mount` 并挂载到 `/opsd`。安装器将实际文件系统 UUID 记录在 `storage_mount_uuid`。四个写入单元依赖 `opsd-storage-check.service`，独立盘模式额外绑定 `opsd.mount`。异常时可从下列日志读回预期与实际挂载。
+
+```bash
+journalctl -b -u opsd-storage-check.service -u opsd.mount
+```
 
 受管代理策略会进入签名目录。逐台更新全部有效成员后，再通过能力接口确认 `proxy_routing_version=1`，最后逐台预览并接管代理。节点程序更新与实际监听修复、防火墙接纳、代理策略应用分别读取结果；C041 使用既有停服 `network` 流程，C071 只从已预览的受管代理路由移除，服务器与数据库保持原值。
 

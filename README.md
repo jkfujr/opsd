@@ -65,7 +65,7 @@ sudo systemctl start opsd.service
 - `opsd-executor.service`：root 运行本机 Unix Socket 执行器，只接受有类型的操作。
 - `opsd-operation@.service`、`opsd-recover.service`：独立执行与恢复防火墙、容器及数据库操作。
 
-实例配置默认 `/etc/opsd/instance.json`，节点资料在 `/var/lib/opsd/node`，root 执行与恢复资料在 `/var/lib/opsd/executor`。控制台关闭不停止后台工作。本机账号修改与控制台开关通过本机 Socket 受理：
+实例配置默认 `/etc/opsd/instance.json`。新装节点资料放在 `/opsd/node`，执行与恢复资料放在 `/opsd/executor`。已有实例按配置读取原目录。控制台关闭后后台继续运行。本机账号修改与控制台开关通过本机 Socket 受理。
 
 ```bash
 sudo /opt/opsd/bin/opsd console --enabled=false

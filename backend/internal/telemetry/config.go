@@ -6,12 +6,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"path"
 	"time"
 
 	"github.com/jkfujr/opsd/internal/metricsstore"
 	"github.com/jkfujr/opsd/internal/operations"
 	"github.com/jkfujr/opsd/internal/protocol"
 	"github.com/jkfujr/opsd/internal/sharedsql"
+	"github.com/jkfujr/opsd/internal/storage"
 )
 
 type archiveWorkflow struct {
@@ -25,6 +27,9 @@ type archiveWorkflow struct {
 
 func (s *Service) localConfig(ctx context.Context) (metricsstore.Config, error) {
 	config := metricsstore.DefaultConfig(s.ClusterID())
+	if s.directory == storage.NodeDir {
+		config.Directory = path.Join(storage.DefaultDatasetDir, "archive")
+	}
 	var data []byte
 	err := s.DB.QueryRowContext(ctx, "SELECT body FROM monitoring_config WHERE id=1").Scan(&data)
 	if err == sql.ErrNoRows {

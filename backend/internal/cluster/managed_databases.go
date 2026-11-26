@@ -486,7 +486,19 @@ func (n *Node) databaseDispatch(ctx context.Context, origin, method string, body
 		if request.Action.Deployment == nil {
 			return nil, fault("invalid_request", "缺少部署参数")
 		}
-		return n.executeRead(ctx, &protocol.DatabaseDeploymentCheck{Deployment: *request.Action.Deployment})
+		deployment := *request.Action.Deployment
+		if request.DefaultDirectory {
+			deployment.Directory = n.databaseDeploymentDirectory(deployment.ID)
+		}
+		reply, err := n.executeRead(ctx, &protocol.DatabaseDeploymentCheck{Deployment: deployment})
+		if err != nil || !request.DefaultDirectory {
+			return reply, err
+		}
+		env, ok := reply.(*protocol.DatabaseDeploymentEnvironment)
+		if !ok {
+			return nil, fmt.Errorf("数据库部署环境应答无效")
+		}
+		return databaseDeploymentCheck{DatabaseDeploymentEnvironment: *env, Directory: deployment.Directory}, nil
 	case "database.deployment.profile":
 		instance, err := n.databaseInstance(ctx, request.InstanceID)
 		if err != nil {
@@ -613,6 +625,7 @@ func (n *Node) databaseDispatch(ctx context.Context, origin, method string, body
 }
 
 type DatabaseRPC struct {
+	DefaultDirectory  bool                           `json:"default_directory,omitempty"`
 	FlowID            string                         `json:"flow_id,omitempty"`
 	CoordinatorEpoch  uint64                         `json:"coordinator_epoch,omitempty"`
 	NetworkCheck      *protocol.DatabaseNetworkCheck `json:"network_check,omitempty"`

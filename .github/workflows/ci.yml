@@ -75,15 +75,16 @@ jobs:
           password=$(openssl rand -hex 24)
           echo "::add-mask::$password"
           echo "OPSD_API_PASSWORD=$password" >> "$GITHUB_ENV"
-          sudo chmod 0700 /var/lib/opsd
+          sudo mkdir -p /opsd
+          sudo chmod 0700 /opsd
           sudo env OPSD_PASSWORD="$password" artifacts/opsd-linux-amd64 install --non-interactive --address http://127.0.0.1:8444 -n api-check --username api-check --entrance /signin > artifacts/install-check.log
           # 新装默认关闭：从实际配置读回，再显式开启供正向用例使用。
           sudo python3 -c 'import json,sys; d=json.load(open("/etc/opsd/instance.json")); p=d.get("operation_policy") or {}; sys.exit(0 if p.get("arbitrary_code") is False else 1)'
           sudo python3 -c 'import json; path="/etc/opsd/instance.json"; d=json.load(open(path)); d["operation_policy"]={"arbitrary_code":True}; open(path,"w").write(json.dumps(d, ensure_ascii=False, indent=2))'
           sudo systemctl restart opsd-executor.service
-          test "$(stat -c %a /var/lib/opsd)" = 755
-          test "$(sudo stat -c %a /var/lib/opsd/node)" = 700
-          test "$(sudo stat -c %a /var/lib/opsd/executor)" = 700
+          test "$(stat -c %a /opsd)" = 755
+          test "$(sudo stat -c %U:%G:%a /opsd/node)" = opsd:opsd:700
+          test "$(sudo stat -c %U:%G:%a /opsd/executor)" = root:root:700
           if sudo /opt/opsd/bin/opsd network --listen 127.0.0.1:8444 > artifacts/network-running.log 2>&1; then exit 1; fi
           grep -q '请先停止 opsd.service' artifacts/network-running.log
           sudo systemctl stop opsd.service opsd-executor.service

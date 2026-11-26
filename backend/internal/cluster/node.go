@@ -28,6 +28,7 @@ type Options struct {
 	Config                       Config
 	Username, Password, Entrance string
 	Executor                     Executor
+	ExecutorDir                  string
 	Now                          func() time.Time
 }
 type Node struct {
@@ -46,6 +47,7 @@ type Node struct {
 	// 零值表示没有任何授予，只保留默认允许的四个方法。
 	Capabilities SourceCapabilities
 	Now                  func() time.Time
+	executorDir          string
 	mu                   sync.Mutex
 	connections          map[string]*peer
 	retiring             map[*peer]struct{}
@@ -155,7 +157,7 @@ func Open(ctx context.Context, path string, o Options) (*Node, error) {
 	if e != nil {
 		return nil, e
 	}
-	n := &Node{DB: db, Executor: o.Executor, Now: o.Now, connections: map[string]*peer{}, dialing: map[string]chan struct{}{}, wake: make(chan struct{}, 1), taskWake: make(chan struct{}, 1), changed: make(chan struct{}, 1), subscribers: map[chan Change]struct{}{}}
+	n := &Node{DB: db, Executor: o.Executor, executorDir: o.ExecutorDir, Now: o.Now, connections: map[string]*peer{}, dialing: map[string]chan struct{}{}, wake: make(chan struct{}, 1), taskWake: make(chan struct{}, 1), changed: make(chan struct{}, 1), subscribers: map[chan Change]struct{}{}}
 	var private, public, signing []byte
 	var ageKey string
 	e = db.QueryRowContext(ctx, "SELECT cluster,private_key,public_key,signing_key,age_key FROM node_identity WHERE id=1").Scan(&n.cluster, &private, &public, &signing, &ageKey)

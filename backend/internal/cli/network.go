@@ -31,6 +31,11 @@ func network(args []string) error {
 	if err != nil {
 		return err
 	}
+	ctx, cancel := processContext()
+	defer cancel()
+	if err = f.CheckStorage(ctx); err != nil {
+		return err
+	}
 	unlock, err := localstate.Lock(filepath.Join(f.DataDir, "node.lock"))
 	if err != nil {
 		return fmt.Errorf("请先停止 opsd.service")
@@ -41,8 +46,6 @@ func network(args []string) error {
 		return err
 	}
 	defer executorUnlock()
-	ctx, cancel := processContext()
-	defer cancel()
 	for _, path := range []string{filepath.Join(f.DataDir, "node.db"), filepath.Join(f.ExecutorDir, "executor.db")} {
 		if _, err := os.Stat(path); err != nil {
 			return err

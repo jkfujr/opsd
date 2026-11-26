@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/jkfujr/opsd/internal/protocol"
+	"github.com/jkfujr/opsd/internal/storage"
 )
 
 type deploymentExecutor struct {
@@ -144,6 +145,7 @@ func advanceDeploymentTest(t *testing.T, owner *Node, id string, nodes ...*Node)
 func TestDatabaseDeploymentSingleNodeExpansionAndLostReply(t *testing.T) {
 	a, x := deploymentNode(t)
 	b, y := deploymentNode(t)
+	b.executorDir = storage.ExecutorDir
 	joinTest(t, b, a)
 	x.dockerState = "not_installed"
 	x.lost = true
@@ -151,6 +153,9 @@ func TestDatabaseDeploymentSingleNodeExpansionAndLostReply(t *testing.T) {
 	p, err := a.PreviewDatabaseDeployment(t.Context(), input, a.ID)
 	if err != nil || len(p.Problems) > 0 || p.Token == "" || len(p.Targets) != 1 || p.Targets[0].DockerState != "not_installed" {
 		t.Fatal(p.Problems, err)
+	}
+	if !strings.HasPrefix(p.Targets[0].Directory, storage.LegacyDatabaseDir+"/") {
+		t.Fatal(p.Targets[0].Directory)
 	}
 	op := commitDeployment(t, a, p, "create", "create_or_import")
 	if duplicate := commitDeployment(t, a, p, "create", "create_or_import"); duplicate.ID != op.ID {
@@ -169,9 +174,12 @@ func TestDatabaseDeploymentSingleNodeExpansionAndLostReply(t *testing.T) {
 	if err != nil || len(preview.Problems) > 0 {
 		t.Fatal(preview.Problems, err)
 	}
+	if !strings.HasPrefix(preview.Targets[0].Directory, storage.ExecutorDir+"/databases/") {
+		t.Fatal(preview.Targets[0].Directory)
+	}
 	expand := commitDeployment(t, a, preview, "expand", "members")
 	expand = advanceDeploymentTest(t, a, expand.ID, a, b)
-	if expand.State != protocol.Succeeded || y.submits != 1 || y.d.Bootstrap || y.d.ClusterID != c.ClusterID || y.d.SSTPassword != x.d.SSTPassword {
+	if expand.State != protocol.Succeeded || y.submits != 1 || y.d.Bootstrap || y.d.ClusterID != c.ClusterID || y.d.SSTPassword != x.d.SSTPassword || y.d.Directory != preview.Targets[0].Directory {
 		t.Fatal("扩容未沿用原集群", expand.State, expand.Error)
 	}
 	if x.seedUpdates != 2 || y.seedUpdates != 1 {

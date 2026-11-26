@@ -64,13 +64,19 @@ api() {
   for service in opsd.service opsd-executor.service opsd-recover.service; do
     if systemctl cat "$service" > /dev/null 2>&1; then sudo systemctl disable --now "$service"; fi
   done
-  sudo rm -f /etc/systemd/system/opsd.service /etc/systemd/system/opsd-executor.service /etc/systemd/system/opsd-operation@.service /etc/systemd/system/opsd-recover.service /etc/opsd/instance.json /opt/opsd/bin/opsd
-  sudo rm -rf /var/lib/opsd/node /var/lib/opsd/executor
+  for directory in /opsd /opsd/node /opsd/executor; do
+    if [[ -L $directory ]] || mountpoint -q "$directory"; then
+      echo "API 验收需要系统盘上的临时目录：$directory" >&2
+      return 1
+    fi
+  done
+  sudo rm -f /etc/systemd/system/opsd.service /etc/systemd/system/opsd-executor.service /etc/systemd/system/opsd-operation@.service /etc/systemd/system/opsd-recover.service /etc/systemd/system/opsd-storage-check.service /etc/opsd/instance.json /opt/opsd/bin/opsd /opt/opsd/bin/opsd-storage-check
+  sudo rm -rf /opsd/node /opsd/executor
   sudo systemctl daemon-reload
   export OPSD_API_PASSWORD
   OPSD_API_PASSWORD=$(openssl rand -hex 24)
-  sudo mkdir -p /var/lib/opsd
-  sudo chmod 0700 /var/lib/opsd
+  sudo mkdir -p /opsd
+  sudo chmod 0700 /opsd
   sudo env OPSD_PASSWORD="$OPSD_API_PASSWORD" artifacts/opsd-linux-amd64 install --non-interactive --address http://127.0.0.1:8444 -n api-check --username api-check --entrance /signin > artifacts/install-check.log
   # 新装默认必须关闭可执行代码能力：从实际安装出来的配置读回，而不是看代码默认值。
   sudo python3 -c 'import json,sys; d=json.load(open("/etc/opsd/instance.json")); p=d.get("operation_policy") or {}; sys.exit(0 if p.get("arbitrary_code") is False else 1)' \
@@ -78,9 +84,9 @@ api() {
   # 明确开启，供随后依赖 shell／compose／root 终端的正向用例使用。
   sudo python3 -c 'import json; path="/etc/opsd/instance.json"; d=json.load(open(path)); d["operation_policy"]={"arbitrary_code":True}; open(path,"w").write(json.dumps(d, ensure_ascii=False, indent=2))'
   sudo systemctl restart opsd-executor.service
-  test "$(stat -c %a /var/lib/opsd)" = 755
-  test "$(sudo stat -c %a /var/lib/opsd/node)" = 700
-  test "$(sudo stat -c %a /var/lib/opsd/executor)" = 700
+  test "$(stat -c %a /opsd)" = 755
+  test "$(sudo stat -c %U:%G:%a /opsd/node)" = opsd:opsd:700
+  test "$(sudo stat -c %U:%G:%a /opsd/executor)" = root:root:700
   if sudo /opt/opsd/bin/opsd network --listen 127.0.0.1:8444 > artifacts/network-running.log 2>&1; then exit 1; fi
   grep -q '请先停止 opsd.service' artifacts/network-running.log
   sudo systemctl stop opsd.service opsd-executor.service

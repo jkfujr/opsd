@@ -98,7 +98,7 @@ func serveNode(args []string) error {
 		return e
 	}
 	defer unlock()
-	n, e := cluster.Open(ctx, filepath.Join(f.DataDir, "node.db"), cluster.Options{Executor: executor.NewClient(f.Socket)})
+	n, e := cluster.Open(ctx, filepath.Join(f.DataDir, "node.db"), cluster.Options{Executor: executor.NewClient(f.Socket), ExecutorDir: f.ExecutorDir})
 	if e != nil {
 		return e
 	}

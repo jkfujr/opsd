@@ -57,7 +57,11 @@ jobs:
           sudo sh /tmp/opsd-release-check/install.sh --non-interactive --address http://127.0.0.1:8444 --name preserve-existing > /tmp/opsd-release-check/repeat.log
           sudo python3 - <<'PY'
           import json, sqlite3
-          db = sqlite3.connect('file:/var/lib/opsd/node/node.db?mode=ro', uri=True)
+          with open('/etc/opsd/instance.json') as file:
+              instance = json.load(file)
+          assert instance['data_dir'] == '/opsd/node'
+          assert instance['executor_dir'] == '/opsd/executor'
+          db = sqlite3.connect('file:/opsd/node/node.db?mode=ro', uri=True)
           config = json.loads(db.execute('select config from node_identity where id=1').fetchone()[0])
           assert config['name'] == 'release-check'
           assert not config['console']

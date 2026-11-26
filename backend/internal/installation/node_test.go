@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/jkfujr/opsd/internal/cluster"
+	"github.com/jkfujr/opsd/internal/storage"
 )
 
 func TestUnifiedServicesKeepRecoveryIndependent(t *testing.T) {
@@ -22,6 +23,34 @@ func TestUnifiedServicesKeepRecoveryIndependent(t *testing.T) {
 	operation := units["opsd-operation@.service"]
 	if !strings.Contains(node, "User=opsd") || !strings.Contains(root, "User=root") || !strings.Contains(root, "RuntimeDirectory=opsd") || !strings.Contains(operation, "TimeoutStartSec=infinity") || strings.Contains(operation, "BindsTo=opsd.service") {
 		t.Fatal("本机恢复依赖 Web 或节点服务")
+	}
+}
+
+func TestMetadataRootUnits(t *testing.T) {
+	f := NodeFile{Binary: "/opt/opsd/bin/opsd", DataDir: storage.NodeDir, ExecutorDir: storage.ExecutorDir}
+	for _, uuid := range []string{"", "12345678-abcd"} {
+		f.StorageMountUUID = uuid
+		units := Units(f, "/etc/opsd/instance.json")
+		check := units["opsd-storage-check.service"]
+		if !strings.Contains(check, quote(f.storageCheckPath())+" check "+quote(uuid)) ||
+			strings.Contains(check, "Wants=opsd.mount") != (uuid != "") {
+			t.Fatal(check)
+		}
+		for name, directory := range map[string]string{
+			"opsd.service": f.DataDir, "opsd-executor.service": f.ExecutorDir,
+			"opsd-recover.service": f.ExecutorDir, "opsd-operation@.service": f.ExecutorDir,
+		} {
+			body := units[name]
+			if !strings.Contains(body, "Requires=opsd-storage-check.service\nAfter=opsd-storage-check.service") ||
+				!strings.Contains(body, "RequiresMountsFor="+quote(directory)) ||
+				strings.Contains(body, "BindsTo=opsd.mount\nAfter=opsd.mount") != (uuid != "") ||
+				strings.Contains(body, "ReadWritePaths=") != (name == "opsd.service") {
+				t.Fatal(name, body)
+			}
+		}
+		if !strings.Contains(units["opsd.service"], "ReadWritePaths="+quote(storage.NodeDir)+"\n") {
+			t.Fatal(units["opsd.service"])
+		}
 	}
 }
 
