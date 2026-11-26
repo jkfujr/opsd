@@ -78,7 +78,7 @@ func InstallNode(ctx context.Context, o NodeInstall) (bool, error) {
 	if e := RefuseUnclaimedServices(o.ConfigPath, "opsd.service", "opsd-executor.service", "opsd-operation@.service", "opsd-recover.service", "opsd-storage-check.service"); e != nil {
 		return false, e
 	}
-	mountUUID, e := checkStorage(ctx, "discover", "")
+	mountUUID, e := checkStorage(ctx, "discover", "", "")
 	if e != nil {
 		return false, e
 	}
@@ -132,6 +132,9 @@ func InstallNode(ctx context.Context, o NodeInstall) (bool, error) {
 	if e = os.Chmod(f.DataDir, 0700); e != nil {
 		return false, e
 	}
+	if e = os.Chown(f.DataDir, uid, gid); e != nil {
+		return false, e
+	}
 	if e = f.CheckStorage(ctx); e != nil {
 		return false, e
 	}
@@ -167,9 +170,6 @@ func InstallNode(ctx context.Context, o NodeInstall) (bool, error) {
 		if e = os.Lchown(filepath.Join(f.DataDir, file.Name()), uid, gid); e != nil {
 			return false, e
 		}
-	}
-	if e = os.Chown(f.DataDir, uid, gid); e != nil {
-		return false, e
 	}
 	db, e := storage.Open(ctx, filepath.Join(f.ExecutorDir, "executor.db"), storage.Executor)
 	if e != nil {
@@ -245,7 +245,7 @@ func Units(f NodeFile, configPath string) map[string]string {
 		}
 		nodeMounts = dependency + "RequiresMountsFor=" + quote(f.DataDir) + "\n"
 		executorMounts = dependency + "RequiresMountsFor=" + quote(f.ExecutorDir) + "\n"
-		units["opsd-storage-check.service"] = "[Unit]\nDescription=OPSD 元数据盘自检\n" + checkMounts + "\n[Service]\nType=oneshot\nExecStart=" + quote(f.storageCheckPath()) + " check " + quote(f.StorageMountUUID) + "\n"
+		units["opsd-storage-check.service"] = "[Unit]\nDescription=OPSD 元数据盘自检\n" + checkMounts + "\n[Service]\nType=oneshot\nExecStart=" + quote(f.storageCheckPath()) + " check " + quote(f.StorageMountUUID) + " " + quote(f.storageCheckUID()) + "\n"
 	}
 	units["opsd.service"] = "[Unit]\nDescription=OPSD 对等节点\nAfter=network-online.target opsd-executor.service\nWants=network-online.target opsd-executor.service\n" + nodeMounts + "\n[Service]\nUser=opsd\nType=notify\nNotifyAccess=main\nTimeoutStartSec=45\nGroup=opsd\nRuntimeDirectory=opsd-node\nRuntimeDirectoryMode=0700\nUMask=0077\nExecStart=" + command + " node" + config + "\nRestart=on-failure\nRestartSec=3\nEnvironment=GOMEMLIMIT=64MiB\nNoNewPrivileges=true\nProtectSystem=strict\nReadWritePaths=" + quote(f.DataDir) + "\n\n[Install]\nWantedBy=multi-user.target\n"
 	units["opsd-executor.service"] = "[Unit]\nDescription=OPSD 本机执行器\nAfter=network.target opsd-recover.service\n" + executorMounts + "\n[Service]\nUser=root\nType=notify\nNotifyAccess=main\nTimeoutStartSec=45\nGroup=opsd\nUMask=0007\nRuntimeDirectory=opsd\nRuntimeDirectoryMode=0750\nExecStart=" + command + " executor" + config + "\nRestart=on-failure\nRestartSec=3\n\n[Install]\nWantedBy=multi-user.target\n"

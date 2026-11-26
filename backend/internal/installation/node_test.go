@@ -27,12 +27,13 @@ func TestUnifiedServicesKeepRecoveryIndependent(t *testing.T) {
 }
 
 func TestMetadataRootUnits(t *testing.T) {
-	f := NodeFile{Binary: "/opt/opsd/bin/opsd", DataDir: storage.NodeDir, ExecutorDir: storage.ExecutorDir}
+	uid := 987
+	f := NodeFile{Binary: "/opt/opsd/bin/opsd", DataDir: storage.NodeDir, ExecutorDir: storage.ExecutorDir, UserID: &uid}
 	for _, uuid := range []string{"", "12345678-abcd"} {
 		f.StorageMountUUID = uuid
 		units := Units(f, "/etc/opsd/instance.json")
 		check := units["opsd-storage-check.service"]
-		if !strings.Contains(check, quote(f.storageCheckPath())+" check "+quote(uuid)) ||
+		if !strings.Contains(check, quote(f.storageCheckPath())+" check "+quote(uuid)+` "987"`+"\n") ||
 			strings.Contains(check, "Wants=opsd.mount") != (uuid != "") {
 			t.Fatal(check)
 		}

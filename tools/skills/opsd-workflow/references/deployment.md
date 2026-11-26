@@ -10,7 +10,7 @@
 
 已有实例沿用配置中的两条目录及受管组件的已登记绑定。节点单元只放行有效 `data_dir` 和运行目录 `/run/opsd-node`。带旧默认路径的实例在激活时继续修正 `/var/lib/opsd` 的入口权限为 `0755`。
 
-独立盘安装前先准备 `opsd.mount` 并挂载到 `/opsd`。安装器将实际文件系统 UUID 记录在 `storage_mount_uuid`。四个写入单元依赖 `opsd-storage-check.service`，独立盘模式额外绑定 `opsd.mount`。异常时可从下列日志读回预期与实际挂载。
+独立盘安装前先准备 `opsd.mount` 并挂载到 `/opsd`。安装器将实际文件系统 UUID 记录在 `storage_mount_uuid`。四个写入单元依赖 `opsd-storage-check.service`，独立盘模式额外绑定 `opsd.mount`。自检核对两个私有目录的属主、属组和 `0700`，异常日志给出路径、实际值和期望值。
 
 ```bash
 journalctl -b -u opsd-storage-check.service -u opsd.mount

@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/jkfujr/opsd/internal/storage"
@@ -26,8 +27,15 @@ func (f NodeFile) storageCheckPath() string {
 	return filepath.Join(filepath.Dir(f.Binary), "opsd-storage-check")
 }
 
-func checkStorage(ctx context.Context, mode, uuid string) (string, error) {
-	command := exec.CommandContext(ctx, "/bin/sh", "-s", "--", mode, uuid)
+func (f NodeFile) storageCheckUID() string {
+	if f.UserID == nil {
+		return ""
+	}
+	return strconv.Itoa(*f.UserID)
+}
+
+func checkStorage(ctx context.Context, mode, uuid, uid string) (string, error) {
+	command := exec.CommandContext(ctx, "/bin/sh", "-s", "--", mode, uuid, uid)
 	command.Stdin = strings.NewReader(strings.ReplaceAll(storageCheckScript, "\r\n", "\n"))
 	output, err := command.CombinedOutput()
 	if err != nil {
@@ -40,7 +48,7 @@ func (f NodeFile) CheckStorage(ctx context.Context) error {
 	if !f.usesMetadataRoot() {
 		return nil
 	}
-	_, err := checkStorage(ctx, "check", f.StorageMountUUID)
+	_, err := checkStorage(ctx, "check", f.StorageMountUUID, f.storageCheckUID())
 	return err
 }
 

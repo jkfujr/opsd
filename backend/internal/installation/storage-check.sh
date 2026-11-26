@@ -100,4 +100,29 @@ fi
 
 if [ "$mode" = discover ]; then
     printf '%s\n' "$uuid"
+elif [ "$mode" = check ]; then
+    check_directory() {
+        directory=$1
+        account=$2
+        configured_uid=$3
+        uid=$(id -u "$account" 2>/dev/null) ||
+            fail "$directory actual=用户不存在 expected=owner=$account"
+        group=$(getent group "$account" 2>/dev/null) ||
+            fail "$directory actual=组不存在 expected=group=$account"
+        gid=$(printf '%s\n' "$group" | cut -d: -f3)
+        if [ "$account" = opsd ] && [ "$uid" = 0 ]; then
+            fail "$directory actual=owner=opsd(0) expected=opsd 的非零 UID"
+        fi
+        if [ -n "$configured_uid" ] && [ "$uid" != "$configured_uid" ]; then
+            fail "$directory actual=owner=$account($uid) expected=user_id=$configured_uid"
+        fi
+        expected=$uid:$gid:0700
+        actual=$(stat -c '%u:%g:0%a (%U:%G)' -- "$directory") ||
+            fail "$directory actual=无法读取 expected=$expected ($account:$account)"
+        if [ "${actual%% *}" != "$expected" ]; then
+            fail "$directory actual=$actual expected=$expected ($account:$account)"
+        fi
+    }
+    check_directory "$root/node" opsd "${3-}"
+    check_directory "$root/executor" root 0
 fi
