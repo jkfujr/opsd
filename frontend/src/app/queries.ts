@@ -1,7 +1,7 @@
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { enc, get, getVersioned, readAll } from '../api/http';
 import type {
-  ContainerList, ComposeProjectList, FirewallConfiguration, ManagedDatabaseList, ManagedDatabaseStatus, ManagedFirewallState, MonitoringArchiveStatusList,
+  ContainerList, ComposeProjectList, FirewallConfiguration, ManagedDatabaseList, ManagedDatabaseStatus, ManagedFirewallState, MonitoringArchiveStatusList, Schemas,
   NodeAccount, NodeConfig, NodeList, NodeStatus, Overview, PeerTrustPolicy, PeerTrustStatus, PublicAddresses, ScheduledTaskList, SessionList, Account,
   APIIdentity, APITokenList, EnrollmentTokenList, StorageTargetList, OperationList, NodeInfo, SharedStorageOverview, ThemeList,
 } from '../api/types';
@@ -150,4 +150,11 @@ export const useIdentity = () => useQuery({ queryKey: ['identity'], queryFn: ({ 
 export const useTokens = (nodeId: string) => useQuery({ queryKey: ['tokens', nodeId], queryFn: ({ signal }) => readAll<APITokenList>((cursor) => get(`/nodes/${enc(nodeId)}/api-tokens`, { signal, query: { limit: 100, cursor } })), enabled: !!nodeId });
 export const useEnrollments = () => useQuery({ queryKey: ['nodes', 'enrollments'], queryFn: ({ signal }) => readAll<EnrollmentTokenList>((cursor) => get('/enrollment-tokens', { signal, query: { limit: 100, cursor } })) });
 export const useStorageTargets = () => useQuery({ queryKey: ['storage', 'targets'], queryFn: ({ signal }) => get<StorageTargetList>('/storage/targets', { signal }), retry: 0 });
+export const useMonitoringHistory = (range: '24h' | '7d', grouped = false) => useQuery({
+  queryKey: ['monitoring', 'history', range, grouped],
+  queryFn: ({ signal }) => get<Schemas['MonitoringHistory']>('/monitoring/history', { signal, query: { range, group_by: grouped ? 'node' : undefined } }),
+  placeholderData: keepPreviousData,
+  refetchInterval: 5 * 60_000,
+  retry: 0,
+});
 export const useThemes = () => useQuery({ queryKey: ['themes'], queryFn: ({ signal }) => get<ThemeList>('/console/theme-installations', { signal, query: { limit: 100 } }), retry: 0 });

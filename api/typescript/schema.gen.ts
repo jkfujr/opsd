@@ -617,8 +617,28 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** 读取监控历史 */
+        /**
+         * 读取监控历史
+         * @description 查询 UTC 左闭右开的最近七天窗口。无显式时间时默认查询最近 24 小时。部分节点失败时返回 unavailable，缺样本的桶返回 sample_count=0。
+         */
         get: operations["getMonitoringHistory"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/nodes/{node_id}/monitoring/local": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 读取节点本机七天历史状态 */
+        get: operations["getMonitoringLocal"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1671,6 +1691,7 @@ export interface components {
             /** Format: date-time */
             collected_at: string;
             summary: components["schemas"]["MonitoringSummary"];
+            sample_count?: number;
         };
         MonitoringHistory: {
             items: components["schemas"]["MonitoringPoint"][];
@@ -1679,6 +1700,11 @@ export interface components {
             nodes?: components["schemas"]["MonitoringNodeHistory"][];
             /** Format: date-time */
             checked_at?: string;
+            /** Format: date-time */
+            from?: string;
+            /** Format: date-time */
+            to?: string;
+            node_status?: components["schemas"]["MonitoringHistoryNodeStatus"][];
         };
         MonitoringSettings: {
             /** @default 5 */
@@ -3695,6 +3721,37 @@ export interface components {
             partial: boolean;
             missing: components["schemas"]["MonitoringGap"][];
         };
+        MonitoringHistoryNodeStatus: {
+            node_id: string;
+            /** @enum {string} */
+            state: "ready" | "empty" | "offline" | "timeout" | "error";
+            /** Format: date-time */
+            last_sample_at?: string;
+        };
+        MonitoringLocal: {
+            node_id: string;
+            /** Format: int64 */
+            revision: number;
+            directory: string;
+            interval_minutes: number;
+            /** @enum {integer} */
+            retention_days: 7;
+            /** Format: int64 */
+            db_bytes: number;
+            /** Format: int64 */
+            wal_bytes: number;
+            /** Format: int64 */
+            max_db_bytes: number;
+            /** Format: int64 */
+            wal_budget_bytes: number;
+            /** Format: date-time */
+            first_sample_at?: string;
+            /** Format: date-time */
+            last_sample_at?: string;
+            /** @enum {string} */
+            state: "initializing" | "ready" | "fallback" | "history_full" | "error";
+            error?: string;
+        };
     };
     responses: {
         /** @description 请求语法无效 */
@@ -5686,6 +5743,46 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MonitoringHistory"];
+                };
+            };
+            400: components["responses"]["Error400"];
+            401: components["responses"]["Error401"];
+            403: components["responses"]["Error403"];
+            404: components["responses"]["Error404"];
+            405: components["responses"]["Error405"];
+            406: components["responses"]["Error406"];
+            409: components["responses"]["Error409"];
+            412: components["responses"]["Error412"];
+            413: components["responses"]["Error413"];
+            415: components["responses"]["Error415"];
+            422: components["responses"]["Error422"];
+            428: components["responses"]["Error428"];
+            429: components["responses"]["Error429"];
+            500: components["responses"]["Error500"];
+            503: components["responses"]["Error503"];
+            504: components["responses"]["Error504"];
+        };
+    };
+    getMonitoringLocal: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                node_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 请求成功 */
+            200: {
+                headers: {
+                    "X-Request-ID": string;
+                    ETag: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MonitoringLocal"];
                 };
             };
             400: components["responses"]["Error400"];

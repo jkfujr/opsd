@@ -3109,6 +3109,50 @@ func (a *strictAPI) GetFirewallStatus(ctx context.Context, request httpapi.GetFi
 	return nil, fmt.Errorf("GetFirewallStatus 返回未声明状态 %d", w.status())
 }
 
+func (a *strictAPI) GetMonitoringLocal(ctx context.Context, request httpapi.GetMonitoringLocalRequestObject) (httpapi.GetMonitoringLocalResponseObject, error) {
+	r := strictRequest(ctx)
+	w := newAPIResponse(r)
+	a.server.GetMonitoringLocal(w, r, request.NodeId)
+	a.server.prepareAPIResponse(w, r)
+	switch w.status() {
+	case 200:
+		return strictResponse[httpapi.GetMonitoringLocal200JSONResponse](w)
+	case 400:
+		return strictResponse[httpapi.GetMonitoringLocal400ApplicationProblemPlusJSONResponse](w)
+	case 401:
+		return strictResponse[httpapi.GetMonitoringLocal401ApplicationProblemPlusJSONResponse](w)
+	case 403:
+		return strictResponse[httpapi.GetMonitoringLocal403ApplicationProblemPlusJSONResponse](w)
+	case 404:
+		return strictResponse[httpapi.GetMonitoringLocal404ApplicationProblemPlusJSONResponse](w)
+	case 405:
+		return strictResponse[httpapi.GetMonitoringLocal405ApplicationProblemPlusJSONResponse](w)
+	case 406:
+		return strictResponse[httpapi.GetMonitoringLocal406ApplicationProblemPlusJSONResponse](w)
+	case 409:
+		return strictResponse[httpapi.GetMonitoringLocal409ApplicationProblemPlusJSONResponse](w)
+	case 412:
+		return strictResponse[httpapi.GetMonitoringLocal412ApplicationProblemPlusJSONResponse](w)
+	case 413:
+		return strictResponse[httpapi.GetMonitoringLocal413ApplicationProblemPlusJSONResponse](w)
+	case 415:
+		return strictResponse[httpapi.GetMonitoringLocal415ApplicationProblemPlusJSONResponse](w)
+	case 422:
+		return strictResponse[httpapi.GetMonitoringLocal422ApplicationProblemPlusJSONResponse](w)
+	case 428:
+		return strictResponse[httpapi.GetMonitoringLocal428ApplicationProblemPlusJSONResponse](w)
+	case 429:
+		return strictResponse[httpapi.GetMonitoringLocal429ApplicationProblemPlusJSONResponse](w)
+	case 500:
+		return strictResponse[httpapi.GetMonitoringLocal500ApplicationProblemPlusJSONResponse](w)
+	case 503:
+		return strictResponse[httpapi.GetMonitoringLocal503ApplicationProblemPlusJSONResponse](w)
+	case 504:
+		return strictResponse[httpapi.GetMonitoringLocal504ApplicationProblemPlusJSONResponse](w)
+	}
+	return nil, fmt.Errorf("GetMonitoringLocal 返回未声明状态 %d", w.status())
+}
+
 func (a *strictAPI) GetPublicAddresses(ctx context.Context, request httpapi.GetPublicAddressesRequestObject) (httpapi.GetPublicAddressesResponseObject, error) {
 	r := strictRequest(ctx)
 	w := newAPIResponse(r)

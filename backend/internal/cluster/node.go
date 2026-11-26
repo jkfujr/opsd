@@ -96,6 +96,7 @@ type Node struct {
 	readSlots            chan struct{}
 	metricsReadSlots     chan struct{}
 	telemetry            *telemetry.Service
+	history              localHistoryState
 }
 
 func Defaults(c Config) Config {
@@ -306,6 +307,10 @@ func Open(ctx context.Context, path string, o Options) (*Node, error) {
 		}
 	}
 	n.telemetry = n.newTelemetry(filepath.Dir(path))
+	n.history.source = path
+	n.history.path = filepath.Join(filepath.Dir(path), "monitoring", "history.db")
+	n.history.state = "initializing"
+	n.history.sampleReady = make(chan struct{})
 	return n, nil
 }
 func (n *Node) Start() {
@@ -315,7 +320,7 @@ func (n *Node) Start() {
 		return
 	}
 	n.started = true
-	n.wg.Add(11)
+	n.wg.Add(12)
 	n.telemetry.Start(n.ctx)
 	n.mu.Unlock()
 	go func() { defer n.wg.Done(); n.discovery() }()
@@ -324,6 +329,7 @@ func (n *Node) Start() {
 	go func() { defer n.wg.Done(); n.taskQueueLoop() }()
 	go func() { defer n.wg.Done(); n.storageLoop() }()
 	go func() { defer n.wg.Done(); n.sampleLoop() }()
+	go func() { defer n.wg.Done(); n.localHistoryLoop() }()
 	go func() { defer n.wg.Done(); n.maintenanceLoop() }()
 	go func() { defer n.wg.Done(); n.firewallLoop() }()
 	go func() { defer n.wg.Done(); n.networkLoop() }()
@@ -343,6 +349,9 @@ func (n *Node) Close() error {
 	n.mu.Unlock()
 	n.wg.Wait()
 	n.telemetry.Close()
+	if history, _, _, _ := n.history.snapshot(); history != nil {
+		_ = history.Close()
+	}
 	n.storageMu.Lock()
 	if n.databaseHTTP != nil {
 		n.databaseHTTP.CloseIdleConnections()

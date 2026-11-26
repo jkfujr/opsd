@@ -527,7 +527,7 @@ func TestLiveReadSharedAndHistoryIndependent(t *testing.T) {
 	if x.live.Load() != 1 {
 		t.Fatal(x.live.Load())
 	}
-	if e := n.sample(t.Context()); e != nil {
+	if e := n.sample(t.Context(), 5*time.Minute); e != nil {
 		t.Fatal(e)
 	}
 	if x.history.Load() != 1 || x.live.Load() != 1 {

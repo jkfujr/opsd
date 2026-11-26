@@ -250,11 +250,11 @@ func TestAPITokensAcrossEntriesScopesAndOwnerFailure(t *testing.T) {
 		t.Fatal(e)
 	}
 	var history httpapi.MonitoringHistory
-	if code := apiCall(t, http.DefaultClient, a.web.URL, "GET", "/api/v2/monitoring/history?node_ids="+a.node.ID+","+c.node.ID+"&group_by=node", created.Value, "", "", nil, &history); code != 200 || history.Nodes == nil || len(*history.Nodes) != 1 || history.Unavailable == nil || len(*history.Unavailable) != 1 {
-		t.Fatal("部分历史或节点分组错误", code)
+	if code := apiCall(t, http.DefaultClient, a.web.URL, "GET", "/api/v2/monitoring/history?node_ids="+a.node.ID+","+c.node.ID+"&group_by=node", created.Value, "", "", nil, &history); code != 200 || history.Nodes == nil || len(*history.Nodes) != 2 || history.Unavailable == nil || len(*history.Unavailable) != 0 || history.NodeStatus == nil || (*history.NodeStatus)[1].State != "empty" {
+		t.Fatal("节点分组或空历史状态错误", code)
 	}
 	older := url.QueryEscape(time.Now().Add(-8 * 24 * time.Hour).UTC().Format(time.RFC3339))
-	if code := apiCall(t, http.DefaultClient, a.web.URL, "GET", "/api/v2/monitoring/history?from="+older, created.Value, "", "", nil, nil); code != 422 {
+	if code := apiCall(t, http.DefaultClient, a.web.URL, "GET", "/api/v2/monitoring/history?from="+older, created.Value, "", "", nil, nil); code != 400 {
 		t.Fatal("七天历史边界错误", code)
 	}
 	c.node.Start()

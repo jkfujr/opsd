@@ -222,16 +222,22 @@ func (n *Node) storageLoop() {
 }
 
 func (n *Node) sampleLoop() {
+	select {
+	case <-n.ctx.Done():
+		return
+	case <-n.history.sampleReady:
+	}
 	for {
 		ctx, cancel := context.WithTimeout(n.ctx, 10*time.Second)
 		c, e := n.Config(ctx)
 		interval := 5 * time.Minute
 		if e == nil {
 			interval = time.Duration(c.IntervalMinutes) * time.Minute
-			_ = n.sample(ctx)
+			_ = n.sample(ctx, interval)
 		}
 		cancel()
-		timer := time.NewTimer(interval)
+		now := n.Now().UTC()
+		timer := time.NewTimer(now.Truncate(interval).Add(interval).Sub(now))
 		select {
 		case <-n.ctx.Done():
 			timer.Stop()

@@ -4959,7 +4959,112 @@
           {
             "BearerToken": []
           }
-        ]
+        ],
+        "description": "查询 UTC 左闭右开的最近七天窗口。无显式时间时默认查询最近 24 小时。部分节点失败时返回 unavailable，缺样本的桶返回 sample_count=0。"
+      }
+    },
+    "/nodes/{node_id}/monitoring/local": {
+      "get": {
+        "operationId": "getMonitoringLocal",
+        "summary": "读取节点本机七天历史状态",
+        "tags": [
+          "monitoring"
+        ],
+        "security": [
+          {
+            "SessionCookie": []
+          }
+        ],
+        "x-opsd-access": {
+          "mode": "session",
+          "level": "read"
+        },
+        "x-opsd-version": "monitoring-archive",
+        "parameters": [
+          {
+            "name": "node_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "请求成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MonitoringLocal"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-ID": {
+                "schema": {
+                  "type": "string"
+                },
+                "required": true
+              },
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                },
+                "required": true
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "405": {
+            "$ref": "#/components/responses/Error405"
+          },
+          "406": {
+            "$ref": "#/components/responses/Error406"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "412": {
+            "$ref": "#/components/responses/Error412"
+          },
+          "413": {
+            "$ref": "#/components/responses/Error413"
+          },
+          "415": {
+            "$ref": "#/components/responses/Error415"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error422"
+          },
+          "428": {
+            "$ref": "#/components/responses/Error428"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          },
+          "504": {
+            "$ref": "#/components/responses/Error504"
+          }
+        }
       }
     },
     "/metrics": {
@@ -13207,6 +13312,10 @@
           },
           "summary": {
             "$ref": "#/components/schemas/MonitoringSummary"
+          },
+          "sample_count": {
+            "type": "integer",
+            "minimum": 0
           }
         },
         "required": [
@@ -13243,6 +13352,20 @@
           "checked_at": {
             "type": "string",
             "format": "date-time"
+          },
+          "from": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "to": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "node_status": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MonitoringHistoryNodeStatus"
+            }
           }
         },
         "required": [
@@ -20996,6 +21119,114 @@
           "warnings",
           "partial",
           "missing"
+        ]
+      },
+      "MonitoringHistoryNodeStatus": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "node_id": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "ready",
+              "empty",
+              "offline",
+              "timeout",
+              "error"
+            ]
+          },
+          "last_sample_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "node_id",
+          "state"
+        ]
+      },
+      "MonitoringLocal": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "node_id": {
+            "type": "string"
+          },
+          "revision": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "directory": {
+            "type": "string"
+          },
+          "interval_minutes": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1440
+          },
+          "retention_days": {
+            "type": "integer",
+            "enum": [
+              7
+            ]
+          },
+          "db_bytes": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "wal_bytes": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "max_db_bytes": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "wal_budget_bytes": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "first_sample_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "last_sample_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "initializing",
+              "ready",
+              "fallback",
+              "history_full",
+              "error"
+            ]
+          },
+          "error": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "node_id",
+          "revision",
+          "directory",
+          "interval_minutes",
+          "retention_days",
+          "db_bytes",
+          "wal_bytes",
+          "max_db_bytes",
+          "wal_budget_bytes",
+          "state"
         ]
       }
     },

@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router';
 import { AnimatePresence, motion } from 'motion/react';
 import { ArrowDown, ArrowUp, Cpu, HardDrive, MemoryStick, Network, Plus, Server, ShieldAlert, WifiOff } from 'lucide-react';
 import type { OverviewNode } from '../api/types';
-import { useLive, useOverview } from '../app/queries';
+import { useLive, useMonitoringHistory, useOverview } from '../app/queries';
 import { useSession } from '../app/session';
 import { openDock } from '../app/ops';
 import { bytes, initials, pct, rate, ratio, ago, fullTime } from '../lib/format';
@@ -22,7 +22,8 @@ export function Overview() {
   const [search, setSearch] = useState('');
   const now = useNow(1000);
   const data = query.data;
-  const cluster = useLive('__cluster');
+  const history = useMonitoringHistory('24h');
+  const trend = history.data?.items.map((p) => p.sample_count === 0 ? undefined : p.summary.metrics);
 
   const nodes = useMemo(() => {
     const list = (data?.nodes ?? []).filter((n) => !n.node.revoked_at);
@@ -70,10 +71,10 @@ export function Overview() {
       {cachedCount > 0 && <div className="row"><Badge tone="warn">{cachedCount} 个节点使用上次读数</Badge></div>}
 
       <motion.div className="kpis" variants={listVariants} initial="hidden" animate="show">
-        <Kpi icon={<Cpu />} label="CPU" value={s?.cpu_usage} format={(x) => x.toFixed(1)} unit="%" sub={v ? `${v.cpu} 个节点 · ${s?.cpu_cores ?? 0} 核` : undefined} spark={cluster?.map((p) => p.cpu ?? null)} max={100} loading={!data} />
-        <Kpi icon={<MemoryStick />} label="内存" value={memP} format={(x) => x.toFixed(1)} unit="%" sub={s ? `${bytes(s.memory_used)} / ${bytes(s.memory_total)}` : undefined} spark={cluster?.map((p) => p.mem ?? null)} max={100} loading={!data} />
-        <Kpi icon={<HardDrive />} label="磁盘" value={diskP} format={(x) => x.toFixed(1)} unit="%" sub={s ? `${bytes(s.disk_used)} / ${bytes(s.disk_total)}` : undefined} spark={cluster?.map((p) => p.disk ?? null)} max={100} loading={!data} />
-        <Kpi icon={<Network />} label="网络" value={s?.network_rx !== undefined || s?.network_tx !== undefined ? (s?.network_rx ?? 0) + (s?.network_tx ?? 0) : undefined} format={(x) => rate(x)} sub={s ? <><span><ArrowDown width={12} height={12} /> {rate(s.network_rx)}</span><span><ArrowUp width={12} height={12} /> {rate(s.network_tx)}</span></> : undefined} spark={cluster?.map((p) => p.rx === undefined && p.tx === undefined ? null : (p.rx ?? 0) + (p.tx ?? 0))} loading={!data} />
+        <Kpi icon={<Cpu />} label="CPU" value={s?.cpu_usage} format={(x) => x.toFixed(1)} unit="%" sub={v ? `${v.cpu} 个节点 · ${s?.cpu_cores ?? 0} 核` : undefined} spark={trend?.map((m) => m?.cpu_usage ?? null)} max={100} loading={!data} />
+        <Kpi icon={<MemoryStick />} label="内存" value={memP} format={(x) => x.toFixed(1)} unit="%" sub={s ? `${bytes(s.memory_used)} / ${bytes(s.memory_total)}` : undefined} spark={trend?.map((m) => ratio(m?.memory_used, m?.memory_total) ?? null)} max={100} loading={!data} />
+        <Kpi icon={<HardDrive />} label="磁盘" value={diskP} format={(x) => x.toFixed(1)} unit="%" sub={s ? `${bytes(s.disk_used)} / ${bytes(s.disk_total)}` : undefined} spark={trend?.map((m) => ratio(m?.disk_used, m?.disk_total) ?? null)} max={100} loading={!data} />
+        <Kpi icon={<Network />} label="网络" value={s?.network_rx !== undefined || s?.network_tx !== undefined ? (s?.network_rx ?? 0) + (s?.network_tx ?? 0) : undefined} format={(x) => rate(x)} sub={s ? <><span><ArrowDown width={12} height={12} /> {rate(s.network_rx)}</span><span><ArrowUp width={12} height={12} /> {rate(s.network_tx)}</span></> : undefined} spark={trend?.map((m) => m?.network_rx === undefined && m?.network_tx === undefined ? null : (m?.network_rx ?? 0) + (m?.network_tx ?? 0))} loading={!data} />
       </motion.div>
 
       <AnimatePresence>
@@ -136,7 +137,7 @@ function Kpi({ icon, label, value, format, unit, sub, spark, max, loading }: { i
           <div className="kpi-value"><Ticker value={value} format={format} />{unit && value !== undefined && <small>{unit}</small>}</div>
         )}
         <div className="kpi-sub">{loading ? <Skeleton width="80%" /> : sub ?? '—'}</div>
-        <div className="kpi-spark"><Spark values={pad(spark)} max={max} height={44} tone={color} /></div>
+        <div className="kpi-spark"><Spark values={spark ?? []} max={max} height={44} tone={color} /></div>
       </Card>
     </motion.div>
   );

@@ -204,6 +204,8 @@ root 终端先以管理员会话 `POST /nodes/{node_id}/terminal` 创建票据�
 
 ## S3 与集中监控
 
+`GET /monitoring/history` 默认读取 24 小时，`range=7d` 或显式 UTC `from`、`to` 可查询最近七天的左闭右开窗口。`items` 保留集群时间桶，`group_by=node` 返回 `nodes`。`sample_count` 为桶内参与聚合的节点样本数，零表示缺口。`node_status` 给出各节点状态。部分读取失败返回 `200` 及 `unavailable`，全部目标读取失败返回 `503`。管理员可通过 `GET /nodes/{node_id}/monitoring/local` 读取本机历史库的目录、容量和采集状态。
+
 “监控服务宿主”表示运行监控组件的节点；采集、归档、查询分别指样本生成、S3 保存和授权时序读取。`/monitoring/slos` 为 P4 计划的只读展示接口，当前尚未实现。目标与当前实现的区别见 [ADR 0001](adr/0001-monitoring-single-pipeline.md)。
 
 | 接口 | 用途及写入条件 |

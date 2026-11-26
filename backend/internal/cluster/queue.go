@@ -92,9 +92,10 @@ func (n *Node) dispatch(ctx context.Context, origin, method string, body json.Ra
 	switch method {
 	case "api.capabilities":
 		return struct {
+			historyCapability
 			AuthorizationVersion int `json:"authorization_version"`
 			ProxyRoutingVersion  int `json:"proxy_routing_version"`
-		}{APIAuthorizationVersion, 1}, nil
+		}{n.localHistoryCapability(), APIAuthorizationVersion, 1}, nil
 	case "api.request":
 		var request requeststate.Write
 		if e := json.Unmarshal(body, &request); e != nil {
@@ -233,6 +234,8 @@ func (n *Node) dispatch(ctx context.Context, origin, method string, body json.Ra
 			return nil, e
 		}
 		return n.localHistory(ctx, q)
+	case "history.local":
+		return n.localHistoryStatus(ctx)
 	case "storage.credentials":
 		return n.databaseCredentials(ctx, origin)
 	case "storage.status":

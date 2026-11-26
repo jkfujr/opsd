@@ -180,6 +180,7 @@ var methodAccess = map[string]MethodAccess{
 	"monitoring_config": {Capability: CapabilityManageMonitoring},
 	"metrics":           {Capability: CapabilityReadMonitoring},
 	"history":           {Capability: CapabilityReadMonitoring},
+	"history.local":     {Capability: CapabilityReadMonitoring},
 
 	// —— 对外地址 ——
 	"public_addresses.read":    {Capability: CapabilityManagePublic},

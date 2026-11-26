@@ -3,7 +3,6 @@ package cluster
 import (
 	"context"
 	"encoding/json"
-	"strconv"
 	"time"
 
 	"github.com/jkfujr/opsd/internal/monitoring"
@@ -20,9 +19,6 @@ type liveRead struct {
 func (n *Node) metrics(ctx context.Context, stream string) (protocol.MonitoringResult, error) {
 	if cached := n.telemetry.CurrentHost(); cached != nil {
 		return *cached, nil
-	}
-	if stream == "history" {
-		return n.collect(ctx, stream)
 	}
 	for {
 		n.liveMu.Lock()
@@ -81,31 +77,13 @@ func (n *Node) collect(ctx context.Context, stream string) (protocol.MonitoringR
 	}
 	return protocol.MonitoringResult{Metrics: n.collector.Collect(stream), Firewall: "unknown", FirewallError: "防火墙状态读取失败"}, nil
 }
-func (n *Node) sample(ctx context.Context) error {
-	v, e := n.metrics(ctx, "history")
+func (n *Node) sample(ctx context.Context, interval time.Duration) error {
+	// 秒级缓存可能位于前一个五分钟档。历史任务按自己的采集流取值。
+	v, e := n.collect(ctx, "history")
 	if e != nil {
 		return e
 	}
-	b, _ := json.Marshal(v.Metrics)
-	tx, e := n.DB.BeginTx(ctx, nil)
-	if e != nil {
-		return e
-	}
-	defer tx.Rollback()
-	at := v.Metrics.CollectedAt.UTC()
-	if _, e = tx.ExecContext(ctx, "INSERT INTO monitoring_samples(collected_at,body) VALUES(?,?) ON CONFLICT(collected_at) DO NOTHING", at.Unix(), string(b)); e != nil {
-		return e
-	}
-	if e = n.appendTx(ctx, tx, "metrics", strconv.FormatInt(at.Unix(), 10), v.Metrics, at); e != nil {
-		return e
-	}
-	if _, e = tx.ExecContext(ctx, "DELETE FROM monitoring_samples WHERE collected_at<?", n.Now().Add(-7*24*time.Hour).Unix()); e != nil {
-		return e
-	}
-	if _, e = tx.ExecContext(ctx, "DELETE FROM records WHERE kind='metrics' AND database_name<?", "opsd_metrics_"+n.Now().UTC().AddDate(0, 0, -6).Format("20060102")); e != nil {
-		return e
-	}
-	return tx.Commit()
+	return n.saveHistorySample(ctx, v.Metrics, interval)
 }
 
 type HistoryQuery struct {
@@ -113,7 +91,7 @@ type HistoryQuery struct {
 	To   time.Time `json:"to"`
 }
 
-func (n *Node) localHistory(ctx context.Context, q HistoryQuery) ([]protocol.Metrics, error) {
+func (n *Node) legacyLocalHistory(ctx context.Context, q HistoryQuery) ([]protocol.Metrics, error) {
 	if q.From.Before(n.Now().Add(-7 * 24 * time.Hour)) {
 		q.From = n.Now().Add(-7 * 24 * time.Hour)
 	}
@@ -140,12 +118,11 @@ func (n *Node) History(ctx context.Context, target string, q HistoryQuery) ([]pr
 	if target == n.ID {
 		return n.localHistory(ctx, q)
 	}
-	items := []protocol.Metrics{}
-	failed := n.ReadHistory(ctx, []string{target}, q, func(_ string, m protocol.Metrics) { items = append(items, m) })
-	if len(failed) > 0 {
+	result := n.ReadHistoryWindow(ctx, []string{target}, HistoryQuery{From: q.From, To: time.Unix(q.To.Unix()+1, 0).UTC()})[0]
+	if result.State != "ready" && result.State != "empty" {
 		return nil, fault("dependency_unavailable", "监控历史不可用")
 	}
-	return items, nil
+	return result.Samples, nil
 }
 
 type Overview struct {

@@ -21,6 +21,7 @@ const (
 	Executor Kind = "executor"
 	Node     Kind = "node"
 	Metrics  Kind = "metrics"
+	history  Kind = "history"
 )
 
 //go:embed migrations/*/*.sql
@@ -28,23 +29,26 @@ var migrations embed.FS
 
 // Open 打开指定子系统的数据库，迁移成功后才交给调用者使用。
 func Open(ctx context.Context, path string, kind Kind) (*sql.DB, error) {
-	if kind != Executor && kind != Node && kind != Metrics {
+	if kind != Executor && kind != Node && kind != Metrics && kind != history {
 		return nil, fmt.Errorf("未知数据库类型：%s", kind)
 	}
 	source, err := fs.Sub(migrations, "migrations/"+string(kind))
 	if err != nil {
 		return nil, err
 	}
+	if kind == history {
+		return open(ctx, path, source, "page_size(4096)", "auto_vacuum(INCREMENTAL)", "max_page_count(8192)", "wal_autocheckpoint(1018)", "journal_size_limit(4194304)")
+	}
 	return open(ctx, path, source)
 }
 
-func open(ctx context.Context, path string, source fs.FS) (*sql.DB, error) {
+func open(ctx context.Context, path string, source fs.FS, extra ...string) (*sql.DB, error) {
 	uri, err := databaseURL(path)
 	if err != nil {
 		return nil, err
 	}
 	params := url.Values{}
-	for _, pragma := range []string{"foreign_keys(1)", "synchronous(FULL)", "busy_timeout(5000)"} {
+	for _, pragma := range append([]string{"foreign_keys(1)", "synchronous(FULL)", "busy_timeout(5000)"}, extra...) {
 		params.Add("_pragma", pragma)
 	}
 	uri.RawQuery = params.Encode()
@@ -84,11 +88,15 @@ func databaseURL(path string) (url.URL, error) {
 
 // ReadOnly 用于本机查看入口，不迁移、不初始化，也不切换日志模式。
 func ReadOnly(ctx context.Context, path string) (*sql.DB, error) {
+	return readOnly(ctx, path, "")
+}
+
+func readOnly(ctx context.Context, path, pragmas string) (*sql.DB, error) {
 	uri, err := databaseURL(path)
 	if err != nil {
 		return nil, err
 	}
-	uri.RawQuery = "mode=ro&_pragma=busy_timeout(5000)"
+	uri.RawQuery = "mode=ro&_pragma=busy_timeout(5000)" + pragmas
 	db, err := sql.Open("sqlite", uri.String())
 	if err != nil {
 		return nil, err
@@ -168,6 +176,7 @@ var migrationHooks = map[string]func(context.Context, *sql.Conn) error{
 // 两个已推送的结构都要能升级，且它们的 011 并不相同：
 //   - cf661ca 的 011 只有 create_key；
 //   - 7515d25 的 011 只有 resource_key（没有 create_key）。
+//
 // 所以每一列都要先确认存在再用，不能假设 create_key 一定在。
 func migrateQueueResourceKey(ctx context.Context, conn *sql.Conn) error {
 	has := func(column string) (bool, error) {

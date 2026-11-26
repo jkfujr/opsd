@@ -109,13 +109,13 @@ func TestHistoryBatchPaginationAndSignatureIsolation(t *testing.T) {
 	n.storage = &database{ID: n.ID, URL: server.URL, Client: server.Client()}
 	q := HistoryQuery{From: from, To: from.Add(6 * time.Hour)}
 	counts := map[string]int{}
-	failed := n.ReadHistory(t.Context(), []string{b.ID, c.ID}, q, func(id string, _ protocol.Metrics) { counts[id]++ })
+	failed := n.readLegacyHistory(t.Context(), []string{b.ID, c.ID}, q, func(id string, _ protocol.Metrics) { counts[id]++ })
 	if len(failed) != 0 || counts[b.ID] != 300 || counts[c.ID] != 201 || calls.Load() != 2 {
 		t.Fatal("批量或分页丢失", failed, counts, calls.Load())
 	}
 	tamper.Store(true)
 	counts = map[string]int{}
-	failed = n.ReadHistory(t.Context(), []string{b.ID, c.ID}, q, func(id string, _ protocol.Metrics) { counts[id]++ })
+	failed = n.readLegacyHistory(t.Context(), []string{b.ID, c.ID}, q, func(id string, _ protocol.Metrics) { counts[id]++ })
 	if len(failed) != 1 || failed[0] != b.ID || counts[b.ID] != 0 || counts[c.ID] != 201 {
 		t.Fatal("篡改来源未隔离", failed, counts)
 	}

@@ -36,6 +36,7 @@ type Summary struct {
 type Point struct {
 	CollectedAt time.Time `json:"collected_at"`
 	Summary     Summary   `json:"summary"`
+	SampleCount int       `json:"sample_count"`
 }
 
 func Aggregate(readings []Reading, now time.Time) Summary {

@@ -1060,6 +1060,75 @@ func (e MonitoringArchiveInputLocalDays) Valid() bool {
 	}
 }
 
+// Defines values for MonitoringHistoryNodeStatusState.
+const (
+	MonitoringHistoryNodeStatusStateEmpty   MonitoringHistoryNodeStatusState = "empty"
+	MonitoringHistoryNodeStatusStateError   MonitoringHistoryNodeStatusState = "error"
+	MonitoringHistoryNodeStatusStateOffline MonitoringHistoryNodeStatusState = "offline"
+	MonitoringHistoryNodeStatusStateReady   MonitoringHistoryNodeStatusState = "ready"
+	MonitoringHistoryNodeStatusStateTimeout MonitoringHistoryNodeStatusState = "timeout"
+)
+
+// Valid indicates whether the value is a known member of the MonitoringHistoryNodeStatusState enum.
+func (e MonitoringHistoryNodeStatusState) Valid() bool {
+	switch e {
+	case MonitoringHistoryNodeStatusStateEmpty:
+		return true
+	case MonitoringHistoryNodeStatusStateError:
+		return true
+	case MonitoringHistoryNodeStatusStateOffline:
+		return true
+	case MonitoringHistoryNodeStatusStateReady:
+		return true
+	case MonitoringHistoryNodeStatusStateTimeout:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for MonitoringLocalRetentionDays.
+const (
+	MonitoringLocalRetentionDaysN7 MonitoringLocalRetentionDays = 7
+)
+
+// Valid indicates whether the value is a known member of the MonitoringLocalRetentionDays enum.
+func (e MonitoringLocalRetentionDays) Valid() bool {
+	switch e {
+	case MonitoringLocalRetentionDaysN7:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for MonitoringLocalState.
+const (
+	MonitoringLocalStateError        MonitoringLocalState = "error"
+	MonitoringLocalStateFallback     MonitoringLocalState = "fallback"
+	MonitoringLocalStateHistoryFull  MonitoringLocalState = "history_full"
+	MonitoringLocalStateInitializing MonitoringLocalState = "initializing"
+	MonitoringLocalStateReady        MonitoringLocalState = "ready"
+)
+
+// Valid indicates whether the value is a known member of the MonitoringLocalState enum.
+func (e MonitoringLocalState) Valid() bool {
+	switch e {
+	case MonitoringLocalStateError:
+		return true
+	case MonitoringLocalStateFallback:
+		return true
+	case MonitoringLocalStateHistoryFull:
+		return true
+	case MonitoringLocalStateInitializing:
+		return true
+	case MonitoringLocalStateReady:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for MonitoringNodeState.
 const (
 	MonitoringNodeStateError   MonitoringNodeState = "error"
@@ -3631,12 +3700,48 @@ type MonitoringGap struct {
 
 // MonitoringHistory defines model for MonitoringHistory.
 type MonitoringHistory struct {
-	CheckedAt       *time.Time               `json:"checked_at,omitempty"`
-	IntervalMinutes int                      `json:"interval_minutes"`
-	Items           []MonitoringPoint        `json:"items"`
-	Nodes           *[]MonitoringNodeHistory `json:"nodes,omitempty"`
-	Unavailable     *[]string                `json:"unavailable,omitempty"`
+	CheckedAt       *time.Time                     `json:"checked_at,omitempty"`
+	From            *time.Time                     `json:"from,omitempty"`
+	IntervalMinutes int                            `json:"interval_minutes"`
+	Items           []MonitoringPoint              `json:"items"`
+	NodeStatus      *[]MonitoringHistoryNodeStatus `json:"node_status,omitempty"`
+	Nodes           *[]MonitoringNodeHistory       `json:"nodes,omitempty"`
+	To              *time.Time                     `json:"to,omitempty"`
+	Unavailable     *[]string                      `json:"unavailable,omitempty"`
 }
+
+// MonitoringHistoryNodeStatus defines model for MonitoringHistoryNodeStatus.
+type MonitoringHistoryNodeStatus struct {
+	LastSampleAt *time.Time                       `json:"last_sample_at,omitempty"`
+	NodeId       string                           `json:"node_id"`
+	State        MonitoringHistoryNodeStatusState `json:"state"`
+}
+
+// MonitoringHistoryNodeStatusState defines model for MonitoringHistoryNodeStatus.State.
+type MonitoringHistoryNodeStatusState string
+
+// MonitoringLocal defines model for MonitoringLocal.
+type MonitoringLocal struct {
+	DbBytes         int64                        `json:"db_bytes"`
+	Directory       string                       `json:"directory"`
+	Error           *string                      `json:"error,omitempty"`
+	FirstSampleAt   *time.Time                   `json:"first_sample_at,omitempty"`
+	IntervalMinutes int                          `json:"interval_minutes"`
+	LastSampleAt    *time.Time                   `json:"last_sample_at,omitempty"`
+	MaxDbBytes      int64                        `json:"max_db_bytes"`
+	NodeId          string                       `json:"node_id"`
+	RetentionDays   MonitoringLocalRetentionDays `json:"retention_days"`
+	Revision        int64                        `json:"revision"`
+	State           MonitoringLocalState         `json:"state"`
+	WalBudgetBytes  int64                        `json:"wal_budget_bytes"`
+	WalBytes        int64                        `json:"wal_bytes"`
+}
+
+// MonitoringLocalRetentionDays defines model for MonitoringLocal.RetentionDays.
+type MonitoringLocalRetentionDays int
+
+// MonitoringLocalState defines model for MonitoringLocal.State.
+type MonitoringLocalState string
 
 // MonitoringNode defines model for MonitoringNode.
 type MonitoringNode struct {
@@ -3661,6 +3766,7 @@ type MonitoringNodeHistory struct {
 // MonitoringPoint defines model for MonitoringPoint.
 type MonitoringPoint struct {
 	CollectedAt time.Time         `json:"collected_at"`
+	SampleCount *int              `json:"sample_count,omitempty"`
 	Summary     MonitoringSummary `json:"summary"`
 }
 
@@ -6230,6 +6336,9 @@ type ServerInterface interface {
 	// GetFirewallStatus 读取 OPSD 防火墙配置及应用状态
 	// (GET /nodes/{node_id}/firewall/status)
 	GetFirewallStatus(w http.ResponseWriter, r *http.Request, nodeId string)
+	// GetMonitoringLocal 读取节点本机七天历史状态
+	// (GET /nodes/{node_id}/monitoring/local)
+	GetMonitoringLocal(w http.ResponseWriter, r *http.Request, nodeId string)
 	// GetPublicAddresses 读取节点公网地址
 	// (GET /nodes/{node_id}/public-addresses)
 	GetPublicAddresses(w http.ResponseWriter, r *http.Request, nodeId string)
@@ -10371,6 +10480,32 @@ func (siw *ServerInterfaceWrapper) GetFirewallStatus(w http.ResponseWriter, r *h
 	handler.ServeHTTP(w, r)
 }
 
+// GetMonitoringLocal operation middleware
+func (siw *ServerInterfaceWrapper) GetMonitoringLocal(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "node_id" -------------
+	var nodeId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "node_id", r.PathValue("node_id"), &nodeId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "node_id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetMonitoringLocal(w, r, nodeId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // GetPublicAddresses operation middleware
 func (siw *ServerInterfaceWrapper) GetPublicAddresses(w http.ResponseWriter, r *http.Request) {
 
@@ -12348,6 +12483,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/nodes/{node_id}/firewall/configuration", wrapper.ReadFirewall)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/nodes/{node_id}/firewall/peer-trust", wrapper.GetNodePeerTrust)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/nodes/{node_id}/firewall/status", wrapper.GetFirewallStatus)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/nodes/{node_id}/monitoring/local", wrapper.GetMonitoringLocal)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/nodes/{node_id}/public-addresses", wrapper.GetPublicAddresses)
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/nodes/{node_id}/public-addresses", wrapper.ChangePublicAddresses)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/nodes/{node_id}/public-addresses/actions", wrapper.RefreshPublicAddresses)
@@ -38325,6 +38461,354 @@ func (response GetFirewallStatus504ApplicationProblemPlusJSONResponse) VisitGetF
 	return err
 }
 
+type GetMonitoringLocalRequestObject struct {
+	NodeId string `json:"node_id"`
+}
+
+type GetMonitoringLocalResponseObject interface {
+	VisitGetMonitoringLocalResponse(w http.ResponseWriter) error
+}
+
+type GetMonitoringLocal200ResponseHeaders struct {
+	ETag       string
+	XRequestID string
+}
+
+type GetMonitoringLocal200JSONResponse struct {
+	Body    MonitoringLocal
+	Headers GetMonitoringLocal200ResponseHeaders
+}
+
+func (response GetMonitoringLocal200JSONResponse) VisitGetMonitoringLocalResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("ETag", fmt.Sprint(response.Headers.ETag))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetMonitoringLocal400ApplicationProblemPlusJSONResponse struct {
+	Error400ApplicationProblemPlusJSONResponse
+}
+
+func (response GetMonitoringLocal400ApplicationProblemPlusJSONResponse) VisitGetMonitoringLocalResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetMonitoringLocal401ApplicationProblemPlusJSONResponse struct {
+	Error401ApplicationProblemPlusJSONResponse
+}
+
+func (response GetMonitoringLocal401ApplicationProblemPlusJSONResponse) VisitGetMonitoringLocalResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetMonitoringLocal403ApplicationProblemPlusJSONResponse struct {
+	Error403ApplicationProblemPlusJSONResponse
+}
+
+func (response GetMonitoringLocal403ApplicationProblemPlusJSONResponse) VisitGetMonitoringLocalResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetMonitoringLocal404ApplicationProblemPlusJSONResponse struct {
+	Error404ApplicationProblemPlusJSONResponse
+}
+
+func (response GetMonitoringLocal404ApplicationProblemPlusJSONResponse) VisitGetMonitoringLocalResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetMonitoringLocal405ApplicationProblemPlusJSONResponse struct {
+	Error405ApplicationProblemPlusJSONResponse
+}
+
+func (response GetMonitoringLocal405ApplicationProblemPlusJSONResponse) VisitGetMonitoringLocalResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.Allow != nil {
+		w.Header().Set("Allow", fmt.Sprint(*response.Headers.Allow))
+	}
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(405)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetMonitoringLocal406ApplicationProblemPlusJSONResponse struct {
+	Error406ApplicationProblemPlusJSONResponse
+}
+
+func (response GetMonitoringLocal406ApplicationProblemPlusJSONResponse) VisitGetMonitoringLocalResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(406)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetMonitoringLocal409ApplicationProblemPlusJSONResponse struct {
+	Error409ApplicationProblemPlusJSONResponse
+}
+
+func (response GetMonitoringLocal409ApplicationProblemPlusJSONResponse) VisitGetMonitoringLocalResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetMonitoringLocal412ApplicationProblemPlusJSONResponse struct {
+	Error412ApplicationProblemPlusJSONResponse
+}
+
+func (response GetMonitoringLocal412ApplicationProblemPlusJSONResponse) VisitGetMonitoringLocalResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(412)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetMonitoringLocal413ApplicationProblemPlusJSONResponse struct {
+	Error413ApplicationProblemPlusJSONResponse
+}
+
+func (response GetMonitoringLocal413ApplicationProblemPlusJSONResponse) VisitGetMonitoringLocalResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(413)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetMonitoringLocal415ApplicationProblemPlusJSONResponse struct {
+	Error415ApplicationProblemPlusJSONResponse
+}
+
+func (response GetMonitoringLocal415ApplicationProblemPlusJSONResponse) VisitGetMonitoringLocalResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(415)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetMonitoringLocal422ApplicationProblemPlusJSONResponse struct {
+	Error422ApplicationProblemPlusJSONResponse
+}
+
+func (response GetMonitoringLocal422ApplicationProblemPlusJSONResponse) VisitGetMonitoringLocalResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetMonitoringLocal428ApplicationProblemPlusJSONResponse struct {
+	Error428ApplicationProblemPlusJSONResponse
+}
+
+func (response GetMonitoringLocal428ApplicationProblemPlusJSONResponse) VisitGetMonitoringLocalResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(428)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetMonitoringLocal429ApplicationProblemPlusJSONResponse struct {
+	Error429ApplicationProblemPlusJSONResponse
+}
+
+func (response GetMonitoringLocal429ApplicationProblemPlusJSONResponse) VisitGetMonitoringLocalResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.RetryAfter != nil {
+		w.Header().Set("Retry-After", fmt.Sprint(*response.Headers.RetryAfter))
+	}
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(429)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetMonitoringLocal500ApplicationProblemPlusJSONResponse struct {
+	Error500ApplicationProblemPlusJSONResponse
+}
+
+func (response GetMonitoringLocal500ApplicationProblemPlusJSONResponse) VisitGetMonitoringLocalResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetMonitoringLocal503ApplicationProblemPlusJSONResponse struct {
+	Error503ApplicationProblemPlusJSONResponse
+}
+
+func (response GetMonitoringLocal503ApplicationProblemPlusJSONResponse) VisitGetMonitoringLocalResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(503)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetMonitoringLocal504ApplicationProblemPlusJSONResponse struct {
+	Error504ApplicationProblemPlusJSONResponse
+}
+
+func (response GetMonitoringLocal504ApplicationProblemPlusJSONResponse) VisitGetMonitoringLocalResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(504)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type GetPublicAddressesRequestObject struct {
 	NodeId string `json:"node_id"`
 }
@@ -51383,6 +51867,9 @@ type StrictServerInterface interface {
 	// GetFirewallStatus 读取 OPSD 防火墙配置及应用状态
 	// (GET /nodes/{node_id}/firewall/status)
 	GetFirewallStatus(ctx context.Context, request GetFirewallStatusRequestObject) (GetFirewallStatusResponseObject, error)
+	// GetMonitoringLocal 读取节点本机七天历史状态
+	// (GET /nodes/{node_id}/monitoring/local)
+	GetMonitoringLocal(ctx context.Context, request GetMonitoringLocalRequestObject) (GetMonitoringLocalResponseObject, error)
 	// GetPublicAddresses 读取节点公网地址
 	// (GET /nodes/{node_id}/public-addresses)
 	GetPublicAddresses(ctx context.Context, request GetPublicAddressesRequestObject) (GetPublicAddressesResponseObject, error)
@@ -53687,6 +54174,32 @@ func (sh *strictHandler) GetFirewallStatus(w http.ResponseWriter, r *http.Reques
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(GetFirewallStatusResponseObject); ok {
 		if err := validResponse.VisitGetFirewallStatusResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetMonitoringLocal operation middleware
+func (sh *strictHandler) GetMonitoringLocal(w http.ResponseWriter, r *http.Request, nodeId string) {
+	var request GetMonitoringLocalRequestObject
+
+	request.NodeId = nodeId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetMonitoringLocal(ctx, request.(GetMonitoringLocalRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetMonitoringLocal")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetMonitoringLocalResponseObject); ok {
+		if err := validResponse.VisitGetMonitoringLocalResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

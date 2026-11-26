@@ -205,10 +205,15 @@ func TestRealConsoleLifecycleAndNodeRestart(t *testing.T) {
 	if !bytes.Equal(public, after) || saved.Console {
 		t.Fatal("重启后身份或控制台状态未保留")
 	}
-	var samples int
-	if e = db.QueryRow("SELECT count(*) FROM monitoring_samples").Scan(&samples); e != nil || samples == 0 {
-		t.Fatal("控制台关闭时未采集本机历史", samples, e)
-	}
+	waitLocal(t, node, func() bool {
+		history, err := storage.ReadOnly(t.Context(), filepath.Join(data, "monitoring", "history.db"))
+		if err != nil {
+			return false
+		}
+		defer history.Close()
+		var samples int
+		return history.QueryRow("SELECT count(*) FROM history_samples").Scan(&samples) == nil && samples > 0
+	})
 }
 
 // TestExecutorDerivesAllowedCallerFromServiceAccount 覆盖 A1 的升级路径与真实拒绝路径：

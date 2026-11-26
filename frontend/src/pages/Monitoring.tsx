@@ -5,12 +5,11 @@ import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import { Activity } from 'lucide-react';
 import { get } from '../api/http';
 import type { MonitoringSeriesResult, Schemas } from '../api/types';
-import { useMonitoringStatus, useNodes } from '../app/queries';
+import { useMonitoringHistory, useMonitoringStatus, useNodes } from '../app/queries';
 import { ago, bytes, rate } from '../lib/format';
 import { AreaChart, palette, type Series } from '../ui/charts';
 import { Badge, Card, CardHead, Dot, Empty, ErrorNotice, Notice, PageHead, Segmented, Select, Skeleton, Spinner } from '../ui/kit';
 
-type History = Schemas['MonitoringHistory'];
 type Metric = 'cpu' | 'mem' | 'disk' | 'net';
 
 const metricDefs: Record<Metric, { label: string; format: (v: number) => string; max?: number }> = {
@@ -50,17 +49,23 @@ function Trend() {
   const [range, setRange] = useState<'24h' | '7d'>('24h');
   const nodes = useNodes();
   const names = new Map((nodes.data?.items ?? []).map((n) => [n.id, n.name]));
-  const q = useQuery({
-    queryKey: ['monitoring', 'history', range],
-    queryFn: ({ signal }) => get<History>('/monitoring/history', { signal, query: { range, group_by: 'node' } }),
-    placeholderData: keepPreviousData,
-    refetchInterval: 5 * 60_000,
-  });
+  const q = useMonitoringHistory(range, true);
   const timeFmt = (t: number) => new Date(t).toLocaleString('zh-CN', range === '24h' ? { hour: '2-digit', minute: '2-digit', hour12: false } : { month: '2-digit', day: '2-digit', hour: '2-digit', hour12: false });
   const build = (k: Metric): Series[] => {
-    const per = q.data?.nodes ?? [];
-    if (per.length) return per.map((n, i) => ({ name: names.get(n.node_id) ?? n.node_id.slice(0, 10), color: palette[i % palette.length]!, points: n.items.map((m) => ({ t: Date.parse(m.collected_at), v: value(m, k) })) }));
-    return [{ name: '集群', color: palette[0]!, points: (q.data?.items ?? []).map((p) => ({ t: Date.parse(p.collected_at), v: value(p.summary.metrics, k) })) }];
+    const data = q.data;
+    if (!data) return [];
+    const size = data.interval_minutes * 60_000;
+    if (data.nodes?.length) return data.nodes.map((n, i) => {
+      const values = new Map(n.items.map((m) => [Math.floor(Date.parse(m.collected_at) / size), value(m, k)]));
+      return {
+        name: names.get(n.node_id) ?? n.node_id.slice(0, 10), color: palette[i % palette.length]!,
+        points: data.items.map((p) => {
+          const t = Date.parse(p.collected_at);
+          return { t, v: values.get(Math.floor(t / size)) ?? null };
+        }),
+      };
+    });
+    return [{ name: '集群', color: palette[0]!, points: data.items.map((p) => ({ t: Date.parse(p.collected_at), v: p.sample_count === 0 ? null : value(p.summary.metrics, k) })) }];
   };
   return (
     <>

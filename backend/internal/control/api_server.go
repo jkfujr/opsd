@@ -337,6 +337,9 @@ func (s *Server) validationProblem(w http.ResponseWriter, r *http.Request, err e
 		location = requestError.Parameter.In
 		pointer = requestError.Parameter.Name
 	}
+	if location == "query" && r.URL.Path == httpapi.APIBasePath+"/monitoring/history" {
+		status, code = 400, "invalid_request"
+	}
 	if errors.As(err, &parseError) {
 		status, code = 400, "malformed_request"
 	}
