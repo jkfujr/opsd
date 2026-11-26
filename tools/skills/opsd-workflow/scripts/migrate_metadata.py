@@ -145,6 +145,23 @@ def stop_writers(config):
         require(pending == 0, f"停服后仍有在途操作：{table}={pending}")
 
 
+def start_writers(seconds):
+    started = time.monotonic()
+    try:
+        for name, args in (
+            ("reset_failed", ("reset-failed", "opsd.service", "opsd-executor.service")),
+            ("daemon_reload", ("daemon-reload",)),
+            ("start", ("start", *SERVICES)),
+        ):
+            clock = time.monotonic()
+            try:
+                command("systemctl", *args)
+            finally:
+                seconds[name] = round(time.monotonic() - clock, 3)
+    finally:
+        seconds["total"] = round(time.monotonic() - started, 3)
+
+
 def audit_file(path):
     info = path.lstat()
     require(stat.S_ISREG(info.st_mode), f"预期为常规文件：{path}")
@@ -342,6 +359,7 @@ def migrate_locked(record_dir, helper, expected_name, lab):
         (record_dir / unit).write_text(command("systemctl", "cat", unit) + "\n", encoding="utf-8")
     record(record_dir, "preflight.json", {**baseline, **capacity, "added_files": [str(path) for path in files]})
     timings = {"preflight": round(time.monotonic() - started, 3)}
+    starts = {}
     next_config = {**config, **DESTINATION}
     interrupted = time.monotonic()
     last = interrupted
@@ -388,9 +406,11 @@ def migrate_locked(record_dir, helper, expected_name, lab):
                 candidate = config_candidate(INSTANCE, (json.dumps(next_config, ensure_ascii=False, indent=2) + "\n").encode(),
                                              metadata)
                 os.replace(candidate, INSTANCE)
-                command("systemctl", "daemon-reload")
-                target_started = True
-                command("systemctl", "start", *SERVICES)
+                starts["cutover"] = {}
+                try:
+                    start_writers(starts["cutover"])
+                finally:
+                    target_started = "start" in starts["cutover"]
                 step("switch_and_start")
                 after = console_write(next_config)
                 validate_readback(baseline, after)
@@ -410,7 +430,8 @@ def migrate_locked(record_dir, helper, expected_name, lab):
             require(new_events > 0, "缺少新节点库写入事件")
             record(record_dir, "write-counts.json", {"old_path_events": old_events, "new_node_db_events": new_events})
             step("readback_and_writes")
-            result = {"status": "migrated", "elapsed": round(time.monotonic() - interrupted, 3), "timing": timings}
+            result = {"status": "migrated", "elapsed": round(time.monotonic() - interrupted, 3),
+                      "timing": timings, "systemd_start_seconds": starts}
     except Exception as error:
         write_state = "postwrite" if target_started else "prewrite"
         step("failure_detection")
@@ -429,17 +450,18 @@ def migrate_locked(record_dir, helper, expected_name, lab):
                     os.replace(config_candidate(INSTANCE, before, metadata), INSTANCE)
                     for path in reversed(installed_files):
                         path.unlink()
-                    command("systemctl", "daemon-reload")
-                command("systemctl", "reset-failed", *SERVICES)
-                command("systemctl", "start", *SERVICES)
+                starts["rollback"] = {}
+                start_writers(starts["rollback"])
                 restored = service_state(config)
                 validate_readback(baseline, restored)
                 record(record_dir, "rollback-readback.json", restored, best_effort=True)
                 step("rollback_start_and_readback")
                 result = {"status": "rolled_back", "stage": write_state, "copied": copied,
-                          "elapsed": round(time.monotonic() - interrupted, 3), "timing": timings}
+                          "elapsed": round(time.monotonic() - interrupted, 3), "timing": timings,
+                          "systemd_start_seconds": starts}
         except Exception as failure:
-            record(record_dir, "needs-recovery.json", {"migration": str(error), "rollback": str(failure)},
+            record(record_dir, "needs-recovery.json", {"migration": str(error), "rollback": str(failure),
+                                                       "systemd_start_seconds": starts},
                    best_effort=True)
             raise RuntimeError(f"迁移与回退均未完成，保留两份目录和材料：{record_dir}") from failure
     record(record_dir, "result.json", result)

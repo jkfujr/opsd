@@ -55,6 +55,16 @@ sudo python3 tools/skills/opsd-workflow/scripts/migrate_metadata.py \
 
 目标使用原单元和新增覆盖项。迁移结束后核对记录目录中的预检、五项读回和写事件。切换失败时入口恢复原配置和单元，目标进程曾启动时先把最新数据回灌原目录。失败后从 `result.json` 或 `needs-recovery.json` 读取现场。
 
+保留两个单元现有的 `StartLimitBurst` 和 `StartLimitIntervalSec`，让 systemd 继续限制日常崩溃后的自动重启。迁移或回滚每次启动前，先确认两服务已停、配置和单元已就位，再按下列顺序执行。方向切换失败后，先记录故障状态，再清除两个单元的失败状态和启动计数。
+
+```bash
+sudo systemctl reset-failed opsd.service opsd-executor.service
+sudo systemctl daemon-reload
+sudo systemctl start opsd-executor.service opsd.service
+```
+
+从第一次发起停服到最终五项读回通过，留出 90 秒。正向在 60 秒内未通过时进入回滚。上面三条命令的耗时计入同一段中断时间，`result.json` 的 `systemd_start_seconds` 逐次记录分项和合计。命令失败后先读回单元、进程和数据路径，再按回滚结果处理。
+
 ## 来源授权调整
 
 先让全部有效节点运行识别新能力名的版本，逐台确认后再写入新名称。读能力只用于对应的读取方法，既有写能力自动包含对应读能力。预检的「显式」列显示配置原值，「有效」列同时显示推导出的读能力。
