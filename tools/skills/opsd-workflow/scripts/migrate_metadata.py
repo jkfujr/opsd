@@ -34,6 +34,9 @@ DATABASES = {
 }
 DIRECTORIES = (("data_dir", "themes"), ("executor_dir", "logs"))
 EXCLUDES = ("*.bak-*", "*.pre-prune-*")
+STOP_SECONDS = 45
+DRAIN_SECONDS = 60
+RELOAD_SECONDS = 10
 
 
 def require(condition, error):
@@ -41,8 +44,8 @@ def require(condition, error):
         raise RuntimeError(error)
 
 
-def command(*args, allowed=(0,)):
-    result = subprocess.run(args, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=45)
+def command(*args, allowed=(0,), timeout=45):
+    result = subprocess.run(args, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=timeout)
     if result.returncode not in allowed:
         raise RuntimeError(f"{' '.join(map(str, args))} 退出 {result.returncode}：{result.stderr.strip()}")
     return result.stdout.strip()
@@ -61,6 +64,66 @@ def deadline(seconds):
     finally:
         signal.setitimer(signal.ITIMER_REAL, 0)
         signal.signal(signal.SIGALRM, previous)
+
+
+@contextmanager
+def measured(timings, phase):
+    started = time.monotonic()
+    try:
+        yield
+    finally:
+        timings[phase] = round(time.monotonic() - started, 3)
+
+
+class ServiceTransition:
+    def __init__(self, units=SERVICES):
+        self.units = units
+        self.client = None
+        self.action = None
+
+    def pending_action(self):
+        return self.action if self.client is not None and self.client.poll() is None else None
+
+    def change(self, action, *, timeout=45):
+        require(not self.pending_action(), f"systemctl {self.action} 尚未返回")
+        until = time.monotonic() + timeout
+        args = ("systemctl", action, *(() if action == "daemon-reload" else self.units))
+        # 闹钟到期时仍保留已发出的 systemctl，以便回滚等待同一请求结束。
+        mask = signal.pthread_sigmask(signal.SIG_BLOCK, {signal.SIGALRM})
+        try:
+            self.action = action
+            self.client = subprocess.Popen(args, stdout=subprocess.DEVNULL)
+        finally:
+            signal.pthread_sigmask(signal.SIG_SETMASK, mask)
+        try:
+            status = self.client.wait(timeout=max(0, until - time.monotonic()))
+        except subprocess.TimeoutExpired as error:
+            raise TimeoutError(f"systemctl {action} 超过 {timeout} 秒") from error
+        if time.monotonic() >= until:
+            raise TimeoutError(f"systemctl {action} 超过 {timeout} 秒")
+        require(status == 0, f"systemctl {action} 退出 {status}")
+
+    def drain(self, timings, phase="jobs_drained", *, stopped=False, allow_failed=False):
+        stop_states = {"inactive", "failed"} if allow_failed else {"inactive"}
+        with measured(timings, phase):
+            until = time.monotonic() + DRAIN_SECONDS
+            while (remaining := until - time.monotonic()) > 0:
+                if not self.pending_action():
+                    try:
+                        jobs = command("systemctl", "list-jobs", "--no-legend", "--no-pager", "--plain",
+                                       timeout=min(2, remaining))
+                        remaining = until - time.monotonic()
+                        if remaining > 0 and jobs in {"", "No jobs running.", "No jobs running"}:
+                            if not stopped:
+                                return
+                            states = command("systemctl", "is-active", *self.units,
+                                             allowed=(0, 3, 4), timeout=min(2, remaining)).splitlines()
+                            if time.monotonic() < until and len(states) == len(self.units) and set(states) <= stop_states:
+                                return
+                    except subprocess.TimeoutExpired:
+                        pass
+                time.sleep(max(0, min(0.1, until - time.monotonic())))
+            raise TimeoutError(f"{phase} 超过 {DRAIN_SECONDS} 秒，systemd 状态未稳定")
 
 
 def record(directory, name, value, *, best_effort=False):
@@ -133,8 +196,22 @@ def validate_readback(before, after):
         require(after[key] == before[key], f"读回不符：{key} actual={after[key]} expected={before[key]}")
 
 
-def stop_writers(config):
-    command("systemctl", "stop", "opsd.service", "opsd-executor.service")
+def sync_before_stop(config, directory):
+    paths = {Path(config[key]).stat().st_dev: config[key] for key in SOURCE}
+    pressure = Path("/proc/pressure/io")
+    io = {"paths": list(paths.values()), "before": pressure.read_text().strip() if pressure.exists() else None}
+    try:
+        with measured(io, "sync_seconds"):
+            command("sync", "-f", *paths.values())
+    finally:
+        io["after"] = pressure.read_text().strip() if pressure.exists() else None
+        record(directory, "io-before-stop.json", io)
+
+
+def stop_writers(config, systemd, seconds):
+    with measured(seconds, "stop"):
+        systemd.change("stop", timeout=STOP_SECONDS)
+    systemd.drain(seconds, stopped=True)
     active = command("systemctl", "list-units", "--no-legend", "--plain",
                      "--state=active,activating,reloading,deactivating",
                      *SERVICES, "opsd-operation@*.service", "opsd-recover.service")
@@ -145,21 +222,15 @@ def stop_writers(config):
         require(pending == 0, f"停服后仍有在途操作：{table}={pending}")
 
 
-def start_writers(seconds):
-    started = time.monotonic()
-    try:
-        for name, args in (
-            ("reset_failed", ("reset-failed", "opsd.service", "opsd-executor.service")),
-            ("daemon_reload", ("daemon-reload",)),
-            ("start", ("start", *SERVICES)),
-        ):
-            clock = time.monotonic()
-            try:
-                command("systemctl", *args)
-            finally:
-                seconds[name] = round(time.monotonic() - clock, 3)
-    finally:
-        seconds["total"] = round(time.monotonic() - started, 3)
+def start_writers(systemd, seconds):
+    with measured(seconds, "total"):
+        with measured(seconds, "reset_failed"):
+            systemd.change("reset-failed")
+        systemd.drain(seconds, "jobs_before_reload", stopped=True)
+        with measured(seconds, "daemon_reload"):
+            systemd.change("daemon-reload", timeout=RELOAD_SECONDS)
+        with measured(seconds, "start"):
+            systemd.change("start")
 
 
 def audit_file(path):
@@ -370,7 +441,10 @@ def migrate_locked(record_dir, helper, expected_name, lab):
     for unit in WRITERS:
         (record_dir / unit).write_text(command("systemctl", "cat", unit) + "\n", encoding="utf-8")
     record(record_dir, "preflight.json", {**baseline, **capacity, "added_files": [str(path) for path in files]})
+    sync_before_stop(config, record_dir)
     timings = {"preflight": round(time.monotonic() - started, 3)}
+    systemd = ServiceTransition()
+    stops = {"cutover": {}}
     starts = {}
     next_config = {**config, **DESTINATION}
     interrupted = time.monotonic()
@@ -388,7 +462,7 @@ def migrate_locked(record_dir, helper, expected_name, lab):
 
     try:
         with deadline(60):
-            stop_writers(config)
+            stop_writers(config, systemd, stops["cutover"])
             step("stop_and_drain")
             ROOT.mkdir(mode=0o755, exist_ok=True)
             require(ROOT.stat().st_uid == 0 and ROOT.stat().st_mode & 0o022 == 0, "/opsd 须由 root 管理")
@@ -420,7 +494,7 @@ def migrate_locked(record_dir, helper, expected_name, lab):
                 os.replace(candidate, INSTANCE)
                 starts["cutover"] = {}
                 try:
-                    start_writers(starts["cutover"])
+                    start_writers(systemd, starts["cutover"])
                 finally:
                     target_started = "start" in starts["cutover"]
                 step("switch_and_start")
@@ -453,16 +527,18 @@ def migrate_locked(record_dir, helper, expected_name, lab):
             record(record_dir, "write-counts.json", {"old_path_events": old_events, "new_node_db_events": new_events})
             step("readback_and_writes")
             result = {"status": "migrated", "elapsed": round(time.monotonic() - interrupted, 3),
-                      "timing": timings, "systemd_start_seconds": starts}
+                      "timing": timings, "systemd_stop_seconds": stops, "systemd_start_seconds": starts}
     except Exception as error:
         write_state = "postwrite" if target_started else "prewrite"
         step("failure_detection")
         record(record_dir, "rollback-cause.json", {"stage": write_state, "cause": str(error)}, best_effort=True)
         last = time.monotonic()
+        stops["rollback"] = {}
         try:
             with deadline(90 - (time.monotonic() - interrupted)):
+                systemd.drain(stops["rollback"], "previous_jobs_drained", stopped=not target_started, allow_failed=True)
                 if target_started:
-                    stop_writers(next_config)
+                    stop_writers(next_config, systemd, stops["rollback"])
                     if lab:
                         lab("stopped_for_rollback", next_config)
                     restored = copy_state(next_config, config)
@@ -473,16 +549,18 @@ def migrate_locked(record_dir, helper, expected_name, lab):
                     for path in reversed(installed_files):
                         path.unlink()
                 starts["rollback"] = {}
-                start_writers(starts["rollback"])
+                start_writers(systemd, starts["rollback"])
                 restored = service_state(config)
                 validate_readback(baseline, restored)
                 record(record_dir, "rollback-readback.json", restored, best_effort=True)
                 step("rollback_start_and_readback")
                 result = {"status": "rolled_back", "stage": write_state, "copied": copied,
                           "elapsed": round(time.monotonic() - interrupted, 3), "timing": timings,
-                          "systemd_start_seconds": starts}
+                          "systemd_stop_seconds": stops, "systemd_start_seconds": starts}
         except Exception as failure:
             record(record_dir, "needs-recovery.json", {"migration": str(error), "rollback": str(failure),
+                                                       "systemd_pending_client": systemd.pending_action(),
+                                                       "systemd_stop_seconds": stops,
                                                        "systemd_start_seconds": starts},
                    best_effort=True)
             raise RuntimeError(f"迁移与回退均未完成，保留两份目录和材料：{record_dir}") from failure

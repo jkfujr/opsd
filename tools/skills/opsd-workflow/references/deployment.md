@@ -55,15 +55,19 @@ sudo python3 tools/skills/opsd-workflow/scripts/migrate_metadata.py \
 
 目标使用原单元和新增覆盖项。迁移结束后核对记录目录中的预检、五项读回、控制台配置版本和服务自身的写事件。切换失败时入口恢复原配置和单元，目标进程曾启动时先把最新数据回灌原目录并保留源库原权限。失败后从 `result.json` 或 `needs-recovery.json` 读取现场。
 
-保留两个单元现有的 `StartLimitBurst` 和 `StartLimitIntervalSec`，让 systemd 继续限制日常崩溃后的自动重启。迁移或回滚每次启动前，先确认两服务已停、配置和单元已就位，再按下列顺序执行。方向切换失败后，先记录故障状态，再清除两个单元的失败状态和启动计数。
+首次停服前，对源元数据所在文件系统执行 `sync -f`，在 `io-before-stop.json` 记录 `sync` 耗时及前后 `/proc/pressure/io`。切换和回滚都等收到当前 `systemctl` 命令的结果，再检查 `list-jobs` 为空且两服务为 `inactive`。回滚遇到已停止的 `failed` 单元时，先确认 job 已清空，再用 `reset-failed` 清除失败状态，随后重新检查两服务和队列。
+
+两服务已停、配置和单元已就位后，按下列顺序启动。`reset-failed` 清除迁移及回滚的失败状态和启动计数，日常崩溃重启继续受原单元限频约束。
 
 ```bash
 sudo systemctl reset-failed opsd.service opsd-executor.service
+systemctl list-jobs --no-legend --no-pager --plain
+systemctl is-active opsd.service opsd-executor.service
 sudo systemctl daemon-reload
 sudo systemctl start opsd-executor.service opsd.service
 ```
 
-从第一次发起停服到最终五项读回通过，留出 90 秒。正向在 60 秒内未通过时进入回滚。上面三条命令的耗时计入同一段中断时间，`result.json` 的 `systemd_start_seconds` 逐次记录分项和合计。命令失败后先读回单元、进程和数据路径，再按回滚结果处理。
+从第一次发起停服到切换或回滚的五项读回通过，使用同一个 90 秒计时。正向总预算 60 秒。`stop` 上限 45 秒，等待 job 清空上限 60 秒，`daemon-reload` 上限 10 秒，各段继续受总预算约束。正向超限转入回滚，当前 systemd 请求和 job 未处理完时仅观察状态。确认队列清空、两服务处于回滚所需状态且仍有预算后，再继续恢复。回滚超限时根据 `needs-recovery.json` 处理，当前动作结束后再决定下一条 systemd 命令。`result.json` 的 `systemd_stop_seconds` 和 `systemd_start_seconds` 记录分段耗时。
 
 ## 来源授权调整
 
