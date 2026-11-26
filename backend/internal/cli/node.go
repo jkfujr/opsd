@@ -36,7 +36,7 @@ import (
 
 func Run(args []string) error {
 	if len(args) == 0 {
-		return fmt.Errorf("用法：opsd version | install | node | network | console | api | account | data | executor | operation | recover")
+		return fmt.Errorf("用法：opsd version | install | node | network | console | api | account | data | capability | executor | operation | recover")
 	}
 	switch args[0] {
 	case "version", "--version":
@@ -54,6 +54,8 @@ func Run(args []string) error {
 		return network(args[1:])
 	case "data":
 		return dataCommand(args[1:])
+	case "capability":
+		return capabilityCommand(args[1:], os.Stdout)
 	case "executor":
 		return serveExecutor(args[1:])
 	case "operation":
@@ -85,6 +87,10 @@ func serveNode(args []string) error {
 	if e != nil {
 		return e
 	}
+	capabilities, e := cluster.ParseSourceCapabilities(f.SourceCapabilities)
+	if e != nil {
+		return e
+	}
 	ctx, cancel := processContext()
 	defer cancel()
 	unlock, e := localstate.Lock(filepath.Join(f.DataDir, "node.lock"))
@@ -97,13 +103,12 @@ func serveNode(args []string) error {
 		return e
 	}
 	defer n.Close()
-	// 来源授权表必须在使用任何监听之前解析并通过：配置写错就要拒绝启动，
-	// 否则管理员会以为授权已生效而实际是默认权限。
-	capabilities, e := cluster.ParseSourceCapabilities(f.SourceCapabilities)
-	if e != nil {
-		return e
-	}
 	n.Capabilities = capabilities
+	if len(f.SourceCapabilities) == 0 {
+		slog.Warn("缺少 source_capabilities，成员仅可使用默认权限", "effective", capabilities.Grants())
+	} else {
+		slog.Info("已加载来源节点授权", "sources", len(capabilities), "effective", capabilities.Grants())
+	}
 	n.Log = func(format string, args ...any) {
 		slog.Info(fmt.Sprintf(format, args...), "component", "cluster")
 	}

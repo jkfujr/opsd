@@ -188,6 +188,28 @@ func TestRemoteSharedDecisionUsesCurrentCoordinator(t *testing.T) {
 	}
 }
 
+func TestReadMonitoringFiltersUnrelatedPendingOperations(t *testing.T) {
+	source, _ := openTestNode(t)
+	target, _ := openTestNode(t)
+	joinTest(t, target, source)
+	op := Operation{OperationRecord: protocol.OperationRecord{ID: NewOperationID(target.ID), State: protocol.Accepted, Revision: 1}, Subject: "database"}
+	if _, err := target.DB.ExecContext(t.Context(), "INSERT INTO queue(id,origin,kind,payload,request_key,request_digest,body) VALUES(?,?,?,'{}','',?,?)", op.ID, target.ID, op.Subject, []byte{}, string(payload(op))); err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range []struct {
+		capability Capability
+		pending    int
+	}{{CapabilityReadMonitoring, 0}, {CapabilityManageMonitoring, 1}} {
+		target.Capabilities[source.ID] = map[Capability]bool{tc.capability: true}
+		var got struct {
+			Pending []Operation `json:"pending_operations"`
+		}
+		if err := source.Call(t.Context(), target.ID, "metrics", nil, &got); err != nil || len(got.Pending) != tc.pending {
+			t.Fatalf("%s 应该读到 %d 项在途操作：%v，实际 %d 项", tc.capability, tc.pending, err, len(got.Pending))
+		}
+	}
+}
+
 // faultCode 取出错误里的故障码；非 Fault 返回空串。
 func faultCode(err error) string {
 	if f, ok := err.(*Fault); ok {

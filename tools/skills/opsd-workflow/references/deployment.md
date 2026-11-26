@@ -24,12 +24,26 @@ py tools/skills/opsd-workflow/scripts/opsd_remote.py inspect --host root@服务�
 
 ```powershell
 py tools/skills/opsd-workflow/scripts/opsd_remote.py upload --host root@服务器 --identity F:/keys/服务器 --local-file artifacts/opsd-linux-amd64 --remote-file /opt/opsd/bin/opsd.next
-py tools/skills/opsd-workflow/scripts/opsd_remote.py update --host root@服务器 --identity F:/keys/服务器 --config /etc/opsd/instance.json --candidate /opt/opsd/bin/opsd.next
+py tools/skills/opsd-workflow/scripts/opsd_remote.py update --host root@服务器 --identity F:/keys/服务器 --config /etc/opsd/instance.json --candidate /opt/opsd/bin/opsd.next --require /root/opsd-required.json
 ```
 
 upload 先读取候选路径，首次使用 SFTP `put` 创建文件，已有普通文件使用 `reput` 续传，不碰正在运行的程序。只对同一来源工件和已确定归属的候选路径续传；工件变化时使用新的候选路径。传输失败不自动重发，读取错误后再决定是否续传。中断续传结束后核对完整候选文件与 CI 工件一致；校验不符时保持当前程序，完整重传候选文件。
 
-update 在停服前及停服后检查未结束操作，设置候选文件可执行权限并读取版本，再原位替换程序，最后恢复 `opsd-executor.service` 和 `opsd.service` 并读回运行状态。不重新安装，不覆盖配置、身份、账号或数据库。
+update 在停服前使用候选程序执行 `opsd capability check --config`，按 `--require` 清单核对现有配置的有效授权。清单是「来源节点 ID → 必需能力数组」的 JSON 对象。根分区对普通用户可用空间低于 2 GiB、候选程序拒绝配置、清单无法读取、格式错误或必需授权缺失时，更新在停服前退出。停服前后检查未结束操作，再原位替换程序、恢复两个服务并读回。
+
+需要同时备份 SQLite 时，先核对程序盘和节点数据盘对普通用户的可用空间。根分区耗尽会使节点启动时无法扩展 SQLite 共享内存文件。空间不足时，把本批压缩工件及数据库备份放在独立数据盘，跨盘转移后核对内容再移除原副本。
+
+## 来源授权调整
+
+先让全部有效节点运行识别新能力名的版本，逐台确认后再写入新名称。读能力只用于对应的读取方法，既有写能力自动包含对应读能力。预检的「显式」列显示配置原值，「有效」列同时显示推导出的读能力。
+
+新增或补充授权时，在目标准备候选授权表及该节点必需授权清单。候选表只含 `source_capabilities` 的值，备份目录使用新的 root 私有路径。
+
+```powershell
+py tools/skills/opsd-workflow/scripts/opsd_remote.py grants --host root@服务器 --identity F:/keys/服务器 --config /etc/opsd/instance.json --candidate /root/opsd-grants.json --require /root/opsd-required.json --backup /var/backups/opsd/grants-批次
+```
+
+grants 预检候选表后只重启节点服务，保留两份 `instance.before.json`／`instance.after.json` 并返回观察起点 `observe_since`。从此时间连续观察目标节点 `opsd.service` 的「远端请求被拒绝」日志 24 小时。按来源和方法核对预期拒绝，正常调用受阻时确认所需能力后仅补对应来源和能力，再用新备份目录重跑 grants 并复查原调用。更换回拒绝新名称的旧程序时，停服期间一并恢复兼容的变更前配置和旧二进制，再启动两个服务并核对原授权与运行状态。
 
 SSH 中断或应答丢失后先运行 inspect，核对程序版本、服务 PID／启动时间与操作状态；不能因没看到成功文字就再次 update。失败时脚本非零退出，必须按实际结果处理，不声称已回滚。需要还原时另行使用明确已知的旧工件，不自动新建备份或清理历史工件。
 

@@ -26,6 +26,12 @@ const (
 	CapabilityVerifyTokens       Capability = "verify_tokens"
 	CapabilityCoordinateShared   Capability = "coordinate_shared"
 	CapabilityTerminal           Capability = "terminal"
+	CapabilityReadMonitoring     Capability = "read_monitoring"
+	CapabilityReadContainers     Capability = "read_containers"
+	CapabilityReadCompose        Capability = "read_compose"
+	CapabilityReadTasks          Capability = "read_tasks"
+	CapabilityReadStorage        Capability = "read_storage"
+	CapabilityReadDatabase       Capability = "read_database"
 	CapabilityReadArchive        Capability = "read_archive"
 	CapabilityUploadMonitoring   Capability = "upload_monitoring"
 	CapabilityReadStreamReceipts Capability = "read_stream_receipts"
@@ -52,6 +58,12 @@ var knownCapabilities = map[Capability]bool{
 	CapabilityVerifyTokens:       true,
 	CapabilityCoordinateShared:   true,
 	CapabilityTerminal:           true,
+	CapabilityReadMonitoring:     true,
+	CapabilityReadContainers:     true,
+	CapabilityReadCompose:        true,
+	CapabilityReadTasks:          true,
+	CapabilityReadStorage:        true,
+	CapabilityReadDatabase:       true,
 	CapabilityReadArchive:        true,
 	CapabilityUploadMonitoring:   true,
 	CapabilityReadStreamReceipts: true,
@@ -86,72 +98,72 @@ var methodAccess = map[string]MethodAccess{
 	"shared.status":    {DefaultAllowed: true},
 
 	// —— 任务 ——
-	"submit":        {Capability: CapabilityRunTask, InnerAction: true},
-	"task_run":      {Capability: CapabilityRunTask},
-	"task_save":     {Capability: CapabilityRunTask},
-	"task.run":      {Capability: CapabilityRunTask},
-	"tasks.list":    {Capability: CapabilityRunTask},
-	"task.get":      {Capability: CapabilityRunTask},
-	"task.runs":     {Capability: CapabilityRunTask},
-	"task.runs.page": {Capability: CapabilityRunTask},
+	"submit":         {Capability: CapabilityRunTask, InnerAction: true},
+	"task_run":       {Capability: CapabilityRunTask},
+	"task_save":      {Capability: CapabilityRunTask},
+	"task.run":       {Capability: CapabilityRunTask},
+	"tasks.list":     {Capability: CapabilityReadTasks},
+	"task.get":       {Capability: CapabilityReadTasks},
+	"task.runs":      {Capability: CapabilityReadTasks},
+	"task.runs.page": {Capability: CapabilityReadTasks},
 	"execution.logs": {Capability: CapabilityReadLogs},
 
 	// —— 存储 ——
-	"storage.get":         {Capability: CapabilityWriteStorage},
+	"storage.get":         {Capability: CapabilityReadStorage},
 	"storage.save":        {Capability: CapabilityWriteStorage},
 	"storage.check":       {Capability: CapabilityWriteStorage},
 	"storage.credentials": {Capability: CapabilityWriteStorage},
-	"storage.status":      {Capability: CapabilityWriteStorage},
+	"storage.status":      {Capability: CapabilityReadStorage},
 
 	// —— 防火墙 / 组件 ——
-	"firewall":                      {Capability: CapabilityManageFirewall},
-	"firewall_config":               {Capability: CapabilityManageFirewall},
-	"firewall.plan":                 {Capability: CapabilityManageFirewall},
-	"firewall.preview":              {Capability: CapabilityManageFirewall},
-	"firewall.read":                 {Capability: CapabilityManageFirewall},
-	"firewall.config.read":          {Capability: CapabilityManageFirewall},
-	"firewall.config.write":         {Capability: CapabilityManageFirewall},
+	"firewall":                         {Capability: CapabilityManageFirewall},
+	"firewall_config":                  {Capability: CapabilityManageFirewall},
+	"firewall.plan":                    {Capability: CapabilityManageFirewall},
+	"firewall.preview":                 {Capability: CapabilityManageFirewall},
+	"firewall.read":                    {Capability: CapabilityManageFirewall},
+	"firewall.config.read":             {Capability: CapabilityManageFirewall},
+	"firewall.config.write":            {Capability: CapabilityManageFirewall},
 	"firewall.config.preview_adoption": {Capability: CapabilityManageFirewall},
-	"component":                     {Capability: CapabilityManageFirewall},
+	"component":                        {Capability: CapabilityManageFirewall},
 
 	// —— 数据库 ——
-	"database":                       {Capability: CapabilityManageDatabase},
-	"database_step":                  {Capability: CapabilityManageDatabase},
-	"database.execute":               {Capability: CapabilityManageDatabase},
-	"database.read":                  {Capability: CapabilityManageDatabase},
-	"database.query":                 {Capability: CapabilityManageDatabase},
-	"database.exists":                {Capability: CapabilityManageDatabase},
-	"database.discover":              {Capability: CapabilityManageDatabase},
-	"database.reconcile":             {Capability: CapabilityManageDatabase},
-	"database.recover":               {Capability: CapabilityManageDatabase},
-	"database.resolve":               {Capability: CapabilityManageDatabase},
-	"database.instance.get":          {Capability: CapabilityManageDatabase},
-	"database.instance.save":         {Capability: CapabilityManageDatabase},
-	"database.cluster.get":           {Capability: CapabilityManageDatabase},
-	"database.cluster.save":          {Capability: CapabilityManageDatabase},
-	"database.deployment.check":       {Capability: CapabilityManageDatabase},
+	"database":                         {Capability: CapabilityManageDatabase},
+	"database_step":                    {Capability: CapabilityManageDatabase},
+	"database.execute":                 {Capability: CapabilityManageDatabase},
+	"database.read":                    {Capability: CapabilityReadDatabase},
+	"database.query":                   {Capability: CapabilityManageDatabase},
+	"database.exists":                  {Capability: CapabilityManageDatabase},
+	"database.discover":                {Capability: CapabilityManageDatabase},
+	"database.reconcile":               {Capability: CapabilityManageDatabase},
+	"database.recover":                 {Capability: CapabilityManageDatabase},
+	"database.resolve":                 {Capability: CapabilityManageDatabase},
+	"database.instance.get":            {Capability: CapabilityReadDatabase},
+	"database.instance.save":           {Capability: CapabilityManageDatabase},
+	"database.cluster.get":             {Capability: CapabilityReadDatabase},
+	"database.cluster.save":            {Capability: CapabilityManageDatabase},
+	"database.deployment.check":        {Capability: CapabilityManageDatabase},
 	"database.deployment.connectivity": {Capability: CapabilityManageDatabase},
-	"database.deployment.execute":     {Capability: CapabilityManageDatabase},
-	"database.deployment.preview":     {Capability: CapabilityManageDatabase},
-	"database.deployment.profile":     {Capability: CapabilityManageDatabase},
-	"database.deployment.register":    {Capability: CapabilityManageDatabase},
-	"database.deployment.submit":      {Capability: CapabilityManageDatabase},
-	"database.discovery.inspect":      {Capability: CapabilityManageDatabase},
-	"database.discovery.register":     {Capability: CapabilityManageDatabase},
-	"database.discovery.scan":         {Capability: CapabilityManageDatabase},
-	"database.proxy_routing.applied":  {Capability: CapabilityManageDatabase},
-	"database.proxy_routing.read":     {Capability: CapabilityManageDatabase},
-	"database.proxy_routing.state":    {Capability: CapabilityManageDatabase},
+	"database.deployment.execute":      {Capability: CapabilityManageDatabase},
+	"database.deployment.preview":      {Capability: CapabilityManageDatabase},
+	"database.deployment.profile":      {Capability: CapabilityManageDatabase},
+	"database.deployment.register":     {Capability: CapabilityManageDatabase},
+	"database.deployment.submit":       {Capability: CapabilityManageDatabase},
+	"database.discovery.inspect":       {Capability: CapabilityManageDatabase},
+	"database.discovery.register":      {Capability: CapabilityManageDatabase},
+	"database.discovery.scan":          {Capability: CapabilityManageDatabase},
+	"database.proxy_routing.applied":   {Capability: CapabilityManageDatabase},
+	"database.proxy_routing.read":      {Capability: CapabilityReadDatabase},
+	"database.proxy_routing.state":     {Capability: CapabilityReadDatabase},
 
 	// —— Compose / 容器 ——
-	"compose":             {Capability: CapabilityManageCompose},
-	"compose_register":    {Capability: CapabilityManageCompose},
-	"compose.list":        {Capability: CapabilityManageCompose},
-	"compose.registration": {Capability: CapabilityManageCompose},
-	"container":           {Capability: CapabilityManageContainer},
-	"containers.read":     {Capability: CapabilityManageContainer},
-	"container.inspect":   {Capability: CapabilityManageContainer},
-	"container.logs":      {Capability: CapabilityReadLogs},
+	"compose":              {Capability: CapabilityManageCompose},
+	"compose_register":     {Capability: CapabilityManageCompose},
+	"compose.list":         {Capability: CapabilityReadCompose},
+	"compose.registration": {Capability: CapabilityReadCompose},
+	"container":            {Capability: CapabilityManageContainer},
+	"containers.read":      {Capability: CapabilityReadContainers},
+	"container.inspect":    {Capability: CapabilityReadContainers},
+	"container.logs":       {Capability: CapabilityReadLogs},
 
 	// —— 监控数据通道（上传与回执是两种能力） ——
 	"stream.upload":   {Capability: CapabilityUploadMonitoring},
@@ -164,10 +176,10 @@ var methodAccess = map[string]MethodAccess{
 	"archive.series":    {Capability: CapabilityReadArchive},
 
 	// —— 监控 ——
-	"monitoring_deploy":   {Capability: CapabilityManageMonitoring},
-	"monitoring_config":   {Capability: CapabilityManageMonitoring},
-	"metrics":             {Capability: CapabilityManageMonitoring},
-	"history":             {Capability: CapabilityManageMonitoring},
+	"monitoring_deploy": {Capability: CapabilityManageMonitoring},
+	"monitoring_config": {Capability: CapabilityManageMonitoring},
+	"metrics":           {Capability: CapabilityReadMonitoring},
+	"history":           {Capability: CapabilityReadMonitoring},
 
 	// —— 对外地址 ——
 	"public_addresses.read":    {Capability: CapabilityManagePublic},
@@ -175,12 +187,12 @@ var methodAccess = map[string]MethodAccess{
 	"public_addresses.refresh": {Capability: CapabilityManagePublic},
 
 	// —— 身份与配置 ——
-	"name":            {Capability: CapabilityManageIdentity},
-	"config":          {Capability: CapabilityManageIdentity},
-	"config.read":     {Capability: CapabilityReadConfig},
-	"account":         {Capability: CapabilityManageIdentity},
-	"account.read":    {Capability: CapabilityReadAccount},
-	"peer_trust.rules": {Capability: CapabilityManageIdentity},
+	"name":              {Capability: CapabilityManageIdentity},
+	"config":            {Capability: CapabilityManageIdentity},
+	"config.read":       {Capability: CapabilityReadConfig},
+	"account":           {Capability: CapabilityManageIdentity},
+	"account.read":      {Capability: CapabilityReadAccount},
+	"peer_trust.rules":  {Capability: CapabilityManageIdentity},
 	"shared_initialize": {Capability: CapabilityCoordinateShared},
 
 	// —— 共享协调 ——
@@ -192,14 +204,14 @@ var methodAccess = map[string]MethodAccess{
 	"shared.recover_steps": {Capability: CapabilityCoordinateShared},
 
 	// —— 操作推进：继承原操作及其资源的权限，由调用方按操作判定 ——
-	"operation.cancel":        {Advance: true},
-	"operation.confirm":       {Advance: true},
-	"operation.recover":       {Advance: true},
-	"operation.resolve":       {Advance: true},
-	"operation.get":           {Advance: true},
-	"operation.list":          {Capability: CapabilityReadOperations},
-	"api.request":             {Capability: CapabilityReadOperations},
-	"api.operation.decision":  {Advance: true},
+	"operation.cancel":       {Advance: true},
+	"operation.confirm":      {Advance: true},
+	"operation.recover":      {Advance: true},
+	"operation.resolve":      {Advance: true},
+	"operation.get":          {Advance: true},
+	"operation.list":         {Capability: CapabilityReadOperations},
+	"api.request":            {Capability: CapabilityReadOperations},
+	"api.operation.decision": {Advance: true},
 
 	// —— API 令牌 ——
 	"api_token.create": {Capability: CapabilityManageTokens},
@@ -221,6 +233,51 @@ func Access(method string) (MethodAccess, bool) {
 // SourceCapabilities 是"来源节点 ID → 能力集合"的授权表。
 type SourceCapabilities map[string]map[Capability]bool
 
+// 写能力仅向对应的读能力推导。
+var capabilityImpliedBy = map[Capability]Capability{
+	CapabilityReadMonitoring: CapabilityManageMonitoring,
+	CapabilityReadContainers: CapabilityManageContainer,
+	CapabilityReadCompose:    CapabilityManageCompose,
+	CapabilityReadTasks:      CapabilityRunTask,
+	CapabilityReadStorage:    CapabilityWriteStorage,
+	CapabilityReadDatabase:   CapabilityManageDatabase,
+}
+
+func (s SourceCapabilities) Has(origin string, capability Capability) bool {
+	impliedBy, implied := capabilityImpliedBy[capability]
+	return s[origin][capability] || implied && s[origin][impliedBy]
+}
+
+type CapabilityGrant struct {
+	Origin    string   `json:"origin"`
+	Explicit  []string `json:"explicit"`
+	Effective []string `json:"effective"`
+}
+
+func (s SourceCapabilities) Grants() []CapabilityGrant {
+	names := CapabilityNames()
+	origins := make([]string, 0, len(s))
+	for origin := range s {
+		origins = append(origins, origin)
+	}
+	sort.Strings(origins)
+	grants := make([]CapabilityGrant, 0, len(s))
+	for _, origin := range origins {
+		grant := CapabilityGrant{Origin: origin, Explicit: []string{}, Effective: []string{}}
+		for _, name := range names {
+			capability := Capability(name)
+			if s[origin][capability] {
+				grant.Explicit = append(grant.Explicit, name)
+			}
+			if s.Has(origin, capability) {
+				grant.Effective = append(grant.Effective, name)
+			}
+		}
+		grants = append(grants, grant)
+	}
+	return grants
+}
+
 // ParseSourceCapabilities 严格解析配置里的授权表。
 //
 // 字段缺失表示只应用默认权限；字段存在但内容非法时返回错误，调用方须在
@@ -234,15 +291,16 @@ func ParseSourceCapabilities(raw json.RawMessage) (SourceCapabilities, error) {
 		return nil, fmt.Errorf("source_capabilities 不能为 null，需写明来源节点与能力")
 	}
 	var decoded map[string][]string
-	decoder := json.NewDecoder(bytes.NewReader(trimmed))
-	decoder.DisallowUnknownFields()
-	if err := decoder.Decode(&decoded); err != nil {
+	if err := json.Unmarshal(trimmed, &decoded); err != nil {
 		return nil, fmt.Errorf("source_capabilities 格式无效：%w", err)
 	}
 	result := make(SourceCapabilities, len(decoded))
 	for origin, names := range decoded {
 		if !validOriginID(origin) {
 			return nil, fmt.Errorf("来源节点标识无效：%q", origin)
+		}
+		if names == nil {
+			return nil, fmt.Errorf("来源 %s 的能力必须是数组", origin)
 		}
 		set := make(map[Capability]bool, len(names))
 		for _, name := range names {
@@ -280,7 +338,7 @@ func (s SourceCapabilities) Allowed(origin, method string) bool {
 		return false
 	}
 	// 只按认证来源精确匹配：没有条目就是没有授予，不存在任何通配回查。
-	return s[origin][access.Capability]
+	return s.Has(origin, access.Capability)
 }
 
 // CapabilityNames 返回全部已知能力名，供配置校验与文档使用。
@@ -316,7 +374,7 @@ func (s SourceCapabilities) Kinds(origin string) []string {
 	}
 	seen := map[string]bool{}
 	for method, access := range methodAccess {
-		if access.Capability == "" || !granted[access.Capability] {
+		if access.Capability == "" || !s.Has(origin, access.Capability) {
 			continue
 		}
 		seen[method] = true

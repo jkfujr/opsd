@@ -218,7 +218,11 @@ func (n *Node) dispatch(ctx context.Context, origin, method string, body json.Ra
 		if e != nil {
 			return nil, e
 		}
-		pending, e := n.localOperations(ctx, ListQuery{Pending: true, Limit: 100})
+		query := ListQuery{Pending: true, Limit: 100}
+		if origin != n.ID && !n.Capabilities.Has(origin, CapabilityManageMonitoring) {
+			query.Origin = origin
+		}
+		pending, e := n.localOperations(ctx, query)
 		return struct {
 			protocol.MonitoringResult
 			Pending []Operation `json:"pending_operations"`
@@ -1596,17 +1600,17 @@ func (p OperationPosition) includes(op Operation) bool {
 }
 
 type ListQuery struct {
-	ResourceID    string                       `json:"resource_id,omitempty"`
-	Authorization *apiauth.Token               `json:"authorization,omitempty"`
-	Key           string                       `json:"key,omitempty"`
-	Actor         string                       `json:"actor,omitempty"`
+	ResourceID    string         `json:"resource_id,omitempty"`
+	Authorization *apiauth.Token `json:"authorization,omitempty"`
+	Key           string         `json:"key,omitempty"`
+	Actor         string         `json:"actor,omitempty"`
 	// Origin 由调度层填入的是已认证来源，不来自载荷。
-	Origin        string                       `json:"-"`
-	Positions     map[string]OperationPosition `json:"positions,omitempty"`
-	Pending       bool                         `json:"pending"`
-	State         string                       `json:"state"`
-	Before        *OperationPosition           `json:"before,omitempty"`
-	Limit         int                          `json:"limit"`
+	Origin    string                       `json:"-"`
+	Positions map[string]OperationPosition `json:"positions,omitempty"`
+	Pending   bool                         `json:"pending"`
+	State     string                       `json:"state"`
+	Before    *OperationPosition           `json:"before,omitempty"`
+	Limit     int                          `json:"limit"`
 }
 type OperationList struct {
 	NextPositions map[string]OperationPosition `json:"next_positions,omitempty"`

@@ -12,7 +12,7 @@ import tempfile
 
 def parser():
     result = argparse.ArgumentParser(description=__doc__)
-    result.add_argument("action", choices=("inspect", "upload", "update"), nargs="?", default="inspect")
+    result.add_argument("action", choices=("inspect", "upload", "update", "grants"), nargs="?", default="inspect")
     result.add_argument("--host", required=True)
     result.add_argument("--identity", type=Path)
     result.add_argument("--port", type=int, default=22)
@@ -20,6 +20,8 @@ def parser():
     result.add_argument("--local-file", type=Path)
     result.add_argument("--remote-file")
     result.add_argument("--candidate")
+    result.add_argument("--require")
+    result.add_argument("--backup")
     result.add_argument("--small-packets", action="store_true")
     return result
 
@@ -75,8 +77,10 @@ def main(argv=None):
                 subprocess.run(connection(options, True) + ["-b", str(path), options.host], check=True)
         else:
             remote = ["python3", "-", "--action", options.action, "--config", check_remote_path(options.config)]
-            if options.action == "update":
-                remote += ["--candidate", check_remote_path(options.candidate)]
+            if options.action in ("update", "grants"):
+                remote += ["--candidate", check_remote_path(options.candidate), "--require", check_remote_path(options.require)]
+            if options.action == "grants":
+                remote += ["--backup", check_remote_path(options.backup)]
             source = Path(__file__).with_name("remote_instance.py").read_bytes().replace(b"\r\n", b"\n")
             subprocess.run(connection(options) + [options.host, shlex.join(remote)], input=source, check=True)
         return 0

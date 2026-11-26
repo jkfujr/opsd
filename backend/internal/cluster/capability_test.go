@@ -88,6 +88,7 @@ func TestParseSourceCapabilitiesStrict(t *testing.T) {
 		`[]`,
 		`"run_task"`,
 		`{"0123456789abcdef0123456789abcdef":"run_task"}`,
+		`{"0123456789abcdef0123456789abcdef":null}`,
 		`{`,
 	}
 	for _, raw := range bad {
@@ -181,14 +182,48 @@ func TestKindsFollowGrantedCapabilities(t *testing.T) {
 		t.Fatal("授予 run_task 后应至少允许一个品种")
 	}
 	for _, kind := range kinds {
-		access, ok := Access(kind)
-		if !ok || access.Capability != CapabilityRunTask {
+		if !table.Allowed(origin, kind) {
 			t.Fatalf("越权品种出现在列表预筛里：%s", kind)
 		}
 	}
 	// 没有任何授予时，预筛结果为空——列表不会回退成全量。
 	if got := (SourceCapabilities{}).Kinds(origin); len(got) != 0 {
 		t.Fatalf("未授予时不应有可见品种：%v", got)
+	}
+}
+
+func TestReadCapabilitiesAreOneWay(t *testing.T) {
+	const origin = "0123456789abcdef0123456789abcdef"
+	tests := []struct {
+		reader, writer Capability
+		reads          []string
+		writes         []string
+	}{
+		{CapabilityReadMonitoring, CapabilityManageMonitoring, []string{"metrics", "history"}, []string{"monitoring_deploy", "monitoring_config"}},
+		{CapabilityReadContainers, CapabilityManageContainer, []string{"containers.read", "container.inspect"}, []string{"container"}},
+		{CapabilityReadCompose, CapabilityManageCompose, []string{"compose.list", "compose.registration"}, []string{"compose", "compose_register"}},
+		{CapabilityReadTasks, CapabilityRunTask, []string{"tasks.list", "task.get", "task.runs", "task.runs.page"}, []string{"task.run", "task_run", "task_save"}},
+		{CapabilityReadStorage, CapabilityWriteStorage, []string{"storage.get", "storage.status"}, []string{"storage.save", "storage.check", "storage.credentials"}},
+		{CapabilityReadDatabase, CapabilityManageDatabase, []string{"database.read", "database.instance.get", "database.cluster.get", "database.proxy_routing.read", "database.proxy_routing.state"}, []string{"database.execute", "database.query", "database.discover", "database.discovery.register", "database.proxy_routing.applied"}},
+	}
+	for _, tc := range tests {
+		t.Run(string(tc.reader), func(t *testing.T) {
+			read := SourceCapabilities{origin: {tc.reader: true}}
+			write := SourceCapabilities{origin: {tc.writer: true}}
+			if read.Has(origin, tc.writer) || !write.Has(origin, tc.reader) {
+				t.Fatal("只可从写能力推导对应读能力")
+			}
+			for _, method := range tc.reads {
+				if !read.Allowed(origin, method) || !write.Allowed(origin, method) {
+					t.Errorf("读能力和旧写授权均应允许 %s", method)
+				}
+			}
+			for _, method := range tc.writes {
+				if read.Allowed(origin, method) || !write.Allowed(origin, method) {
+					t.Errorf("仅写能力应允许 %s", method)
+				}
+			}
+		})
 	}
 }
 
