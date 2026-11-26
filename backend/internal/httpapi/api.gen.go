@@ -342,6 +342,8 @@ func (e ContainerActionAction) Valid() bool {
 
 // Defines values for ContainerActionRequestAction.
 const (
+	ContainerActionRequestActionKill    ContainerActionRequestAction = "kill"
+	ContainerActionRequestActionRemove  ContainerActionRequestAction = "remove"
 	ContainerActionRequestActionRestart ContainerActionRequestAction = "restart"
 	ContainerActionRequestActionStart   ContainerActionRequestAction = "start"
 	ContainerActionRequestActionStop    ContainerActionRequestAction = "stop"
@@ -351,6 +353,10 @@ const (
 // Valid indicates whether the value is a known member of the ContainerActionRequestAction enum.
 func (e ContainerActionRequestAction) Valid() bool {
 	switch e {
+	case ContainerActionRequestActionKill:
+		return true
+	case ContainerActionRequestActionRemove:
+		return true
 	case ContainerActionRequestActionRestart:
 		return true
 	case ContainerActionRequestActionStart:
@@ -6200,7 +6206,7 @@ type ServerInterface interface {
 	// GetContainer 读取容器详情
 	// (GET /nodes/{node_id}/engines/{engine_id}/containers/{container_id})
 	GetContainer(w http.ResponseWriter, r *http.Request, nodeId string, engineId string, containerId string)
-	// ChangeContainer 启动、停止或重启容器
+	// ChangeContainer 启动、停止、强制停止、重启、删除容器或更新镜像
 	// (POST /nodes/{node_id}/engines/{engine_id}/containers/{container_id}/actions)
 	ChangeContainer(w http.ResponseWriter, r *http.Request, nodeId string, engineId string, containerId string, params ChangeContainerParams)
 	// GetContainerLogs 读取最近容器日志
@@ -51353,7 +51359,7 @@ type StrictServerInterface interface {
 	// GetContainer 读取容器详情
 	// (GET /nodes/{node_id}/engines/{engine_id}/containers/{container_id})
 	GetContainer(ctx context.Context, request GetContainerRequestObject) (GetContainerResponseObject, error)
-	// ChangeContainer 启动、停止或重启容器
+	// ChangeContainer 启动、停止、强制停止、重启、删除容器或更新镜像
 	// (POST /nodes/{node_id}/engines/{engine_id}/containers/{container_id}/actions)
 	ChangeContainer(ctx context.Context, request ChangeContainerRequestObject) (ChangeContainerResponseObject, error)
 	// GetContainerLogs 读取最近容器日志

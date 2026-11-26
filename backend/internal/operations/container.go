@@ -35,7 +35,9 @@ func containerGoal(a protocol.ContainerAction, current protocol.ContainerDetail,
 	case "start":
 		return current.State == "running"
 	case "stop":
-		return current.State == "exited" || current.State == "created" || current.State == "dead"
+		return protocol.ContainerStopped(current.State)
+	case "kill":
+		return state != nil && state.Attempted && protocol.ContainerStopped(current.State)
 	case "restart":
 		return state != nil && state.Acknowledged && state.BeforeStartedAt != nil && current.StartedAt != nil && current.State == "running" && current.StartedAt.After(*state.BeforeStartedAt)
 	}
@@ -61,15 +63,31 @@ func (e *Engine) container(ctx context.Context, l *Local, boot string) error {
 	if l.Record.State == protocol.AttentionRequired && l.RequestRevision != l.Record.Revision {
 		return nil
 	}
-	current, err := e.Containers.Inspect(ctx, a.ContainerRef)
-	if err != nil {
-		if l.Record.State == protocol.AttentionRequired && l.Request == "resolve" && operationCode(err) == "not_found" {
-			return e.end(ctx, l, protocol.ResolvedManually, nil)
+	complete := func() error {
+		if len(l.Record.Steps) > 0 {
+			l.Record.Steps[0].State = "completed"
+		}
+		return e.end(ctx, l, protocol.Succeeded, nil)
+	}
+	inspectFailure := func(err error) error {
+		if operationCode(err) == "not_found" {
+			if l.Record.State == protocol.AttentionRequired && l.Request == "resolve" {
+				return e.end(ctx, l, protocol.ResolvedManually, nil)
+			}
+			if a.Action == "remove" && l.ContainerState != nil && l.ContainerState.Attempted {
+				observedAt := time.Now().UTC()
+				l.Record.LastObservedAt = &observedAt
+				return complete()
+			}
 		}
 		if l.ContainerState == nil && l.Record.State != protocol.AttentionRequired {
 			return e.end(ctx, l, protocol.Rejected, err)
 		}
 		return attention(err)
+	}
+	current, err := e.Containers.Inspect(ctx, a.ContainerRef)
+	if err != nil {
+		return inspectFailure(err)
 	}
 	l.Record.LastObservedAt = &current.CheckedAt
 	if l.Record.State == protocol.AttentionRequired && l.Request == "resolve" {
@@ -78,14 +96,11 @@ func (e *Engine) container(ctx context.Context, l *Local, boot string) error {
 	if l.ContainerState == nil && current.ReadOnlyReason != "" {
 		return e.end(ctx, l, protocol.Rejected, fmt.Errorf("%s", current.ReadOnlyReason))
 	}
-	if l.ContainerState == nil && a.ExpectedRevision != "" && protocol.ContainerRevision(current.ContainerSummary) != a.ExpectedRevision {
+	if l.ContainerState == nil && a.ExpectedRevision != "" && !current.MatchesRevision(a.ExpectedRevision) {
 		return e.end(ctx, l, protocol.Rejected, fmt.Errorf("容器已经变化，未执行原请求"))
 	}
 	if containerGoal(*a, current, l.ContainerState) {
-		if len(l.Record.Steps) > 0 {
-			l.Record.Steps[0].State = "completed"
-		}
-		return e.end(ctx, l, protocol.Succeeded, nil)
+		return complete()
 	}
 	// 已发送和人工重新处理只读回现状，旧操作永远不再次提交 Docker。
 	if l.Record.State == protocol.AttentionRequired || (l.ContainerState != nil && l.ContainerState.Attempted) {
@@ -94,13 +109,13 @@ func (e *Engine) container(ctx context.Context, l *Local, boot string) error {
 	if l.BootID != "" && l.BootID != boot {
 		return e.end(ctx, l, protocol.Rejected, fmt.Errorf("主机已重启，未执行旧的容器操作"))
 	}
-	if current.State == "paused" || current.State == "restarting" || current.State == "removing" || (a.Action == "restart" && current.State != "running") {
+	if !a.CanApply(current.State) {
 		return e.end(ctx, l, protocol.Rejected, fmt.Errorf("容器当前状态不支持此操作"))
 	}
 	if a.Action == "restart" && current.StartedAt == nil {
 		return e.end(ctx, l, protocol.Rejected, fmt.Errorf("容器启动时间不可用，请刷新列表"))
 	}
-	name := map[string]string{"start": "启动", "stop": "停止", "restart": "重启"}[a.Action]
+	name := map[string]string{"start": "启动", "stop": "停止", "restart": "重启", "kill": "强制停止", "remove": "删除"}[a.Action]
 	l.Record.State = protocol.Applying
 	l.Record.Steps = []protocol.OperationStep{{Name: name + "容器 " + current.Name, State: "applying"}}
 	l.ContainerState = &containerState{BeforeStartedAt: current.StartedAt, Attempted: true}
@@ -119,12 +134,11 @@ func (e *Engine) container(ctx context.Context, l *Local, boot string) error {
 	}
 	current, readErr := e.Containers.Inspect(ctx, a.ContainerRef)
 	if readErr != nil {
-		return attention(readErr)
+		return inspectFailure(readErr)
 	}
 	l.Record.LastObservedAt = &current.CheckedAt
 	if containerGoal(*a, current, l.ContainerState) {
-		l.Record.Steps[0].State = "completed"
-		return e.end(ctx, l, protocol.Succeeded, nil)
+		return complete()
 	}
 	if err == nil {
 		err = fmt.Errorf("Docker 已应答，容器目标状态尚未成立")

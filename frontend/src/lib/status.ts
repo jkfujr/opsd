@@ -1,4 +1,4 @@
-import type { Operation, OperationState, ReadStatus } from '../api/types';
+import type { ContainerActionRequest, Operation, OperationState, ReadStatus } from '../api/types';
 
 export type Tone = 'ok' | 'warn' | 'bad' | 'info' | 'idle' | 'accent';
 
@@ -36,8 +36,12 @@ const subjectLabel: Record<Operation['subject'], string> = {
   task_save: '保存任务', task_run: '执行任务', compose: 'Compose 操作', compose_register: '登记 Compose', shared_initialize: '初始化 OPSD 数据',
 };
 
+export const containerActionLabel: Record<ContainerActionRequest['action'], string> = {
+  start: '启动容器', stop: '停止容器', kill: '强制停止容器', restart: '重启容器', remove: '删除容器', update: '更新容器镜像',
+};
+
 const actionLabel: Record<string, Record<string, string>> = {
-  container: { start: '启动容器', stop: '停止容器', restart: '重启容器', update: '更新容器镜像' },
+  container: containerActionLabel,
   compose: { pull: '拉取镜像', start: '启动项目', stop: '停止项目', recreate: '重建项目', update: '更新项目' },
   database: {
     create_cluster: '创建数据库集群', import_cluster: '接入数据库集群', add_members: '添加数据库节点', add_proxy: '添加数据库代理',

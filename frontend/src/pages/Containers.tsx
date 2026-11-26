@@ -1,17 +1,17 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router';
 import { AnimatePresence, motion } from 'motion/react';
-import { Boxes, Download, FileText, Layers, Ellipsis, Play, RefreshCw, RotateCw, Square, ArrowDownToLine, Info, PackageCheck } from 'lucide-react';
+import { Boxes, Download, FileText, Layers, Ellipsis, Play, RefreshCw, RotateCw, Square, ArrowDownToLine, Info, PackageCheck, Trash2, OctagonX } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { call, enc, get } from '../api/http';
-import type { ComposeProjectItem, ContainerDetail, ContainerListItem, ContainerLogs, Operation } from '../api/types';
+import type { ComposeProjectItem, ContainerActionRequest, ContainerDetail, ContainerListItem, ContainerLogs, Operation } from '../api/types';
 import { useCompose, useContainers, useNodes } from '../app/queries';
 import { useCommand } from '../app/commands';
 import { confirm } from '../app/confirm';
 import { ops } from '../app/ops';
 import { useStore } from '../lib/store';
 import { ago, fullTime, stripAnsi } from '../lib/format';
-import { containerLabel, containerTone, isTerminal, readProblem } from '../lib/status';
+import { containerActionLabel, containerLabel, containerTone, isTerminal, readProblem } from '../lib/status';
 import { useVisible } from '../lib/hooks';
 import { Badge, Button, Card, CardHead, CopyText, Dot, Empty, ErrorNotice, IconButton, Menu, Notice, PageHead, SearchInput, Segmented, Select, Sheet, Skeleton, Spinner, Tabs, Tag } from '../ui/kit';
 
@@ -103,7 +103,7 @@ function ContainerTable({ node, setNode, nodes, openRef, setOpen }: { node: stri
           <Empty icon={<Boxes />} title={items.length ? '没有匹配的容器' : '没有容器'}>{items.length ? '调整筛选条件试试。' : '节点上的 Docker 还没有容器，或尚未读取完成。'}</Empty>
         ) : (
           <div className="table-wrap">
-            <table className="table">
+            <table className="table container-table">
               <thead><tr><th>容器</th><th>状态</th><th className="hide-sm">项目</th><th className="hide-sm">端口</th><th className="actions-cell" /></tr></thead>
               <tbody>
                 {groups.map(([nodeId, g]) => (
@@ -122,31 +122,54 @@ function ContainerTable({ node, setNode, nodes, openRef, setOpen }: { node: stri
 function GroupRows({ name, items, onOpen, showGroup }: { name: string; items: ContainerListItem[]; onOpen: (c: ContainerListItem) => void; showGroup: boolean }) {
   return (
     <>
-      {showGroup && <tr className="group-row"><td colSpan={5}>{name} · {items.length}</td></tr>}
+      {showGroup && <tr className="group-row"><td colSpan={3}>{name} · {items.length}</td><td className="hide-sm" colSpan={2} /></tr>}
       {items.map((c) => <ContainerRow key={ref(c)} c={c} onOpen={() => onOpen(c)} />)}
     </>
   );
 }
 
-function useContainerAction(c: ContainerListItem) {
-  return useCommand<'start' | 'stop' | 'restart' | 'update', Operation>({
-    label: (a) => ({ start: '启动容器', stop: '停止容器', restart: '重启容器', update: '更新容器镜像' })[a],
+function ContainerActions({ c, active, onOpen }: { c: ContainerListItem; active: boolean; onOpen?: () => void }) {
+  const command = useCommand<ContainerActionRequest, Operation>({
+    label: ({ action }) => containerActionLabel[action],
     node: c.node_id,
-    run: async (action, key) => (await call<Operation>('POST', `/nodes/${enc(c.node_id)}/engines/${enc(c.engine_id)}/containers/${enc(c.container_id)}/actions`, { key, body: { action, expected_revision: c.revision } })).data,
+    run: async (body, key) => (await call<Operation>('POST', `/nodes/${enc(c.node_id)}/engines/${enc(c.engine_id)}/containers/${enc(c.container_id)}/actions`, { key, body })).data,
   });
+  const disabled = command.busy || active || !!c.read_only_reason;
+  const run = async (action: ContainerActionRequest['action']) => {
+    const text = {
+      stop: ['停止', `${c.name} 将停止运行。`],
+      kill: ['强制停止', `${c.name} 将立即停止，未保存的数据可能丢失。`],
+      restart: ['重启', `${c.name} 将重新启动，服务会短暂中断。`],
+      remove: ['删除', `将删除 ${c.name} 及其可写层，保留挂载卷和绑定目录。`],
+      update: ['更新', `将拉取 ${c.image} 的最新镜像并重建 ${c.name}，保留卷与网络配置。`],
+    };
+    if (action !== 'start') {
+      const [confirmLabel, body] = text[action];
+      if (!await confirm({ title: `${containerActionLabel[action]}？`, body, confirmLabel, danger: action === 'stop' || action === 'kill' || action === 'remove' })) return;
+    }
+    void command.run({ action, expected_revision: c.revision });
+  };
+  const running = c.state === 'running';
+  const stopped = c.state === 'created' || c.state === 'exited' || c.state === 'dead';
+  return (
+    <Menu trigger={(props) => <IconButton size="sm" label={onOpen ? '更多' : '容器操作'} {...props}><Ellipsis /></IconButton>} items={[
+      ...(onOpen ? [{ label: '详情与日志', icon: <FileText />, onSelect: onOpen }] : []),
+      ...(running ? [
+        { label: '停止', icon: <Square />, disabled, onSelect: () => void run('stop') },
+        { label: '强制停止', icon: <OctagonX />, disabled, danger: true, onSelect: () => void run('kill') },
+        { label: '重启', icon: <RotateCw />, disabled, onSelect: () => void run('restart') },
+      ] : []),
+      ...(stopped ? [{ label: '启动', icon: <Play />, disabled, onSelect: () => void run('start') }] : []),
+      { label: '更新镜像', icon: <Download />, disabled, onSelect: () => void run('update') },
+      ...(stopped ? [{ label: '删除', icon: <Trash2 />, disabled, danger: true, onSelect: () => void run('remove') }] : []),
+    ]} />
+  );
 }
 
 function ContainerRow({ c, onOpen }: { c: ContainerListItem; onOpen: () => void }) {
-  const action = useContainerAction(c);
   const active = useActiveOp('container', c.container_id);
   const tone = containerTone(c.state, c.health);
   const running = c.state === 'running';
-  const locked = !!c.read_only_reason;
-  const busy = action.busy || !!active;
-  const ask = async (a: 'stop' | 'restart' | 'update') => {
-    const text = { stop: ['停止容器？', `${c.name} 将停止运行。`], restart: ['重启容器？', `${c.name} 将重新启动，服务会短暂中断。`], update: ['更新镜像并重建？', `先拉取 ${c.image} 的最新镜像，再停止并替换容器；卷与网络配置保留。`] }[a];
-    if (await confirm({ title: text[0]!, body: text[1], confirmLabel: { stop: '停止', restart: '重启', update: '更新' }[a], danger: a === 'stop' })) void action.run(a);
-  };
   return (
     <motion.tr layout="position" className="clickable" onClick={onOpen} initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
       <td>
@@ -171,14 +194,7 @@ function ContainerRow({ c, onOpen }: { c: ContainerListItem; onOpen: () => void 
       <td className="hide-sm"><div className="ports">{c.ports.filter((p) => p.host_port).slice(0, 3).map((p, i) => <Tag key={i}>{p.host_port}→{p.container_port}/{p.protocol}</Tag>)}{c.ports.filter((p) => p.host_port).length > 3 && <Tag>+{c.ports.filter((p) => p.host_port).length - 3}</Tag>}</div></td>
       <td className="actions-cell" onClick={(e) => e.stopPropagation()}>
         <div className="row-actions">
-          {running
-            ? <IconButton size="sm" label="重启" disabled={busy || locked} onClick={() => void ask('restart')}><RotateCw /></IconButton>
-            : <IconButton size="sm" label="启动" disabled={busy || locked} onClick={() => void action.run('start')}><Play /></IconButton>}
-          {running && <IconButton size="sm" label="停止" disabled={busy || locked} onClick={() => void ask('stop')}><Square /></IconButton>}
-          <Menu trigger={(p) => <IconButton size="sm" label="更多" {...p}><Ellipsis /></IconButton>} items={[
-            { label: '详情与日志', icon: <FileText />, onSelect: onOpen },
-            { label: '更新镜像', icon: <Download />, disabled: busy || locked, onSelect: () => void ask('update') },
-          ]} />
+          <ContainerActions c={c} active={!!active} onOpen={onOpen} />
         </div>
       </td>
     </motion.tr>
@@ -190,18 +206,10 @@ function ContainerSheet({ item, onClose }: { item?: ContainerListItem; onClose: 
   const lastItem = useRef(item);
   if (item) lastItem.current = item;
   const c = item ?? lastItem.current;
-  const action = useContainerAction(c ?? ({ node_id: '', engine_id: '', container_id: '', revision: '' } as ContainerListItem));
   const active = useActiveOp('container', c?.container_id ?? '');
   return (
     <Sheet open={!!item} onClose={onClose} width={860} title={c?.name ?? ''} sub={c ? `${c.node_name} · ${c.image}` : ''} icon={c && <Dot tone={containerTone(c.state, c.health)} live={c.state === 'running'} />}
-      actions={c && (
-        <div className="row">
-          {c.state === 'running'
-            ? <><Button size="sm" icon={<RotateCw />} busy={action.busy || !!active} disabled={!!c.read_only_reason} onClick={async () => { if (await confirm({ title: '重启容器？', confirmLabel: '重启' })) void action.run('restart'); }}>重启</Button>
-               <Button size="sm" icon={<Square />} disabled={!!active || !!c.read_only_reason} onClick={async () => { if (await confirm({ title: '停止容器？', danger: true, confirmLabel: '停止' })) void action.run('stop'); }}>停止</Button></>
-            : <Button size="sm" variant="primary" icon={<Play />} busy={action.busy || !!active} disabled={!!c.read_only_reason} onClick={() => void action.run('start')}>启动</Button>}
-        </div>
-      )}>
+      actions={c && <ContainerActions key={ref(c)} c={c} active={!!active} />}>
       {c?.read_only_reason && <Notice tone="info">{c.read_only_reason}</Notice>}
       <Tabs value={tab} onChange={setTab} options={[{ value: 'logs', label: '日志' }, { value: 'info', label: '详情' }]} />
       {c && (tab === 'logs' ? <ContainerLogView c={c} /> : <ContainerInfo c={c} />)}

@@ -169,6 +169,8 @@ curl -fsS -X PUT "$OPSD_API_URL/nodes/$OPSD_NODE_ID/tasks/check/definition" \
 
 Compose 集合为 `/compose-projects`，详情位于 `/nodes/{node_id}/engines/{engine_id}/compose-projects/{project_id}`。单项 `GET /registration` 读取已登记配置和 ETag，`PUT /registration` 首次使用 `If-None-Match: *`、替换使用原登记的 `If-Match`，并提供请求键。`POST /actions` 发送 `action`、`expected_revision` 和请求键。定义文件内容参与动作版本核验；执行前再次检查实际项目，配置编辑继续使用 SSH。容器详情、日志与动作采用相同节点／Engine／完整容器 ID 归属。
 
+容器 `POST /actions` 中，`kill` 对运行中的容器发送 `SIGKILL`，`remove` 仅删除 `created`、`exited` 或 `dead` 容器，保留挂载卷和绑定目录。两者都需要 `expected_revision` 和 `Idempotency-Key`。受管容器返回 `403`，原 ID 在受理前已消失返回 `404`。删除发送后，由同一 Engine 确认原 ID 已消失时操作完成。应答丢失时用原请求键查回执，原操作的 `recover` 只读回状态。
+
 数据库定义位于 `/database-clusters`，配置详情与 `/{id}/status` 分类运行读取分开；`POST /{id}/changes` 提交业务变更，`/{id}/backups` 读取备份。连接凭据留在所属节点，Galera 变更执行一次，各代理保留独立持久结果。部分完成读取原操作后显式处理；其他待应用差异保留。系统及已登记服务账号继续受保护。
 
 数据库创建与接入要求管理员会话。`POST /database-clusters/discovery` 只读发现实例并按实际 Galera 身份归组，缺失凭据通过 `credentials` 按实例补充；扫描和预览均不登记实例。`POST /database-clusters/deployment-previews` 的 `mode` 为 `create/import/members/proxy`，返回环境、Docker 与防火墙变更、阻断原因及有效期。确认时将预览的 `coordinator/token/revision` 和原请求键提交到 `/database-clusters/deployments`、`/{id}/members/actions` 或 `/{id}/proxies/actions`，返回 `202 + Operation`。任务沿用原操作查询、排队取消和重新处理入口；已完成成员保留，版本或环境变化后重新预览。

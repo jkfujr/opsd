@@ -5460,7 +5460,7 @@
     "/nodes/{node_id}/engines/{engine_id}/containers/{container_id}/actions": {
       "post": {
         "operationId": "changeContainer",
-        "summary": "启动、停止或重启容器",
+        "summary": "启动、停止、强制停止、重启、删除容器或更新镜像",
         "tags": [
           "containers"
         ],
@@ -16473,6 +16473,8 @@
               "start",
               "stop",
               "restart",
+              "kill",
+              "remove",
               "update"
             ]
           },

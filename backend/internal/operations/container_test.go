@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/jkfujr/opsd/internal/dockerengine"
 	"github.com/jkfujr/opsd/internal/protocol"
 	"github.com/jkfujr/opsd/internal/storage"
 )
@@ -16,17 +17,19 @@ type containerRuntime struct {
 	writes      int
 	lost        bool
 	interrupted func()
+	inspectErr  error
 }
 
 func (c *containerRuntime) Inspect(context.Context, protocol.ContainerRef) (protocol.ContainerDetail, error) {
 	c.current.CheckedAt = time.Now().UTC()
-	return c.current, nil
+	return c.current, c.inspectErr
 }
 func (c *containerRuntime) Change(_ context.Context, a protocol.ContainerAction) error {
 	c.writes++
-	if a.Action == "stop" {
+	switch a.Action {
+	case "stop", "kill", "remove":
 		c.current.State = "exited"
-	} else {
+	default:
 		c.current.State = "running"
 		at := c.current.StartedAt.Add(time.Second)
 		c.current.StartedAt = &at
@@ -38,6 +41,56 @@ func (c *containerRuntime) Change(_ context.Context, a protocol.ContainerAction)
 		return errors.New("Docker 应答丢失")
 	}
 	return nil
+}
+
+func TestContainerDestructiveActionReadback(t *testing.T) {
+	missing := &dockerengine.Fault{Code: "not_found", Message: "原容器已移除"}
+	wrongEngine := &dockerengine.Fault{Code: "conflict", Message: "Docker Engine 身份已变化"}
+	for _, c := range []struct {
+		name, action, state string
+		before, after       error
+		want                protocol.OperationState
+		writes              int
+	}{
+		{"原容器在发送前已消失", "remove", "exited", missing, nil, protocol.Rejected, 0},
+		{"拒绝删除运行容器", "remove", "running", nil, nil, protocol.Rejected, 0},
+		{"删除丢失应答后由原 ID 缺失确认", "remove", "exited", nil, missing, protocol.Succeeded, 1},
+		{"删除后换了 Engine", "remove", "exited", nil, wrongEngine, protocol.AttentionRequired, 1},
+		{"删除后仍读到原容器", "remove", "exited", nil, nil, protocol.AttentionRequired, 1},
+		{"强制停止后原容器仍在且已停止", "kill", "running", nil, nil, protocol.Succeeded, 1},
+		{"强制停止后原容器消失", "kill", "running", nil, missing, protocol.AttentionRequired, 1},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			e, _, _ := operationFixture(t)
+			runtime := &containerRuntime{current: protocol.ContainerDetail{ContainerSummary: protocol.ContainerSummary{
+				ContainerRef: protocol.ContainerRef{EngineID: "本机 Docker", ContainerID: strings.Repeat("a", 64)}, Name: "测试容器", State: c.state,
+			}}, inspectErr: c.before, lost: true}
+			runtime.interrupted = func() { runtime.inspectErr = c.after }
+			e.Containers = runtime
+			action := protocol.ContainerAction{ContainerRef: runtime.current.ContainerRef, Action: c.action, ExpectedRevision: protocol.ContainerRevision(runtime.current.ContainerSummary)}
+			accept(t, e, "container-action", protocol.OperationAction{Kind: "container", Container: &action})
+			if err := e.Run(t.Context(), "container-action"); err != nil {
+				t.Fatal(err)
+			}
+			local, err := e.Store.Get(t.Context(), "container-action")
+			if err != nil || local.Record.State != c.want || runtime.writes != c.writes {
+				t.Fatal(local.Record, err, runtime.writes)
+			}
+			if c.action == "remove" && c.want == protocol.AttentionRequired {
+				runtime.inspectErr = missing
+				if _, err = e.Store.Request(t.Context(), local.Record.ID, "recover", local.Record.Revision); err != nil {
+					t.Fatal(err)
+				}
+				if err = e.Run(t.Context(), local.Record.ID); err != nil {
+					t.Fatal(err)
+				}
+				local, err = e.Store.Get(t.Context(), local.Record.ID)
+				if err != nil || local.Record.State != protocol.Succeeded || runtime.writes != 1 {
+					t.Fatal("读回原操作时重发了删除或未确认缺失", local.Record, err, runtime.writes)
+				}
+			}
+		})
+	}
 }
 func TestContainerRestartUnknownNeverRepeats(t *testing.T) {
 	e, _, _ := operationFixture(t)

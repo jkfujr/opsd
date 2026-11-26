@@ -545,8 +545,14 @@ func (n *Node) enqueueTxObserved(ctx context.Context, origin string, r Request, 
 			if !ok {
 				return Operation{}, fault("dependency_unavailable", "容器状态不可用")
 			}
-			if protocol.ContainerRevision(current.Container.ContainerSummary) != action.ExpectedRevision {
+			if reason := current.Container.ReadOnlyReason; reason != "" {
+				return Operation{}, fault("forbidden", reason)
+			}
+			if !current.Container.MatchesRevision(action.ExpectedRevision) {
 				return Operation{}, fault("conflict", "容器已经变化，请重新读取")
+			}
+			if !action.CanApply(current.Container.State) {
+				return Operation{}, fault("conflict", "容器当前状态不支持此操作")
 			}
 			targetName = current.Container.Name
 			action.Project = current.Container.Project

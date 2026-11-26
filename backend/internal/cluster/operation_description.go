@@ -43,6 +43,9 @@ func (n *Node) describeOperation(ctx context.Context, tx firewallQuerier, r Requ
 			return err
 		}
 		op.Action = action.Action
+		if action.Action == "remove" {
+			logs = false
+		}
 		op.ResourceID = action.ContainerID
 		op.Resource = &OperationResource{Kind: "container", NodeID: n.ID, ID: action.ContainerID, EngineID: action.EngineID}
 	case "compose":

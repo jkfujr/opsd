@@ -20,3 +20,16 @@ func ContainerRevision(value ContainerSummary) string {
 	sort.Slice(value.Ports, func(i, j int) bool { return ResourceVersion(value.Ports[i]) < ResourceVersion(value.Ports[j]) })
 	return ResourceVersion(value)
 }
+
+func (d ContainerDetail) MatchesRevision(revision string) bool {
+	if revision == ContainerRevision(d.ContainerSummary) {
+		return true
+	}
+	if d.ImageID == "" || d.ImageID == d.Image {
+		return false
+	}
+	// 镜像标签改指后，Docker 列表会用该容器实际绑定的镜像 ID。
+	summary := d.ContainerSummary
+	summary.Image = d.ImageID
+	return revision == ContainerRevision(summary)
+}

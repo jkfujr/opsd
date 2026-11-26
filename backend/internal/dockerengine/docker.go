@@ -132,6 +132,12 @@ func readOnly(labels map[string]string) string {
 	if labels["opsd.storage"] != "" {
 		return "通过 OPSD 数据设置管理"
 	}
+	if _, managed := labels[deploymentLabel]; managed {
+		return "通过数据库管理"
+	}
+	if _, managed := labels["com.opsd.storage.pool"]; managed {
+		return "通过存储池管理"
+	}
 	if labels["com.docker.swarm.task.id"] != "" {
 		return "由 Swarm 管理"
 	}
@@ -185,7 +191,7 @@ func (m *Manager) Inspect(ctx context.Context, ref protocol.ContainerRef) (proto
 	return detail(ref, raw), nil
 }
 func detail(ref protocol.ContainerRef, raw container.InspectResponse) protocol.ContainerDetail {
-	v := protocol.ContainerDetail{ContainerSummary: protocol.ContainerSummary{ContainerRef: ref, Name: strings.TrimPrefix(raw.Name, "/"), Ports: []protocol.ContainerPort{}, Health: "none"}, Mounts: []protocol.ContainerMount{}, Networks: []protocol.ContainerNetwork{}, CheckedAt: time.Now().UTC(), RestartCount: raw.RestartCount}
+	v := protocol.ContainerDetail{ContainerSummary: protocol.ContainerSummary{ContainerRef: ref, Name: strings.TrimPrefix(raw.Name, "/"), Ports: []protocol.ContainerPort{}, Health: "none"}, ImageID: raw.Image, Mounts: []protocol.ContainerMount{}, Networks: []protocol.ContainerNetwork{}, CheckedAt: time.Now().UTC(), RestartCount: raw.RestartCount}
 	if t := timeValue(raw.Created); t != nil {
 		v.CreatedAt = *t
 	}
@@ -248,13 +254,13 @@ func (m *Manager) Change(ctx context.Context, action protocol.ContainerAction) e
 	defer c.Close()
 	current := detail(action.ContainerRef, raw)
 	if current.ReadOnlyReason != "" {
-		return failure("conflict", current.ReadOnlyReason, "")
+		return failure("forbidden", current.ReadOnlyReason, "")
 	}
-	if current.State == "paused" || current.State == "restarting" || current.State == "removing" {
+	if action.ExpectedRevision != "" && !current.MatchesRevision(action.ExpectedRevision) {
+		return failure("conflict", "容器已经变化，请重新读取", "")
+	}
+	if !action.CanApply(current.State) {
 		return failure("conflict", "容器当前状态不支持此操作", "")
-	}
-	if action.Action == "restart" && current.State != "running" {
-		return failure("conflict", "请先启动容器", "")
 	}
 	switch action.Action {
 	case "start":
@@ -263,6 +269,10 @@ func (m *Manager) Change(ctx context.Context, action protocol.ContainerAction) e
 		_, err = c.ContainerStop(ctx, action.ContainerID, client.ContainerStopOptions{})
 	case "restart":
 		_, err = c.ContainerRestart(ctx, action.ContainerID, client.ContainerRestartOptions{})
+	case "kill":
+		_, err = c.ContainerKill(ctx, action.ContainerID, client.ContainerKillOptions{Signal: "SIGKILL"})
+	case "remove":
+		_, err = c.ContainerRemove(ctx, action.ContainerID, client.ContainerRemoveOptions{})
 	}
 	if err != nil {
 		return failure("dependency_unavailable", "Docker 操作应答未知，请核对原操作", "")

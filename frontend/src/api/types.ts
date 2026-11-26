@@ -26,6 +26,7 @@ export type ContainerList = Schemas['ContainerList'];
 export type ContainerListItem = Schemas['ContainerListItem'];
 export type ContainerDetail = Schemas['ContainerDetail'];
 export type ContainerLogs = Schemas['ContainerLogs'];
+export type ContainerActionRequest = Schemas['ContainerActionRequest'];
 export type DockerNodeState = Schemas['DockerNodeState'];
 export type ComposeProjectList = Schemas['ComposeProjectList'];
 export type ComposeProjectItem = Schemas['ComposeProjectItem'];

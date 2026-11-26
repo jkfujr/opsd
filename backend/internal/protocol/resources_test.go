@@ -29,3 +29,21 @@ func TestResourceClaimsFollowProjectAndInstance(t *testing.T) {
 		})
 	}
 }
+
+func TestContainerRevisionMatchesDisplayedImage(t *testing.T) {
+	detail := ContainerDetail{ContainerSummary: ContainerSummary{
+		ContainerRef: ContainerRef{EngineID: "engine", ContainerID: "container"}, Image: "app:latest", State: "running",
+	}, ImageID: "sha256:actual"}
+	list := detail.ContainerSummary
+	if !detail.MatchesRevision(ContainerRevision(list)) {
+		t.Fatal("容器标签版本失效")
+	}
+	list.Image = detail.ImageID
+	if !detail.MatchesRevision(ContainerRevision(list)) {
+		t.Fatal("镜像 ID 列表版本失效")
+	}
+	list.State = "exited"
+	if detail.MatchesRevision(ContainerRevision(list)) {
+		t.Fatal("镜像 ID 版本绕过了容器状态检查")
+	}
+}

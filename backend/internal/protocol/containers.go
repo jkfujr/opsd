@@ -35,10 +35,31 @@ func (a ContainerAction) Validate() error {
 	if err := a.ContainerRef.Validate(); err != nil {
 		return err
 	}
-	if a.Action != "start" && a.Action != "stop" && a.Action != "restart" && a.Action != "update" {
+	switch a.Action {
+	case "start", "stop", "restart", "update":
+	case "kill", "remove":
+		if !containerID.MatchString(a.ExpectedRevision) {
+			return fmt.Errorf("容器版本无效，请刷新列表")
+		}
+	default:
 		return fmt.Errorf("容器动作无效")
 	}
 	return nil
+}
+
+func ContainerStopped(state string) bool {
+	return state == "created" || state == "exited" || state == "dead"
+}
+
+func (a ContainerAction) CanApply(state string) bool {
+	switch a.Action {
+	case "kill", "restart":
+		return state == "running"
+	case "remove":
+		return ContainerStopped(state)
+	default:
+		return state != "paused" && state != "restarting" && state != "removing"
+	}
 }
 
 type ContainerPort struct {
@@ -71,6 +92,7 @@ type ContainerNetwork struct {
 }
 type ContainerDetail struct {
 	ContainerSummary
+	ImageID       string             `json:"image_id,omitempty"`
 	CreatedAt     time.Time          `json:"created_at"`
 	StartedAt     *time.Time         `json:"started_at,omitempty"`
 	FinishedAt    *time.Time         `json:"finished_at,omitempty"`

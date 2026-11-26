@@ -44,7 +44,7 @@ func (e *Engine) updateContainer(ctx context.Context, l *Local, boot string) err
 		if err != nil {
 			return e.end(ctx, l, protocol.Rejected, err)
 		}
-		if protocol.ContainerRevision(current.ContainerSummary) != a.ExpectedRevision {
+		if !current.MatchesRevision(a.ExpectedRevision) {
 			return e.end(ctx, l, protocol.Rejected, fmt.Errorf("容器已经变化，未开始镜像更新"))
 		}
 	}

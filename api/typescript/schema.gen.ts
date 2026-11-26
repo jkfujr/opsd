@@ -708,7 +708,7 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * 启动、停止或重启容器
+         * 启动、停止、强制停止、重启、删除容器或更新镜像
          * @description Idempotency-Key 作用于稳定调用身份和所属目标；未知结果先查询原请求，禁止自动换键重做。
          */
         post: operations["changeContainer"];
@@ -2514,7 +2514,7 @@ export interface components {
         };
         ContainerActionRequest: {
             /** @enum {string} */
-            action: "start" | "stop" | "restart" | "update";
+            action: "start" | "stop" | "restart" | "kill" | "remove" | "update";
             expected_revision: string;
         };
         ContainerLogs: {

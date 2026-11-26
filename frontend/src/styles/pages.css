@@ -116,6 +116,13 @@
 .ports { display: flex; flex-wrap: wrap; gap: 4px; }
 .row-actions { display: inline-flex; gap: 2px; opacity: 0.55; transition: opacity var(--t-fast); }
 tr:hover .row-actions, .row-actions:focus-within { opacity: 1; }
+@media (max-width: 760px) {
+  .container-table { table-layout: fixed; }
+  .container-table th, .container-table td { padding-inline: 10px; }
+  .container-table th:nth-child(2) { width: 7rem; }
+  .container-table .actions-cell { width: 3rem; }
+  .container-table .row-actions { opacity: 1; }
+}
 .logs-view {
   flex: 1;
   min-height: 260px;
