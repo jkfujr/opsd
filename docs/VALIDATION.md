@@ -57,6 +57,23 @@ sudo env OPSD_TEST_STORAGE_ROOT=1 OPSD_TEST_BINARY="$opsd_fixture_exec/opsd" \
   artifacts/opsd-i3/cli.test -test.run '^TestStorageRootDualDisk$' -test.v -test.timeout=8m
 ```
 
+集群 S3 池验收在独立的 `OPSD-CI` 运行，使用三个逻辑成员、三个模拟故障域、固定镜像、原生 loop 挂载和真实 systemd。五类容器以 `65534:65534` 运行。先启动 PolicyKit，使其挂载命名空间在测试盘挂载之前建立。
+
+```bash
+set -o pipefail
+mkdir -p artifacts/opsd-i5
+go -C backend build -o ../artifacts/opsd-i5/opsd ./cmd/opsd
+go -C backend test -c -o ../artifacts/opsd-i5/api.test ./internal/control
+sudo systemctl start polkit.service
+sudo env OPSD_TEST_STORAGE_POOL=1 \
+  artifacts/opsd-i5/api.test -test.run '^TestStoragePoolSharedDiskCapacityNative$' -test.v -test.timeout=3m \
+  2>&1 | tee artifacts/opsd-i5/capacity.log
+sudo env OPSD_TEST_STORAGE_POOL=1 OPSD_TEST_STORAGE_POOL_SOAK=2h \
+  OPSD_TEST_BINARY="$PWD/artifacts/opsd-i5/opsd" \
+  artifacts/opsd-i5/api.test -test.run '^TestStoragePoolNative$' -test.v -test.timeout=2h20m \
+  2>&1 | tee artifacts/opsd-i5/native.log
+```
+
 主题检查沿用 Go 测试和 Playwright，CI 的“整套主题与内置恢复界面”步骤构建 React、Vue 成品包，在内置生产资源上检查安装、连续条件切换、双登录模式、深层路由、未知应答后的读取和损坏主题恢复，同时验证 Swagger 会话／Bearer、CSRF、条件写入、原键查询与根路径指标。另在独立主题、默认内置与内置恢复三模式执行受影响状态、日志、受管路由和防火墙接纳检查，截图随 `theme-check` 工件保存。手动复现从仓库根目录运行：
 
 ```powershell
@@ -69,8 +86,8 @@ go -C backend test ./internal/control -run '^TestConsoleThemeBrowser$' -v -count
 
 ## 最近结果
 
-2026-11-27，基于 `d6df211` 的工作区。环境为独立 WSL 2 `OPSD-CI`、Ubuntu 24.04、Linux amd64、Go 1.26.2、Node.js 24.14.1、Docker 29.1.3 和 systemd。构建阶段完成 OpenAPI 生成一致性、前端类型检查及生产构建、Linux amd64／arm64 编译。后端回归阶段退出码为 0。双盘用例 81.78 秒，I0.6 已完成记录回退用例 1.54 秒。原始结果和逐步读回保存在 `artifacts/opsd-v4/I3/`，合并审查位于 `artifacts/opsd-v4/final-review.md`。
+2026-11-27，基于 `dda0b6c` 的 I5 改动。独立 WSL 2 `OPSD-CI` 的构建和后端回归退出码均为 0。构建覆盖 OpenAPI 生成一致性、前端类型检查与生产构建、Linux amd64／arm64 编译。I5 原生三成员用例使用 6 GiB 数据卷，三次领导节点故障后旧对象恢复读取最慢 3.241 秒，新写入并跨入口读回最慢 34.808 秒。连续观察 2 小时完成 359 轮三入口签名读取，隔离容器、挂载、loop 设备和 systemd 单元均已清理。I3 原生双盘复用容量兼容修订后的结果，用时 81.71 秒。逐项命令和原始结果见 `artifacts/opsd-v4/final-review.md` 及 `artifacts/opsd-v4/I5/`。
 
-已验证：HTTP 条件写入与幂等，ProxySQL、Thanos 和单节点池数据镜像切换，缺盘、错盘、非受管容器冲突、重载超时后停止发出 systemd 操作、目标修复与反迁，以及 I0.6 元数据回退。未验证：生产组件切换、真实 Galera 目录迁移、多成员分布式池、arm64 实机。
+已验证：三逻辑故障域的建池与原回执、跨入口对象和 multipart、三次领导节点故障、同盘并发配额、写满及重挂载、池数据卷迁移、五类角色实际 UID/GID 和落盘权限、近到期换证、双 CA 信任和零防火墙写入。未验证：生产私网建池、整机停机、真实 Galera 搬盘和 arm64 实机。
 
 历史结果见 [变更记录](../CHANGELOG.md)。

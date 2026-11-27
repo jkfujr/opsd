@@ -4567,6 +4567,186 @@ func (a *strictAPI) InitializeSharedStorage(ctx context.Context, request httpapi
 	return nil, fmt.Errorf("InitializeSharedStorage 返回未声明状态 %d", w.status())
 }
 
+func (a *strictAPI) ListStoragePools(ctx context.Context, request httpapi.ListStoragePoolsRequestObject) (httpapi.ListStoragePoolsResponseObject, error) {
+	r := strictRequest(ctx)
+	w := newAPIResponse(r)
+	a.server.ListStoragePools(w, r, request.Params)
+	a.server.prepareAPIResponse(w, r)
+	switch w.status() {
+	case 200:
+		return strictResponse[httpapi.ListStoragePools200JSONResponse](w)
+	case 400:
+		return strictResponse[httpapi.ListStoragePools400ApplicationProblemPlusJSONResponse](w)
+	case 401:
+		return strictResponse[httpapi.ListStoragePools401ApplicationProblemPlusJSONResponse](w)
+	case 403:
+		return strictResponse[httpapi.ListStoragePools403ApplicationProblemPlusJSONResponse](w)
+	case 404:
+		return strictResponse[httpapi.ListStoragePools404ApplicationProblemPlusJSONResponse](w)
+	case 405:
+		return strictResponse[httpapi.ListStoragePools405ApplicationProblemPlusJSONResponse](w)
+	case 406:
+		return strictResponse[httpapi.ListStoragePools406ApplicationProblemPlusJSONResponse](w)
+	case 409:
+		return strictResponse[httpapi.ListStoragePools409ApplicationProblemPlusJSONResponse](w)
+	case 412:
+		return strictResponse[httpapi.ListStoragePools412ApplicationProblemPlusJSONResponse](w)
+	case 413:
+		return strictResponse[httpapi.ListStoragePools413ApplicationProblemPlusJSONResponse](w)
+	case 415:
+		return strictResponse[httpapi.ListStoragePools415ApplicationProblemPlusJSONResponse](w)
+	case 422:
+		return strictResponse[httpapi.ListStoragePools422ApplicationProblemPlusJSONResponse](w)
+	case 428:
+		return strictResponse[httpapi.ListStoragePools428ApplicationProblemPlusJSONResponse](w)
+	case 429:
+		return strictResponse[httpapi.ListStoragePools429ApplicationProblemPlusJSONResponse](w)
+	case 500:
+		return strictResponse[httpapi.ListStoragePools500ApplicationProblemPlusJSONResponse](w)
+	case 503:
+		return strictResponse[httpapi.ListStoragePools503ApplicationProblemPlusJSONResponse](w)
+	case 504:
+		return strictResponse[httpapi.ListStoragePools504ApplicationProblemPlusJSONResponse](w)
+	}
+	return nil, fmt.Errorf("ListStoragePools 返回未声明状态 %d", w.status())
+}
+
+func (a *strictAPI) CreateStoragePool(ctx context.Context, request httpapi.CreateStoragePoolRequestObject) (httpapi.CreateStoragePoolResponseObject, error) {
+	r := strictRequest(ctx)
+	w := newAPIResponse(r)
+	a.server.CreateStoragePool(w, r, request.Params)
+	a.server.prepareAPIResponse(w, r)
+	switch w.status() {
+	case 202:
+		return strictResponse[httpapi.CreateStoragePool202JSONResponse](w)
+	case 400:
+		return strictResponse[httpapi.CreateStoragePool400ApplicationProblemPlusJSONResponse](w)
+	case 401:
+		return strictResponse[httpapi.CreateStoragePool401ApplicationProblemPlusJSONResponse](w)
+	case 403:
+		return strictResponse[httpapi.CreateStoragePool403ApplicationProblemPlusJSONResponse](w)
+	case 404:
+		return strictResponse[httpapi.CreateStoragePool404ApplicationProblemPlusJSONResponse](w)
+	case 405:
+		return strictResponse[httpapi.CreateStoragePool405ApplicationProblemPlusJSONResponse](w)
+	case 406:
+		return strictResponse[httpapi.CreateStoragePool406ApplicationProblemPlusJSONResponse](w)
+	case 409:
+		return strictResponse[httpapi.CreateStoragePool409ApplicationProblemPlusJSONResponse](w)
+	case 412:
+		return strictResponse[httpapi.CreateStoragePool412ApplicationProblemPlusJSONResponse](w)
+	case 413:
+		return strictResponse[httpapi.CreateStoragePool413ApplicationProblemPlusJSONResponse](w)
+	case 415:
+		return strictResponse[httpapi.CreateStoragePool415ApplicationProblemPlusJSONResponse](w)
+	case 422:
+		return strictResponse[httpapi.CreateStoragePool422ApplicationProblemPlusJSONResponse](w)
+	case 428:
+		return strictResponse[httpapi.CreateStoragePool428ApplicationProblemPlusJSONResponse](w)
+	case 429:
+		return strictResponse[httpapi.CreateStoragePool429ApplicationProblemPlusJSONResponse](w)
+	case 500:
+		return strictResponse[httpapi.CreateStoragePool500ApplicationProblemPlusJSONResponse](w)
+	case 503:
+		return strictResponse[httpapi.CreateStoragePool503ApplicationProblemPlusJSONResponse](w)
+	case 504:
+		return strictResponse[httpapi.CreateStoragePool504ApplicationProblemPlusJSONResponse](w)
+	case 507:
+		return strictResponse[httpapi.CreateStoragePool507ApplicationProblemPlusJSONResponse](w)
+	}
+	return nil, fmt.Errorf("CreateStoragePool 返回未声明状态 %d", w.status())
+}
+
+func (a *strictAPI) PreviewStoragePool(ctx context.Context, request httpapi.PreviewStoragePoolRequestObject) (httpapi.PreviewStoragePoolResponseObject, error) {
+	r := strictRequest(ctx)
+	w := newAPIResponse(r)
+	a.server.PreviewStoragePool(w, r, request.Params)
+	a.server.prepareAPIResponse(w, r)
+	switch w.status() {
+	case 200:
+		return strictResponse[httpapi.PreviewStoragePool200JSONResponse](w)
+	case 400:
+		return strictResponse[httpapi.PreviewStoragePool400ApplicationProblemPlusJSONResponse](w)
+	case 401:
+		return strictResponse[httpapi.PreviewStoragePool401ApplicationProblemPlusJSONResponse](w)
+	case 403:
+		return strictResponse[httpapi.PreviewStoragePool403ApplicationProblemPlusJSONResponse](w)
+	case 404:
+		return strictResponse[httpapi.PreviewStoragePool404ApplicationProblemPlusJSONResponse](w)
+	case 405:
+		return strictResponse[httpapi.PreviewStoragePool405ApplicationProblemPlusJSONResponse](w)
+	case 406:
+		return strictResponse[httpapi.PreviewStoragePool406ApplicationProblemPlusJSONResponse](w)
+	case 409:
+		return strictResponse[httpapi.PreviewStoragePool409ApplicationProblemPlusJSONResponse](w)
+	case 412:
+		return strictResponse[httpapi.PreviewStoragePool412ApplicationProblemPlusJSONResponse](w)
+	case 413:
+		return strictResponse[httpapi.PreviewStoragePool413ApplicationProblemPlusJSONResponse](w)
+	case 415:
+		return strictResponse[httpapi.PreviewStoragePool415ApplicationProblemPlusJSONResponse](w)
+	case 422:
+		return strictResponse[httpapi.PreviewStoragePool422ApplicationProblemPlusJSONResponse](w)
+	case 428:
+		return strictResponse[httpapi.PreviewStoragePool428ApplicationProblemPlusJSONResponse](w)
+	case 429:
+		return strictResponse[httpapi.PreviewStoragePool429ApplicationProblemPlusJSONResponse](w)
+	case 500:
+		return strictResponse[httpapi.PreviewStoragePool500ApplicationProblemPlusJSONResponse](w)
+	case 503:
+		return strictResponse[httpapi.PreviewStoragePool503ApplicationProblemPlusJSONResponse](w)
+	case 504:
+		return strictResponse[httpapi.PreviewStoragePool504ApplicationProblemPlusJSONResponse](w)
+	case 507:
+		return strictResponse[httpapi.PreviewStoragePool507ApplicationProblemPlusJSONResponse](w)
+	}
+	return nil, fmt.Errorf("PreviewStoragePool 返回未声明状态 %d", w.status())
+}
+
+func (a *strictAPI) GetStoragePool(ctx context.Context, request httpapi.GetStoragePoolRequestObject) (httpapi.GetStoragePoolResponseObject, error) {
+	r := strictRequest(ctx)
+	w := newAPIResponse(r)
+	a.server.GetStoragePool(w, r, request.Id)
+	a.server.prepareAPIResponse(w, r)
+	switch w.status() {
+	case 200:
+		return strictResponse[httpapi.GetStoragePool200JSONResponse](w)
+	case 400:
+		return strictResponse[httpapi.GetStoragePool400ApplicationProblemPlusJSONResponse](w)
+	case 401:
+		return strictResponse[httpapi.GetStoragePool401ApplicationProblemPlusJSONResponse](w)
+	case 403:
+		return strictResponse[httpapi.GetStoragePool403ApplicationProblemPlusJSONResponse](w)
+	case 404:
+		return strictResponse[httpapi.GetStoragePool404ApplicationProblemPlusJSONResponse](w)
+	case 405:
+		return strictResponse[httpapi.GetStoragePool405ApplicationProblemPlusJSONResponse](w)
+	case 406:
+		return strictResponse[httpapi.GetStoragePool406ApplicationProblemPlusJSONResponse](w)
+	case 409:
+		return strictResponse[httpapi.GetStoragePool409ApplicationProblemPlusJSONResponse](w)
+	case 412:
+		return strictResponse[httpapi.GetStoragePool412ApplicationProblemPlusJSONResponse](w)
+	case 413:
+		return strictResponse[httpapi.GetStoragePool413ApplicationProblemPlusJSONResponse](w)
+	case 415:
+		return strictResponse[httpapi.GetStoragePool415ApplicationProblemPlusJSONResponse](w)
+	case 422:
+		return strictResponse[httpapi.GetStoragePool422ApplicationProblemPlusJSONResponse](w)
+	case 428:
+		return strictResponse[httpapi.GetStoragePool428ApplicationProblemPlusJSONResponse](w)
+	case 429:
+		return strictResponse[httpapi.GetStoragePool429ApplicationProblemPlusJSONResponse](w)
+	case 500:
+		return strictResponse[httpapi.GetStoragePool500ApplicationProblemPlusJSONResponse](w)
+	case 503:
+		return strictResponse[httpapi.GetStoragePool503ApplicationProblemPlusJSONResponse](w)
+	case 504:
+		return strictResponse[httpapi.GetStoragePool504ApplicationProblemPlusJSONResponse](w)
+	}
+	return nil, fmt.Errorf("GetStoragePool 返回未声明状态 %d", w.status())
+}
+
 func (a *strictAPI) ListStorageTargets(ctx context.Context, request httpapi.ListStorageTargetsRequestObject) (httpapi.ListStorageTargetsResponseObject, error) {
 	r := strictRequest(ctx)
 	w := newAPIResponse(r)

@@ -70,21 +70,28 @@ func (p poolDeployment) image(ctx context.Context, dir string) error {
 	if len(entries) != 2 || entries[0].Name() != "data" || !entries[0].IsDir() || entries[1].Name() != "data.img" {
 		return fault("conflict", "池数据目录只允许数据镜像及其挂载目录：%s", dir)
 	}
-	path := filepath.Join(dir, "data.img")
+	return verifyPoolImage(ctx, filepath.Join(dir, "data.img"), p.UUID, 0)
+}
+
+func verifyPoolImage(ctx context.Context, path, uuid string, size int64) error {
 	var st unix.Stat_t
 	if err := unix.Lstat(path, &st); err != nil || st.Mode&unix.S_IFMT != unix.S_IFREG || st.Uid != 0 ||
-		st.Gid != 0 || st.Mode&0077 != 0 || st.Nlink != 1 || st.Size <= 0 || st.Blocks*512 < st.Size {
+		st.Gid != 0 || st.Mode&0077 != 0 || st.Nlink != 1 || st.Size <= 0 || st.Blocks*512 < st.Size || size > 0 && st.Size != size {
 		return fault("conflict", "池数据镜像须为预分配的 root 私有普通文件：%s", path)
 	}
 	actual, err := output(ctx, "blkid", "-p", "-s", "UUID", "-o", "value", "--", path)
-	if err != nil || !strings.EqualFold(actual, p.UUID) {
+	if err != nil || !strings.EqualFold(actual, uuid) {
 		return fault("conflict", "池镜像 UUID 不匹配：%s %v", path, err)
 	}
 	return nil
 }
 
 func (p poolDeployment) activeLoop(ctx context.Context, dir string) (string, error) {
-	point := filepath.Join(dir, "data")
+	return activePoolLoop(ctx, dir, "data", p.UUID)
+}
+
+func activePoolLoop(ctx context.Context, dir, name, expectedUUID string) (string, error) {
+	point := filepath.Join(dir, name)
 	at, err := covering(point)
 	if err != nil || at.Point != point {
 		return "", err
@@ -93,11 +100,11 @@ func (p poolDeployment) activeLoop(ctx context.Context, dir string) (string, err
 	if err != nil {
 		return "", err
 	}
-	if !strings.HasPrefix(at.Device, "/dev/loop") || !strings.EqualFold(uuid, p.UUID) {
+	if !strings.HasPrefix(at.Device, "/dev/loop") || !strings.EqualFold(uuid, expectedUUID) {
 		return "", fault("conflict", "池数据挂载的设备或 UUID 不同：%s", point)
 	}
 	actual, err := output(ctx, "losetup", "--noheadings", "--output", "BACK-FILE", at.Device)
-	if err != nil || actual != filepath.Join(dir, "data.img") {
+	if err != nil || actual != filepath.Join(dir, name+".img") {
 		return "", fault("conflict", "池数据 loop 后端不同：%s %v", point, err)
 	}
 	queue := filepath.Join("/sys/class/block", filepath.Base(at.Device), "queue", "discard_max_bytes")
@@ -111,10 +118,14 @@ func (p poolDeployment) mount(ctx context.Context, dir string) error {
 	if err := p.image(ctx, dir); err != nil {
 		return err
 	}
-	if dev, err := p.activeLoop(ctx, dir); err != nil || dev != "" {
+	return mountPoolImage(ctx, dir, "data", p.UUID)
+}
+
+func mountPoolImage(ctx context.Context, dir, name, uuid string) error {
+	if dev, err := activePoolLoop(ctx, dir, name, uuid); err != nil || dev != "" {
 		return err
 	}
-	image, point := filepath.Join(dir, "data.img"), filepath.Join(dir, "data")
+	image, point := filepath.Join(dir, name+".img"), filepath.Join(dir, name)
 	if err := realDir(point, false); err != nil {
 		return err
 	}
@@ -146,18 +157,22 @@ func (p poolDeployment) mount(ctx context.Context, dir string) error {
 		return err
 	}
 	mounted = true
-	_, err = p.activeLoop(ctx, dir)
+	_, err = activePoolLoop(ctx, dir, name, uuid)
 	return err
 }
 
 func (p poolDeployment) unmount(ctx context.Context, dir string) error {
-	dev, err := p.activeLoop(ctx, dir)
+	return unmountPoolImage(ctx, dir, "data", p.UUID)
+}
+
+func unmountPoolImage(ctx context.Context, dir, name, uuid string) error {
+	dev, err := activePoolLoop(ctx, dir, name, uuid)
 	if err != nil {
 		return err
 	}
 	if dev == "" {
 		// 中断可能发生在 umount 与 loop detach 之间。
-		image := filepath.Join(dir, "data.img")
+		image := filepath.Join(dir, name+".img")
 		if _, err := os.Stat(image); errors.Is(err, os.ErrNotExist) {
 			return nil
 		}
@@ -167,7 +182,7 @@ func (p poolDeployment) unmount(ctx context.Context, dir string) error {
 		}
 		return fault("conflict", "池镜像仍关联未核验的 loop：%s", attached)
 	}
-	point := filepath.Join(dir, "data")
+	point := filepath.Join(dir, name)
 	if _, err = output(ctx, "umount", point); err != nil {
 		return err
 	}

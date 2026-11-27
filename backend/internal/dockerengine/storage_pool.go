@@ -4,11 +4,14 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"maps"
 	"path/filepath"
 	"strings"
+	"sync"
 
+	"github.com/containerd/errdefs"
 	"github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/api/types/mount"
 	"github.com/moby/moby/api/types/network"
@@ -23,8 +26,47 @@ type StoragePoolTemplate struct {
 	Networks *network.NetworkingConfig `json:"networks,omitempty"`
 }
 
+func (m *Manager) RestartStoragePool(ctx context.Context, states []StorageContainerState) error {
+	c, _, _, err := m.connect(ctx, 0)
+	if err != nil {
+		return err
+	}
+	defer c.Close()
+	// 同节点的角色彼此独立停机，共享一次等待窗口。
+	timeout := 16
+	results := make([]error, len(states))
+	var wg sync.WaitGroup
+	for i, state := range states {
+		wg.Go(func() {
+			_, results[i] = c.ContainerStop(ctx, state.ID, client.ContainerStopOptions{Timeout: &timeout})
+		})
+	}
+	wg.Wait()
+	if err := errors.Join(results...); err != nil {
+		return err
+	}
+	for _, role := range []string{"etcd", "master", "volume", "filer", "s3"} {
+		for _, state := range states {
+			if strings.HasSuffix(state.Name, "-"+role) {
+				if _, err := c.ContainerStart(ctx, state.ID, client.ContainerStartOptions{}); err != nil {
+					return err
+				}
+			}
+		}
+	}
+	return nil
+}
+
 func (t StoragePoolTemplate) StorageSpec(poolID, directory string) (StorageContainer, error) {
-	out := StorageContainer{Name: t.Name}
+	return t.storageSpec(poolID, directory, "data")
+}
+
+func (t StoragePoolTemplate) StorageControlSpec(poolID, directory string) (StorageContainer, error) {
+	return t.storageSpec(poolID, directory, "control")
+}
+
+func (t StoragePoolTemplate) storageSpec(poolID, directory, volume string) (StorageContainer, error) {
+	out := StorageContainer{Name: t.Name, User: t.Config.User}
 	if t.Name == "" || !(strings.HasPrefix(t.Config.Image, "sha256:") || strings.Contains(t.Config.Image, "@sha256:")) ||
 		t.Host.AutoRemove || len(t.Host.Binds) > 0 || len(t.Host.VolumesFrom) > 0 {
 		return out, fmt.Errorf("存储池数据容器模板无效")
@@ -41,7 +83,7 @@ func (t StoragePoolTemplate) StorageSpec(poolID, directory string) (StorageConta
 			return out, fmt.Errorf("池数据容器仅支持明确的目录绑定")
 		}
 		switch {
-		case filepath.IsLocal(b.Source) && filepath.Clean(b.Source) == b.Source && pathWithin("data", b.Source):
+		case filepath.IsLocal(b.Source) && filepath.Clean(b.Source) == b.Source && pathWithin(volume, b.Source):
 			b.Source = filepath.Join(directory, b.Source)
 			writable = writable || !b.ReadOnly
 		case filepath.IsAbs(b.Source) && b.ReadOnly:
@@ -57,18 +99,37 @@ func (t StoragePoolTemplate) StorageSpec(poolID, directory string) (StorageConta
 }
 
 func (m *Manager) StageStoragePool(ctx context.Context, poolID, directory string, templates []StoragePoolTemplate) error {
+	return m.stageStoragePool(ctx, poolID, directory, "data", templates)
+}
+
+func (m *Manager) StageStoragePoolControl(ctx context.Context, poolID, directory string, templates []StoragePoolTemplate) error {
+	return m.stageStoragePool(ctx, poolID, directory, "control", templates)
+}
+
+func (m *Manager) stageStoragePool(ctx context.Context, poolID, directory, volume string, templates []StoragePoolTemplate) error {
 	c, _, _, err := m.connect(ctx)
 	if err != nil {
 		return err
 	}
 	defer c.Close()
 	for _, t := range templates {
-		spec, err := t.StorageSpec(poolID, directory)
+		spec, err := t.storageSpec(poolID, directory, volume)
 		if err != nil {
 			return err
 		}
 		image, err := c.ImageInspect(ctx, t.Config.Image)
 		if err != nil {
+			return err
+		}
+		existing, err := c.ContainerInspect(ctx, spec.Name, client.ContainerInspectOptions{})
+		if err == nil {
+			if !storageMatches(existing.Container, spec) || existing.Container.Image != image.ID ||
+				existing.Container.HostConfig.RestartPolicy.Name != "no" {
+				return fmt.Errorf("池容器 %s 与已登记的模板不同", spec.Name)
+			}
+			continue
+		}
+		if !errdefs.IsNotFound(err) {
 			return err
 		}
 		config, host := t.Config, t.Host

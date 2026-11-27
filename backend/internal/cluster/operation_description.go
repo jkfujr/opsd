@@ -27,6 +27,18 @@ func (n *Node) describeOperation(ctx context.Context, tx firewallQuerier, r Requ
 		return json.Unmarshal([]byte(body), out)
 	}
 	switch r.Kind {
+	case "storage_pool_create":
+		var input protocol.PoolCreate
+		if err := json.Unmarshal(r.Payload, &input); err != nil {
+			return err
+		}
+		var plan poolPlanRecord
+		if err := read("SELECT body FROM plans WHERE id=?", input.PlanID, &plan); err != nil {
+			return err
+		}
+		op.PlanID, op.ResourceID = input.PlanID, r.ResourceID
+		op.Action, op.TargetName = "create_pool", plan.Normalized.Name
+		op.Resource = &OperationResource{Kind: "storage_pool", NodeID: n.ID, ID: r.ResourceID}
 	case "storage_root":
 		var input protocol.StorageRootInput
 		if err := json.Unmarshal(r.Payload, &input); err != nil {

@@ -31,6 +31,7 @@ type binding struct {
 	Record   string                         `json:"record,omitempty"`
 	Archive  *protocol.MonitoringDeployment `json:"archive,omitempty"`
 	Paused   bool                           `json:"paused,omitempty"`
+	Instance string                         `json:"instance,omitempty"`
 }
 
 type registry struct {

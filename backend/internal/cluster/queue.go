@@ -57,6 +57,9 @@ func (n *Node) dispatch(ctx context.Context, origin, method string, body json.Ra
 	if strings.HasPrefix(method, "shared.") {
 		return n.sharedDispatch(ctx, origin, method, body)
 	}
+	if strings.HasPrefix(method, "storage.pool.") {
+		return n.poolDispatch(ctx, origin, method, body)
+	}
 	switch method {
 	case "storage.save", "storage.save_connection", "storage.get", "storage.check", "storage.probe":
 		return n.storageDispatch(ctx, origin, method, body)
@@ -286,6 +289,9 @@ func (n *Node) enqueue(ctx context.Context, origin string, r Request) (Operation
 			return prior, nil
 		}
 	}
+	if r.Kind == "storage_pool_create" {
+		return n.enqueuePool(ctx, origin, r)
+	}
 	if r.Kind == "storage_root" {
 		if e := n.checkStorageRoot(ctx, r); e != nil {
 			if prior, hit, retry := n.retryOperation(ctx, origin, r); retry != nil {
@@ -458,6 +464,11 @@ func (n *Node) enqueueTxObserved(ctx context.Context, origin string, r Request, 
 	}
 	var targetName string
 	switch r.Kind {
+	case "storage_pool_create":
+		if operationOwner(r.ResourceID) != n.ID || !operations.ValidID(r.ResourceID) {
+			return Operation{}, fault("invalid_request", "存储池标识无效")
+		}
+		r.ExpectedRevision = nil
 	case "storage_root":
 		// 执行器持有登记文件的修订与锁。
 		r.ExpectedRevision = nil
@@ -887,7 +898,7 @@ func (n *Node) enqueueTxObserved(ctx context.Context, origin string, r Request, 
 	if _, e = tx.ExecContext(ctx, "UPDATE queue SET body=? WHERE id=?", string(b), r.ID); e != nil {
 		return op, e
 	}
-	if op.PlanID != "" {
+	if op.PlanID != "" && r.Kind != "storage_pool_create" {
 		if _, e = tx.ExecContext(ctx, "UPDATE plans SET operation_id=COALESCE(operation_id,?) WHERE id=?", op.ID, op.PlanID); e != nil {
 			return op, e
 		}
@@ -1181,6 +1192,10 @@ func (n *Node) advanceFiltered(filter string, args ...any) {
 			return
 		}
 		n.advanceDatabase(ctx, &op, plain)
+		return
+	}
+	if kind == "storage_pool_create" {
+		n.advancePool(ctx, &op, plain)
 		return
 	}
 	if kind != "firewall" && kind != "component" && kind != "firewall_config" && kind != "container" && kind != "database_step" && kind != "task_run" && kind != "compose" && kind != "monitoring_deploy" {
@@ -1542,6 +1557,9 @@ func (n *Node) decide(ctx context.Context, method string, d OperationDecision) (
 	}
 	if op.Subject == "monitoring_config" {
 		return n.decideArchive(ctx, method, d, op)
+	}
+	if op.Subject == "storage_pool_create" {
+		return n.decidePool(ctx, method, d, op)
 	}
 	var p protocol.Payload
 	switch method {

@@ -33,19 +33,19 @@ type Options struct {
 }
 type Node struct {
 	// acceptPause 只供测试构造"读回后、登记前"的并发窗口，生产环境保持 nil。
-	acceptPause          func()
-	DB                   *sql.DB
-	ID                   string
-	Key                  identity.Key
-	signing              ed25519.PrivateKey
-	age                  *age.X25519Identity
-	cluster              string
-	Executor             Executor
+	acceptPause func()
+	DB          *sql.DB
+	ID          string
+	Key         identity.Key
+	signing     ed25519.PrivateKey
+	age         *age.X25519Identity
+	cluster     string
+	Executor    Executor
 	// Log 是拒绝等安全事件的日志出口；为空时不记录。
 	Log func(format string, args ...any)
 	// Capabilities 是目标节点对每个来源节点授予的能力。
 	// 零值表示没有任何授予，只保留默认允许的四个方法。
-	Capabilities SourceCapabilities
+	Capabilities         SourceCapabilities
 	Now                  func() time.Time
 	executorDir          string
 	mu                   sync.Mutex
@@ -97,6 +97,7 @@ type Node struct {
 	metricsReadSlots     chan struct{}
 	telemetry            *telemetry.Service
 	history              localHistoryState
+	pools                poolState
 }
 
 func Defaults(c Config) Config {
@@ -159,6 +160,7 @@ func Open(ctx context.Context, path string, o Options) (*Node, error) {
 		return nil, e
 	}
 	n := &Node{DB: db, Executor: o.Executor, executorDir: o.ExecutorDir, Now: o.Now, connections: map[string]*peer{}, dialing: map[string]chan struct{}{}, wake: make(chan struct{}, 1), taskWake: make(chan struct{}, 1), changed: make(chan struct{}, 1), subscribers: map[chan Change]struct{}{}}
+	n.setPoolDatabaseDir(path)
 	var private, public, signing []byte
 	var ageKey string
 	e = db.QueryRowContext(ctx, "SELECT cluster,private_key,public_key,signing_key,age_key FROM node_identity WHERE id=1").Scan(&n.cluster, &private, &public, &signing, &ageKey)
@@ -320,7 +322,7 @@ func (n *Node) Start() {
 		return
 	}
 	n.started = true
-	n.wg.Add(12)
+	n.wg.Add(13)
 	n.telemetry.Start(n.ctx)
 	n.mu.Unlock()
 	go func() { defer n.wg.Done(); n.discovery() }()
@@ -335,6 +337,7 @@ func (n *Node) Start() {
 	go func() { defer n.wg.Done(); n.networkLoop() }()
 	go func() { defer n.wg.Done(); n.proxyRoutingLoop() }()
 	go func() { defer n.wg.Done(); n.sharedLoop() }()
+	go func() { defer n.wg.Done(); n.poolLoop() }()
 }
 func (n *Node) Close() error {
 	n.cancel()
@@ -348,6 +351,11 @@ func (n *Node) Close() error {
 	}
 	n.mu.Unlock()
 	n.wg.Wait()
+	n.pools.mu.Lock()
+	if n.pools.store.DB != nil {
+		_ = n.pools.store.DB.Close()
+	}
+	n.pools.mu.Unlock()
 	n.telemetry.Close()
 	if history, _, _, _ := n.history.snapshot(); history != nil {
 		_ = history.Close()

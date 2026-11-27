@@ -8,6 +8,8 @@ import (
 func requestResources(r Request) []protocol.ResourceClaim {
 	a := protocol.OperationAction{Kind: r.Kind}
 	switch r.Kind {
+	case "storage_pool_create":
+		return []protocol.ResourceClaim{{Key: "storage-pool/" + r.ResourceID}}
 	case "storage_root":
 		return []protocol.ResourceClaim{{Key: "storage-root"}}
 	case "monitoring_config":

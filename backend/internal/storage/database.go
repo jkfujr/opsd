@@ -21,6 +21,7 @@ const (
 	Executor Kind = "executor"
 	Node     Kind = "node"
 	Metrics  Kind = "metrics"
+	Pools    Kind = "pools"
 	history  Kind = "history"
 )
 
@@ -29,7 +30,7 @@ var migrations embed.FS
 
 // Open 打开指定子系统的数据库，迁移成功后才交给调用者使用。
 func Open(ctx context.Context, path string, kind Kind) (*sql.DB, error) {
-	if kind != Executor && kind != Node && kind != Metrics && kind != history {
+	if kind != Executor && kind != Node && kind != Metrics && kind != Pools && kind != history {
 		return nil, fmt.Errorf("未知数据库类型：%s", kind)
 	}
 	source, err := fs.Sub(migrations, "migrations/"+string(kind))

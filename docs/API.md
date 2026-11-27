@@ -222,6 +222,19 @@ root 终端先以管理员会话 `POST /nodes/{node_id}/terminal` 创建票据�
 
 序列查询要求 `metric`，可选 `node_id`、`resource_id`、UTC `from/to`、`step_seconds` 及 `aggregate=sum|avg`。令牌需要对应的监控、容器或数据库读取权限，数据库实例范围来自已授权集群。默认最近 30 天、约 1200 点；每序列最多 10000 点，总计最多 250000 点，时间范围为最近 365 天。`step_seconds` 是返回点间隔，`source_resolution_seconds` 是允许使用的来源分辨率上限，0 表示原始数据；缩放到一秒后读取原始样本。缺口值为 `null`，S3 等部分读取故障通过 `partial`、`warnings` 和 `missing` 返回。
 
+## 集群 S3 池
+
+池操作使用管理员会话。写入和读取分别需要来源节点的 `write_storage`、`read_storage` 能力。
+
+| 接口 | 请求与读回 |
+|---|---|
+| `POST /storage/pools/preview` | 提交 `name`、`nodes` 和可选 `port_offset`。成员提交 `node_id`、`private_ip`、整数 `capacity_gib`，可选 `storage_root_id`、`failure_domain`。返回 `200`、30 分钟有效的 `plan_id` 以及选点、端口、实际文件系统和 A/B 分配 |
+| `POST /storage/pools` | 使用 `Idempotency-Key`，正文含 `plan_id` 和 `credentials`（`access_key`、`secret_key`）。返回 `202 + Operation + Location`。同键查询原操作，异键复用已用计划返回 `409` |
+| `GET /storage/pools` | 可选 `cursor`、`limit`，默认 50，最大 100。返回 `items`、`next_cursor` 和失联节点 `unavailable` |
+| `GET /storage/pools/{id}` | 返回池状态、所属节点、公开 CA、各入口和成员健康，附强 `ETag` |
+
+预览至少需要三个独立故障域。普通成员总配额至少 7 GiB，Master／etcd 至少 12 GiB，所有成员的 B 数据卷至少 6 GiB。拓扑无效返回 `422`，端口冲突返回 `409`，挂载或端口已变化及计划过期返回 `412`，成员不可达返回 `503`。配额不足返回 `507`，详情提供成员、所需数据卷或文件系统可用量。建池失败按原操作查看步骤和请求回执，再通过现有重新处理入口恢复。S3 凭据由所属执行器使用，读取接口只返回公开 CA 和入口。
+
 ## 节点存储根
 
 `GET /nodes/{node_id}/storage-root` 返回节点的元数据目录、已登记数据根、实际组件绑定和当前申请，并附强 `ETag`。跨节点读取使用 `read_storage`，登记和迁移申请使用 `manage_storage_root`。HTTP 入口和相关回执要求管理员会话。

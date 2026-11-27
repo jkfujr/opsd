@@ -13464,6 +13464,448 @@
           }
         }
       }
+    },
+    "/storage/pools/preview": {
+      "post": {
+        "operationId": "previewStoragePool",
+        "summary": "预览集群 S3 池配额与角色",
+        "tags": [
+          "storage"
+        ],
+        "security": [
+          {
+            "SessionCookie": []
+          }
+        ],
+        "x-opsd-access": {
+          "mode": "session",
+          "level": "manage"
+        },
+        "parameters": [
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StoragePoolPreviewInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "请求成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StoragePoolPlan"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-ID": {
+                "schema": {
+                  "type": "string"
+                },
+                "required": true
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "405": {
+            "$ref": "#/components/responses/Error405"
+          },
+          "406": {
+            "$ref": "#/components/responses/Error406"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "412": {
+            "$ref": "#/components/responses/Error412"
+          },
+          "413": {
+            "$ref": "#/components/responses/Error413"
+          },
+          "415": {
+            "$ref": "#/components/responses/Error415"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error422"
+          },
+          "428": {
+            "$ref": "#/components/responses/Error428"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          },
+          "504": {
+            "$ref": "#/components/responses/Error504"
+          },
+          "507": {
+            "$ref": "#/components/responses/Error507"
+          }
+        }
+      }
+    },
+    "/storage/pools": {
+      "get": {
+        "operationId": "listStoragePools",
+        "summary": "读取集群 S3 池",
+        "tags": [
+          "storage"
+        ],
+        "security": [
+          {
+            "SessionCookie": []
+          }
+        ],
+        "x-opsd-access": {
+          "mode": "session",
+          "level": "read"
+        },
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 50
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "请求成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StoragePoolList"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-ID": {
+                "schema": {
+                  "type": "string"
+                },
+                "required": true
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "405": {
+            "$ref": "#/components/responses/Error405"
+          },
+          "406": {
+            "$ref": "#/components/responses/Error406"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "412": {
+            "$ref": "#/components/responses/Error412"
+          },
+          "413": {
+            "$ref": "#/components/responses/Error413"
+          },
+          "415": {
+            "$ref": "#/components/responses/Error415"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error422"
+          },
+          "428": {
+            "$ref": "#/components/responses/Error428"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          },
+          "504": {
+            "$ref": "#/components/responses/Error504"
+          }
+        }
+      },
+      "post": {
+        "operationId": "createStoragePool",
+        "summary": "提交集群 S3 池部署",
+        "tags": [
+          "storage"
+        ],
+        "security": [
+          {
+            "SessionCookie": []
+          }
+        ],
+        "x-opsd-access": {
+          "mode": "session",
+          "level": "manage"
+        },
+        "x-opsd-idempotent": true,
+        "parameters": [
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StoragePoolCreateInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "请求成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Operation"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-ID": {
+                "schema": {
+                  "type": "string"
+                },
+                "required": true
+              },
+              "Location": {
+                "schema": {
+                  "type": "string"
+                },
+                "required": true
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "405": {
+            "$ref": "#/components/responses/Error405"
+          },
+          "406": {
+            "$ref": "#/components/responses/Error406"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "412": {
+            "$ref": "#/components/responses/Error412"
+          },
+          "413": {
+            "$ref": "#/components/responses/Error413"
+          },
+          "415": {
+            "$ref": "#/components/responses/Error415"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error422"
+          },
+          "428": {
+            "$ref": "#/components/responses/Error428"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          },
+          "504": {
+            "$ref": "#/components/responses/Error504"
+          },
+          "507": {
+            "$ref": "#/components/responses/Error507"
+          }
+        }
+      }
+    },
+    "/storage/pools/{id}": {
+      "get": {
+        "operationId": "getStoragePool",
+        "summary": "读取集群 S3 池详情",
+        "tags": [
+          "storage"
+        ],
+        "security": [
+          {
+            "SessionCookie": []
+          }
+        ],
+        "x-opsd-access": {
+          "mode": "session",
+          "level": "read"
+        },
+        "x-opsd-version": "storage-pool",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "请求成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StoragePool"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-ID": {
+                "schema": {
+                  "type": "string"
+                },
+                "required": true
+              },
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                },
+                "required": true
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "405": {
+            "$ref": "#/components/responses/Error405"
+          },
+          "406": {
+            "$ref": "#/components/responses/Error406"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "412": {
+            "$ref": "#/components/responses/Error412"
+          },
+          "413": {
+            "$ref": "#/components/responses/Error413"
+          },
+          "415": {
+            "$ref": "#/components/responses/Error415"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error422"
+          },
+          "428": {
+            "$ref": "#/components/responses/Error428"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          },
+          "504": {
+            "$ref": "#/components/responses/Error504"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -15544,7 +15986,8 @@
               "compose",
               "compose_register",
               "shared_initialize",
-              "storage_root"
+              "storage_root",
+              "storage_pool_create"
             ]
           },
           "state": {
@@ -19754,7 +20197,8 @@
               "compose",
               "task",
               "database",
-              "component"
+              "component",
+              "storage_pool"
             ]
           },
           "node_id": {
@@ -21900,6 +22344,507 @@
             "$ref": "#/components/schemas/StorageRootMove"
           }
         ]
+      },
+      "StoragePoolMemberInput": {
+        "type": "object",
+        "required": [
+          "node_id",
+          "private_ip",
+          "capacity_gib"
+        ],
+        "properties": {
+          "node_id": {
+            "type": "string"
+          },
+          "private_ip": {
+            "type": "string"
+          },
+          "capacity_gib": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 7,
+            "description": "节点总配额。普通成员至少 7 GiB，所选 Master／etcd 成员至少 12 GiB，每个成员的 B 数据卷至少 6 GiB。"
+          },
+          "storage_root_id": {
+            "type": "string"
+          },
+          "failure_domain": {
+            "type": "string"
+          }
+        }
+      },
+      "StoragePoolPreviewInput": {
+        "type": "object",
+        "required": [
+          "name",
+          "nodes"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          },
+          "nodes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StoragePoolMemberInput"
+            },
+            "minItems": 3,
+            "maxItems": 64
+          },
+          "port_offset": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 16000,
+            "default": 0
+          },
+          "ec_enabled": {
+            "type": "boolean",
+            "default": false,
+            "description": "I5 使用跨故障域双副本，EC 开关须为 false。"
+          }
+        }
+      },
+      "StoragePoolDisk": {
+        "type": "object",
+        "required": [
+          "uuid",
+          "mount_point",
+          "capacity_bytes",
+          "available_bytes",
+          "reserve_bytes",
+          "archive_bytes"
+        ],
+        "properties": {
+          "uuid": {
+            "type": "string"
+          },
+          "mount_point": {
+            "type": "string"
+          },
+          "capacity_bytes": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "available_bytes": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "reserve_bytes": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "archive_bytes": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          }
+        }
+      },
+      "StoragePoolPorts": {
+        "type": "object",
+        "required": [
+          "s3",
+          "s3_grpc",
+          "volume",
+          "volume_grpc",
+          "filer",
+          "filer_grpc",
+          "master",
+          "master_grpc",
+          "etcd_client",
+          "etcd_peer"
+        ],
+        "properties": {
+          "s3": {
+            "type": "integer"
+          },
+          "s3_grpc": {
+            "type": "integer"
+          },
+          "volume": {
+            "type": "integer"
+          },
+          "volume_grpc": {
+            "type": "integer"
+          },
+          "filer": {
+            "type": "integer"
+          },
+          "filer_grpc": {
+            "type": "integer"
+          },
+          "master": {
+            "type": "integer"
+          },
+          "master_grpc": {
+            "type": "integer"
+          },
+          "etcd_client": {
+            "type": "integer"
+          },
+          "etcd_peer": {
+            "type": "integer"
+          }
+        }
+      },
+      "StoragePoolNodePlan": {
+        "type": "object",
+        "required": [
+          "node_id",
+          "private_ip",
+          "capacity_gib",
+          "storage_root_id",
+          "failure_domain",
+          "roles",
+          "ports",
+          "control_disk",
+          "data_disk",
+          "data_bytes",
+          "control_bytes"
+        ],
+        "properties": {
+          "node_id": {
+            "type": "string"
+          },
+          "private_ip": {
+            "type": "string"
+          },
+          "capacity_gib": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 3
+          },
+          "storage_root_id": {
+            "type": "string"
+          },
+          "failure_domain": {
+            "type": "string"
+          },
+          "roles": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "master",
+                "etcd",
+                "volume",
+                "filer",
+                "s3"
+              ]
+            }
+          },
+          "ports": {
+            "$ref": "#/components/schemas/StoragePoolPorts"
+          },
+          "control_disk": {
+            "$ref": "#/components/schemas/StoragePoolDisk"
+          },
+          "data_disk": {
+            "$ref": "#/components/schemas/StoragePoolDisk"
+          },
+          "data_bytes": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "control_bytes": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          }
+        }
+      },
+      "StoragePoolPlan": {
+        "type": "object",
+        "required": [
+          "plan_id",
+          "pool_id",
+          "owner_node_id",
+          "expires_at",
+          "normalized",
+          "nodes"
+        ],
+        "properties": {
+          "plan_id": {
+            "type": "string"
+          },
+          "pool_id": {
+            "type": "string"
+          },
+          "owner_node_id": {
+            "type": "string"
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "normalized": {
+            "$ref": "#/components/schemas/StoragePoolPreviewInput"
+          },
+          "nodes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StoragePoolNodePlan"
+            }
+          }
+        }
+      },
+      "StoragePoolCreateInput": {
+        "type": "object",
+        "required": [
+          "plan_id",
+          "credentials"
+        ],
+        "properties": {
+          "plan_id": {
+            "type": "string"
+          },
+          "credentials": {
+            "type": "object",
+            "required": [
+              "access_key",
+              "secret_key"
+            ],
+            "properties": {
+              "access_key": {
+                "type": "string",
+                "minLength": 3,
+                "maxLength": 128
+              },
+              "secret_key": {
+                "type": "string",
+                "minLength": 8,
+                "maxLength": 128,
+                "writeOnly": true
+              }
+            }
+          }
+        }
+      },
+      "StoragePoolMember": {
+        "type": "object",
+        "required": [
+          "node_id",
+          "private_ip",
+          "capacity_gib",
+          "storage_root_id",
+          "failure_domain",
+          "roles",
+          "ports",
+          "control_disk",
+          "data_disk",
+          "data_bytes",
+          "control_bytes",
+          "endpoint",
+          "data_used_bytes",
+          "control_used_bytes",
+          "state",
+          "writable",
+          "s3_ready",
+          "etcd_read"
+        ],
+        "properties": {
+          "node_id": {
+            "type": "string"
+          },
+          "private_ip": {
+            "type": "string"
+          },
+          "capacity_gib": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 3
+          },
+          "storage_root_id": {
+            "type": "string"
+          },
+          "failure_domain": {
+            "type": "string"
+          },
+          "roles": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "master",
+                "etcd",
+                "volume",
+                "filer",
+                "s3"
+              ]
+            }
+          },
+          "ports": {
+            "$ref": "#/components/schemas/StoragePoolPorts"
+          },
+          "control_disk": {
+            "$ref": "#/components/schemas/StoragePoolDisk"
+          },
+          "data_disk": {
+            "$ref": "#/components/schemas/StoragePoolDisk"
+          },
+          "data_bytes": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "control_bytes": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "endpoint": {
+            "type": "string"
+          },
+          "data_used_bytes": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "control_used_bytes": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "data_uuid": {
+            "type": "string"
+          },
+          "control_uuid": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "deploying",
+              "ready",
+              "degraded",
+              "unavailable",
+              "attention_required"
+            ]
+          },
+          "error": {
+            "type": "string"
+          },
+          "checked_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "writable": {
+            "type": "boolean"
+          },
+          "s3_ready": {
+            "type": "boolean"
+          },
+          "master_leader": {
+            "type": "string"
+          },
+          "etcd_read": {
+            "type": "boolean"
+          },
+          "cert_expiry": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "StoragePool": {
+        "type": "object",
+        "required": [
+          "id",
+          "owner_node_id",
+          "name",
+          "revision",
+          "state",
+          "ec_enabled",
+          "replication",
+          "operation_id",
+          "ca_pem",
+          "nodes",
+          "checked_at"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "owner_node_id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "revision": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "creating",
+              "deploying",
+              "ready",
+              "degraded",
+              "read_only",
+              "unavailable",
+              "attention_required"
+            ]
+          },
+          "ec_enabled": {
+            "type": "boolean"
+          },
+          "replication": {
+            "type": "string",
+            "enum": [
+              "010"
+            ]
+          },
+          "operation_id": {
+            "type": "string"
+          },
+          "ca_pem": {
+            "type": "string"
+          },
+          "nodes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StoragePoolMember"
+            }
+          },
+          "checked_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "StoragePoolList": {
+        "type": "object",
+        "required": [
+          "items",
+          "unavailable"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StoragePool"
+            }
+          },
+          "next_cursor": {
+            "type": "string"
+          },
+          "unavailable": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
       }
     },
     "responses": {

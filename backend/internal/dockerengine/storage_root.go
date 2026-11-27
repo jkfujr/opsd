@@ -25,6 +25,7 @@ type StorageContainer struct {
 	Aliases []string
 	Labels  map[string]string
 	Binds   []StorageBind
+	User    string
 }
 
 func (s StorageContainer) named(name string) bool {
@@ -126,6 +127,9 @@ func StorageDatabaseSpec(d protocol.DatabaseDeployment, dataDir string) []Storag
 
 func storageMatches(actual container.InspectResponse, spec StorageContainer) bool {
 	if actual.Config == nil || actual.HostConfig == nil || actual.State == nil || len(actual.Mounts) != len(spec.Binds) {
+		return false
+	}
+	if spec.User != "" && actual.Config.User != spec.User {
 		return false
 	}
 	for key, value := range spec.Labels {

@@ -13,6 +13,7 @@ import (
 
 	"github.com/jkfujr/opsd/internal/dockerengine"
 	"github.com/jkfujr/opsd/internal/localstate"
+	"github.com/jkfujr/opsd/internal/protocol"
 )
 
 const unitDirectory = "/etc/systemd/system"
@@ -24,7 +25,11 @@ const startBudget = 75 * time.Second
 var systemdTimeout = errors.New("systemd 阶段超时")
 
 func unitName(b binding) string {
-	hash := sha256.Sum256([]byte(b.Component + "/" + b.ComponentID))
+	name := b.Component + "/" + b.ComponentID
+	if b.Instance != "" {
+		name += "/" + b.Instance
+	}
+	hash := sha256.Sum256([]byte(name))
 	return fmt.Sprintf("opsd-storage-root-%x.service", hash[:10])
 }
 
@@ -132,6 +137,14 @@ func (m *Manager) installUnit(ctx context.Context, b binding) error {
 		}
 		dependency = fmt.Sprintf("RequiresMountsFor=%s\nBindsTo=%s\nAfter=%s\n", unitArg(point), mount, mount)
 	}
+	if b.Component == protocol.StoragePoolData && b.Instance != "" {
+		d, err := m.readPoolNode(b.ComponentID)
+		if err != nil {
+			return err
+		}
+		controlUnit := unitName(m.poolControlBinding(d))
+		dependency += fmt.Sprintf("BindsTo=%s\nAfter=%s\n", controlUnit, controlUnit)
+	}
 	cmd := func(action string) string {
 		return fmt.Sprintf("%s storage-root %s --config %s --component %s --component-id %s",
 			unitArg(binary), action, unitArg(m.Config), b.Component, b.ComponentID)
@@ -215,6 +228,9 @@ func (m *Manager) removeUnit(b binding) error {
 }
 
 func (m *Manager) Component(ctx context.Context, cmd, component, id string) error {
+	if component == poolControlComponent {
+		return m.poolControlComponent(ctx, cmd, id)
+	}
 	r, err := m.paths(ctx)
 	if err != nil {
 		return err
@@ -236,6 +252,18 @@ func (m *Manager) Component(ctx context.Context, cmd, component, id string) erro
 		}
 		if err = m.validateBinding(ctx, b, false); err != nil {
 			return err
+		}
+		if component == protocol.StoragePoolData && b.Instance != "" {
+			d, err := m.readPoolNode(id)
+			if err != nil {
+				return err
+			}
+			if err := m.checkPoolControl(ctx, d); err != nil {
+				return err
+			}
+			if device, err := activePoolLoop(ctx, m.poolDir(id), "control", d.ControlUUID); err != nil || device == "" {
+				return fault("dependency_unavailable", "池控制卷未就绪")
+			}
 		}
 	}
 	if cmd == "component-check" {

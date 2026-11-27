@@ -64,6 +64,14 @@ func (t Target) Validate() error {
 	return t.S3Connection.Validate()
 }
 func New(c protocol.S3Connection, key protocol.S3Credential) (*minio.Client, error) {
+	return newClient(c, key, false)
+}
+
+func NewDirect(c protocol.S3Connection, key protocol.S3Credential) (*minio.Client, error) {
+	return newClient(c, key, true)
+}
+
+func newClient(c protocol.S3Connection, key protocol.S3Credential, direct bool) (*minio.Client, error) {
 	if err := c.Validate(); err != nil {
 		return nil, err
 	}
@@ -73,6 +81,9 @@ func New(c protocol.S3Connection, key protocol.S3Credential) (*minio.Client, err
 		lookup = minio.BucketLookupDNS
 	}
 	transport := http.DefaultTransport.(*http.Transport).Clone()
+	if direct {
+		transport.Proxy = nil
+	}
 	transport.ResponseHeaderTimeout = 10 * time.Second
 	if c.CAPEM != "" {
 		pool := x509.NewCertPool()

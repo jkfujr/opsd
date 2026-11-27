@@ -9,6 +9,7 @@ import { useSession } from '../app/session';
 import { invalidateResource } from '../app/query';
 import { ago } from '../lib/format';
 import { Badge, Button, Card, Dialog, Empty, ErrorNotice, Field, Input, Notice, PageHead, Segmented, Select, Skeleton, Switch, Textarea, itemVariants, listVariants } from '../ui/kit';
+import { StoragePools } from './StoragePools';
 
 export function Storage() {
   const q = useStorageTargets();
@@ -25,6 +26,7 @@ export function Storage() {
           {items.map((t) => <TargetCard key={t.id} t={t} onEdit={() => setEditing(t)} />)}
         </motion.div>
       )}
+      <StoragePools />
       <TargetDialog open={editing !== null} target={editing === 'new' ? undefined : editing ?? undefined} onClose={() => setEditing(null)} />
     </div>
   );

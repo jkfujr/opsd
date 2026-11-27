@@ -4,6 +4,10 @@ import "fmt"
 
 func newPayload(kind Kind) (Payload, error) {
 	switch kind {
+	case "storage.pool.host":
+		return &PoolHostRequest{}, nil
+	case "storage.pool.host.result":
+		return &PoolHostResult{}, nil
 	case "storage.root.read":
 		return &StorageRootRead{}, nil
 	case "storage.root.view":

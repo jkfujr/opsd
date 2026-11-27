@@ -20,6 +20,7 @@ import (
 func configureStorageRoots(s *executor.Services, config string, f installation.NodeFile) {
 	host := &storageroot.Manager{Config: config, Binary: f.Binary, NodeDir: f.DataDir, ExecutorDir: f.ExecutorDir, Store: s.Engine.Store, Docker: dockerengine.New()}
 	s.StorageRoots = host
+	s.StoragePool = host.PoolHost
 	s.Docker.StorageBinding = host.Directory
 	s.Docker.StorageArchivePrepare = host.PrepareArchive
 	s.Docker.StorageArchiveApply = host.ApplyArchive
@@ -46,7 +47,7 @@ func storageRootCommand(args []string) error {
 	unitCommand := slices.Contains([]string{"component-check", "component-start", "component-stop"}, action)
 	if unitCommand {
 		if *id != "" || *mode != "" || !operations.ValidID(*componentID) ||
-			!slices.Contains([]string{protocol.StorageArchive, protocol.StorageDatabase, protocol.StoragePoolData}, *component) {
+			!slices.Contains([]string{protocol.StorageArchive, protocol.StorageDatabase, protocol.StoragePoolData, "pool_control"}, *component) {
 			return fmt.Errorf("组件启动参数无效")
 		}
 	} else if !slices.Contains([]string{"status", "apply", "recover", "rollback"}, action) ||

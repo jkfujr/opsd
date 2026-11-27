@@ -1665,6 +1665,58 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/storage/pools/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 预览集群 S3 池配额与角色 */
+        post: operations["previewStoragePool"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/storage/pools": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 读取集群 S3 池 */
+        get: operations["listStoragePools"];
+        put?: never;
+        /** 提交集群 S3 池部署 */
+        post: operations["createStoragePool"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/storage/pools/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 读取集群 S3 池详情 */
+        get: operations["getStoragePool"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -2203,7 +2255,7 @@ export interface components {
             /** @enum {string} */
             executor: "node";
             /** @enum {string} */
-            subject: "firewall" | "component" | "config" | "name" | "account" | "firewall_config" | "container" | "database" | "database_step" | "task_save" | "task_run" | "compose" | "compose_register" | "shared_initialize" | "storage_root";
+            subject: "firewall" | "component" | "config" | "name" | "account" | "firewall_config" | "container" | "database" | "database_step" | "task_save" | "task_run" | "compose" | "compose_register" | "shared_initialize" | "storage_root" | "storage_pool_create";
             state: components["schemas"]["OperationState"];
             /** Format: int64 */
             revision: number;
@@ -3302,7 +3354,7 @@ export interface components {
         };
         OperationResource: {
             /** @enum {string} */
-            kind: "node" | "container" | "compose" | "task" | "database" | "component";
+            kind: "node" | "container" | "compose" | "task" | "database" | "component" | "storage_pool";
             node_id: string;
             id: string;
             engine_id?: string;
@@ -3856,6 +3908,140 @@ export interface components {
             target_root_id: string;
         };
         StorageRootInput: components["schemas"]["StorageRootRegister"] | components["schemas"]["StorageRootMove"];
+        StoragePoolMemberInput: {
+            node_id: string;
+            private_ip: string;
+            /**
+             * Format: int64
+             * @description 节点总配额。普通成员至少 7 GiB，所选 Master／etcd 成员至少 12 GiB，每个成员的 B 数据卷至少 6 GiB。
+             */
+            capacity_gib: number;
+            storage_root_id?: string;
+            failure_domain?: string;
+        };
+        StoragePoolPreviewInput: {
+            name: string;
+            nodes: components["schemas"]["StoragePoolMemberInput"][];
+            /** @default 0 */
+            port_offset: number;
+            /**
+             * @description I5 使用跨故障域双副本，EC 开关须为 false。
+             * @default false
+             */
+            ec_enabled: boolean;
+        };
+        StoragePoolDisk: {
+            uuid: string;
+            mount_point: string;
+            /** Format: int64 */
+            capacity_bytes: number;
+            /** Format: int64 */
+            available_bytes: number;
+            /** Format: int64 */
+            reserve_bytes: number;
+            /** Format: int64 */
+            archive_bytes: number;
+        };
+        StoragePoolPorts: {
+            s3: number;
+            s3_grpc: number;
+            volume: number;
+            volume_grpc: number;
+            filer: number;
+            filer_grpc: number;
+            master: number;
+            master_grpc: number;
+            etcd_client: number;
+            etcd_peer: number;
+        };
+        StoragePoolNodePlan: {
+            node_id: string;
+            private_ip: string;
+            /** Format: int64 */
+            capacity_gib: number;
+            storage_root_id: string;
+            failure_domain: string;
+            roles: ("master" | "etcd" | "volume" | "filer" | "s3")[];
+            ports: components["schemas"]["StoragePoolPorts"];
+            control_disk: components["schemas"]["StoragePoolDisk"];
+            data_disk: components["schemas"]["StoragePoolDisk"];
+            /** Format: int64 */
+            data_bytes: number;
+            /** Format: int64 */
+            control_bytes: number;
+        };
+        StoragePoolPlan: {
+            plan_id: string;
+            pool_id: string;
+            owner_node_id: string;
+            /** Format: date-time */
+            expires_at: string;
+            normalized: components["schemas"]["StoragePoolPreviewInput"];
+            nodes: components["schemas"]["StoragePoolNodePlan"][];
+        };
+        StoragePoolCreateInput: {
+            plan_id: string;
+            credentials: {
+                access_key: string;
+                secret_key: string;
+            };
+        };
+        StoragePoolMember: {
+            node_id: string;
+            private_ip: string;
+            /** Format: int64 */
+            capacity_gib: number;
+            storage_root_id: string;
+            failure_domain: string;
+            roles: ("master" | "etcd" | "volume" | "filer" | "s3")[];
+            ports: components["schemas"]["StoragePoolPorts"];
+            control_disk: components["schemas"]["StoragePoolDisk"];
+            data_disk: components["schemas"]["StoragePoolDisk"];
+            /** Format: int64 */
+            data_bytes: number;
+            /** Format: int64 */
+            control_bytes: number;
+            endpoint: string;
+            /** Format: int64 */
+            data_used_bytes: number;
+            /** Format: int64 */
+            control_used_bytes: number;
+            data_uuid?: string;
+            control_uuid?: string;
+            /** @enum {string} */
+            state: "pending" | "deploying" | "ready" | "degraded" | "unavailable" | "attention_required";
+            error?: string;
+            /** Format: date-time */
+            checked_at?: string;
+            writable: boolean;
+            s3_ready: boolean;
+            master_leader?: string;
+            etcd_read: boolean;
+            /** Format: date-time */
+            cert_expiry?: string;
+        };
+        StoragePool: {
+            id: string;
+            owner_node_id: string;
+            name: string;
+            /** Format: int64 */
+            revision: number;
+            /** @enum {string} */
+            state: "creating" | "deploying" | "ready" | "degraded" | "read_only" | "unavailable" | "attention_required";
+            ec_enabled: boolean;
+            /** @enum {string} */
+            replication: "010";
+            operation_id: string;
+            ca_pem: string;
+            nodes: components["schemas"]["StoragePoolMember"][];
+            /** Format: date-time */
+            checked_at: string;
+        };
+        StoragePoolList: {
+            items: components["schemas"]["StoragePool"][];
+            next_cursor?: string;
+            unavailable: string[];
+        };
     };
     responses: {
         /** @description 请求语法无效 */
@@ -8909,6 +9095,176 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MonitoringSeriesResult"];
+                };
+            };
+            400: components["responses"]["Error400"];
+            401: components["responses"]["Error401"];
+            403: components["responses"]["Error403"];
+            404: components["responses"]["Error404"];
+            405: components["responses"]["Error405"];
+            406: components["responses"]["Error406"];
+            409: components["responses"]["Error409"];
+            412: components["responses"]["Error412"];
+            413: components["responses"]["Error413"];
+            415: components["responses"]["Error415"];
+            422: components["responses"]["Error422"];
+            428: components["responses"]["Error428"];
+            429: components["responses"]["Error429"];
+            500: components["responses"]["Error500"];
+            503: components["responses"]["Error503"];
+            504: components["responses"]["Error504"];
+        };
+    };
+    previewStoragePool: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-CSRF-Token"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StoragePoolPreviewInput"];
+            };
+        };
+        responses: {
+            /** @description 请求成功 */
+            200: {
+                headers: {
+                    "X-Request-ID": string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StoragePoolPlan"];
+                };
+            };
+            400: components["responses"]["Error400"];
+            401: components["responses"]["Error401"];
+            403: components["responses"]["Error403"];
+            404: components["responses"]["Error404"];
+            405: components["responses"]["Error405"];
+            406: components["responses"]["Error406"];
+            409: components["responses"]["Error409"];
+            412: components["responses"]["Error412"];
+            413: components["responses"]["Error413"];
+            415: components["responses"]["Error415"];
+            422: components["responses"]["Error422"];
+            428: components["responses"]["Error428"];
+            429: components["responses"]["Error429"];
+            500: components["responses"]["Error500"];
+            503: components["responses"]["Error503"];
+            504: components["responses"]["Error504"];
+            507: components["responses"]["Error507"];
+        };
+    };
+    listStoragePools: {
+        parameters: {
+            query?: {
+                limit?: number;
+                cursor?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 请求成功 */
+            200: {
+                headers: {
+                    "X-Request-ID": string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StoragePoolList"];
+                };
+            };
+            400: components["responses"]["Error400"];
+            401: components["responses"]["Error401"];
+            403: components["responses"]["Error403"];
+            404: components["responses"]["Error404"];
+            405: components["responses"]["Error405"];
+            406: components["responses"]["Error406"];
+            409: components["responses"]["Error409"];
+            412: components["responses"]["Error412"];
+            413: components["responses"]["Error413"];
+            415: components["responses"]["Error415"];
+            422: components["responses"]["Error422"];
+            428: components["responses"]["Error428"];
+            429: components["responses"]["Error429"];
+            500: components["responses"]["Error500"];
+            503: components["responses"]["Error503"];
+            504: components["responses"]["Error504"];
+        };
+    };
+    createStoragePool: {
+        parameters: {
+            query?: never;
+            header: {
+                "X-CSRF-Token"?: string;
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StoragePoolCreateInput"];
+            };
+        };
+        responses: {
+            /** @description 请求成功 */
+            202: {
+                headers: {
+                    "X-Request-ID": string;
+                    Location: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Operation"];
+                };
+            };
+            400: components["responses"]["Error400"];
+            401: components["responses"]["Error401"];
+            403: components["responses"]["Error403"];
+            404: components["responses"]["Error404"];
+            405: components["responses"]["Error405"];
+            406: components["responses"]["Error406"];
+            409: components["responses"]["Error409"];
+            412: components["responses"]["Error412"];
+            413: components["responses"]["Error413"];
+            415: components["responses"]["Error415"];
+            422: components["responses"]["Error422"];
+            428: components["responses"]["Error428"];
+            429: components["responses"]["Error429"];
+            500: components["responses"]["Error500"];
+            503: components["responses"]["Error503"];
+            504: components["responses"]["Error504"];
+            507: components["responses"]["Error507"];
+        };
+    };
+    getStoragePool: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 请求成功 */
+            200: {
+                headers: {
+                    "X-Request-ID": string;
+                    ETag: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StoragePool"];
                 };
             };
             400: components["responses"]["Error400"];

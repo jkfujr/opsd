@@ -94,6 +94,11 @@ func (m *Manager) Run(ctx context.Context, id, action, mode string) error {
 	if r.Phase == "rolled_back" || action == "apply" && r.Phase == "complete" {
 		return nil
 	}
+	ctx, unlockPool, err := m.lockPoolMigration(ctx, r)
+	if err != nil {
+		return err
+	}
+	defer unlockPool()
 	switch action {
 	case "apply":
 		if r.Phase == "pending_restart" && reg.Pending == id {
@@ -143,7 +148,24 @@ func (m *Manager) capacity(ctx context.Context, r *record) error {
 		if err != nil {
 			return err
 		}
-		bytes = size
+		// I3 的独立池数据镜像沿用原有容量检查。
+		if _, err = m.readPoolNode(r.From.ComponentID); errors.Is(err, os.ErrNotExist) {
+			return checkCapacity(r.To.Identity.MountPoint, size)
+		} else if err != nil {
+			return err
+		}
+		reg, err := m.paths(ctx)
+		if err != nil {
+			return err
+		}
+		_, data, err := m.poolDisks(ctx, reg, r.To.Identity, r.To.Identity)
+		if err != nil {
+			return err
+		}
+		if data.AvailableBytes-data.ReserveBytes-data.ArchiveBytes < size {
+			return fault("insufficient_storage", "目标存储根扣除预留后无法容纳 %d 字节的池数据镜像", size)
+		}
+		return nil
 	} else {
 		current, err := inspectTree(ctx, r.From.Directory, false)
 		if err != nil {

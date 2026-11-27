@@ -151,7 +151,12 @@ func (m *Manager) copy(ctx context.Context, r *record) error {
 		if err != nil {
 			return err
 		}
-		if _, err = output(ctx, "fallocate", "--length", fmt.Sprint(size), "--", filepath.Join(stage, "data.img")); err != nil {
+		image := filepath.Join(stage, "data.img")
+		if _, err = output(ctx, "fallocate", "--length", fmt.Sprint(size), "--", image); err != nil {
+			return err
+		}
+		// fallocate 会更新时间，保持 rsync 复制的镜像修改时间。
+		if _, err = output(ctx, "touch", "-m", "-r", filepath.Join(r.From.Directory, "data.img"), "--", image); err != nil {
 			return err
 		}
 	}

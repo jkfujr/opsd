@@ -27,6 +27,7 @@ type Services struct {
 		Read(context.Context) (protocol.StorageRootView, error)
 		Write(context.Context, protocol.StorageRootWrite) (protocol.StorageRootResult, error)
 	}
+	StoragePool   func(context.Context, protocol.PoolHostRequest) (protocol.PoolHostResult, error)
 	Start         func(context.Context, string) error
 	Restart       func(context.Context, string) error
 	TaskLock      func(string) (func(), error)
@@ -71,6 +72,12 @@ func NewServices(db *sql.DB) *Services {
 }
 func (s *Services) Handle(ctx context.Context, payload protocol.Payload) (protocol.Payload, error) {
 	switch body := payload.(type) {
+	case *protocol.PoolHostRequest:
+		if s.StoragePool == nil {
+			return nil, &firewall.Fault{Code: "dependency_unavailable", Message: "本机存储池入口不可用"}
+		}
+		out, err := s.StoragePool(ctx, *body)
+		return &out, err
 	case *protocol.StorageRootRead:
 		if s.StorageRoots == nil {
 			return nil, &firewall.Fault{Code: "dependency_unavailable", Message: "本机存储根入口不可用"}

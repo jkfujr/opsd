@@ -120,6 +120,13 @@ var methodAccess = map[string]MethodAccess{
 	"storage.status":          {Capability: CapabilityReadStorage},
 	"storage.root":            {Capability: CapabilityReadStorage},
 	"storage_root":            {Capability: CapabilityManageStorageRoot},
+	"storage_pool_create":     {Capability: CapabilityWriteStorage},
+	"storage.pool.plan":       {Capability: CapabilityWriteStorage},
+	"storage.pool.inspect":    {Capability: CapabilityWriteStorage},
+	"storage.pool.deploy":     {Capability: CapabilityWriteStorage},
+	"storage.pool.observe":    {Capability: CapabilityReadStorage},
+	"storage.pool.list":       {Capability: CapabilityReadStorage},
+	"storage.pool.get":        {Capability: CapabilityReadStorage},
 
 	// —— 防火墙 / 组件 ——
 	"firewall":                         {Capability: CapabilityManageFirewall},

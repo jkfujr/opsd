@@ -2,7 +2,9 @@
 
 ## Unreleased
 
+- 新增 SeaweedFS 集群 S3 池、成员与磁盘配额预览、持久创建回执、入口健康和逐台 TLS 轮换。池数据卷沿用节点存储根迁移。
 - 节点存储根支持登记原生 ext4、申请组件迁移和按原 ID 应用、恢复及回退。组件停写后复制校验，已开放写入的反迁保留新数据。I0.6 已完成的元数据迁移可用同一命令回退。
+- 2026-11-27，I3 `dda0b6c` 在 OPSD-CI 通过构建、后端回归、ProxySQL／Thanos／单节点池双盘迁移和 I0.6 元数据回退。
 - 前端收敛为唯一实现:删除 gpt2 及其页面级脚本,移除 legacy、variants 等历史方案;`frontend/t1` 铺平到 `frontend/` 根,主题改名为 OPSD(`theme.json` 的 `id=opsd`)。构建脚本、CI、本地控制台、共享类型相对路径与相关文档同步更新。新增 `scripts/check-frontend.mjs`,在隔离本地服务上覆盖登录页字段可访问名称、整页登录落地、页面白名单路由、旧地址带查询与锚点重定向、白名单外 404、外观主题管理与内置恢复。页面白名单补 `/tasks`、`/operations`,使旧地址硬刷新后仍能完成客户端重定向。内置与独立主题构建均随附 Inter、JetBrains Mono 的 OFL 许可证。修复管理员修改安全入口后跳回旧入口:并发会话检查的 401 会早于 PATCH 应答到达,改为在 PATCH 期间暂缓处理并缓存该 401,成功时按应答返回的新入口退出。`TestConsoleThemeBrowser` 在本机 Edge 上通过;仓库同时删除根 `dist/` 并归置 `.agents`、`.data` 残留。
 - 明确监控采集、归档、查询与监控服务宿主的含义；概览筛选改为“查看节点”。ADR 0001 区分目标与当前实现：本批保持 raw／5m／1h 365 天，P3 统一历史入口，P4 提供只读 SLO 展示，RPO 24h 留待后续验收。
 - 监控编排迁入 `telemetry.Service`，Node 的八个 archive 字段收为一个 Service，三个监控循环由 Service 启停；保留队列对象、共用配置锁、认证流及原批次确认顺序。Windows／WSL 五包测试、WSL 原生 S3／Thanos 与 20／100 节点负载、角色迁移及三模式监控页定向检查通过。

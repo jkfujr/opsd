@@ -112,7 +112,7 @@ sudo /opt/opsd/bin/opsd data recover
 
 配置、操作、监控和账号密文继续由所属节点生成签名版本记录，节点保留待上传资料；私钥、浏览器会话、原始执行日志和执行恢复资料留在本机。监控默认每 5 分钟采集一次，历史保存在各节点的 `<data_dir>/monitoring/history.db`，窗口为七天。页面当前读数每 3 秒直连获取。备份计划需要覆盖 `opsd_core`。
 
-分布式存储池计划在 I5 使用 SeaweedFS。详见 [监控与对象存储](docs/ARCHITECTURE.md#监控与对象存储)。
+“存储”可预览、创建和查看 SeaweedFS 集群 S3 池。详见 [监控与对象存储](docs/ARCHITECTURE.md#监控与对象存储)。
 
 ## 节点存储根
 
