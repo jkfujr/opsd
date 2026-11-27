@@ -292,6 +292,11 @@ func (n *Node) enqueue(ctx context.Context, origin string, r Request) (Operation
 	if r.Kind == "storage_pool_create" {
 		return n.enqueuePool(ctx, origin, r)
 	}
+	if r.Kind == "storage_pool_ec" {
+		if err := n.checkPoolECSubmission(ctx, &r); err != nil {
+			return Operation{}, err
+		}
+	}
 	if r.Kind == "storage_root" {
 		if e := n.checkStorageRoot(ctx, r); e != nil {
 			if prior, hit, retry := n.retryOperation(ctx, origin, r); retry != nil {
@@ -464,7 +469,7 @@ func (n *Node) enqueueTxObserved(ctx context.Context, origin string, r Request, 
 	}
 	var targetName string
 	switch r.Kind {
-	case "storage_pool_create":
+	case "storage_pool_create", "storage_pool_ec":
 		if operationOwner(r.ResourceID) != n.ID || !operations.ValidID(r.ResourceID) {
 			return Operation{}, fault("invalid_request", "存储池标识无效")
 		}
@@ -856,7 +861,7 @@ func (n *Node) enqueueTxObserved(ctx context.Context, origin string, r Request, 
 		return Operation{}, e
 	}
 	op.ResourceClaims = requestResources(r)
-	if r.Kind == "compose_register" || r.Kind == "compose" || r.Kind == "task_save" || r.Kind == "task_run" {
+	if r.Kind == "compose_register" || r.Kind == "compose" || r.Kind == "task_save" || r.Kind == "task_run" || r.Kind == "storage_pool_ec" {
 		op.ResourceID = r.ResourceID
 	}
 	if r.Kind == "database_step" {
@@ -1326,6 +1331,9 @@ func sameOperationError(a, b *protocol.Error) bool {
 }
 
 func (n *Node) applyLocal(ctx context.Context, kind string, plain []byte, op *Operation) error {
+	if kind == "storage_pool_ec" {
+		return n.applyPoolECPolicy(ctx, plain, op)
+	}
 	if kind == "storage_root" {
 		return n.applyStorageRoot(ctx, plain, op)
 	}

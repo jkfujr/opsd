@@ -74,6 +74,24 @@ sudo env OPSD_TEST_STORAGE_POOL=1 OPSD_TEST_STORAGE_POOL_SOAK=2h \
   2>&1 | tee artifacts/opsd-i5/native.log
 ```
 
+EC 验收在 OPSD-CI 使用四个独立故障域，每域有独立 ext4 数据挂载、Volume 进程和私网地址。先构建并加载[固定衍生镜像](../tools/seaweedfs-opsd/README.md)，再从 Linux 仓库根目录执行。
+
+```bash
+set -o pipefail
+mkdir -p artifacts/opsd-i6
+go -C backend build -o ../artifacts/opsd-i6/opsd ./cmd/opsd
+go -C backend test -c -o ../artifacts/opsd-i6/control.test ./internal/control
+sudo systemctl start polkit.service
+sudo env OPSD_TEST_STORAGE_POOL_EC=1 OPSD_TEST_STORAGE_POOL_EC_TRANSITION=1 \
+  OPSD_TEST_STORAGE_POOL_EC_REPAIR=1 OPSD_TEST_BINARY="$PWD/artifacts/opsd-i6/opsd" \
+  artifacts/opsd-i6/control.test -test.run '^TestStoragePoolECConservativeNative$' -test.v -test.timeout=15m \
+  2>&1 | tee artifacts/opsd-i6/transition.log
+sudo env OPSD_TEST_STORAGE_POOL_EC_LIFECYCLE=1 OPSD_TEST_STORAGE_POOL_EC_REALTIME=1 \
+  OPSD_TEST_STORAGE_POOL_EC_REPAIR=1 OPSD_TEST_BINARY="$PWD/artifacts/opsd-i6/opsd" \
+  artifacts/opsd-i6/control.test -test.run '^TestStoragePoolECLifecycleNative$' -test.v -test.timeout=90m \
+  2>&1 | tee artifacts/opsd-i6/lifecycle.log
+```
+
 主题检查沿用 Go 测试和 Playwright，CI 的“整套主题与内置恢复界面”步骤构建 React、Vue 成品包，在内置生产资源上检查安装、连续条件切换、双登录模式、深层路由、未知应答后的读取和损坏主题恢复，同时验证 Swagger 会话／Bearer、CSRF、条件写入、原键查询与根路径指标。另在独立主题、默认内置与内置恢复三模式执行受影响状态、日志、受管路由和防火墙接纳检查，截图随 `theme-check` 工件保存。手动复现从仓库根目录运行：
 
 ```powershell
@@ -86,8 +104,8 @@ go -C backend test ./internal/control -run '^TestConsoleThemeBrowser$' -v -count
 
 ## 最近结果
 
-2026-11-27，基于 `dda0b6c` 的 I5 改动。独立 WSL 2 `OPSD-CI` 的构建和后端回归退出码均为 0。构建覆盖 OpenAPI 生成一致性、前端类型检查与生产构建、Linux amd64／arm64 编译。I5 原生三成员用例使用 6 GiB 数据卷，三次领导节点故障后旧对象恢复读取最慢 3.241 秒，新写入并跨入口读回最慢 34.808 秒。连续观察 2 小时完成 359 轮三入口签名读取，隔离容器、挂载、loop 设备和 systemd 单元均已清理。I3 原生双盘复用容量兼容修订后的结果，用时 81.71 秒。逐项命令和原始结果见 `artifacts/opsd-v4/final-review.md` 及 `artifacts/opsd-v4/I5/`。
+2026-11-27，基于 `a311e75` 的 I6 改动在独立 WSL 2 `OPSD-CI` 验证。固定衍生镜像的两次无缓存 linux/amd64 构建，manifest、config 和程序 SHA-256 完全一致。最终镜像专项用例用时 116.76 秒。每份源卷 1,048,597,608 字节，覆盖 100 个 10 MiB 对象。真实时钟轮次经过 64 次阈值前检查，最后写入后 1 小时 8.884 秒进入编码。该轮次使用槽位修订前的镜像。补齐容量拒绝后的真实大小 HTTP 用例用时 299.61 秒。首轮后端回归的 Galera 启动和部署等待用例失败，两项单独复跑均通过。逐项读回见 `artifacts/opsd-v4/final-review.md`、`artifacts/opsd-v4/I6/` 和 `artifacts/opsd-v4/I7/`。
 
-已验证：三逻辑故障域的建池与原回执、跨入口对象和 multipart、三次领导节点故障、同盘并发配额、写满及重挂载、池数据卷迁移、五类角色实际 UID/GID 和落盘权限、近到期换证、双 CA 信任和零防火墙写入。未验证：生产私网建池、整机停机、真实 Galera 搬盘和 arm64 实机。
+已验证：四个逻辑故障域、14 个唯一分片、单域失联、缺片与错代际拒绝、同代际修复、跨入口版本和原回执、删源前后读取、转换期间新写入、`cleanup_pending`、容量不足时拒绝并保留原分片、容量恢复后反向转换。未验证：独立物理宿主联合验收、生产池和 arm64 衍生镜像。
 
 历史结果见 [变更记录](../CHANGELOG.md)。

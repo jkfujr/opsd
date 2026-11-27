@@ -36,6 +36,7 @@ const subjectLabel: Record<Operation['subject'], string> = {
   task_save: '保存任务', task_run: '执行任务', compose: 'Compose 操作', compose_register: '登记 Compose', shared_initialize: '初始化 OPSD 数据',
   storage_root: '存储根操作',
   storage_pool_create: '创建存储池',
+  storage_pool_ec: '更新存储池 EC 设置',
 };
 
 export const containerActionLabel: Record<ContainerActionRequest['action'], string> = {

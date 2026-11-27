@@ -57,14 +57,17 @@ func validatePoolDeployment(d *protocol.PoolDeploy, id string) error {
 	}
 	memberInputs := make([]protocol.PoolMemberInput, 0, len(d.Members))
 	controlDomains := map[string]bool{}
+	domains := map[string]bool{}
 	matches := 0
 	for _, n := range d.Members {
 		input := n.PoolMemberInput
 		memberInputs = append(memberInputs, input)
+		domains[n.FailureDomain] = true
 		offset := n.Ports.S3 - 8333
 		if offset < 0 || offset > 16000 || n.Ports != storagepool.Ports(offset) || n.Ports != d.Member.Ports ||
 			n.CapacityGiB < protocol.PoolMinCapacityGiB || n.CapacityGiB > (1<<33)-1 || n.FailureDomain == "" ||
-			n.ControlDisk.UUID == "" || n.DataDisk.UUID == "" {
+			n.ControlDisk.UUID == "" || n.DataDisk.UUID == "" ||
+			(n.ECImage == "") != (d.Member.ECImage == "") {
 			return fault("invalid_request", "存储池成员端口、容量或磁盘身份无效")
 		}
 		expected := []string{"volume", "filer", "s3"}
@@ -81,14 +84,14 @@ func validatePoolDeployment(d *protocol.PoolDeploy, id string) error {
 		}
 		if n.NodeID == d.Member.NodeID && n.PoolMemberInput == d.Member.PoolMemberInput && n.DataBytes == d.Member.DataBytes &&
 			n.ControlBytes == d.Member.ControlBytes && n.ControlDisk == d.Member.ControlDisk && n.DataDisk == d.Member.DataDisk &&
-			slices.Equal(n.Roles, d.Member.Roles) {
+			n.ECImage == d.Member.ECImage && slices.Equal(n.Roles, d.Member.Roles) {
 			matches++
 		}
 	}
 	if _, err := storagepool.Normalize(protocol.PoolInput{Name: id[:min(64, len(id))], Nodes: memberInputs}); err != nil {
 		return err
 	}
-	if matches != 1 || len(controlDomains) != 3 {
+	if matches != 1 || len(controlDomains) != 3 || d.Member.ECImage != "" && len(domains) < 4 {
 		return fault("invalid_request", "存储池固定成员或控制面不完整")
 	}
 	return nil
@@ -114,6 +117,15 @@ func (m *Manager) PoolHost(ctx context.Context, req protocol.PoolHostRequest) (p
 			return protocol.PoolHostResult{}, err
 		}
 		return m.observePool(ctx, d), nil
+	case "ec":
+		if err != nil {
+			return protocol.PoolHostResult{}, err
+		}
+		if req.Deploy == nil || req.Deploy.PoolID != d.PoolID || req.Deploy.OperationID != d.OperationID ||
+			req.Deploy.Member.NodeID != d.Member.NodeID || req.Deploy.EC == nil {
+			return protocol.PoolHostResult{}, fault("conflict", "EC 请求不属于此池和成员")
+		}
+		return m.poolECJob(ctx, d, *req.Deploy.EC)
 	case "prepare":
 		if err = validatePoolDeployment(req.Deploy, req.PoolID); err != nil {
 			return protocol.PoolHostResult{}, err
@@ -279,7 +291,7 @@ func (m *Manager) preparePoolNode(ctx context.Context, d poolNodeRecord, spec pr
 			return d, err
 		}
 	}
-	if err = m.ensurePoolImages(ctx, n.Control()); err != nil {
+	if err = m.ensurePoolImages(ctx, n); err != nil {
 		return d, err
 	}
 	for _, image := range []struct {
@@ -482,8 +494,16 @@ func (m *Manager) servePoolNode(ctx context.Context, d *poolNodeRecord) error {
 	if err = p.Pool.mount(ctx, b.Directory); err != nil {
 		return err
 	}
-	if err = makePoolRoleDir(filepath.Join(b.Directory, "data", "volume")); err != nil {
+	volumeDir := filepath.Join(b.Directory, "data", "volume")
+	if err = makePoolRoleDir(volumeDir); err != nil {
 		return err
+	}
+	if d.Member.ECImage != "" {
+		for _, sub := range []string{"replica", "ec"} {
+			if err = makePoolRoleDir(filepath.Join(volumeDir, sub)); err != nil {
+				return err
+			}
+		}
 	}
 	if err = m.stage(ctx, p, b); err != nil {
 		return err

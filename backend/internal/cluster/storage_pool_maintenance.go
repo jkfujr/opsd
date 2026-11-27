@@ -109,6 +109,7 @@ func (n *Node) maintainPools(observed map[string]poolObservation) {
 			if changed {
 				n.notifyChange(Change{Resource: "storage", NodeID: n.ID})
 			}
+			n.maintainPoolEC(ctx, db, p, plan, values, replies)
 			if poolObservedState(values) == "ready" {
 				if !work.DegradedSince.IsZero() {
 					work.DegradedSince, work.RepairAfter = time.Time{}, time.Time{}

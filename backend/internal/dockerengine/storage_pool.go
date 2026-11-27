@@ -12,11 +12,33 @@ import (
 	"sync"
 
 	"github.com/containerd/errdefs"
+	"github.com/jkfujr/opsd/internal/protocol"
 	"github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/api/types/mount"
 	"github.com/moby/moby/api/types/network"
 	"github.com/moby/moby/client"
 )
+
+func (m *Manager) StoragePoolECImage(ctx context.Context) (string, error) {
+	c, _, _, err := m.connect(ctx)
+	if err != nil {
+		return "", err
+	}
+	defer c.Close()
+	info, err := c.ImageInspect(ctx, protocol.PoolECImageTag)
+	if errdefs.IsNotFound(err) {
+		return "", nil
+	}
+	if err != nil {
+		return "", err
+	}
+	if info.Config == nil || info.Config.Labels["org.opencontainers.image.version"] != protocol.PoolECVersion ||
+		info.Config.Labels["org.opencontainers.image.revision"] != protocol.PoolECUpstreamRevision ||
+		!strings.HasPrefix(info.ID, "sha256:") {
+		return "", fmt.Errorf("本机 EC 镜像与 OPSD 固定构建版本不符")
+	}
+	return info.ID, nil
+}
 
 // StoragePoolTemplate 来自本机 root 部署记录。模板中的 data 相对绑定随数据镜像迁移。
 type StoragePoolTemplate struct {

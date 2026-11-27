@@ -86,9 +86,9 @@ func monitorPoolFirewall(t *testing.T) func() []byte {
 	}
 }
 
-func poolTestLab(t *testing.T) string {
+func poolTestLab(t *testing.T, phase string) string {
 	t.Helper()
-	lab, err := os.MkdirTemp("/srv", "opsd-i5-")
+	lab, err := os.MkdirTemp("/srv", "opsd-"+phase+"-")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -103,36 +103,29 @@ func poolTestLab(t *testing.T) string {
 	return lab
 }
 
-func TestStoragePoolNative(t *testing.T) {
-	bin := os.Getenv("OPSD_TEST_BINARY")
-	if os.Getenv("OPSD_TEST_STORAGE_POOL") != "1" || bin == "" || os.Geteuid() != 0 {
-		t.Skip("需要 OPSD-CI、真实 Docker、systemd、loop 磁盘和 Linux 工件")
-	}
-	lab := poolTestLab(t)
-	var err error
-	entries := make([]*apiNode, 3)
+func poolTestNodes(t *testing.T, lab, bin string, octet int, now func() time.Time, capacities []int64) ([]*apiNode, map[string]*storageroot.Manager, []protocol.PoolMemberInput) {
+	t.Helper()
+	entries := make([]*apiNode, len(capacities))
 	hosts := make(map[string]*storageroot.Manager)
-	moveTarget := poolTestExt4(t, lab, "move-target", "10G")
-	var shift atomic.Int64
-	shift.Store(int64(-65 * 24 * time.Hour))
-	before := time.Now()
-	in := protocol.PoolInput{Name: "OPSD 隔离池", PortOffset: 12103}
+	var members []protocol.PoolMemberInput
 	for i := range entries {
 		n := openAPINode(t, fmt.Sprintf("记录节点 %d", i+1), "隔离", 1, 1)
-		n.node.Now = func() time.Time { return time.Now().Add(time.Duration(shift.Load())) }
+		if now != nil {
+			n.node.Now = now
+		}
 		entries[i] = n
 		dir := filepath.Join(lab, fmt.Sprintf("node-%d", i+1))
 		b := poolTestExt4(t, dir, "B", "12G")
-		ip := fmt.Sprintf("10.253.89.%d", 81+i)
+		ip := fmt.Sprintf("10.253.89.%d", octet+i)
 		poolTestCommand(t, "ip", "address", "add", ip+"/32", "dev", "lo")
 		t.Cleanup(func() { _, _ = exec.Command("ip", "address", "del", ip+"/32", "dev", "lo").CombinedOutput() })
 		config := filepath.Join(dir, "config", "instance.json")
 		f := installation.NodeFile{Binary: bin, DataDir: filepath.Join(dir, "meta"), ExecutorDir: filepath.Join(dir, "executor"),
 			Socket: filepath.Join(dir, "executor.sock")}
-		if err = localstate.Write(config, f, 0600); err != nil {
+		if err := localstate.Write(config, f, 0600); err != nil {
 			t.Fatal(err)
 		}
-		if err = os.MkdirAll(f.ExecutorDir, 0700); err != nil {
+		if err := os.MkdirAll(f.ExecutorDir, 0700); err != nil {
 			t.Fatal(err)
 		}
 		db, err := storage.Open(t.Context(), filepath.Join(f.ExecutorDir, "executor.db"), storage.Executor)
@@ -158,7 +151,7 @@ func TestStoragePoolNative(t *testing.T) {
 				root = r.ID
 			}
 		}
-		in.Nodes = append(in.Nodes, protocol.PoolMemberInput{NodeID: n.node.ID, PrivateIP: ip, CapacityGiB: 12,
+		members = append(members, protocol.PoolMemberInput{NodeID: n.node.ID, PrivateIP: ip, CapacityGiB: capacities[i],
 			StorageRootID: root, FailureDomain: fmt.Sprintf("rack-%d", i+1)})
 		services := executor.NewServices(db)
 		services.StoragePool = host.PoolHost
@@ -175,6 +168,23 @@ func TestStoragePoolNative(t *testing.T) {
 	for _, e := range entries {
 		e.node.Start()
 	}
+	return entries, hosts, members
+}
+
+func TestStoragePoolNative(t *testing.T) {
+	bin := os.Getenv("OPSD_TEST_BINARY")
+	if os.Getenv("OPSD_TEST_STORAGE_POOL") != "1" || bin == "" || os.Geteuid() != 0 {
+		t.Skip("需要 OPSD-CI、真实 Docker、systemd、loop 磁盘和 Linux 工件")
+	}
+	lab := poolTestLab(t, "i5")
+	moveTarget := poolTestExt4(t, lab, "move-target", "10G")
+	var shift atomic.Int64
+	shift.Store(int64(-65 * 24 * time.Hour))
+	before := time.Now()
+	entries, hosts, members := poolTestNodes(t, lab, bin, 81, func() time.Time {
+		return time.Now().Add(time.Duration(shift.Load()))
+	}, []int64{12, 12, 12})
+	in := protocol.PoolInput{Name: "OPSD 隔离池", PortOffset: 12103, Nodes: members}
 	clients, csrf := make([]*http.Client, len(entries)), make([]string, len(entries))
 	for i, entry := range entries {
 		clients[i], csrf[i] = apiAdmin(t, entry)
@@ -360,7 +370,7 @@ func TestStoragePoolSharedDiskCapacityNative(t *testing.T) {
 	if os.Getenv("OPSD_TEST_STORAGE_POOL") != "1" || os.Geteuid() != 0 {
 		t.Skip("需要 OPSD-CI、真实 Docker 和 loop 磁盘")
 	}
-	lab := poolTestLab(t)
+	lab := poolTestLab(t, "i5")
 	mount := poolTestExt4(t, lab, "shared", "12G")
 	const offset = 15100
 	ip := "10.253.89.91"

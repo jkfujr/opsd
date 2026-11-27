@@ -1,0 +1,184 @@
+diff --git a/weed/ec/ec_decode.go b/weed/ec/ec_decode.go
+index b0c3c2e..d66d9e5 100644
+--- a/weed/ec/ec_decode.go
++++ b/weed/ec/ec_decode.go
+@@ -14,6 +14,7 @@ import (
+ 	"github.com/seaweedfs/seaweedfs/weed/storage/needle"
+ 	"github.com/seaweedfs/seaweedfs/weed/storage/types"
+ 	"github.com/seaweedfs/seaweedfs/weed/util"
++	"github.com/seaweedfs/seaweedfs/weed/util/version"
+ 	"github.com/seaweedfs/seaweedfs/weed/util/wildcard"
+ 	"google.golang.org/grpc"
+ 	"google.golang.org/grpc/codes"
+@@ -21,6 +22,9 @@ import (
+ )
+ 
+ func DoEcDecode(env *Env, topoInfo *master_pb.TopologyInfo, collection string, vid needle.VolumeId, diskType types.DiskType, checkMinFreeSpace bool, diskUsageState *DecodeDiskUsageState) (err error) {
++	if version.VERSION_NUMBER == "4.55-opsd.1" {
++		return fmt.Errorf("OPSD 池使用 opsd-ec 分阶段恢复双副本")
++	}
+ 
+ 	if !env.isLocked() {
+ 		return fmt.Errorf("lock is lost")
+diff --git a/weed/ec/ec_encode.go b/weed/ec/ec_encode.go
+index 7ac36bd..5cd6816 100644
+--- a/weed/ec/ec_encode.go
++++ b/weed/ec/ec_encode.go
+@@ -24,6 +24,7 @@ import (
+ 	"github.com/seaweedfs/seaweedfs/weed/storage/types"
+ 	"github.com/seaweedfs/seaweedfs/weed/storage/volume_replica"
+ 	"github.com/seaweedfs/seaweedfs/weed/util"
++	"github.com/seaweedfs/seaweedfs/weed/util/version"
+ 	"github.com/seaweedfs/seaweedfs/weed/util/wildcard"
+ 	"github.com/seaweedfs/seaweedfs/weed/wdclient"
+ 	"google.golang.org/grpc"
+@@ -62,6 +63,9 @@ func ChunkVolumeIds(volumeIds []needle.VolumeId, batchSize int) [][]needle.Volum
+ }
+ 
+ func ProcessEcEncodeBatch(env *Env, writer io.Writer, volumeIds []needle.VolumeId, rp *super_block.ReplicaPlacement, diskType types.DiskType, maxParallelization int, applyBalancing bool, collectionForMessage string) (err error) {
++	if version.VERSION_NUMBER == "4.55-opsd.1" {
++		return fmt.Errorf("OPSD 池使用 opsd-ec 分阶段转换")
++	}
+ 	topologyInfo, _, err := env.FetchTopology(0)
+ 	if err != nil {
+ 		return err
+diff --git a/weed/server/volume_grpc_admin.go b/weed/server/volume_grpc_admin.go
+index 6b99ca6..5c293fa 100644
+--- a/weed/server/volume_grpc_admin.go
++++ b/weed/server/volume_grpc_admin.go
+@@ -243,7 +243,11 @@ func (vs *VolumeServer) VolumeDelete(ctx context.Context, req *volume_server_pb.
+ 		return resp, status.FromContextError(err).Err()
+ 	}
+ 
+-	err := vs.store.DeleteVolume(needle.VolumeId(req.VolumeId), req.OnlyEmpty, req.OnlyGarbage, req.KeepRemoteData)
++	allowed, err := vs.checkOPSDReplicaRemoval(ctx, req)
++	if err != nil || !allowed {
++		return resp, err
++	}
++	err = vs.store.DeleteVolume(needle.VolumeId(req.VolumeId), req.OnlyEmpty, req.OnlyGarbage, req.KeepRemoteData)
+ 
+ 	if err != nil {
+ 		glog.Errorf("volume delete %v: %v", req, err)
+diff --git a/weed/server/volume_grpc_copy.go b/weed/server/volume_grpc_copy.go
+index 421b047..d1e3f48 100644
+--- a/weed/server/volume_grpc_copy.go
++++ b/weed/server/volume_grpc_copy.go
+@@ -12,6 +12,7 @@ import (
+ 	"time"
+ 
+ 	"google.golang.org/grpc/codes"
++	"google.golang.org/grpc/metadata"
+ 	"google.golang.org/grpc/status"
+ 
+ 	"github.com/seaweedfs/seaweedfs/weed/pb/master_pb"
+@@ -1124,6 +1125,10 @@ func (vs *VolumeServer) ReceiveFile(stream volume_server_pb.VolumeServer_Receive
+ 		return err
+ 	}
+ 
++	if token := metadata.ValueFromIncomingContext(stream.Context(), "opsd-ec-repair"); len(token) != 0 {
++		return vs.receiveOPSDRepairShard(stream, token)
++	}
++
+ 	var fileInfo *volume_server_pb.ReceiveFileInfo
+ 	var targetFile *os.File
+ 	var filePath string
+@@ -1146,7 +1151,12 @@ func (vs *VolumeServer) ReceiveFile(stream volume_server_pb.VolumeServer_Receive
+ 		if err == io.EOF {
+ 			// Stream completed successfully
+ 			if targetFile != nil {
+-				targetFile.Sync()
++				if err := targetFile.Sync(); err != nil {
++					return err
++				}
++				if err := util.FsyncDir(filepath.Dir(filePath)); err != nil {
++					return err
++				}
+ 				glog.V(1).Infof("Successfully received file %s (%d bytes)", filePath, bytesWritten)
+ 			}
+ 			return stream.SendAndClose(&volume_server_pb.ReceiveFileResponse{
+diff --git a/weed/server/volume_grpc_erasure_coding.go b/weed/server/volume_grpc_erasure_coding.go
+index b80c7db..9026bf1 100644
+--- a/weed/server/volume_grpc_erasure_coding.go
++++ b/weed/server/volume_grpc_erasure_coding.go
+@@ -26,6 +26,7 @@ import (
+ 	"github.com/seaweedfs/seaweedfs/weed/storage/types"
+ 	"github.com/seaweedfs/seaweedfs/weed/storage/volume_info"
+ 	"github.com/seaweedfs/seaweedfs/weed/util"
++	"github.com/seaweedfs/seaweedfs/weed/util/version"
+ 
+ 	"google.golang.org/grpc/codes"
+ 	"google.golang.org/grpc/status"
+@@ -816,6 +817,9 @@ func (vs *VolumeServer) VolumeEcShardsDelete(ctx context.Context, req *volume_se
+ 		return nil, err
+ 	}
+ 
++	if version.VERSION_NUMBER == "4.55-opsd.1" {
++		return vs.opsdDeleteECGeneration(ctx, req)
++	}
+ 	bName := erasure_coding.EcShardBaseFileName(req.Collection, int(req.VolumeId))
+ 
+ 	if req.FullTeardown {
+@@ -1699,11 +1703,18 @@ func (vs *VolumeServer) adoptStagedVolume(req *volume_server_pb.VolumeEcShardsTo
+ 	// volume that still carries a .note is swept by loadExistingVolume.
+ 	for _, ext := range []string{".vif", ".dat", ".idx"} {
+ 		if err := os.Rename(base+ext+".copying", base+ext); err != nil {
+-			os.Remove(noteFile)
+ 			return nil, fmt.Errorf("rename staged %s for volume %d: %w", ext, req.VolumeId, err)
+ 		}
+ 	}
+-	os.Remove(noteFile)
++	if err := util.FsyncDir(filepath.Dir(base)); err != nil {
++		return nil, err
++	}
++	if err := os.Remove(noteFile); err != nil {
++		return nil, err
++	}
++	if err := util.FsyncDir(filepath.Dir(base)); err != nil {
++		return nil, err
++	}
+ 
+ 	if err := vs.store.MountVolumeClaimed(vid, &req.Collection); err != nil {
+ 		return nil, fmt.Errorf("mount staged volume %d: %w", req.VolumeId, err)
+diff --git a/weed/util/version/constants.go b/weed/util/version/constants.go
+index 9a2f1ff..0209e0e 100644
+--- a/weed/util/version/constants.go
++++ b/weed/util/version/constants.go
+@@ -10,7 +10,7 @@ import (
+ var (
+ 	MAJOR_VERSION  = int32(4)
+ 	MINOR_VERSION  = int32(55)
+-	VERSION_NUMBER = fmt.Sprintf("%d.%02d", MAJOR_VERSION, MINOR_VERSION)
++	VERSION_NUMBER = fmt.Sprintf("%d.%02d-opsd.1", MAJOR_VERSION, MINOR_VERSION)
+ 	VERSION        = util.SizeLimit + " " + VERSION_NUMBER
+ 	COMMIT         = ""
+ )
+diff --git a/weed/worker/tasks/erasure_coding/ec_task.go b/weed/worker/tasks/erasure_coding/ec_task.go
+index e6670b8..374dafc 100644
+--- a/weed/worker/tasks/erasure_coding/ec_task.go
++++ b/weed/worker/tasks/erasure_coding/ec_task.go
+@@ -23,6 +23,7 @@ import (
+ 	"github.com/seaweedfs/seaweedfs/weed/storage/volume_info"
+ 	"github.com/seaweedfs/seaweedfs/weed/storage/volume_replica"
+ 	"github.com/seaweedfs/seaweedfs/weed/util"
++	"github.com/seaweedfs/seaweedfs/weed/util/version"
+ 	"github.com/seaweedfs/seaweedfs/weed/wdclient"
+ 	"github.com/seaweedfs/seaweedfs/weed/worker/types"
+ 	"github.com/seaweedfs/seaweedfs/weed/worker/types/base"
+@@ -88,6 +89,9 @@ func NewErasureCodingTask(id string, server string, volumeID uint32, collection
+ 
+ // Execute implements the UnifiedTask interface
+ func (t *ErasureCodingTask) Execute(ctx context.Context, params *worker_pb.TaskParams) error {
++	if version.VERSION_NUMBER == "4.55-opsd.1" {
++		return fmt.Errorf("OPSD 池禁用上游自动删源的编码任务")
++	}
+ 	if params == nil {
+ 		return fmt.Errorf("task parameters are required")
+ 	}
+@@ -738,6 +742,7 @@ func (t *ErasureCodingTask) generateEcShardsLocally(localFiles map[string]string
+ 		DataShards:   uint32(defaultCtx.DataShards),
+ 		ParityShards: uint32(defaultCtx.ParityShards),
+ 		EncodeTsNs:   encodeTsNs,
++		BlockSize:    t.encodedBlockSize,
+ 	}
+ 	if ecBitrot != nil && ecBitrot.EcShardConfig != nil {
+ 		ecShardConfig.DataShards = ecBitrot.EcShardConfig.DataShards

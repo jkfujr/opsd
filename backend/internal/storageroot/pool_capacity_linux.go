@@ -176,6 +176,9 @@ func (m *Manager) inspectPool(ctx context.Context, n protocol.PoolMemberInput, o
 	data, control := storagepool.PortGroups(storagepool.Ports(offset))
 	out.PortsFree = portGroupFree(ctx, n.PrivateIP, data, reserved)
 	out.ControlPortsFree = portGroupFree(ctx, n.PrivateIP, control, reserved)
+	if m.Docker != nil {
+		out.ECImage, _ = m.Docker.StoragePoolECImage(ctx)
+	}
 	return out, nil
 }
 

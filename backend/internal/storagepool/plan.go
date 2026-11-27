@@ -22,9 +22,6 @@ func Normalize(in protocol.PoolInput) (protocol.PoolInput, error) {
 	if in.Name == "" || len([]rune(in.Name)) > 64 || in.PortOffset < 0 || in.PortOffset > 16_000 || len(in.Nodes) < 3 || len(in.Nodes) > 64 {
 		return in, Fault("invalid_request", "名称须为 1–64 个字符，成员须为 3–64 个，端口偏移须为 0–16000")
 	}
-	if in.ECEnabled {
-		return in, Fault("invalid_request", "当前版本只支持跨故障域双副本")
-	}
 	in.Nodes = slices.Clone(in.Nodes)
 	seen := make(map[string]bool, len(in.Nodes))
 	for i, m := range in.Nodes {
@@ -137,6 +134,12 @@ func Select(in protocol.PoolInput, probes map[string]protocol.PoolHostResult) ([
 	if len(domains) < 3 {
 		return nil, Fault("invalid_request", "存储池至少需要三个故障域")
 	}
+	ecReady := len(domains) >= 4 && !slices.ContainsFunc(out, func(n protocol.PoolNodePlan) bool {
+		return probes[n.NodeID].ECImage == ""
+	})
+	if in.ECEnabled && !ecReady {
+		return nil, Fault("invalid_request", "EC 需要至少四个故障域和全部成员的固定镜像")
+	}
 	clear(domains)
 	var controlShortfalls []string
 	for i := range out {
@@ -157,6 +160,9 @@ func Select(in protocol.PoolInput, probes map[string]protocol.PoolHostResult) ([
 			return nil, Fault("insufficient_storage", CapacityMessage(member.NodeID, p.ControlDisk, p.DataDisk, control, data, member.Control()))
 		}
 		member.DataBytes, member.ControlBytes = data, control
+		if ecReady {
+			member.ECImage = p.ECImage
+		}
 		member.Roles = append(member.Roles, "volume", "filer", "s3")
 	}
 	if len(domains) < 3 {

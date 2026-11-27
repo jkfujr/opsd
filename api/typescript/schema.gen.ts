@@ -1717,6 +1717,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/storage/pools/{id}/ec": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** 设置存储池纠删码 */
+        put: operations["saveStoragePoolEC"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -2255,7 +2272,7 @@ export interface components {
             /** @enum {string} */
             executor: "node";
             /** @enum {string} */
-            subject: "firewall" | "component" | "config" | "name" | "account" | "firewall_config" | "container" | "database" | "database_step" | "task_save" | "task_run" | "compose" | "compose_register" | "shared_initialize" | "storage_root" | "storage_pool_create";
+            subject: "firewall" | "component" | "config" | "name" | "account" | "firewall_config" | "container" | "database" | "database_step" | "task_save" | "task_run" | "compose" | "compose_register" | "shared_initialize" | "storage_root" | "storage_pool_create" | "storage_pool_ec";
             state: components["schemas"]["OperationState"];
             /** Format: int64 */
             revision: number;
@@ -3969,6 +3986,8 @@ export interface components {
             data_bytes: number;
             /** Format: int64 */
             control_bytes: number;
+            /** @description 当前计划固定的 EC 镜像标识 */
+            ec_image?: string;
         };
         StoragePoolPlan: {
             plan_id: string;
@@ -4036,11 +4055,36 @@ export interface components {
             nodes: components["schemas"]["StoragePoolMember"][];
             /** Format: date-time */
             checked_at: string;
+            ec_supported?: boolean;
+            ec_restore_pending?: boolean;
+            parity_preferred_node_ids?: string[];
+            ec_volumes?: components["schemas"]["StoragePoolECStatus"][];
         };
         StoragePoolList: {
             items: components["schemas"]["StoragePool"][];
             next_cursor?: string;
             unavailable: string[];
+        };
+        StoragePoolECInput: {
+            enabled: boolean;
+            restore_replicas?: boolean;
+            parity_preferred_node_ids?: string[];
+        };
+        StoragePoolECStatus: {
+            /** Format: int64 */
+            volume_id: number;
+            collection: string;
+            /** @enum {string} */
+            layout: "replicated" | "ec";
+            state: string;
+            /** @enum {string} */
+            direction: "encode" | "restore";
+            /** @enum {string} */
+            conversion_state: "pending" | "encoding" | "verifying" | "done" | "failed";
+            generation: string;
+            cleanup_pending: boolean;
+            operation_id: string;
+            error?: string;
         };
     };
     responses: {
@@ -9283,6 +9327,55 @@ export interface operations {
             500: components["responses"]["Error500"];
             503: components["responses"]["Error503"];
             504: components["responses"]["Error504"];
+        };
+    };
+    saveStoragePoolEC: {
+        parameters: {
+            query?: never;
+            header: {
+                "If-Match": string;
+                "X-CSRF-Token"?: string;
+                "Idempotency-Key": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StoragePoolECInput"];
+            };
+        };
+        responses: {
+            /** @description 请求成功 */
+            202: {
+                headers: {
+                    "X-Request-ID": string;
+                    Location: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Operation"];
+                };
+            };
+            400: components["responses"]["Error400"];
+            401: components["responses"]["Error401"];
+            403: components["responses"]["Error403"];
+            404: components["responses"]["Error404"];
+            405: components["responses"]["Error405"];
+            406: components["responses"]["Error406"];
+            409: components["responses"]["Error409"];
+            412: components["responses"]["Error412"];
+            413: components["responses"]["Error413"];
+            415: components["responses"]["Error415"];
+            422: components["responses"]["Error422"];
+            428: components["responses"]["Error428"];
+            429: components["responses"]["Error429"];
+            500: components["responses"]["Error500"];
+            503: components["responses"]["Error503"];
+            504: components["responses"]["Error504"];
+            507: components["responses"]["Error507"];
         };
     };
 }

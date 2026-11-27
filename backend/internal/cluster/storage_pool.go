@@ -113,7 +113,7 @@ func (n *Node) poolDispatch(ctx context.Context, origin, method string, raw []by
 			}
 		case "storage.pool.deploy":
 			if origin != operationOwner(r.PoolID) || !operations.ValidID(r.PoolID) ||
-				!slices.Contains([]string{"prepare", "control", "serve", "rotate", "repair"}, r.Action) ||
+				!slices.Contains([]string{"prepare", "control", "serve", "rotate", "repair", "ec"}, r.Action) ||
 				wire.Sealed == nil || r.Deploy != nil {
 				return nil, fault("forbidden", "存储池部署需要所属节点签发")
 			}
@@ -336,7 +336,7 @@ func (n *Node) recheckPoolPlan(ctx context.Context, plan protocol.PoolPlan) erro
 	for i, now := range current {
 		before := plan.Nodes[i]
 		if before.PoolMemberInput != now.PoolMemberInput || !slices.Equal(before.Roles, now.Roles) ||
-			before.ControlBytes != now.ControlBytes || before.DataBytes != now.DataBytes {
+			before.ControlBytes != now.ControlBytes || before.DataBytes != now.DataBytes || before.ECImage != now.ECImage {
 			return fault("precondition_failed", "存储池选点或配额已变化，请重新预览")
 		}
 	}
@@ -437,6 +437,15 @@ func (n *Node) localPool(ctx context.Context, db storagepool.Store, id string) (
 	plan, err := n.poolPlanForOperation(ctx, p.OperationID)
 	if err != nil {
 		return p, err
+	}
+	p.ECSupported = poolSupportsEC(plan.Nodes)
+	if p.ECSupported {
+		if err = db.ReadECPolicy(ctx, &p); err != nil {
+			return p, err
+		}
+		if p.ECVolumes, err = db.ECStatus(ctx, id); err != nil {
+			return p, err
+		}
 	}
 	read, cancel := context.WithTimeout(ctx, 6*time.Second)
 	defer cancel()

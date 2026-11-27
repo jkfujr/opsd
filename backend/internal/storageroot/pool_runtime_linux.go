@@ -71,7 +71,11 @@ func poolWeedRole(d poolNodeRecord, config, role, rel string, port, grpc int, ar
 	ip := d.Member.PrivateIP
 	cmd := []string{role, "-ip=" + ip, "-ip.bind=" + ip, "-port=" + strconv.Itoa(port), "-port.grpc=" + strconv.Itoa(grpc)}
 	cmd = append(cmd, args...)
-	return poolTemplate(d, config, role, rel, protocol.PoolSeaweedImage, "weed", cmd)
+	image := d.Member.ECImage
+	if image == "" {
+		image = protocol.PoolSeaweedImage
+	}
+	return poolTemplate(d, config, role, rel, image, "weed", cmd)
 }
 
 func poolVolumeTemplate(d poolNodeRecord, config string) dockerengine.StoragePoolTemplate {
@@ -79,8 +83,12 @@ func poolVolumeTemplate(d poolNodeRecord, config string) dockerengine.StoragePoo
 	masters, _, _ := poolMasters(d.Members)
 	// SeaweedFS 用 rack 表达跨故障域的第二副本。
 	rack := sha256.Sum256([]byte(m.FailureDomain))
-	return poolWeedRole(d, config, "volume", "data/volume", m.Ports.Volume, m.Ports.VolumeGRPC,
-		"-master="+masters, "-dir=/data", "-dataCenter=opsd", fmt.Sprintf("-rack=%x", rack[:12]), "-max=0", "-minFreeSpace=10")
+	args := []string{"-master=" + masters, "-dir=/data", "-dataCenter=opsd", fmt.Sprintf("-rack=%x", rack[:12]), "-max=0", "-minFreeSpace=10"}
+	if m.ECImage != "" {
+		args[1] = "-dir=/data/replica,/data/ec"
+		args = append(args, "-disk=hdd,ssd")
+	}
+	return poolWeedRole(d, config, "volume", "data/volume", m.Ports.Volume, m.Ports.VolumeGRPC, args...)
 }
 
 func poolControlTemplates(d poolNodeRecord, config string, includeAPI bool) []dockerengine.StoragePoolTemplate {
@@ -313,9 +321,20 @@ func readPoolMaterial(config string) (protocol.PoolMaterial, error) {
 	return out, nil
 }
 
-func (m *Manager) ensurePoolImages(ctx context.Context, control bool) error {
-	images := []string{protocol.PoolSeaweedImage}
-	if control {
+func (m *Manager) ensurePoolImages(ctx context.Context, member protocol.PoolNodePlan) error {
+	var images []string
+	if member.ECImage == "" {
+		images = append(images, protocol.PoolSeaweedImage)
+	} else {
+		image, err := m.Docker.StoragePoolECImage(ctx)
+		if err != nil {
+			return err
+		}
+		if image != member.ECImage {
+			return fault("precondition_failed", "本机 EC 镜像已变化，请重新预览")
+		}
+	}
+	if member.Control() {
 		images = append(images, protocol.PoolEtcdImage)
 	}
 	for _, img := range images {

@@ -1414,6 +1414,7 @@ const (
 	OperationSubjectName              OperationSubject = "name"
 	OperationSubjectSharedInitialize  OperationSubject = "shared_initialize"
 	OperationSubjectStoragePoolCreate OperationSubject = "storage_pool_create"
+	OperationSubjectStoragePoolEc     OperationSubject = "storage_pool_ec"
 	OperationSubjectStorageRoot       OperationSubject = "storage_root"
 	OperationSubjectTaskRun           OperationSubject = "task_run"
 	OperationSubjectTaskSave          OperationSubject = "task_save"
@@ -1447,6 +1448,8 @@ func (e OperationSubject) Valid() bool {
 	case OperationSubjectSharedInitialize:
 		return true
 	case OperationSubjectStoragePoolCreate:
+		return true
+	case OperationSubjectStoragePoolEc:
 		return true
 	case OperationSubjectStorageRoot:
 		return true
@@ -2212,6 +2215,69 @@ func (e StoragePoolState) Valid() bool {
 	case StoragePoolStateReady:
 		return true
 	case StoragePoolStateUnavailable:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for StoragePoolECStatusConversionState.
+const (
+	StoragePoolECStatusConversionStateDone      StoragePoolECStatusConversionState = "done"
+	StoragePoolECStatusConversionStateEncoding  StoragePoolECStatusConversionState = "encoding"
+	StoragePoolECStatusConversionStateFailed    StoragePoolECStatusConversionState = "failed"
+	StoragePoolECStatusConversionStatePending   StoragePoolECStatusConversionState = "pending"
+	StoragePoolECStatusConversionStateVerifying StoragePoolECStatusConversionState = "verifying"
+)
+
+// Valid indicates whether the value is a known member of the StoragePoolECStatusConversionState enum.
+func (e StoragePoolECStatusConversionState) Valid() bool {
+	switch e {
+	case StoragePoolECStatusConversionStateDone:
+		return true
+	case StoragePoolECStatusConversionStateEncoding:
+		return true
+	case StoragePoolECStatusConversionStateFailed:
+		return true
+	case StoragePoolECStatusConversionStatePending:
+		return true
+	case StoragePoolECStatusConversionStateVerifying:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for StoragePoolECStatusDirection.
+const (
+	Encode  StoragePoolECStatusDirection = "encode"
+	Restore StoragePoolECStatusDirection = "restore"
+)
+
+// Valid indicates whether the value is a known member of the StoragePoolECStatusDirection enum.
+func (e StoragePoolECStatusDirection) Valid() bool {
+	switch e {
+	case Encode:
+		return true
+	case Restore:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for StoragePoolECStatusLayout.
+const (
+	Ec         StoragePoolECStatusLayout = "ec"
+	Replicated StoragePoolECStatusLayout = "replicated"
+)
+
+// Valid indicates whether the value is a known member of the StoragePoolECStatusLayout enum.
+func (e StoragePoolECStatusLayout) Valid() bool {
+	switch e {
+	case Ec:
+		return true
+	case Replicated:
 		return true
 	default:
 		return false
@@ -5099,17 +5165,21 @@ type StorageConfigPatch struct {
 
 // StoragePool defines model for StoragePool.
 type StoragePool struct {
-	CaPem       string                 `json:"ca_pem"`
-	CheckedAt   time.Time              `json:"checked_at"`
-	EcEnabled   bool                   `json:"ec_enabled"`
-	Id          string                 `json:"id"`
-	Name        string                 `json:"name"`
-	Nodes       []StoragePoolMember    `json:"nodes"`
-	OperationId string                 `json:"operation_id"`
-	OwnerNodeId string                 `json:"owner_node_id"`
-	Replication StoragePoolReplication `json:"replication"`
-	Revision    int64                  `json:"revision"`
-	State       StoragePoolState       `json:"state"`
+	CaPem                  string                 `json:"ca_pem"`
+	CheckedAt              time.Time              `json:"checked_at"`
+	EcEnabled              bool                   `json:"ec_enabled"`
+	EcRestorePending       *bool                  `json:"ec_restore_pending,omitempty"`
+	EcSupported            *bool                  `json:"ec_supported,omitempty"`
+	EcVolumes              *[]StoragePoolECStatus `json:"ec_volumes,omitempty"`
+	Id                     string                 `json:"id"`
+	Name                   string                 `json:"name"`
+	Nodes                  []StoragePoolMember    `json:"nodes"`
+	OperationId            string                 `json:"operation_id"`
+	OwnerNodeId            string                 `json:"owner_node_id"`
+	ParityPreferredNodeIds *[]string              `json:"parity_preferred_node_ids,omitempty"`
+	Replication            StoragePoolReplication `json:"replication"`
+	Revision               int64                  `json:"revision"`
+	State                  StoragePoolState       `json:"state"`
 }
 
 // StoragePoolReplication defines model for StoragePool.Replication.
@@ -5136,6 +5206,36 @@ type StoragePoolDisk struct {
 	ReserveBytes   int64  `json:"reserve_bytes"`
 	Uuid           string `json:"uuid"`
 }
+
+// StoragePoolECInput defines model for StoragePoolECInput.
+type StoragePoolECInput struct {
+	Enabled                bool      `json:"enabled"`
+	ParityPreferredNodeIds *[]string `json:"parity_preferred_node_ids,omitempty"`
+	RestoreReplicas        *bool     `json:"restore_replicas,omitempty"`
+}
+
+// StoragePoolECStatus defines model for StoragePoolECStatus.
+type StoragePoolECStatus struct {
+	CleanupPending  bool                               `json:"cleanup_pending"`
+	Collection      string                             `json:"collection"`
+	ConversionState StoragePoolECStatusConversionState `json:"conversion_state"`
+	Direction       StoragePoolECStatusDirection       `json:"direction"`
+	Error           *string                            `json:"error,omitempty"`
+	Generation      string                             `json:"generation"`
+	Layout          StoragePoolECStatusLayout          `json:"layout"`
+	OperationId     string                             `json:"operation_id"`
+	State           string                             `json:"state"`
+	VolumeId        int64                              `json:"volume_id"`
+}
+
+// StoragePoolECStatusConversionState defines model for StoragePoolECStatus.ConversionState.
+type StoragePoolECStatusConversionState string
+
+// StoragePoolECStatusDirection defines model for StoragePoolECStatus.Direction.
+type StoragePoolECStatusDirection string
+
+// StoragePoolECStatusLayout defines model for StoragePoolECStatus.Layout.
+type StoragePoolECStatusLayout string
 
 // StoragePoolList defines model for StoragePoolList.
 type StoragePoolList struct {
@@ -5190,11 +5290,14 @@ type StoragePoolMemberInput struct {
 
 // StoragePoolNodePlan defines model for StoragePoolNodePlan.
 type StoragePoolNodePlan struct {
-	CapacityGib   int64                      `json:"capacity_gib"`
-	ControlBytes  int64                      `json:"control_bytes"`
-	ControlDisk   StoragePoolDisk            `json:"control_disk"`
-	DataBytes     int64                      `json:"data_bytes"`
-	DataDisk      StoragePoolDisk            `json:"data_disk"`
+	CapacityGib  int64           `json:"capacity_gib"`
+	ControlBytes int64           `json:"control_bytes"`
+	ControlDisk  StoragePoolDisk `json:"control_disk"`
+	DataBytes    int64           `json:"data_bytes"`
+	DataDisk     StoragePoolDisk `json:"data_disk"`
+
+	// EcImage 当前计划固定的 EC 镜像标识
+	EcImage       *string                    `json:"ec_image,omitempty"`
 	FailureDomain string                     `json:"failure_domain"`
 	NodeId        string                     `json:"node_id"`
 	Ports         StoragePoolPorts           `json:"ports"`
@@ -6012,6 +6115,13 @@ type PreviewStoragePoolParams struct {
 	XCSRFToken *string `json:"X-CSRF-Token,omitempty"`
 }
 
+// SaveStoragePoolECParams defines parameters for SaveStoragePoolEC.
+type SaveStoragePoolECParams struct {
+	IfMatch        string  `json:"If-Match"`
+	XCSRFToken     *string `json:"X-CSRF-Token,omitempty"`
+	IdempotencyKey string  `json:"Idempotency-Key"`
+}
+
 // SaveStorageTargetParams defines parameters for SaveStorageTarget.
 type SaveStorageTargetParams struct {
 	IfMatch        *string `json:"If-Match,omitempty"`
@@ -6163,6 +6273,9 @@ type CreateStoragePoolJSONRequestBody = StoragePoolCreateInput
 
 // PreviewStoragePoolJSONRequestBody defines body for PreviewStoragePool for application/json ContentType.
 type PreviewStoragePoolJSONRequestBody = StoragePoolPreviewInput
+
+// SaveStoragePoolECJSONRequestBody defines body for SaveStoragePoolEC for application/json ContentType.
+type SaveStoragePoolECJSONRequestBody = StoragePoolECInput
 
 // SaveStorageTargetJSONRequestBody defines body for SaveStorageTarget for application/json ContentType.
 type SaveStorageTargetJSONRequestBody = StorageTargetInput
@@ -7092,6 +7205,9 @@ type ServerInterface interface {
 	// GetStoragePool 读取集群 S3 池详情
 	// (GET /storage/pools/{id})
 	GetStoragePool(w http.ResponseWriter, r *http.Request, id string)
+	// SaveStoragePoolEC 设置存储池纠删码
+	// (PUT /storage/pools/{id}/ec)
+	SaveStoragePoolEC(w http.ResponseWriter, r *http.Request, id string, params SaveStoragePoolECParams)
 	// ListStorageTargets 读取 S3 存储目标
 	// (GET /storage/targets)
 	ListStorageTargets(w http.ResponseWriter, r *http.Request)
@@ -12919,6 +13035,102 @@ func (siw *ServerInterfaceWrapper) GetStoragePool(w http.ResponseWriter, r *http
 	handler.ServeHTTP(w, r)
 }
 
+// SaveStoragePoolEC operation middleware
+func (siw *ServerInterfaceWrapper) SaveStoragePoolEC(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params SaveStoragePoolECParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "If-Match" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("If-Match")]; found {
+		var IfMatch string
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "If-Match", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "If-Match", valueList[0], &IfMatch, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "If-Match", Err: err})
+			return
+		}
+
+		params.IfMatch = IfMatch
+
+	} else {
+		err := fmt.Errorf("Header parameter If-Match is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "If-Match", Err: err})
+		return
+	}
+
+	// ------------- Optional header parameter "X-CSRF-Token" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-CSRF-Token")]; found {
+		var XCSRFToken string
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "X-CSRF-Token", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "X-CSRF-Token", valueList[0], &XCSRFToken, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-CSRF-Token", Err: err})
+			return
+		}
+
+		params.XCSRFToken = &XCSRFToken
+
+	}
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey string
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.SaveStoragePoolEC(w, r, id, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // ListStorageTargets operation middleware
 func (siw *ServerInterfaceWrapper) ListStorageTargets(w http.ResponseWriter, r *http.Request) {
 
@@ -13579,6 +13791,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/storage/pools", wrapper.CreateStoragePool)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/storage/pools/preview", wrapper.PreviewStoragePool)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/storage/pools/{id}", wrapper.GetStoragePool)
+	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/storage/pools/{id}/ec", wrapper.SaveStoragePoolEC)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/storage/targets", wrapper.ListStorageTargets)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/storage/targets/{id}", wrapper.GetStorageTarget)
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/storage/targets/{id}", wrapper.SaveStorageTarget)
@@ -52791,6 +53004,375 @@ func (response GetStoragePool504ApplicationProblemPlusJSONResponse) VisitGetStor
 	return err
 }
 
+type SaveStoragePoolECRequestObject struct {
+	Id     string `json:"id"`
+	Params SaveStoragePoolECParams
+	Body   *SaveStoragePoolECJSONRequestBody
+}
+
+type SaveStoragePoolECResponseObject interface {
+	VisitSaveStoragePoolECResponse(w http.ResponseWriter) error
+}
+
+type SaveStoragePoolEC202ResponseHeaders struct {
+	Location   string
+	XRequestID string
+}
+
+type SaveStoragePoolEC202JSONResponse struct {
+	Body    Operation
+	Headers SaveStoragePoolEC202ResponseHeaders
+}
+
+func (response SaveStoragePoolEC202JSONResponse) VisitSaveStoragePoolECResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Location", fmt.Sprint(response.Headers.Location))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(202)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SaveStoragePoolEC400ApplicationProblemPlusJSONResponse struct {
+	Error400ApplicationProblemPlusJSONResponse
+}
+
+func (response SaveStoragePoolEC400ApplicationProblemPlusJSONResponse) VisitSaveStoragePoolECResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SaveStoragePoolEC401ApplicationProblemPlusJSONResponse struct {
+	Error401ApplicationProblemPlusJSONResponse
+}
+
+func (response SaveStoragePoolEC401ApplicationProblemPlusJSONResponse) VisitSaveStoragePoolECResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SaveStoragePoolEC403ApplicationProblemPlusJSONResponse struct {
+	Error403ApplicationProblemPlusJSONResponse
+}
+
+func (response SaveStoragePoolEC403ApplicationProblemPlusJSONResponse) VisitSaveStoragePoolECResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SaveStoragePoolEC404ApplicationProblemPlusJSONResponse struct {
+	Error404ApplicationProblemPlusJSONResponse
+}
+
+func (response SaveStoragePoolEC404ApplicationProblemPlusJSONResponse) VisitSaveStoragePoolECResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SaveStoragePoolEC405ApplicationProblemPlusJSONResponse struct {
+	Error405ApplicationProblemPlusJSONResponse
+}
+
+func (response SaveStoragePoolEC405ApplicationProblemPlusJSONResponse) VisitSaveStoragePoolECResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.Allow != nil {
+		w.Header().Set("Allow", fmt.Sprint(*response.Headers.Allow))
+	}
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(405)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SaveStoragePoolEC406ApplicationProblemPlusJSONResponse struct {
+	Error406ApplicationProblemPlusJSONResponse
+}
+
+func (response SaveStoragePoolEC406ApplicationProblemPlusJSONResponse) VisitSaveStoragePoolECResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(406)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SaveStoragePoolEC409ApplicationProblemPlusJSONResponse struct {
+	Error409ApplicationProblemPlusJSONResponse
+}
+
+func (response SaveStoragePoolEC409ApplicationProblemPlusJSONResponse) VisitSaveStoragePoolECResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SaveStoragePoolEC412ApplicationProblemPlusJSONResponse struct {
+	Error412ApplicationProblemPlusJSONResponse
+}
+
+func (response SaveStoragePoolEC412ApplicationProblemPlusJSONResponse) VisitSaveStoragePoolECResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(412)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SaveStoragePoolEC413ApplicationProblemPlusJSONResponse struct {
+	Error413ApplicationProblemPlusJSONResponse
+}
+
+func (response SaveStoragePoolEC413ApplicationProblemPlusJSONResponse) VisitSaveStoragePoolECResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(413)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SaveStoragePoolEC415ApplicationProblemPlusJSONResponse struct {
+	Error415ApplicationProblemPlusJSONResponse
+}
+
+func (response SaveStoragePoolEC415ApplicationProblemPlusJSONResponse) VisitSaveStoragePoolECResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(415)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SaveStoragePoolEC422ApplicationProblemPlusJSONResponse struct {
+	Error422ApplicationProblemPlusJSONResponse
+}
+
+func (response SaveStoragePoolEC422ApplicationProblemPlusJSONResponse) VisitSaveStoragePoolECResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SaveStoragePoolEC428ApplicationProblemPlusJSONResponse struct {
+	Error428ApplicationProblemPlusJSONResponse
+}
+
+func (response SaveStoragePoolEC428ApplicationProblemPlusJSONResponse) VisitSaveStoragePoolECResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(428)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SaveStoragePoolEC429ApplicationProblemPlusJSONResponse struct {
+	Error429ApplicationProblemPlusJSONResponse
+}
+
+func (response SaveStoragePoolEC429ApplicationProblemPlusJSONResponse) VisitSaveStoragePoolECResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.RetryAfter != nil {
+		w.Header().Set("Retry-After", fmt.Sprint(*response.Headers.RetryAfter))
+	}
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(429)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SaveStoragePoolEC500ApplicationProblemPlusJSONResponse struct {
+	Error500ApplicationProblemPlusJSONResponse
+}
+
+func (response SaveStoragePoolEC500ApplicationProblemPlusJSONResponse) VisitSaveStoragePoolECResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SaveStoragePoolEC503ApplicationProblemPlusJSONResponse struct {
+	Error503ApplicationProblemPlusJSONResponse
+}
+
+func (response SaveStoragePoolEC503ApplicationProblemPlusJSONResponse) VisitSaveStoragePoolECResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(503)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SaveStoragePoolEC504ApplicationProblemPlusJSONResponse struct {
+	Error504ApplicationProblemPlusJSONResponse
+}
+
+func (response SaveStoragePoolEC504ApplicationProblemPlusJSONResponse) VisitSaveStoragePoolECResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(504)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SaveStoragePoolEC507ApplicationProblemPlusJSONResponse struct {
+	Error507ApplicationProblemPlusJSONResponse
+}
+
+func (response SaveStoragePoolEC507ApplicationProblemPlusJSONResponse) VisitSaveStoragePoolECResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.XRequestID != nil {
+		w.Header().Set("X-Request-ID", fmt.Sprint(*response.Headers.XRequestID))
+	}
+	w.WriteHeader(507)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type ListStorageTargetsRequestObject struct {
 }
 
@@ -55550,6 +56132,9 @@ type StrictServerInterface interface {
 	// GetStoragePool 读取集群 S3 池详情
 	// (GET /storage/pools/{id})
 	GetStoragePool(ctx context.Context, request GetStoragePoolRequestObject) (GetStoragePoolResponseObject, error)
+	// SaveStoragePoolEC 设置存储池纠删码
+	// (PUT /storage/pools/{id}/ec)
+	SaveStoragePoolEC(ctx context.Context, request SaveStoragePoolECRequestObject) (SaveStoragePoolECResponseObject, error)
 	// ListStorageTargets 读取 S3 存储目标
 	// (GET /storage/targets)
 	ListStorageTargets(ctx context.Context, request ListStorageTargetsRequestObject) (ListStorageTargetsResponseObject, error)
@@ -58843,6 +59428,40 @@ func (sh *strictHandler) GetStoragePool(w http.ResponseWriter, r *http.Request, 
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(GetStoragePoolResponseObject); ok {
 		if err := validResponse.VisitGetStoragePoolResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// SaveStoragePoolEC operation middleware
+func (sh *strictHandler) SaveStoragePoolEC(w http.ResponseWriter, r *http.Request, id string, params SaveStoragePoolECParams) {
+	var request SaveStoragePoolECRequestObject
+
+	request.Id = id
+	request.Params = params
+
+	var body SaveStoragePoolECJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.SaveStoragePoolEC(ctx, request.(SaveStoragePoolECRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "SaveStoragePoolEC")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(SaveStoragePoolECResponseObject); ok {
+		if err := validResponse.VisitSaveStoragePoolECResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

@@ -9,6 +9,8 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+
+	"github.com/jkfujr/opsd/internal/cluster"
 )
 
 func conditionResource(s *Server, r *http.Request) string {
@@ -32,6 +34,9 @@ func conditionResource(s *Server, r *http.Request) string {
 	}
 	if state.route.Version == "compose-registration" {
 		id = r.PathValue("engine_id") + "/" + r.PathValue("project_id")
+	}
+	if state.route.Version == "storage-pool" {
+		owner = cluster.OperationOwner(id)
 	}
 	return state.route.Version + "/" + owner + "/" + id
 }

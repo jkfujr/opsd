@@ -228,12 +228,17 @@ root 终端先以管理员会话 `POST /nodes/{node_id}/terminal` 创建票据�
 
 | 接口 | 请求与读回 |
 |---|---|
-| `POST /storage/pools/preview` | 提交 `name`、`nodes` 和可选 `port_offset`。成员提交 `node_id`、`private_ip`、整数 `capacity_gib`，可选 `storage_root_id`、`failure_domain`。返回 `200`、30 分钟有效的 `plan_id` 以及选点、端口、实际文件系统和 A/B 分配 |
+| `POST /storage/pools/preview` | 提交 `name`、`nodes` 和可选 `port_offset`、`ec_enabled`。成员提交 `node_id`、`private_ip`、整数 `capacity_gib`，可选 `storage_root_id`、`failure_domain`。返回 `200`、30 分钟有效的 `plan_id` 以及选点、端口、实际文件系统和 A/B 分配 |
 | `POST /storage/pools` | 使用 `Idempotency-Key`，正文含 `plan_id` 和 `credentials`（`access_key`、`secret_key`）。返回 `202 + Operation + Location`。同键查询原操作，异键复用已用计划返回 `409` |
 | `GET /storage/pools` | 可选 `cursor`、`limit`，默认 50，最大 100。返回 `items`、`next_cursor` 和失联节点 `unavailable` |
-| `GET /storage/pools/{id}` | 返回池状态、所属节点、公开 CA、各入口和成员健康，附强 `ETag` |
+| `GET /storage/pools/{id}` | 返回池状态、所属节点、公开 CA、各入口和成员健康，附强 `ETag`。支持 EC 的池另返回策略、校验片优先成员、反向转换状态和最近 100 个卷的转换记录 |
+| `PUT /storage/pools/{id}/ec` | 提交 `enabled`，可选 `parity_preferred_node_ids`。`enabled=false` 时可加 `restore_replicas=true`。请求使用 `Idempotency-Key` 和池的 `If-Match`，返回 `202 + Operation + Location` |
 
 预览至少需要三个独立故障域。普通成员总配额至少 7 GiB，Master／etcd 至少 12 GiB，所有成员的 B 数据卷至少 6 GiB。拓扑无效返回 `422`，端口冲突返回 `409`，挂载或端口已变化及计划过期返回 `412`，成员不可达返回 `503`。配额不足返回 `507`，详情提供成员、所需数据卷或文件系统可用量。建池失败按原操作查看步骤和请求回执，再通过现有重新处理入口恢复。S3 凭据由所属执行器使用，读取接口只返回公开 CA 和入口。
+
+EC 默认关闭。启用需要至少四个独立故障域和建池时固定的衍生镜像。`ec_enabled` 控制新转换，`ec_restore_pending` 表示正在逐卷恢复跨域双副本。`ec_volumes` 返回布局、代际、卷健康、阶段、原执行标识和 `cleanup_pending`。`cleanup_pending=true` 表示新布局已持久提交，旧布局的清理尚待确认。只关闭 EC 时，已有 EC 卷继续读取。EC 设置冲突或池内有待执行的数据卷迁移时返回 `409`，无效拓扑或优先成员返回 `422`，当前可用容量不足返回 `507`。
+
+反向转换按 SeaweedFS 普通卷空槽和可用字节选择两个独立故障域。预检容量不足返回 `507 insufficient_storage`。受理后确认容量不足时，原操作进入 `Failed` 并记录 `insufficient_storage`，池清除该次反向请求，原 EC 布局和分片继续提供读取。
 
 ## 节点存储根
 

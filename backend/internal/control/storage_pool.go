@@ -1,9 +1,6 @@
 package control
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
-	"encoding/json"
 	"net/http"
 
 	"github.com/jkfujr/opsd/internal/cluster"
@@ -53,12 +50,22 @@ func (s *Server) ListStoragePools(w http.ResponseWriter, r *http.Request, p http
 func (s *Server) GetStoragePool(w http.ResponseWriter, r *http.Request, id string) {
 	out, err := s.node.Pool(r.Context(), id)
 	if err == nil {
-		var body []byte
-		body, err = json.Marshal(out)
-		if err == nil {
-			sum := sha256.Sum256(body)
-			w.Header().Set("ETag", `"`+hex.EncodeToString(sum[:])+`"`)
-		}
+		s.setETag(w, r, out.Revision)
 	}
 	s.resultError(w, r, http.StatusOK, out, err)
+}
+
+func (s *Server) SaveStoragePoolEC(w http.ResponseWriter, r *http.Request, id string, _ httpapi.SaveStoragePoolECParams) {
+	var input protocol.PoolECSettings
+	if !s.body(w, r, &input) {
+		return
+	}
+	owner := cluster.OperationOwner(id)
+	if owner == "" || !operations.ValidID(id) {
+		s.fail(w, r, http.StatusUnprocessableEntity, "invalid_request", "存储池标识无效")
+		return
+	}
+	input.ID = id
+	input.Revision = expectedRevision(r)
+	s.submit(w, r, owner, "storage_pool_ec", input, r.Header.Get("Idempotency-Key"), "")
 }

@@ -121,6 +121,7 @@ var methodAccess = map[string]MethodAccess{
 	"storage.root":            {Capability: CapabilityReadStorage},
 	"storage_root":            {Capability: CapabilityManageStorageRoot},
 	"storage_pool_create":     {Capability: CapabilityWriteStorage},
+	"storage_pool_ec":         {Capability: CapabilityWriteStorage},
 	"storage.pool.plan":       {Capability: CapabilityWriteStorage},
 	"storage.pool.inspect":    {Capability: CapabilityWriteStorage},
 	"storage.pool.deploy":     {Capability: CapabilityWriteStorage},

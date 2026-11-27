@@ -10,6 +10,9 @@ const (
 	PoolMinControlCapacityGiB = 12
 	PoolReplication           = "010"
 	PoolSeaweedImage          = "chrislusf/seaweedfs:4.55@sha256:7ca46aeae2f223b37e5d91593c17ab37738eec6df6ab69b48a0487f7643342b9"
+	PoolECVersion             = "4.55-opsd.1"
+	PoolECImageTag            = "opsd/seaweedfs:" + PoolECVersion
+	PoolECUpstreamRevision    = "a98c9e27185cf1003eca095761a39973c60734db"
 	PoolEtcdImage             = "gcr.io/etcd-development/etcd:v3.6.16@sha256:b29d816b546a1966fe7034a33b34e231fa98c47ce4d2883f70b0555020b22132"
 )
 
@@ -58,6 +61,7 @@ type PoolNodePlan struct {
 	DataDisk     PoolDisk  `json:"data_disk"`
 	DataBytes    int64     `json:"data_bytes"`
 	ControlBytes int64     `json:"control_bytes"`
+	ECImage      string    `json:"ec_image,omitempty"`
 }
 
 func (n PoolNodePlan) Control() bool {
@@ -107,6 +111,10 @@ type StoragePool struct {
 	Revision    uint64             `json:"revision"`
 	State       string             `json:"state"`
 	ECEnabled   bool               `json:"ec_enabled"`
+	ECSupported bool               `json:"ec_supported"`
+	ECRestore   bool               `json:"ec_restore_pending"`
+	ParityNodes []string           `json:"parity_preferred_node_ids,omitempty"`
+	ECVolumes   []PoolECStatus     `json:"ec_volumes,omitempty"`
 	Replication string             `json:"replication"`
 	OperationID string             `json:"operation_id"`
 	CAPEM       string             `json:"ca_pem"`
@@ -137,6 +145,7 @@ type PoolDeploy struct {
 	Members     []PoolNodePlan  `json:"members"`
 	Material    PoolMaterial    `json:"material"`
 	Credentials PoolCredentials `json:"credentials"`
+	EC          *PoolECJob      `json:"ec,omitempty"`
 }
 
 type PoolHostRequest struct {
@@ -156,6 +165,10 @@ type PoolHostResult struct {
 	Status           PoolMemberStatus `json:"status"`
 	Phase            string           `json:"phase,omitempty"`
 	TLSGeneration    string           `json:"tls_generation,omitempty"`
+	ECImage          string           `json:"ec_image,omitempty"`
+	DataFreeBytes    int64            `json:"data_free_bytes,omitempty"`
+	DataMigration    string           `json:"data_migration,omitempty"`
+	ECJob            *PoolECJobResult `json:"ec_job,omitempty"`
 }
 
 func (*PoolHostRequest) Kind() Kind { return "storage.pool.host" }

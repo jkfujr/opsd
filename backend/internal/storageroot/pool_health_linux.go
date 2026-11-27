@@ -144,6 +144,12 @@ func (m *Manager) observePool(ctx context.Context, d poolNodeRecord) protocol.Po
 		s.State, s.Error = "unavailable", "池数据绑定不可读取"
 		return out
 	}
+	if d.Member.ECImage != "" && r.Pending != "" {
+		if pending, err := m.pending(r); err == nil && pending != nil &&
+			pending.From.Component == protocol.StoragePoolData && pending.From.ComponentID == d.PoolID {
+			out.DataMigration = pending.ID
+		}
+	}
 	b, ok := r.lookup(protocol.StoragePoolData, d.PoolID)
 	if !ok {
 		s.State, s.Error = "unavailable", "池数据绑定缺失"
@@ -160,6 +166,7 @@ func (m *Manager) observePool(ctx context.Context, d poolNodeRecord) protocol.Po
 		s.State, s.Error = "unavailable", err.Error()
 		return out
 	}
+	out.DataFreeBytes = free
 	if err = m.checkServingPool(ctx, d, config, b, httpClient); err != nil {
 		s.State, s.Error = "degraded", err.Error()
 		return out

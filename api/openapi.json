@@ -13906,6 +13906,149 @@
           }
         }
       }
+    },
+    "/storage/pools/{id}/ec": {
+      "put": {
+        "operationId": "saveStoragePoolEC",
+        "summary": "设置存储池纠删码",
+        "tags": [
+          "storage"
+        ],
+        "security": [
+          {
+            "SessionCookie": []
+          }
+        ],
+        "x-opsd-access": {
+          "mode": "session",
+          "level": "manage"
+        },
+        "x-opsd-version": "storage-pool",
+        "x-opsd-condition": "match",
+        "x-opsd-idempotent": true,
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StoragePoolECInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "请求成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Operation"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-ID": {
+                "schema": {
+                  "type": "string"
+                },
+                "required": true
+              },
+              "Location": {
+                "schema": {
+                  "type": "string"
+                },
+                "required": true
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "405": {
+            "$ref": "#/components/responses/Error405"
+          },
+          "406": {
+            "$ref": "#/components/responses/Error406"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "412": {
+            "$ref": "#/components/responses/Error412"
+          },
+          "413": {
+            "$ref": "#/components/responses/Error413"
+          },
+          "415": {
+            "$ref": "#/components/responses/Error415"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error422"
+          },
+          "428": {
+            "$ref": "#/components/responses/Error428"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          },
+          "504": {
+            "$ref": "#/components/responses/Error504"
+          },
+          "507": {
+            "$ref": "#/components/responses/Error507"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -15987,7 +16130,8 @@
               "compose_register",
               "shared_initialize",
               "storage_root",
-              "storage_pool_create"
+              "storage_pool_create",
+              "storage_pool_ec"
             ]
           },
           "state": {
@@ -22556,6 +22700,10 @@
             "type": "integer",
             "format": "int64",
             "minimum": 0
+          },
+          "ec_image": {
+            "type": "string",
+            "description": "当前计划固定的 EC 镜像标识"
           }
         }
       },
@@ -22819,6 +22967,24 @@
           "checked_at": {
             "type": "string",
             "format": "date-time"
+          },
+          "ec_supported": {
+            "type": "boolean"
+          },
+          "ec_restore_pending": {
+            "type": "boolean"
+          },
+          "parity_preferred_node_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "ec_volumes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StoragePoolECStatus"
+            }
           }
         }
       },
@@ -22843,6 +23009,93 @@
             "items": {
               "type": "string"
             }
+          }
+        }
+      },
+      "StoragePoolECInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "enabled"
+        ],
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "restore_replicas": {
+            "type": "boolean"
+          },
+          "parity_preferred_node_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "uniqueItems": true,
+            "maxItems": 64
+          }
+        }
+      },
+      "StoragePoolECStatus": {
+        "type": "object",
+        "required": [
+          "volume_id",
+          "collection",
+          "layout",
+          "state",
+          "direction",
+          "conversion_state",
+          "generation",
+          "cleanup_pending",
+          "operation_id"
+        ],
+        "properties": {
+          "volume_id": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1,
+            "maximum": 4294967295
+          },
+          "collection": {
+            "type": "string"
+          },
+          "layout": {
+            "type": "string",
+            "enum": [
+              "replicated",
+              "ec"
+            ]
+          },
+          "state": {
+            "type": "string"
+          },
+          "direction": {
+            "type": "string",
+            "enum": [
+              "encode",
+              "restore"
+            ]
+          },
+          "conversion_state": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "encoding",
+              "verifying",
+              "done",
+              "failed"
+            ]
+          },
+          "generation": {
+            "type": "string"
+          },
+          "cleanup_pending": {
+            "type": "boolean"
+          },
+          "operation_id": {
+            "type": "string"
+          },
+          "error": {
+            "type": "string"
           }
         }
       }

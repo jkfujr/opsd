@@ -39,6 +39,9 @@ func (n *Node) describeOperation(ctx context.Context, tx firewallQuerier, r Requ
 		op.PlanID, op.ResourceID = input.PlanID, r.ResourceID
 		op.Action, op.TargetName = "create_pool", plan.Normalized.Name
 		op.Resource = &OperationResource{Kind: "storage_pool", NodeID: n.ID, ID: r.ResourceID}
+	case "storage_pool_ec":
+		op.Action, op.TargetName = "configure_ec", "集群 S3 池"
+		op.Resource = &OperationResource{Kind: "storage_pool", NodeID: n.ID, ID: r.ResourceID}
 	case "storage_root":
 		var input protocol.StorageRootInput
 		if err := json.Unmarshal(r.Payload, &input); err != nil {

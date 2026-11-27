@@ -43,7 +43,7 @@ ops.subscribe(() => {
 const subjectResources: Record<Operation['subject'], string[]> = {
   firewall: ['firewall'], firewall_config: ['firewall'], component: ['firewall'], config: ['nodes'], name: ['nodes'], account: ['nodes', 'account'],
   container: ['containers'], compose: ['compose'], compose_register: ['compose'], database: ['databases'], database_step: ['databases'],
-  task_save: ['tasks'], task_run: ['tasks'], shared_initialize: ['databases', 'nodes'], storage_root: ['storage'], storage_pool_create: ['storage'],
+  task_save: ['tasks'], task_run: ['tasks'], shared_initialize: ['databases', 'nodes'], storage_root: ['storage'], storage_pool_create: ['storage'], storage_pool_ec: ['storage'],
 };
 
 export function isOperation(value: unknown): value is Operation {
