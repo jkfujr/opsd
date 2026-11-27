@@ -6,10 +6,12 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"os/user"
 	"path/filepath"
 	"strconv"
 	"strings"
 
+	"github.com/jkfujr/opsd/internal/command"
 	"github.com/jkfujr/opsd/internal/protocol"
 	"golang.org/x/sys/unix"
 )
@@ -133,8 +135,15 @@ func trustedDir(path string) error {
 		if err != nil && !errors.Is(err, unix.ENOENT) {
 			return err
 		}
-		if err == nil && (st.Mode&unix.S_IFMT != unix.S_IFDIR || st.Uid != 0 || st.Gid != 0 || st.Mode&0022 != 0) {
-			return fault("invalid_request", "目录 %s 须为 root:root 且禁止其他用户写入的真实目录", p)
+		if err == nil {
+			groupOK := st.Gid == 0
+			if !groupOK && p == filepath.Dir(command.DefaultInstance) && st.Mode&07777 == 0750 {
+				group, lookupErr := user.LookupGroup("opsd")
+				groupOK = lookupErr == nil && group.Gid == strconv.FormatUint(uint64(st.Gid), 10)
+			}
+			if st.Mode&unix.S_IFMT != unix.S_IFDIR || st.Uid != 0 || !groupOK || st.Mode&0022 != 0 {
+				return fault("invalid_request", "目录 %s 须为 root 所有、使用受信任组且禁止组和其他用户写入的真实目录", p)
+			}
 		}
 		if p == "/" {
 			return nil

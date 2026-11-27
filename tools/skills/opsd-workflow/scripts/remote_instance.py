@@ -78,6 +78,11 @@ def update(config, config_path, candidate, required):
     print(json.dumps({"candidate_version": version}, ensure_ascii=False), flush=True)
     require_root_space()
     try:
+        run([str(source), "install", "--fix-config-permissions", "--config", str(config_path)])
+    except RuntimeError as error:
+        if not str(error).endswith("命令参数无效：flag provided but not defined: -fix-config-permissions"):
+            raise
+    try:
         run(["systemctl", "stop", "opsd.service", "opsd-executor.service"])
         require_idle(config)
         os.replace(source, target)

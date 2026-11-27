@@ -61,6 +61,9 @@ func InstallNode(ctx context.Context, o NodeInstall) (bool, error) {
 				return false, fmt.Errorf("已安装其他版本，请通过明确的程序更新流程升级")
 			}
 		}
+		if err := prepareNodeConfigDir(o.ConfigPath, false); err != nil {
+			return false, err
+		}
 		return false, activateNode(ctx, f, o.ConfigPath, false)
 	} else if !os.IsNotExist(e) {
 		return false, e
@@ -98,7 +101,7 @@ func InstallNode(ctx context.Context, o NodeInstall) (bool, error) {
 	if e != nil {
 		return false, e
 	}
-	gid, e := strconv.Atoi(u.Gid)
+	gid, e := nodeGroupID()
 	if e != nil {
 		return false, e
 	}
@@ -110,7 +113,10 @@ func InstallNode(ctx context.Context, o NodeInstall) (bool, error) {
 			return false, err
 		}
 	}
-	for _, dir := range []string{filepath.Dir(f.Binary), filepath.Dir(o.ConfigPath), storage.MetadataRoot, f.DataDir, f.ExecutorDir, storage.DefaultDatasetDir} {
+	if e = prepareNodeConfigDir(o.ConfigPath, true); e != nil {
+		return false, e
+	}
+	for _, dir := range []string{filepath.Dir(f.Binary), storage.MetadataRoot, f.DataDir, f.ExecutorDir, storage.DefaultDatasetDir} {
 		if e = os.MkdirAll(dir, 0755); e != nil {
 			return false, e
 		}
@@ -189,8 +195,30 @@ func InstallNode(ctx context.Context, o NodeInstall) (bool, error) {
 	if e = os.Chown(o.ConfigPath, 0, gid); e != nil {
 		return false, e
 	}
+	if e = os.Chmod(o.ConfigPath, 0640); e != nil {
+		return false, e
+	}
 	return true, activateNode(ctx, f, o.ConfigPath, true)
 }
+
+func FixNodeConfigPermissions(configPath string) error {
+	if err := RequireLinuxRoot(); err != nil {
+		return err
+	}
+	if _, err := NodePaths(configPath); err != nil {
+		return err
+	}
+	return prepareNodeConfigDir(configPath, false)
+}
+
+func nodeGroupID() (int, error) {
+	group, err := user.LookupGroup("opsd")
+	if err != nil {
+		return 0, err
+	}
+	return strconv.Atoi(group.Gid)
+}
+
 func activateNode(ctx context.Context, f NodeFile, configPath string, first bool) error {
 	var e error
 	if f.usesMetadataRoot() {

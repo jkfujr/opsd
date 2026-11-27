@@ -403,11 +403,15 @@ func install(args []string) error {
 	set.StringVar(region, "r", "", "")
 	_ = set.Bool("non-interactive", false, "")
 	allowArbitraryCode := set.Bool("allow-arbitrary-code", false, "")
+	fixConfigPermissions := set.Bool("fix-config-permissions", false, "")
 	if e := command.Parse(set, args); e != nil {
 		return e
 	}
 	if *expectedVersion != "" && *expectedVersion != buildinfo.Version {
 		return fmt.Errorf("安装程序版本与接入命令不匹配")
+	}
+	if *fixConfigPermissions {
+		return installation.FixNodeConfigPermissions(*config)
 	}
 	if *password == "" {
 		*password = identity.Random()
