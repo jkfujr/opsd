@@ -160,6 +160,11 @@ func LegacyHistoryPage(ctx context.Context, db *sql.DB, from, to int64, limit in
 	return historyRows(ctx, db, "monitoring_samples", from, to, limit)
 }
 
+func LegacyHistoryLatest(ctx context.Context, db *sql.DB, before int64) (latest sql.NullInt64, err error) {
+	err = db.QueryRowContext(ctx, "SELECT max(collected_at) FROM monitoring_samples WHERE collected_at<?", before).Scan(&latest)
+	return
+}
+
 func historyRows(ctx context.Context, db *sql.DB, table string, from, to int64, limit int) ([]HistoryRow, error) {
 	rows, err := db.QueryContext(ctx, "SELECT collected_at,body FROM "+table+" WHERE collected_at>=? AND collected_at<? ORDER BY collected_at LIMIT ?", from, to, limit)
 	if err != nil {

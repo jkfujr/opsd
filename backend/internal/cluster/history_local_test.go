@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -92,6 +93,67 @@ func TestLocalHistoryImportConflictKeepsLegacy(t *testing.T) {
 	}
 	items, err := n.localHistory(t.Context(), HistoryQuery{From: at, To: at})
 	if err != nil || len(items) != 1 || items[0].CPUCores != 8 {
+		t.Fatal("异体冲突后旧读取路径失效", items, err)
+	}
+}
+
+func TestLocalHistoryCatchesUpAfterRollback(t *testing.T) {
+	ctx := t.Context()
+	path := filepath.Join(t.TempDir(), "node.db")
+	now := time.Date(2026, 11, 21, 0, 0, 0, 0, time.UTC)
+	open := func() *Node {
+		t.Helper()
+		n, err := Open(ctx, path, Options{Password: "test-password"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		n.Now = func() time.Time { return now }
+		return n
+	}
+	initial := now.Add(-10 * time.Minute)
+	boundary := now.Add(-5 * time.Minute)
+	n := open()
+	seedOldHistory(t, n, testHistoryMetric(initial, 2))
+	if err := n.initializeLocalHistory(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if err := n.saveHistorySample(ctx, testHistoryMetric(boundary, 4), 5*time.Minute); err != nil {
+		t.Fatal(err)
+	}
+	if err := n.Close(); err != nil {
+		t.Fatal(err)
+	}
+	old := open()
+	seedOldHistory(t, old, testHistoryMetric(boundary, 4))
+	seedOldHistory(t, old, testHistoryMetric(now, 8))
+	if err := old.Close(); err != nil {
+		t.Fatal(err)
+	}
+	for range 2 {
+		upgraded := open()
+		if err := upgraded.initializeLocalHistory(ctx); err != nil {
+			_ = upgraded.Close()
+			t.Fatal(err)
+		}
+		h, since, state, _ := upgraded.history.snapshot()
+		rows, err := h.Page(ctx, initial.Unix(), now.Unix()+1, storage.HistoryPage)
+		closeErr := upgraded.Close()
+		if err != nil || len(rows) != 3 || rows[1].At != boundary.Unix() || rows[2].At != now.Unix() ||
+			!since.Equal(now.Add(time.Second)) || state != "ready" || closeErr != nil {
+			t.Fatal("回退增量补导或重复启动错误", rows, since, state, err, closeErr)
+		}
+	}
+	conflicted := open()
+	defer conflicted.Close()
+	if _, err := conflicted.DB.Exec("DELETE FROM monitoring_samples WHERE collected_at=?", now.Unix()); err != nil {
+		t.Fatal(err)
+	}
+	seedOldHistory(t, conflicted, testHistoryMetric(now, 16))
+	if err := conflicted.initializeLocalHistory(ctx); err == nil || !strings.Contains(err.Error(), "内容冲突") {
+		t.Fatal("增量交界发生冲突时应停止切换", err)
+	}
+	items, err := conflicted.localHistory(ctx, HistoryQuery{From: now, To: now})
+	if err != nil || len(items) != 1 || items[0].CPUCores != 16 {
 		t.Fatal("异体冲突后旧读取路径失效", items, err)
 	}
 }

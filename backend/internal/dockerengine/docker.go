@@ -24,6 +24,7 @@ import (
 )
 
 const MaxLogBytes = 256 * 1024
+const dockerReadTimeout = 15 * time.Second
 
 type Fault struct{ Code, Message, State string }
 
@@ -40,6 +41,13 @@ type Manager struct {
 
 func New() *Manager { return &Manager{Socket: "/var/run/docker.sock"} }
 
+func dockerReadContext(ctx context.Context, timeouts []time.Duration) (context.Context, context.CancelFunc) {
+	if len(timeouts) > 0 && timeouts[0] > dockerReadTimeout {
+		return context.WithTimeout(ctx, dockerReadTimeout)
+	}
+	return ctx, func() {}
+}
+
 func (m *Manager) connect(ctx context.Context, timeouts ...time.Duration) (*client.Client, string, string, error) {
 	if runtime.GOOS != "linux" {
 		return nil, "", "", failure("dependency_unavailable", "容器管理仅支持 Linux Docker", "unsupported")
@@ -53,7 +61,7 @@ func (m *Manager) connect(ctx context.Context, timeouts ...time.Duration) (*clie
 		}
 		return nil, "", "", failure("dependency_unavailable", "Docker Socket 不可用", "unavailable")
 	}
-	timeout := 15 * time.Second
+	timeout := dockerReadTimeout
 	if len(timeouts) > 0 {
 		timeout = timeouts[0]
 	}
@@ -61,7 +69,9 @@ func (m *Manager) connect(ctx context.Context, timeouts ...time.Duration) (*clie
 	if err != nil {
 		return nil, "", "", failure("dependency_unavailable", "Docker 客户端初始化失败", "unavailable")
 	}
-	info, err := c.Info(ctx, client.InfoOptions{})
+	readCtx, cancel := dockerReadContext(ctx, timeouts)
+	defer cancel()
+	info, err := c.Info(readCtx, client.InfoOptions{})
 	if err != nil {
 		c.Close()
 		return nil, "", "", failure("dependency_unavailable", "Docker 服务不可用", "unavailable")
@@ -161,7 +171,9 @@ func (m *Manager) inspect(ctx context.Context, ref protocol.ContainerRef, timeou
 		c.Close()
 		return nil, container.InspectResponse{}, failure("conflict", "Docker Engine 身份已变化，请刷新列表", "")
 	}
-	result, err := c.ContainerInspect(ctx, ref.ContainerID, client.ContainerInspectOptions{})
+	readCtx, cancel := dockerReadContext(ctx, timeouts)
+	defer cancel()
+	result, err := c.ContainerInspect(readCtx, ref.ContainerID, client.ContainerInspectOptions{})
 	if err != nil {
 		c.Close()
 		if errdefs.IsNotFound(err) {
@@ -253,7 +265,14 @@ func (m *Manager) Change(ctx context.Context, action protocol.ContainerAction) e
 	if err := action.Validate(); err != nil {
 		return failure("invalid_request", err.Error(), "")
 	}
-	c, raw, err := m.inspect(ctx, action.ContainerRef)
+	timeout := dockerReadTimeout
+	switch action.Action {
+	case "stop", "restart":
+		timeout = 45 * time.Second
+	case "start", "remove":
+		timeout = 30 * time.Second
+	}
+	c, raw, err := m.inspect(ctx, action.ContainerRef, timeout)
 	if err != nil {
 		return err
 	}

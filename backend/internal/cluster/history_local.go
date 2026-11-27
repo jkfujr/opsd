@@ -293,9 +293,34 @@ func (n *Node) initializeLocalHistory(ctx context.Context) error {
 	if err := h.Integrity(ctx); err != nil {
 		return err
 	}
+	n.history.sampleMu.Lock()
+	defer n.history.sampleMu.Unlock()
+	if err := n.catchUpLocalHistory(ctx, h); err != nil {
+		return err
+	}
 	n.publishLocalHistory(h, through.Int64)
 	active = true
 	return nil
+}
+
+func (n *Node) catchUpLocalHistory(ctx context.Context, h *storage.LocalHistory) error {
+	now := n.Now()
+	from, to := now.Add(-storage.HistoryRetention).Unix(), now.Unix()+1
+	_, last, err := h.Bounds(ctx)
+	if err != nil {
+		return err
+	}
+	if last.Valid {
+		// 包含水位所在行，以便检测两个库在交界处的内容冲突。
+		from = max(from, last.Int64)
+	}
+	latest, err := storage.LegacyHistoryLatest(ctx, n.DB, to)
+	if err != nil || !latest.Valid || latest.Int64 < from {
+		return err
+	}
+	return walkHistory(ctx, legacyPager(n.DB), from, to, storage.HistoryBatch, func(rows []storage.HistoryRow) error {
+		return h.Save(ctx, rows)
+	})
 }
 
 func (n *Node) publishLocalHistory(h *storage.LocalHistory, through int64) {
