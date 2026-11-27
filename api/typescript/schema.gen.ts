@@ -1916,7 +1916,10 @@ export interface components {
         EnrollmentTokenCreated: {
             token: string;
             record: components["schemas"]["EnrollmentToken"];
+            /** @description 种子节点的主地址，供使用单一接入地址的客户端。 */
             peer_address: string;
+            /** @description 种子节点的可选接入地址。存在备用地址时返回，主地址在首位，其余按配置顺序排列。地址共用 peer_public_key 与本次接入码，客户端选一个地址交给安装器。 */
+            peer_addresses?: string[];
             peer_public_key: string;
             version: string;
             installer_url: string;
@@ -2430,6 +2433,7 @@ export interface components {
             address_mode?: "auto" | "manual";
             api?: boolean;
             network_error?: components["schemas"]["NetworkError"];
+            /** @description 配置中的有序备用通信端点。旧配置可含 8 项，新提交最多 7 项。主地址和去重后的备用端点合计最多公布 8 个。 */
             endpoints?: string[];
             coordinator_candidate?: boolean;
         };
@@ -3314,6 +3318,7 @@ export interface components {
         };
         NodeConfigurationPatch: {
             name?: string;
+            /** @description 节点通信主地址。提交不同地址时，省略 address_mode 按 manual 保存；显式提交 auto 和不同地址时返回 422。 */
             address?: string;
             region?: string;
             listen?: string;
@@ -3324,9 +3329,13 @@ export interface components {
             /** @enum {integer} */
             retention_days?: 7;
             storage?: components["schemas"]["StorageConfigPatch"];
-            /** @enum {string} */
+            /**
+             * @description auto 自动发布公网主地址，manual 使用保存的主地址。省略此字段且主地址未改变时保留现有模式。
+             * @enum {string}
+             */
             address_mode?: "auto" | "manual";
             api?: boolean;
+            /** @description 最多提交 7 个备用通信 URL，按所给顺序替换现有列表。主地址优先，重复地址只公布一次，协议总上限为 8 个。空数组清除备用端点。 */
             endpoints?: string[];
             coordinator_candidate?: boolean;
         };

@@ -1,6 +1,7 @@
 package control
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"github.com/jkfujr/opsd/internal/apiauth"
@@ -11,11 +12,129 @@ import (
 	"net/http"
 	"net/http/cookiejar"
 	"net/url"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
 	"time"
 )
+
+func TestNodeAddressPatchPreservesModeUntilAddressChanges(t *testing.T) {
+	n := openAPINode(t, "地址节点", "东京", 1, 1)
+	const original = "http://8.8.8.8:8444"
+	const manual = "http://100.100.201.91:8444"
+	n.node.ObservePublic = func(_ context.Context, family protocol.AddressFamily) []protocol.AddressObservation {
+		if family != protocol.IPv4 {
+			return nil
+		}
+		return []protocol.AddressObservation{{Source: "ipify", Address: "8.8.8.8", ObservedAt: time.Now()}}
+	}
+	n.node.Start()
+	configureAPI(t, n, func(c *cluster.Config) {
+		c.Address, c.AddressMode = original, "auto"
+	})
+	client, csrf := apiAdmin(t, n)
+	path := "/api/v2/nodes/" + n.node.ID + "/configuration"
+	patch := func(key string, body map[string]string, want int, out any) {
+		t.Helper()
+		if status := apiCall(t, client, n.web.URL, http.MethodPatch, path, "", key, csrf, body, out); status != want {
+			t.Fatalf("请求 %s 返回 %d，预期 %d", key, status, want)
+		}
+	}
+	read := func(address, mode, name, region string) {
+		t.Helper()
+		var config cluster.Config
+		if status := apiCall(t, client, n.web.URL, http.MethodGet, path, "", "", csrf, nil, &config); status != 200 ||
+			config.Address != address || config.AddressMode != mode || config.Name != name || config.Region != region {
+			t.Fatalf("配置返回 %d，地址 %s，模式 %s，名称 %s，地域 %s", status, config.Address, config.AddressMode, config.Name, config.Region)
+		}
+	}
+
+	var op cluster.Operation
+	patch("metadata", map[string]string{"name": "新名称", "region": "上海"}, 202, &op)
+	waitAPIOperation(t, n.node, op.ID)
+	read(original, "auto", "新名称", "上海")
+
+	patch("rename-with-unchanged-address", map[string]string{"address": original, "name": "原地址保存后的名称"}, 202, &op)
+	waitAPIOperation(t, n.node, op.ID)
+	read(original, "auto", "原地址保存后的名称", "上海")
+
+	sameAddress := map[string]string{"address": original, "address_mode": "auto"}
+	patch("same-address", sameAddress, 202, &op)
+	waitAPIOperation(t, n.node, op.ID)
+	originalOperation := op.ID
+	var problem httpapi.Problem
+	patch("auto-new-address", map[string]string{"address": manual, "address_mode": "auto"}, 422, &problem)
+	if problem.Code != "validation_failed" || problem.Title != "自动公网模式请省略手工地址" {
+		t.Fatal(problem.Code)
+	}
+	read(original, "auto", "原地址保存后的名称", "上海")
+
+	patch("legacy-address", map[string]string{"address": manual}, 202, &op)
+	waitAPIOperation(t, n.node, op.ID)
+	if _, err := n.node.RefreshPublic(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	read(manual, "manual", "原地址保存后的名称", "上海")
+	patch("same-address", sameAddress, 202, &op)
+	if op.ID != originalOperation {
+		t.Fatal("旧请求重试未返回原操作", op.ID)
+	}
+}
+
+func TestNodeFallbackEndpointsAndEnrollmentSeed(t *testing.T) {
+	seed := openAPINode(t, "种子节点", "东京", 1, 1)
+	seed.node.ObservePublic = func(context.Context, protocol.AddressFamily) []protocol.AddressObservation { return nil }
+	seed.node.Start()
+	client, csrf := apiAdmin(t, seed)
+	enroll := func(key string) httpapi.EnrollmentTokenCreated {
+		t.Helper()
+		var token httpapi.EnrollmentTokenCreated
+		if status := apiCall(t, client, seed.web.URL, http.MethodPost, "/api/v2/enrollment-tokens", "", key, csrf, nil, &token); status != 201 {
+			t.Fatal("接入码创建失败", status)
+		}
+		return token
+	}
+	if token := enroll("single-seed"); token.PeerAddress != seed.peer.URL || token.PeerAddresses != nil {
+		t.Fatal("单地址接入响应改变")
+	}
+
+	const primary = "http://100.100.201.91:8444"
+	const secondary = "http://203.0.113.5:8444"
+	fallbacks := []string{seed.peer.URL, secondary, "http://203.0.113.6:8444", "http://203.0.113.7:8444", "http://203.0.113.8:8444", "http://203.0.113.9:8444", "http://203.0.113.10:8444"}
+	path := "/api/v2/nodes/" + seed.node.ID + "/configuration"
+	var op cluster.Operation
+	if status := apiCall(t, client, seed.web.URL, http.MethodPatch, path, "", "seven-fallbacks", csrf, map[string]any{"address": primary, "endpoints": fallbacks}, &op); status != 202 {
+		t.Fatal("七个备用端点未受理", status)
+	}
+	waitAPIOperation(t, seed.node, op.ID)
+	signed, err := seed.node.Self(t.Context())
+	if err != nil || !slices.Equal(signed.Endpoints, append([]string{primary}, fallbacks...)) {
+		t.Fatal("公布端点顺序错误", signed.Endpoints, err)
+	}
+	if status := apiCall(t, client, seed.web.URL, http.MethodPatch, path, "", "eight-fallbacks", csrf, map[string]any{"endpoints": append(fallbacks, "http://203.0.113.11:8444")}, nil); status != 422 {
+		t.Fatal("八个备用端点未在受理前拒绝", status)
+	}
+
+	if status := apiCall(t, client, seed.web.URL, http.MethodPatch, path, "", "duplicate-fallbacks", csrf,
+		map[string]any{"endpoints": []string{primary + "/", seed.peer.URL, seed.peer.URL + "/", secondary}}, &op); status != 202 {
+		t.Fatal("重复端点配置未受理", status)
+	}
+	waitAPIOperation(t, seed.node, op.ID)
+	want := []string{primary, seed.peer.URL, secondary}
+	token := enroll("choose-seed")
+	if token.PeerAddress != primary || token.PeerAddresses == nil || !slices.Equal(*token.PeerAddresses, want) {
+		t.Fatal("接入响应没有保留主地址与有序备用项")
+	}
+	joiner := openAPINode(t, "待加入节点", "上海", 1, 1)
+	if err := joiner.node.Join(t.Context(), (*token.PeerAddresses)[1], token.PeerPublicKey, token.Token); err != nil {
+		t.Fatal("选用备用地址接入失败", err)
+	}
+	member, err := joiner.node.Member(t.Context(), seed.node.ID)
+	if err != nil || !slices.Equal(member.Endpoints, want) {
+		t.Fatal("新节点未收到正确的签名端点", member.Endpoints, err)
+	}
+}
 
 func TestAPIV2ValidationConditionsAndReceipts(t *testing.T) {
 	n := openAPINode(t, "契约节点", "东京", 1, 1)

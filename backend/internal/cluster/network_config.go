@@ -7,8 +7,20 @@ import (
 	"net"
 	"net/netip"
 	"net/url"
+	"slices"
 	"strconv"
 )
+
+func networkConfigurationChangeError(before, next Config) error {
+	endpointsChanged := next.Address != before.Address || !slices.Equal(next.Endpoints, before.Endpoints)
+	if endpointsChanged && len(next.distinctPeerEndpoints()) > maxPeerEndpoints {
+		return fault("invalid_request", "主地址和备用端点合计最多 8 个")
+	}
+	if endpointsChanged || next.AddressMode != before.AddressMode {
+		return networkConfigurationError(next)
+	}
+	return nil
+}
 
 // networkConfigurationError 只拒绝能够确认无法接收公布地址的监听组合。
 // 公网地址不在本机时仍允许 NAT 转发，不假定所有公网地址直接绑定接口。
@@ -25,7 +37,16 @@ func networkConfigurationError(c Config) error {
 	if err != nil {
 		return nil
 	}
-	u, err := url.Parse(c.Address)
+	for _, endpoint := range c.PeerEndpoints() {
+		if err := networkEndpointError(bind, endpoint); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func networkEndpointError(bind netip.Addr, endpoint string) error {
+	u, err := url.Parse(endpoint)
 	if err != nil {
 		return fault("invalid_request", "节点通信地址无效")
 	}

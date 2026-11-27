@@ -6,6 +6,8 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
@@ -288,12 +290,18 @@ func TestPeerEndpointFallbackVerifiesSameIdentity(t *testing.T) {
 	n, _ := openTestNode(t)
 	seed, server := openTestNode(t)
 	_, wrong := openTestNode(t)
+	blocked := make(chan struct{}, 1)
+	blackhole := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
+		blocked <- struct{}{}
+		<-r.Context().Done()
+	}))
+	defer blackhole.Close()
 	joinTest(t, n, seed)
 	member, err := seed.Self(t.Context())
 	if err != nil {
 		t.Fatal(err)
 	}
-	member.Endpoints = []string{wrong.URL, server.URL}
+	member.Endpoints = []string{blackhole.URL, wrong.URL, server.URL}
 	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
 	defer cancel()
 	channel, err := n.openPeerChannel(ctx, member, seed.Key.Public)
@@ -301,8 +309,13 @@ func TestPeerEndpointFallbackVerifiesSameIdentity(t *testing.T) {
 		t.Fatal("备选端点未能连接正确节点", err)
 	}
 	channel.Close()
+	select {
+	case <-blocked:
+	default:
+		t.Fatal("备用连接跳过了主端点")
+	}
 	member.Endpoints = []string{wrong.URL}
-	if channel, err = n.openPeerChannel(ctx, member, seed.Key.Public); err == nil {
+	if channel, err = n.openPeerChannel(t.Context(), member, seed.Key.Public); err == nil {
 		channel.Close()
 		t.Fatal("接受了其他节点的端点身份")
 	}

@@ -73,6 +73,20 @@ func (s *Server) ChangeNodeSettings(w http.ResponseWriter, r *http.Request, id s
 		return
 	}
 	c.Revision = expectedRevision(r)
+	// 用 If-Match 指定的配置判断是否改址，已受理请求可继续查询原操作。
+	if c.Address != base.Address && c.Revision == base.Revision {
+		var patch httpapi.NodeConfigurationPatch
+		if err := json.Unmarshal(apiRequestOf(r.Context()).body, &patch); err != nil {
+			s.fail(w, r, 422, "validation_failed", "请求内容无效")
+			return
+		}
+		if patch.AddressMode == nil {
+			c.AddressMode = "manual"
+		} else if c.AddressMode == "auto" {
+			s.fail(w, r, 422, "validation_failed", "自动公网模式请省略手工地址")
+			return
+		}
+	}
 	c.Cached = false
 	c.LastSyncedAt = nil
 	c.NetworkError = nil

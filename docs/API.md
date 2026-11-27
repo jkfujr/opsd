@@ -53,7 +53,11 @@ curl -fsS -b cookies.txt "$OPSD_API_URL/auth/sessions"
 
 ## HTTP 类型、错误与并发
 
-GET 保持只读，可采集当前状态。配置与运行状态使用独立资源；PUT 提交完整可写定义，PATCH 使用 `application/merge-patch+json`。省略字段保持原值，数组整体替换，`null` 只允许移除声明为可空或可省略的字段；删除必填字段返回 422。ID、观测时间和运行字段不进入写入类型，未知字段被拒绝。时间使用 RFC3339 UTC，ID 为不透明字符串。
+GET 保持只读，可采集当前状态。配置与运行状态使用独立资源；PUT 提交完整可写定义，PATCH 使用 `application/merge-patch+json`。省略字段默认保持原值，数组整体替换，`null` 只允许移除声明为可空或可省略的字段；删除必填字段返回 422。ID、观测时间和运行字段不进入写入类型，未知字段被拒绝。时间使用 RFC3339 UTC，ID 为不透明字符串。
+
+节点配置 PATCH 提交不同的主地址且省略 `address_mode` 时，按 `manual` 保存。显式提交 `auto` 和不同的主地址返回 422。备用端点通过 `endpoints` 整体替换，最多 7 项，提交空数组可清空。变更主地址或备用端点后，去重合计超过 8 个时拒绝写入。已有配置中的备用列表可完整读取。生成签名成员记录和接入种子列表时，以主地址为首，按原顺序追加去重后的备用端点，取前 8 个，第 9 个起从公布结果省略。
+
+`POST /enrollment-tokens` 返回种子主地址 `peer_address`。存在备用端点时响应附带有序 `peer_addresses`，客户端可选择其中一个地址，与原 `peer_public_key` 及接入码一起交给安装器。使用单地址的客户端继续读取 `peer_address`。严格校验响应的客户端需更新到包含可选字段 `peer_addresses` 的 OpenAPI 规范。
 
 成功状态：同步完成为 200，创建为 `201 + Location`，持久受理异步执行为 `202 + Operation + Location`，无正文完成为 204。202 只证明已持久受理，最终结果通过原 Operation 的 `state` 读取。确认、恢复、取消等决定持久保存后返回 `200 + Operation`。
 

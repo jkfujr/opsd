@@ -3674,8 +3674,13 @@ type EnrollmentToken struct {
 
 // EnrollmentTokenCreated defines model for EnrollmentTokenCreated.
 type EnrollmentTokenCreated struct {
-	InstallerUrl  string          `json:"installer_url"`
-	PeerAddress   string          `json:"peer_address"`
+	InstallerUrl string `json:"installer_url"`
+
+	// PeerAddress 种子节点的主地址，供使用单一接入地址的客户端。
+	PeerAddress string `json:"peer_address"`
+
+	// PeerAddresses 种子节点的可选接入地址。存在备用地址时返回，主地址在首位，其余按配置顺序排列。地址共用 peer_public_key 与本次接入码，客户端选一个地址交给安装器。
+	PeerAddresses *[]string       `json:"peer_addresses,omitempty"`
 	PeerPublicKey string          `json:"peer_public_key"`
 	Record        EnrollmentToken `json:"record"`
 	Token         string          `json:"token"`
@@ -4281,24 +4286,26 @@ type NodeActionAction string
 
 // NodeConfig defines model for NodeConfig.
 type NodeConfig struct {
-	Address              string                  `json:"address"`
-	AddressMode          *NodeConfigAddressMode  `json:"address_mode,omitempty"`
-	Api                  *bool                   `json:"api,omitempty"`
-	Cached               *bool                   `json:"cached,omitempty"`
-	Console              bool                    `json:"console"`
-	ConsoleListen        string                  `json:"console_listen"`
-	CoordinatorCandidate *bool                   `json:"coordinator_candidate,omitempty"`
-	Endpoints            *[]string               `json:"endpoints,omitempty"`
-	IntervalMinutes      int                     `json:"interval_minutes"`
-	LastSyncedAt         *time.Time              `json:"last_synced_at,omitempty"`
-	Listen               string                  `json:"listen"`
-	Name                 string                  `json:"name"`
-	NetworkError         *NetworkError           `json:"network_error,omitempty"`
-	PreferredStorage     string                  `json:"preferred_storage"`
-	Region               string                  `json:"region"`
-	RetentionDays        NodeConfigRetentionDays `json:"retention_days"`
-	Revision             int64                   `json:"revision"`
-	Storage              StorageConfig           `json:"storage"`
+	Address              string                 `json:"address"`
+	AddressMode          *NodeConfigAddressMode `json:"address_mode,omitempty"`
+	Api                  *bool                  `json:"api,omitempty"`
+	Cached               *bool                  `json:"cached,omitempty"`
+	Console              bool                   `json:"console"`
+	ConsoleListen        string                 `json:"console_listen"`
+	CoordinatorCandidate *bool                  `json:"coordinator_candidate,omitempty"`
+
+	// Endpoints 配置中的有序备用通信端点。旧配置可含 8 项，新提交最多 7 项。主地址和去重后的备用端点合计最多公布 8 个。
+	Endpoints        *[]string               `json:"endpoints,omitempty"`
+	IntervalMinutes  int                     `json:"interval_minutes"`
+	LastSyncedAt     *time.Time              `json:"last_synced_at,omitempty"`
+	Listen           string                  `json:"listen"`
+	Name             string                  `json:"name"`
+	NetworkError     *NetworkError           `json:"network_error,omitempty"`
+	PreferredStorage string                  `json:"preferred_storage"`
+	Region           string                  `json:"region"`
+	RetentionDays    NodeConfigRetentionDays `json:"retention_days"`
+	Revision         int64                   `json:"revision"`
+	Storage          StorageConfig           `json:"storage"`
 }
 
 // NodeConfigAddressMode defines model for NodeConfig.AddressMode.
@@ -4309,23 +4316,28 @@ type NodeConfigRetentionDays int
 
 // NodeConfigurationPatch defines model for NodeConfigurationPatch.
 type NodeConfigurationPatch struct {
-	Address              *string                              `json:"address,omitempty"`
-	AddressMode          *NodeConfigurationPatchAddressMode   `json:"address_mode,omitempty"`
-	Api                  *bool                                `json:"api,omitempty"`
-	Console              *bool                                `json:"console,omitempty"`
-	ConsoleListen        *string                              `json:"console_listen,omitempty"`
-	CoordinatorCandidate *bool                                `json:"coordinator_candidate,omitempty"`
-	Endpoints            *[]string                            `json:"endpoints,omitempty"`
-	IntervalMinutes      *int                                 `json:"interval_minutes,omitempty"`
-	Listen               *string                              `json:"listen,omitempty"`
-	Name                 *string                              `json:"name,omitempty"`
-	PreferredStorage     *string                              `json:"preferred_storage,omitempty"`
-	Region               *string                              `json:"region,omitempty"`
-	RetentionDays        *NodeConfigurationPatchRetentionDays `json:"retention_days,omitempty"`
-	Storage              *StorageConfigPatch                  `json:"storage,omitempty"`
+	// Address 节点通信主地址。提交不同地址时，省略 address_mode 按 manual 保存；显式提交 auto 和不同地址时返回 422。
+	Address *string `json:"address,omitempty"`
+
+	// AddressMode auto 自动发布公网主地址，manual 使用保存的主地址。省略此字段且主地址未改变时保留现有模式。
+	AddressMode          *NodeConfigurationPatchAddressMode `json:"address_mode,omitempty"`
+	Api                  *bool                              `json:"api,omitempty"`
+	Console              *bool                              `json:"console,omitempty"`
+	ConsoleListen        *string                            `json:"console_listen,omitempty"`
+	CoordinatorCandidate *bool                              `json:"coordinator_candidate,omitempty"`
+
+	// Endpoints 最多提交 7 个备用通信 URL，按所给顺序替换现有列表。主地址优先，重复地址只公布一次，协议总上限为 8 个。空数组清除备用端点。
+	Endpoints        *[]string                            `json:"endpoints,omitempty"`
+	IntervalMinutes  *int                                 `json:"interval_minutes,omitempty"`
+	Listen           *string                              `json:"listen,omitempty"`
+	Name             *string                              `json:"name,omitempty"`
+	PreferredStorage *string                              `json:"preferred_storage,omitempty"`
+	Region           *string                              `json:"region,omitempty"`
+	RetentionDays    *NodeConfigurationPatchRetentionDays `json:"retention_days,omitempty"`
+	Storage          *StorageConfigPatch                  `json:"storage,omitempty"`
 }
 
-// NodeConfigurationPatchAddressMode defines model for NodeConfigurationPatch.AddressMode.
+// NodeConfigurationPatchAddressMode auto 自动发布公网主地址，manual 使用保存的主地址。省略此字段且主地址未改变时保留现有模式。
 type NodeConfigurationPatchAddressMode string
 
 // NodeConfigurationPatchRetentionDays defines model for NodeConfigurationPatch.RetentionDays.

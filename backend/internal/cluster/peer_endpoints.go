@@ -3,11 +3,33 @@ package cluster
 import (
 	"context"
 	"errors"
-	"github.com/coder/websocket"
-	"github.com/jkfujr/opsd/internal/transport"
 	"strings"
 	"time"
+
+	"github.com/coder/websocket"
+	"github.com/jkfujr/opsd/internal/transport"
 )
+
+const maxPeerEndpoints = 8
+
+func (c Config) distinctPeerEndpoints() []string {
+	endpoints := []string{c.Address}
+	seen := map[string]bool{strings.TrimRight(c.Address, "/"): true}
+	for _, endpoint := range c.Endpoints {
+		key := strings.TrimRight(endpoint, "/")
+		if !seen[key] {
+			seen[key] = true
+			endpoints = append(endpoints, endpoint)
+		}
+	}
+	return endpoints
+}
+
+func (c Config) PeerEndpoints() []string {
+	endpoints := c.distinctPeerEndpoints()
+	// 旧配置可能含八个备用端点，按原优先顺序公布协议可接收的八个端点。
+	return endpoints[:min(len(endpoints), maxPeerEndpoints)]
+}
 
 func (n *Node) openPeerChannel(ctx context.Context, m Member, key []byte) (*transport.Channel, error) {
 	endpoints := append([]string{}, m.Endpoints...)

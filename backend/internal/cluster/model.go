@@ -174,7 +174,7 @@ func memberBytes(m Member) []byte         { m.Signature = nil; b, _ := json.Mars
 func revocationBytes(r Revocation) []byte { r.Signature = nil; b, _ := json.Marshal(r); return b }
 func recordBytes(r Record) []byte         { r.Signature = nil; b, _ := json.Marshal(r); return b }
 func validateMember(m Member) error {
-	if len(m.Endpoints) > 8 {
+	if len(m.Endpoints) > maxPeerEndpoints {
 		return fmt.Errorf("节点通信端点过多")
 	}
 	for _, endpoint := range m.Endpoints {

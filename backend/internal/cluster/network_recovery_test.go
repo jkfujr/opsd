@@ -3,6 +3,7 @@ package cluster
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -61,6 +62,30 @@ func TestNetworkConfigurationRejectsUnreachableBindingAndAllowsNAT(t *testing.T)
 		if err := networkConfigurationError(c); err != nil {
 			t.Fatal("拒绝了有效监听或 NAT 配置", c, err)
 		}
+	}
+}
+
+func TestNetworkConfigurationChecksFallbacksAndKeepsLegacyFields(t *testing.T) {
+	before := Config{Listen: "100.100.201.91:8444", Address: "http://100.100.201.91:8444"}
+	next := before
+	next.Endpoints = []string{"http://8.8.8.8:8444"}
+	var problem *Fault
+	if err := networkConfigurationChangeError(before, next); !errors.As(err, &problem) || problem.Code != "restart_required" {
+		t.Fatal("备用端点的监听不匹配未拒绝", err)
+	}
+
+	before.Listen = ":8444"
+	next = before
+	for i := range 8 {
+		next.Endpoints = append(next.Endpoints, fmt.Sprintf("http://203.0.113.%d:8444", i+1))
+	}
+	if err := networkConfigurationChangeError(before, next); !errors.As(err, &problem) || problem.Code != "invalid_request" {
+		t.Fatal("九个不同端点未拒绝", err)
+	}
+	before = next
+	next.Name = "旧配置仍可改名"
+	if err := networkConfigurationChangeError(before, next); err != nil || len(next.Endpoints) != 8 || len(next.PeerEndpoints()) != 8 || next.PeerEndpoints()[7] != next.Endpoints[6] {
+		t.Fatal("旧配置的字段或公布顺序改变", err)
 	}
 }
 

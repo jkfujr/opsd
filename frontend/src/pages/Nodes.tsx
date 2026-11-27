@@ -11,7 +11,7 @@ import { confirm } from '../app/confirm';
 import { invalidateResource } from '../app/query';
 import { ago, copyText, initials, pct, ratio, fullTime } from '../lib/format';
 import { usageTone } from '../lib/status';
-import { Badge, Button, Card, CardHead, CopyText, Dialog, Dot, Empty, ErrorNotice, Field, Input, Menu, Meter, PageHead, SearchInput, Segmented, Skeleton, IconButton, Notice, Tag } from '../ui/kit';
+import { Badge, Button, Card, CardHead, CopyText, Dialog, Dot, Empty, ErrorNotice, Field, Input, Menu, Meter, PageHead, SearchInput, Segmented, Select, Skeleton, IconButton, Notice, Tag } from '../ui/kit';
 import { toast } from '../app/toast';
 
 type Filter = 'all' | 'online' | 'offline';
@@ -141,6 +141,7 @@ export function AddNodeDialog({ open, onClose }: { open: boolean; onClose: () =>
   const [name, setName] = useState('');
   const [region, setRegion] = useState('');
   const [created, setCreated] = useState<EnrollmentTokenCreated | null>(null);
+  const [peerAddress, setPeerAddress] = useState('');
   const [tool, setTool] = useState<'curl' | 'wget'>('curl');
   const [copied, setCopied] = useState(false);
   useEffect(() => { if (!open) { setCreated(null); setCopied(false); } }, [open]);
@@ -148,10 +149,10 @@ export function AddNodeDialog({ open, onClose }: { open: boolean; onClose: () =>
     label: '生成接入码',
     node: session.local_node_id,
     run: async (_v, key) => (await call<EnrollmentTokenCreated>('POST', '/enrollment-tokens', { key })).data,
-    onSuccess: (r) => { setCreated(r); invalidateResource('nodes'); },
+    onSuccess: (r) => { setCreated(r); setPeerAddress(r.peer_address); invalidateResource('nodes'); },
     success: false,
   });
-  const command = created ? buildCommand(created, tool, name, region) : '';
+  const command = created ? buildCommand(created, peerAddress, tool, name, region) : '';
   return (
     <Dialog open={open} onClose={onClose} width={640} title="添加节点" sub="在 Debian / Ubuntu 的 systemd 主机上以 root 执行接入命令。"
       footer={created ? <><span className="left muted" style={{ fontSize: 12.5 }}>接入码 {fullTime(created.record.expires_at)} 过期</span><Button onClick={onClose}>完成</Button></> : <><Button variant="ghost" onClick={onClose}>取消</Button><Button variant="primary" busy={create.busy} onClick={() => void create.run()}>生成接入命令</Button></>}
@@ -171,6 +172,13 @@ export function AddNodeDialog({ open, onClose }: { open: boolean; onClose: () =>
               <Notice tone="info">接入码一次性使用，24 小时内有效；完整值只在生成时显示一次。</Notice>
             ) : (
               <motion.div className="stack" style={{ gap: 10 }} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}>
+                {!!created.peer_addresses?.length && (
+                  <Field label="接入地址">
+                    <Select value={peerAddress} onChange={(e) => { setPeerAddress(e.target.value); setCopied(false); }}>
+                      {created.peer_addresses.map((address) => <option key={address} value={address}>{address}</option>)}
+                    </Select>
+                  </Field>
+                )}
                 <div className="row">
                   <Segmented size="sm" value={tool} onChange={setTool} options={[{ value: 'curl', label: 'curl' }, { value: 'wget', label: 'wget' }]} />
                   <span className="spacer" />
@@ -178,7 +186,7 @@ export function AddNodeDialog({ open, onClose }: { open: boolean; onClose: () =>
                 </div>
                 <pre className="code" style={{ maxHeight: 220 }}>{command}</pre>
                 <div className="kv" style={{ fontSize: 12.5 }}>
-                  <dt>种子节点</dt><dd><CopyText value={created.peer_address} /></dd>
+                  {!created.peer_addresses?.length && <><dt>接入地址</dt><dd><CopyText value={peerAddress} /></dd></>}
                   <dt>版本</dt><dd className="mono">{created.version}</dd>
                 </div>
               </motion.div>
@@ -195,8 +203,8 @@ export function AddNodeDialog({ open, onClose }: { open: boolean; onClose: () =>
 }
 
 const q = (v: string) => `'${v.replace(/'/g, `'\\''`)}'`;
-function buildCommand(c: EnrollmentTokenCreated, tool: 'curl' | 'wget', name: string, region: string) {
-  const args = [`-e ${q(c.peer_address)}`, `-k ${q(c.peer_public_key)}`, `-t ${q(c.token)}`];
+function buildCommand(c: EnrollmentTokenCreated, peerAddress: string, tool: 'curl' | 'wget', name: string, region: string) {
+  const args = [`-e ${q(peerAddress)}`, `-k ${q(c.peer_public_key)}`, `-t ${q(c.token)}`];
   if (name.trim()) args.push(`-n ${q(name.trim())}`);
   if (region.trim()) args.push(`-r ${q(region.trim())}`);
   const fetcher = tool === 'curl' ? `curl -fsSL ${q(c.installer_url)}` : `wget -qO- ${q(c.installer_url)}`;

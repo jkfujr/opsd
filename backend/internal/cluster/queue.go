@@ -664,10 +664,8 @@ func (n *Node) enqueueTxObserved(ctx context.Context, origin string, r Request, 
 		if c.Listen != before.Listen {
 			return Operation{}, fault("restart_required", "节点通信监听地址需要通过 opsd network 修改后重启节点")
 		}
-		if c.Address != before.Address || c.AddressMode != before.AddressMode {
-			if err = networkConfigurationError(c); err != nil {
-				return Operation{}, err
-			}
+		if err = networkConfigurationChangeError(before, c); err != nil {
+			return Operation{}, err
 		}
 	case "account":
 		var a AccountChange
@@ -1380,10 +1378,8 @@ func (n *Node) applyLocal(ctx context.Context, kind string, plain []byte, op *Op
 		if next.Listen != c.Listen {
 			return fault("restart_required", "节点通信监听地址需要通过 opsd network 修改后重启节点")
 		}
-		if next.Address != c.Address || next.AddressMode != c.AddressMode {
-			if e = networkConfigurationError(next); e != nil {
-				return e
-			}
+		if e = networkConfigurationChangeError(c, next); e != nil {
+			return e
 		}
 		if e = ValidateConfig(next); e != nil {
 			return e

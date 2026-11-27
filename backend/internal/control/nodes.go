@@ -79,7 +79,17 @@ func (s *Server) CreateEnrollmentToken(w http.ResponseWriter, r *http.Request, _
 		return
 	}
 	w.Header().Set("Location", httpapi.APIBasePath+"/enrollment-tokens/"+id)
-	s.result(w, r, 201, httpapi.EnrollmentTokenCreated{Token: token, Version: s.options.NodeVersion, InstallerUrl: fmt.Sprintf("https://github.com/jkfujr/opsd/releases/download/v%s/install.sh", s.options.NodeVersion), PeerAddress: c.Address, PeerPublicKey: identity.Encode(s.node.Key.Public), Record: httpapi.EnrollmentToken{Id: id, Revision: 1, CreatedAt: s.now().UTC().Truncate(time.Second), ExpiresAt: expires}}, nil)
+	created := httpapi.EnrollmentTokenCreated{
+		Token: token, Version: s.options.NodeVersion,
+		InstallerUrl:  fmt.Sprintf("https://github.com/jkfujr/opsd/releases/download/v%s/install.sh", s.options.NodeVersion),
+		PeerAddress:   c.Address,
+		PeerPublicKey: identity.Encode(s.node.Key.Public),
+		Record:        httpapi.EnrollmentToken{Id: id, Revision: 1, CreatedAt: s.now().UTC().Truncate(time.Second), ExpiresAt: expires},
+	}
+	if addresses := c.PeerEndpoints(); len(addresses) > 1 {
+		created.PeerAddresses = &addresses
+	}
+	s.result(w, r, 201, created, nil)
 }
 
 func (s *Server) ListEnrollmentTokens(w http.ResponseWriter, r *http.Request, _ httpapi.ListEnrollmentTokensParams) {

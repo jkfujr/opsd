@@ -11,7 +11,7 @@ import { invalidateResource } from '../app/query';
 import { ago, bytes, fullTime, initials, pct, rate, ratio } from '../lib/format';
 import { usageTone } from '../lib/status';
 import { AreaChart, Spark } from '../ui/charts';
-import { Badge, Button, Card, CardHead, CopyText, Dialog, Dot, ErrorNotice, Field, Input, Notice, Ring, Skeleton, Switch, Tabs, Tag } from '../ui/kit';
+import { Badge, Button, Card, CardHead, CopyText, Dialog, Dot, ErrorNotice, Field, Input, Notice, Ring, Skeleton, Switch, Tabs, Tag, Textarea } from '../ui/kit';
 
 type Tab = 'overview' | 'config' | 'network' | 'account';
 
@@ -121,6 +121,7 @@ function OverviewTab({ id }: { id: string }) {
   const info = useNode(id);
   const history = useLive(id);
   const n = status.data;
+  const fallbacks = n?.endpoints?.filter((endpoint) => endpoint !== n?.address) ?? [];
   const series = [
     { name: 'CPU', color: 'var(--accent)', points: (history ?? []).map((p) => ({ t: p.t, v: p.cpu ?? null })) },
     { name: '内存', color: 'oklch(0.74 0.15 250)', points: (history ?? []).map((p) => ({ t: p.t, v: p.mem ?? null })) },
@@ -142,7 +143,7 @@ function OverviewTab({ id }: { id: string }) {
               <dt>节点 ID</dt><dd><CopyText value={n.id} /></dd>
               <dt>公钥</dt><dd><CopyText value={n.public_key} display={n.public_key.slice(0, 24) + '…'} /></dd>
               <dt>通信地址</dt><dd className="mono">{n.address || '—'}</dd>
-              {!!n.endpoints?.length && <><dt>备选端点</dt><dd className="row wrap">{n.endpoints.map((e) => <Tag key={e}>{e}</Tag>)}</dd></>}
+              {fallbacks.length > 0 && <><dt>备用端点</dt><dd className="row wrap">{fallbacks.map((e) => <Tag key={e}>{e}</Tag>)}</dd></>}
               <dt>最近在线</dt><dd>{n.connected ? '当前在线' : n.last_seen_at ? `${ago(n.last_seen_at)}（${fullTime(n.last_seen_at)}）` : '—'}</dd>
               <dt>控制台</dt><dd>{n.console_enabled ? <Badge tone="ok">已开启</Badge> : <Badge>未开启</Badge>}</dd>
               <dt>授权版本</dt><dd className="num">{n.api_authorization_version ?? '—'}</dd>
@@ -201,11 +202,21 @@ function ConfigTab({ id }: { id: string }) {
   useEffect(() => setDraft({}), [config.data?.etag]);
   const value = config.data?.value;
   const merged = value ? { ...value, ...draft } : undefined;
+  const endpointText = merged?.endpoints?.join('\n') ?? '';
+  const endpoints = endpointText.split('\n').map((endpoint) => endpoint.trim()).filter(Boolean);
+  const endpointError = endpoints.length > 7 && (draft.endpoints !== undefined || draft.address !== undefined) ? '最多可保存 7 个备用端点' : undefined;
   const dirty = Object.keys(draft).length > 0;
   const save = useCommand<void, Operation>({
     label: '保存节点配置',
     node: id,
-    run: async (_v, key) => (await call<Operation>('PATCH', `/nodes/${enc(id)}/configuration`, { key, ifMatch: config.data?.etag, body: draft })).data,
+    run: async (_v, key) => {
+      const body = {
+        ...draft,
+        ...(draft.address === undefined ? {} : { address_mode: 'manual' }),
+        ...(draft.endpoints === undefined ? {} : { endpoints }),
+      };
+      return (await call<Operation>('PATCH', `/nodes/${enc(id)}/configuration`, { key, ifMatch: config.data?.etag, body })).data;
+    },
     onSuccess: () => setDraft({}),
     onConflict: () => void config.refetch(),
   });
@@ -217,12 +228,19 @@ function ConfigTab({ id }: { id: string }) {
       {value?.cached && <Notice tone="warn" title="显示的是缓存配置">节点当前不可达，{value.last_synced_at ? `最后同步于 ${ago(value.last_synced_at)}` : ''}；恢复连接前无法保存。</Notice>}
       {value?.network_error && <Notice tone="warn" title="监听配置不一致">{value.network_error.message}</Notice>}
       <Card>
-        <CardHead title="节点设置" sub="名称、地域与通信地址" />
+        <CardHead title="节点设置" />
         <div className="card-body form-grid" id="node-settings">
           <Field label="名称"><Input value={merged.name} onChange={(e) => set('name', e.target.value)} /></Field>
           <Field label="地域"><Input value={merged.region} onChange={(e) => set('region', e.target.value)} /></Field>
           <Field label="通信地址" hint="其他成员连接本节点的 URL"><Input mono value={merged.address} onChange={(e) => set('address', e.target.value)} /></Field>
           <Field label="通信监听" hint="修改监听需要在节点本机重启服务"><Input mono value={merged.listen} onChange={(e) => set('listen', e.target.value)} /></Field>
+          <Field className="span-2" label="备用端点" hint={<span id="node-endpoints-hint">每行一个 URL，最多 7 个</span>}
+            error={endpointError && <span id="node-endpoints-hint" role="alert">{endpointError}</span>}>
+            <Textarea mono rows={3} value={endpointText} aria-describedby="node-endpoints-hint" aria-invalid={!!endpointError} onChange={(e) => {
+              const text = e.target.value;
+              set('endpoints', text === (value?.endpoints?.join('\n') ?? '') ? value?.endpoints : text.split('\n'));
+            }} />
+          </Field>
         </div>
       </Card>
       <Card>
@@ -237,7 +255,7 @@ function ConfigTab({ id }: { id: string }) {
           <Field label="历史采集间隔（分钟）"><Input type="number" min={1} max={60} value={merged.interval_minutes} onChange={(e) => set('interval_minutes', Number(e.target.value))} /></Field>
         </div>
       </Card>
-      <SaveBar dirty={dirty} busy={save.busy} onReset={() => setDraft({})} onSave={() => void save.run()} disabled={!!value?.cached} />
+      <SaveBar dirty={dirty} busy={save.busy} onReset={() => setDraft({})} onSave={() => void save.run()} disabled={!!value?.cached || !!endpointError} />
     </div>
   );
 }

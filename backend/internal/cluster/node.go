@@ -131,7 +131,7 @@ func Defaults(c Config) Config {
 	return c
 }
 func ValidateConfig(c Config) error {
-	if len(c.Endpoints) > 8 {
+	if len(c.Endpoints) > maxPeerEndpoints {
 		return fault("invalid_request", "通信备选端点过多")
 	}
 	for _, endpoint := range c.Endpoints {
@@ -287,7 +287,7 @@ func Open(ctx context.Context, path string, o Options) (*Node, error) {
 		db.Close()
 		return nil, e
 	}
-	if m, err := n.Self(ctx); err == nil && m.ManagementVersion < protocol.SharedManagementVersion {
+	if m, err := n.Self(ctx); err == nil && (m.ManagementVersion < protocol.SharedManagementVersion || len(m.Endpoints) > maxPeerEndpoints) {
 		actual, err := n.Config(ctx)
 		if err != nil {
 			db.Close()
@@ -576,7 +576,7 @@ func (n *Node) publishMemberTx(ctx context.Context, tx *sql.Tx, c Config) error 
 		return e
 	}
 	m := Member{ID: n.ID, Cluster: n.cluster, Name: c.Name, Address: c.Address, Region: c.Region, Public: identity.Encode(n.Key.Public), Signing: identity.Encode(n.signing.Public().(ed25519.PublicKey)), Recipient: n.age.Recipient().String(), Version: version, ConfigurationRevision: c.Revision, Issuer: n.ID}
-	m.Endpoints = append([]string{c.Address}, c.Endpoints...)
+	m.Endpoints = c.PeerEndpoints()
 	m.ManagementVersion = protocol.SharedManagementVersion
 	m.CoordinatorCandidate = c.CoordinatorCandidate || c.Console
 	if c.Storage.Enabled {
