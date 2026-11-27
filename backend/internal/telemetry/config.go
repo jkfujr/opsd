@@ -235,7 +235,7 @@ func (s *Service) Advance(ctx context.Context, parent Parent, body []byte) error
 			flow.ChildRevision = 0
 			return s.persistWorkflow(ctx, parent, flow)
 		}
-		d := protocol.MonitoringDeployment{ClusterID: s.ClusterID(), NodeID: config.NodeID, Enabled: enabled, Directory: config.Directory, Prefix: config.Prefix, DiskBudgetBytes: config.DiskBudgetBytes}
+		d := protocol.MonitoringDeployment{ClusterID: s.ClusterID(), NodeID: config.NodeID, Enabled: enabled, Directory: config.Directory, StorageRootID: config.StorageRootID, Prefix: config.Prefix, DiskBudgetBytes: config.DiskBudgetBytes}
 		if flow.Child == "" {
 			flow.Child = s.Queue.StepID(config.NodeID, fmt.Sprintf("%s/monitoring/%d", op.ID, flow.Stage))
 			if err = s.persistWorkflow(ctx, parent, flow); err != nil {
@@ -357,7 +357,7 @@ func (s *Service) Decide(ctx context.Context, method string, revision uint64, pa
 }
 
 func (s *Service) Deployment(ctx context.Context, c metricsstore.Config) (protocol.MonitoringDeployment, error) {
-	d := protocol.MonitoringDeployment{ClusterID: s.ClusterID(), NodeID: c.NodeID, Enabled: c.Enabled, Directory: c.Directory, Prefix: c.Prefix, DiskBudgetBytes: c.DiskBudgetBytes}
+	d := protocol.MonitoringDeployment{ClusterID: s.ClusterID(), NodeID: c.NodeID, Enabled: c.Enabled, Directory: c.Directory, StorageRootID: c.StorageRootID, Prefix: c.Prefix, DiskBudgetBytes: c.DiskBudgetBytes}
 	if !c.Enabled {
 		return d, nil
 	}

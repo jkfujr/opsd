@@ -27,6 +27,13 @@ func (m *Manager) StartDatabaseProxy(ctx context.Context, ref protocol.Container
 	if !strings.Contains(strings.ToLower(image), "proxysql") || raw.State == nil || raw.State.Paused || raw.State.Status == "removing" {
 		return fmt.Errorf("代理容器身份或状态已变化")
 	}
+	if m.StorageDatabaseStart != nil && raw.Config != nil {
+		if id := raw.Config.Labels[deploymentLabel]; id != "" {
+			if handled, err := m.StorageDatabaseStart(ctx, id); handled || err != nil {
+				return err
+			}
+		}
+	}
 	_, err = c.ContainerStart(ctx, ref.ContainerID, client.ContainerStartOptions{})
 	return err
 }

@@ -12,6 +12,7 @@ type MonitoringDeployment struct {
 	NodeID          string        `json:"node_id"`
 	Enabled         bool          `json:"enabled"`
 	Directory       string        `json:"directory"`
+	StorageRootID   string        `json:"storage_root_id,omitempty"`
 	Prefix          string        `json:"prefix"`
 	DiskBudgetBytes int64         `json:"disk_budget_bytes"`
 	Storage         S3Connection  `json:"storage"`
@@ -22,7 +23,8 @@ func (d MonitoringDeployment) Validate() error {
 	if len(d.ClusterID) != 43 || strings.Trim(d.ClusterID, "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_-") != "" || len(d.NodeID) != 32 || strings.Trim(d.NodeID, "0123456789abcdef") != "" {
 		return fmt.Errorf("监控部署身份无效")
 	}
-	if !path.IsAbs(d.Directory) || path.Clean(d.Directory) != d.Directory || d.Directory == "/" || len(d.Directory) > 2048 || strings.ContainsAny(d.Directory, "\x00\r\n") {
+	if !path.IsAbs(d.Directory) || path.Clean(d.Directory) != d.Directory || d.Directory == "/" || len(d.Directory) > 2048 || strings.ContainsAny(d.Directory, "\x00\r\n") ||
+		d.StorageRootID != "" && !storageRootID.MatchString(d.StorageRootID) {
 		return fmt.Errorf("监控数据目录无效")
 	}
 	if !d.Enabled {

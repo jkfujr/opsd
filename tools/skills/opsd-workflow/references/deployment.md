@@ -69,6 +69,25 @@ sudo systemctl start opsd-executor.service opsd.service
 
 从第一次发起停服到切换或回滚的五项读回通过，使用同一个 90 秒计时。正向总预算 60 秒。`stop` 上限 45 秒，等待 job 清空上限 60 秒，`daemon-reload` 上限 10 秒，各段继续受总预算约束。正向超限转入回滚，当前 systemd 请求和 job 未处理完时仅观察状态。确认队列清空、两服务处于回滚所需状态且仍有预算后，再继续恢复。回滚超限时根据 `needs-recovery.json` 处理，当前动作结束后再决定下一条 systemd 命令。`result.json` 的 `systemd_stop_seconds` 和 `systemd_start_seconds` 记录分段耗时。
 
+## 本机存储根操作
+
+先通过 [节点存储根 API](../../../../docs/API.md#节点存储根) 读取已登记根和当前申请。迁移申请返回 `pending_restart` 后，在组件所属节点使用原申请 ID。
+
+```bash
+sudo /opt/opsd/bin/opsd storage-root status --id "$OPSD_REQUEST_ID"
+sudo /opt/opsd/bin/opsd storage-root apply --id "$OPSD_REQUEST_ID"
+```
+
+检查 `active` 的根 ID 和目录、`containers` 的当前写入方，以及 `verified_data` 的文件数、字节数和摘要。用 `findmnt` 与 `docker inspect` 核对设备、UUID 和实际绑定。源副本和失败暂存留在原处。停服前先同步。停止、等待所有 systemd job 清空、重载的单段上限分别为 45、60、10 秒。操作超时后先读回原申请。
+
+```bash
+sudo /opt/opsd/bin/opsd storage-root recover --id "$OPSD_REQUEST_ID" --mode repair-target
+sudo /opt/opsd/bin/opsd storage-root recover --id "$OPSD_REQUEST_ID" --mode reverse
+sudo /opt/opsd/bin/opsd storage-root rollback --id "$OPSD_REQUEST_ID"
+```
+
+`repair-target` 修复并读回已开放写入的目标。选择 `reverse` 时，若目标已开放，就停写后反向复制目标的新数据；目标尚未开放时恢复源。已完成的组件迁移使用 `rollback`。I0.6 已迁移的节点也用原 ID 执行 `rollback`，它从 `/etc/opsd/storage-root/<id>/` 读原记录，停节点和执行器，复制最新 SQLite、主题与日志后恢复旧布局，保留已迁移目录和旧快照。
+
 ## 来源授权调整
 
 先让全部有效节点运行识别新能力名的版本，逐台确认后再写入新名称。读能力只用于对应的读取方法，既有写能力自动包含对应读能力。预检的「显式」列显示配置原值，「有效」列同时显示推导出的读能力。

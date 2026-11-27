@@ -241,6 +241,11 @@ func (n *Node) dispatch(ctx context.Context, origin, method string, body json.Ra
 		return n.databaseCredentials(ctx, origin)
 	case "storage.status":
 		return n.StorageStatus(ctx)
+	case "storage.root":
+		return n.storageRoots(ctx)
+	case "monitoring.storage":
+		v, err := n.storageRoots(ctx)
+		return archiveStorage(v, n.cluster), err
 	default:
 		return nil, fault("invalid_request", "未知节点操作")
 	}
@@ -280,6 +285,23 @@ func (n *Node) enqueue(ctx context.Context, origin string, r Request) (Operation
 		if hit {
 			return prior, nil
 		}
+	}
+	if r.Kind == "storage_root" {
+		if e := n.checkStorageRoot(ctx, r); e != nil {
+			if prior, hit, retry := n.retryOperation(ctx, origin, r); retry != nil {
+				return Operation{}, retry
+			} else if hit {
+				return prior, nil
+			}
+			return Operation{}, e
+		}
+	}
+	if r.Kind == "monitoring_config" {
+		value, err := n.normalizeArchiveStorage(ctx, r.Payload, r.InputDigest != "")
+		if err != nil {
+			return Operation{}, err
+		}
+		r.Payload = value
 	}
 	observed, prior, e := n.prepareDatabaseTarget(ctx, origin, r)
 	if e != nil {
@@ -436,6 +458,9 @@ func (n *Node) enqueueTxObserved(ctx context.Context, origin string, r Request, 
 	}
 	var targetName string
 	switch r.Kind {
+	case "storage_root":
+		// 执行器持有登记文件的修订与锁。
+		r.ExpectedRevision = nil
 	case "monitoring_config":
 		if e := n.validateArchiveRequest(ctx, r.Payload); e != nil {
 			return Operation{}, e
@@ -1116,7 +1141,11 @@ func (n *Node) advanceFiltered(filter string, args ...any) {
 		op.State = state
 		op.Revision++
 		if e != nil {
-			op.Error = &protocol.Error{Code: "conflict", Message: e.Error()}
+			code := "conflict"
+			if kind == "storage_root" {
+				code = firewall.Code(e)
+			}
+			op.Error = &protocol.Error{Code: code, Message: e.Error()}
 		}
 		_ = n.saveOperation(ctx, &op, "finished")
 	}
@@ -1282,6 +1311,9 @@ func sameOperationError(a, b *protocol.Error) bool {
 }
 
 func (n *Node) applyLocal(ctx context.Context, kind string, plain []byte, op *Operation) error {
+	if kind == "storage_root" {
+		return n.applyStorageRoot(ctx, plain, op)
+	}
 	if kind == "monitoring_config" {
 		return n.advanceArchive(ctx, op, plain)
 	}

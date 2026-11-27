@@ -39,6 +39,24 @@ sudo env OPSD_NATIVE_TRUST=1 artifacts/firewall-native.test -test.run '^TestPeer
 
 Release 复用同提交成功工件，通过公开地址下载，检查实际安装、两个 systemd 服务、版本与重复安装保留配置。
 
+节点存储根验收在 `OPSD-CI` 的 Linux 仓库根目录执行。用例创建两块独立 ext4 loop 盘和专用 systemd 单元。MinIO 参数指向监控验收已准备的本机工件。
+
+```bash
+mkdir -p artifacts/opsd-i3
+go -C backend build -o ../artifacts/opsd-i3/opsd ./cmd/opsd
+go -C backend test -c -o ../artifacts/opsd-i3/cli.test ./internal/cli
+go -C backend test -c -o ../artifacts/opsd-i3/storageroot.test ./internal/storageroot
+opsd_fixture_exec=$(mktemp -d /var/tmp/opsd-i3-bin-XXXXXXXX)
+trap 'rm -f "$opsd_fixture_exec/opsd"; rmdir "$opsd_fixture_exec"' EXIT
+chmod 755 "$opsd_fixture_exec"
+install -m 755 artifacts/opsd-i3/opsd "$opsd_fixture_exec/opsd"
+sudo env OPSD_TEST_STORAGE_ROOT=1 OPSD_TEST_BINARY="$opsd_fixture_exec/opsd" \
+  artifacts/opsd-i3/storageroot.test -test.run '^TestCompletedMetadataRollbackOnSystemd$' -test.v -test.timeout=3m
+sudo env OPSD_TEST_STORAGE_ROOT=1 OPSD_TEST_BINARY="$opsd_fixture_exec/opsd" \
+  OPSD_TEST_MINIO="$PWD/artifacts/monitoring-native/bin/minio" \
+  artifacts/opsd-i3/cli.test -test.run '^TestStorageRootDualDisk$' -test.v -test.timeout=8m
+```
+
 主题检查沿用 Go 测试和 Playwright，CI 的“整套主题与内置恢复界面”步骤构建 React、Vue 成品包，在内置生产资源上检查安装、连续条件切换、双登录模式、深层路由、未知应答后的读取和损坏主题恢复，同时验证 Swagger 会话／Bearer、CSRF、条件写入、原键查询与根路径指标。另在独立主题、默认内置与内置恢复三模式执行受影响状态、日志、受管路由和防火墙接纳检查，截图随 `theme-check` 工件保存。手动复现从仓库根目录运行：
 
 ```powershell
@@ -51,20 +69,8 @@ go -C backend test ./internal/control -run '^TestConsoleThemeBrowser$' -v -count
 
 ## 最近结果
 
-2026-11-16；源码：基于 `223aef0` 的工作区，验证后通信修复提交为 `79db0cc`。环境：Windows PowerShell、WSL 2.6.3 的独立 `OPSD-CI`、Ubuntu 24.04.5、Go 1.26.2、Node.js 24.14.1、Docker 29.1.3、systemd，Linux amd64。全部检查在本机执行，GitHub CI 触发配置保留。
+2026-11-27，基于 `d6df211` 的工作区。环境为独立 WSL 2 `OPSD-CI`、Ubuntu 24.04、Linux amd64、Go 1.26.2、Node.js 24.14.1、Docker 29.1.3 和 systemd。构建阶段完成 OpenAPI 生成一致性、前端类型检查及生产构建、Linux amd64／arm64 编译。后端回归阶段退出码为 0。双盘用例 81.78 秒，I0.6 已完成记录回退用例 1.54 秒。原始结果和逐步读回保存在 `artifacts/opsd-v4/I3/`，合并审查位于 `artifacts/opsd-v4/final-review.md`。
 
-接口生成一致性、前端类型检查与生产构建、Linux amd64／arm64 编译、版本和安装脚本语法通过。公网观测限制修复后只重编译受影响的双架构后端，前端成功结果复用此前结果。完整后端通过，包含双向满载查询、已确认握手的重复连接、二十节点连接总数、三条公网主备观测的加入目录，以及真实 Docker、三成员 Galera、双 ProxySQL、Prometheus／Grafana、单成员创建和扩为三成员、TLS 同步、业务数据保留与代理重启恢复。
-
-共享迁移专项通过：三个运行节点与一个新加入成员、两个复用代理及一个自动安装代理，覆盖原 ID 与回执、共享策略、地址补传、引导节点停止后的接入资料、协调转交、已受理步骤复用、代理独立恢复、精确库权限及账号撤销。4／10／40 个全新代理节点的每后端连接预算为 24／60／240，管理连接另计，复用代理保留现场限制。
-
-原生网络检查通过 UFW、nftables、iptables 的双栈新连接与互信恢复。React／Vue 整包主题、默认内置及内置恢复三模式交互通过，包含共享库原请求查询、主备入口、代理状态、协调权转交及窄屏；三模式窄屏截图的人工视觉检查复用此前结果，界面源码保持原值。
-
-实际安装与 API 检查通过：默认父目录 `0755`，节点与执行器私有目录 `0700`；下载和版本失败路径、停止服务后改网络、重复安装保留账号、HTTP／WebSocket、任务幂等与取消、日志、容器更新、Compose 和 root 终端释放。安装阶段重建验收实例后再次通过，下一轮使用新的验收身份和请求回执；结束时停止本地验收服务。
-
-结果位于 `artifacts/wsl-ci/`：`local-ci/` 保存各阶段日志，`shared-storage-result.json`、`database-result.json`、`database-deployment-result.json`、`theme-ui/result.json`、`frontend/gpt2/integration*/` 和 `api/result.json` 保存对应结果与截图。构建产物为同目录的双架构程序和 `install.sh`。
-
-现有备份审查复用此前结果：C091 小时任务只备份 `Openlist`，每日任务采用全量物理备份；检查时两任务的最近结果均为退出码 1。原始结果保留在 `artifacts/shared-storage-20261116/existing-backup-scope.json` 和 `existing-backup-detail.json`。本批生产切换与线上 `opsd_core` 初始化尚未执行。
-
-已验证：本地构建、完整后端、真实数据库与共享迁移、原生互信新连接、三模式浏览器、实际安装及 API，重复执行安装验收。未验证：生产切换与真实跨地域故障接续、生产备份恢复、arm64 实机及整机重启；本批未推送新提交、未公开发布安装包。
+已验证：HTTP 条件写入与幂等，ProxySQL、Thanos 和单节点池数据镜像切换，缺盘、错盘、非受管容器冲突、重载超时后停止发出 systemd 操作、目标修复与反迁，以及 I0.6 元数据回退。未验证：生产组件切换、真实 Galera 目录迁移、多成员分布式池、arm64 实机。
 
 历史结果见 [变更记录](../CHANGELOG.md)。

@@ -292,7 +292,7 @@ func HistoryImportSource(ctx context.Context, source, dir string) (*sql.DB, func
 		return nil, nil, err
 	}
 	_ = file.Close()
-	copyDB, err := historyBackup(ctx, source, path)
+	copyDB, err := BackupSQLite(ctx, source, path)
 	if err != nil {
 		_ = cleanup()
 		return nil, nil, err
@@ -300,7 +300,7 @@ func HistoryImportSource(ctx context.Context, source, dir string) (*sql.DB, func
 	return copyDB, func() { _ = copyDB.Close(); _ = cleanup() }, nil
 }
 
-func historyBackup(ctx context.Context, source, destination string) (*sql.DB, error) {
+func BackupSQLite(ctx context.Context, source, destination string) (*sql.DB, error) {
 	db, err := ReadOnly(ctx, source)
 	if err != nil {
 		return nil, err

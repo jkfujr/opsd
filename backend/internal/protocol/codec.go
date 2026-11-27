@@ -91,6 +91,11 @@ func decodeJSON(data []byte, target any) error {
 func validatePayload(payload Payload) error {
 	var operationID string
 	switch body := payload.(type) {
+	case *StorageRootWrite:
+		if !storageRootID.MatchString(body.ID) || body.Input.ExpectedRevision == 0 {
+			return fmt.Errorf("存储根操作标识或修订无效")
+		}
+		return body.Input.Validate()
 	case *MonitoringStateRead:
 		d := body.Deployment
 		d.Enabled = false

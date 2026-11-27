@@ -4,6 +4,14 @@ import "fmt"
 
 func newPayload(kind Kind) (Payload, error) {
 	switch kind {
+	case "storage.root.read":
+		return &StorageRootRead{}, nil
+	case "storage.root.view":
+		return &StorageRootView{}, nil
+	case "storage.root.write":
+		return &StorageRootWrite{}, nil
+	case "storage.root.result":
+		return &StorageRootResult{}, nil
 	case "monitoring.deployment.read":
 		return &MonitoringStateRead{}, nil
 	case "monitoring.deployment.state":

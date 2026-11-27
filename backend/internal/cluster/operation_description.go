@@ -27,6 +27,12 @@ func (n *Node) describeOperation(ctx context.Context, tx firewallQuerier, r Requ
 		return json.Unmarshal([]byte(body), out)
 	}
 	switch r.Kind {
+	case "storage_root":
+		var input protocol.StorageRootInput
+		if err := json.Unmarshal(r.Payload, &input); err != nil {
+			return err
+		}
+		op.Action, op.TargetName = input.Action, "存储根"
 	case "monitoring_config", "monitoring_deploy":
 		op.TargetName = "集中监控"
 		op.Resource = &OperationResource{Kind: "monitoring", NodeID: n.ID, ID: "monitoring"}

@@ -36,8 +36,10 @@ func (s *Server) operationError(w http.ResponseWriter, r *http.Request, e error)
 		status = 409
 	case "outcome_unknown":
 		status = 504
-	case "conflict", "node_busy", "restart_required":
+	case "conflict", "node_busy", "restart_required", "relocation_required":
 		status = 409
+	case "insufficient_storage":
+		status = 507
 	case "forbidden":
 		status = 403
 	case "not_found":

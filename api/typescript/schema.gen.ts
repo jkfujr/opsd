@@ -335,6 +335,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/nodes/{node_id}/storage-root": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** ��ȡ�ڵ�洢�� */
+        get: operations["getStorageRoot"];
+        /** �ǼǴ洢�����������Ǩ�� */
+        put: operations["saveStorageRoot"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/nodes/{node_id}/public-addresses": {
         parameters: {
             query?: never;
@@ -2185,7 +2203,7 @@ export interface components {
             /** @enum {string} */
             executor: "node";
             /** @enum {string} */
-            subject: "firewall" | "component" | "config" | "name" | "account" | "firewall_config" | "container" | "database" | "database_step" | "task_save" | "task_run" | "compose" | "compose_register" | "shared_initialize";
+            subject: "firewall" | "component" | "config" | "name" | "account" | "firewall_config" | "container" | "database" | "database_step" | "task_save" | "task_run" | "compose" | "compose_register" | "shared_initialize" | "storage_root";
             state: components["schemas"]["OperationState"];
             /** Format: int64 */
             revision: number;
@@ -3657,19 +3675,21 @@ export interface components {
             archive_days: 365;
             operation_id?: string;
             state: string;
+            storage_root_id?: string;
         };
         MonitoringArchiveInput: {
             enabled: boolean;
             node_id: string;
             storage_target_id: string;
             prefix: string;
-            directory: string;
+            directory?: string;
             /** Format: int64 */
             disk_budget_bytes: number;
             /** @enum {integer} */
             local_days: 30;
             /** @enum {integer} */
             archive_days: 365;
+            storage_root_id?: string;
         };
         MonitoringGap: {
             node_id: string;
@@ -3786,6 +3806,56 @@ export interface components {
             state: "initializing" | "ready" | "fallback" | "history_full" | "error";
             error?: string;
         };
+        StorageRoot: {
+            root_id: string;
+            mount_point: string;
+            relative_dir: string;
+            fs_uuid: string;
+            fs_type: string;
+            base_path: string;
+            /** @enum {string} */
+            state: "ready" | "unavailable";
+        };
+        StorageBinding: {
+            /** @enum {string} */
+            component: "archive" | "pool_data" | "database_data";
+            component_id: string;
+            root_id: string;
+            directory: string;
+        };
+        StorageRootProgress: {
+            id: string;
+            /** @enum {string} */
+            phase: "pending_restart" | "prepare" | "copy" | "verify" | "switch" | "cleanup" | "restore_old" | "needs_recovery" | "complete" | "rolled_back";
+            source: components["schemas"]["StorageBinding"];
+            target: components["schemas"]["StorageBinding"];
+            write_intent: boolean;
+            error?: string;
+        };
+        StorageRootView: {
+            node_id: string;
+            /** Format: int64 */
+            revision: number;
+            metadata_root: string;
+            roots: components["schemas"]["StorageRoot"][];
+            bindings: components["schemas"]["StorageBinding"][];
+            pending?: components["schemas"]["StorageRootProgress"];
+        };
+        StorageRootRegister: {
+            /** @enum {string} */
+            action: "register";
+            mount_point: string;
+            relative_dir?: string;
+        };
+        StorageRootMove: {
+            /** @enum {string} */
+            action: "move";
+            /** @enum {string} */
+            component: "archive" | "pool_data" | "database_data";
+            component_id: string;
+            target_root_id: string;
+        };
+        StorageRootInput: components["schemas"]["StorageRootRegister"] | components["schemas"]["StorageRootMove"];
     };
     responses: {
         /** @description 请求语法无效 */
@@ -3944,6 +4014,16 @@ export interface components {
         };
         /** @description 未取得上游处理结果 */
         Error504: {
+            headers: {
+                "X-Request-ID"?: string;
+                [name: string]: unknown;
+            };
+            content: {
+                "application/problem+json": components["schemas"]["Problem"];
+            };
+        };
+        /** @description �洢�ռ䲻�� */
+        Error507: {
             headers: {
                 "X-Request-ID"?: string;
                 [name: string]: unknown;
@@ -5035,6 +5115,95 @@ export interface operations {
             500: components["responses"]["Error500"];
             503: components["responses"]["Error503"];
             504: components["responses"]["Error504"];
+        };
+    };
+    getStorageRoot: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                node_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 请求成功 */
+            200: {
+                headers: {
+                    "X-Request-ID": string;
+                    ETag: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StorageRootView"];
+                };
+            };
+            400: components["responses"]["Error400"];
+            401: components["responses"]["Error401"];
+            403: components["responses"]["Error403"];
+            404: components["responses"]["Error404"];
+            405: components["responses"]["Error405"];
+            406: components["responses"]["Error406"];
+            409: components["responses"]["Error409"];
+            412: components["responses"]["Error412"];
+            413: components["responses"]["Error413"];
+            415: components["responses"]["Error415"];
+            422: components["responses"]["Error422"];
+            428: components["responses"]["Error428"];
+            429: components["responses"]["Error429"];
+            500: components["responses"]["Error500"];
+            503: components["responses"]["Error503"];
+            504: components["responses"]["Error504"];
+        };
+    };
+    saveStorageRoot: {
+        parameters: {
+            query?: never;
+            header: {
+                "If-Match": string;
+                "X-CSRF-Token"?: string;
+                "Idempotency-Key": string;
+            };
+            path: {
+                node_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StorageRootInput"];
+            };
+        };
+        responses: {
+            /** @description 请求成功 */
+            202: {
+                headers: {
+                    "X-Request-ID": string;
+                    Location: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Operation"];
+                };
+            };
+            400: components["responses"]["Error400"];
+            401: components["responses"]["Error401"];
+            403: components["responses"]["Error403"];
+            404: components["responses"]["Error404"];
+            405: components["responses"]["Error405"];
+            406: components["responses"]["Error406"];
+            409: components["responses"]["Error409"];
+            412: components["responses"]["Error412"];
+            413: components["responses"]["Error413"];
+            415: components["responses"]["Error415"];
+            422: components["responses"]["Error422"];
+            428: components["responses"]["Error428"];
+            429: components["responses"]["Error429"];
+            500: components["responses"]["Error500"];
+            503: components["responses"]["Error503"];
+            504: components["responses"]["Error504"];
+            507: components["responses"]["Error507"];
         };
     };
     getPublicAddresses: {

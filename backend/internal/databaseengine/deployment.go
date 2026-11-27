@@ -50,6 +50,20 @@ func deploymentManifestFor(d protocol.DatabaseDeployment) deploymentManifest {
 	return deploymentManifest{ID: d.ID, Fingerprint: fingerprint(d)}
 }
 
+func VerifyDeploymentRecord(d protocol.DatabaseDeployment) error {
+	if err := d.Validate(); err != nil {
+		return err
+	}
+	match, err := deploymentFilesMatch(d)
+	if err != nil {
+		return err
+	}
+	if !match {
+		return fmt.Errorf("数据库部署记录或配置指纹不同")
+	}
+	return nil
+}
+
 func deploymentParent(path string) (string, error) {
 	for {
 		info, err := os.Lstat(path)

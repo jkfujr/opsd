@@ -114,6 +114,10 @@ sudo /opt/opsd/bin/opsd data recover
 
 分布式存储池计划在 I5 使用 SeaweedFS。详见 [监控与对象存储](docs/ARCHITECTURE.md#监控与对象存储)。
 
+## 节点存储根
+
+管理员会话可以登记已挂载的 ext4 数据盘，并申请迁移受管组件。取得申请 ID 后，在组件所属节点执行 `sudo /opt/opsd/bin/opsd storage-root apply --id "$OPSD_REQUEST_ID"`。查看实际绑定、恢复中断或回退已完成的迁移，见 [本机存储根操作](tools/skills/opsd-workflow/references/deployment.md#本机存储根操作)。
+
 ## 容器
 
 “容器”汇总各有效节点的 Docker 容器，支持节点、状态和名称筛选，查看详情、启动、停止、重启及最近日志。列表每五秒刷新，日志默认最近 200 行，可选 100／500／1000 行及每两秒自动刷新；关闭日志或隐藏页面后停止请求。每批日志最多读取 256 KiB，超出时显示截断状态。

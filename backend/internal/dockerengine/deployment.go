@@ -12,6 +12,7 @@ import (
 	"github.com/containerd/errdefs"
 	"github.com/jkfujr/opsd/internal/protocol"
 	"github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/api/types/mount"
 	"github.com/moby/moby/client"
 )
 
@@ -27,6 +28,10 @@ func deploymentFingerprint(d protocol.DatabaseDeployment) string {
 }
 
 func (m *Manager) DeploymentState(ctx context.Context, d protocol.DatabaseDeployment) (id, state string, err error) {
+	path, err := m.deploymentStorage(ctx, d, false)
+	if err != nil {
+		return "", "", err
+	}
 	c, _, _, err := m.connect(ctx)
 	if err != nil {
 		return "", "", err
@@ -44,6 +49,9 @@ func (m *Manager) DeploymentState(ctx context.Context, d protocol.DatabaseDeploy
 		raw := result.Container
 		if raw.Config == nil || raw.Config.Labels[deploymentLabel] != d.ID || raw.Config.Labels[deploymentSpecLabel] != deploymentFingerprint(d) {
 			return "", "", fmt.Errorf("同名容器已存在或部署配置已经变化")
+		}
+		if path != "" && !storageMatches(raw, StorageDatabaseSpec(d, path)[0]) {
+			return "", "", fmt.Errorf("数据库存储绑定不同")
 		}
 		if id != "" || raw.State == nil {
 			return "", "", fmt.Errorf("部署容器重复或状态缺失")
@@ -100,6 +108,24 @@ func (m *Manager) CreateDeployment(ctx context.Context, d protocol.DatabaseDeplo
 	if state != "absent" {
 		return fmt.Errorf("原部署容器已经存在，请核对原操作")
 	}
+	dataDir, err := m.deploymentStorage(ctx, d, true)
+	if err != nil {
+		return err
+	}
+	return m.StageStorageDatabase(ctx, d, dataDir, dataDir != "")
+}
+
+func (m *Manager) deploymentStorage(ctx context.Context, d protocol.DatabaseDeployment, write bool) (string, error) {
+	if m.StorageBinding == nil {
+		return "", nil
+	}
+	return m.StorageBinding(ctx, protocol.StorageDatabase, d.ID, write)
+}
+
+func (m *Manager) StageStorageDatabase(ctx context.Context, d protocol.DatabaseDeployment, dataDir string, guarded bool) error {
+	if dataDir == "" {
+		dataDir = filepath.Join(d.Directory, "data")
+	}
 	c, _, _, err := m.connect(ctx)
 	if err != nil {
 		return err
@@ -111,28 +137,16 @@ func (m *Manager) CreateDeployment(ctx context.Context, d protocol.DatabaseDeplo
 	}
 	config := &container.Config{Image: image.ID, Labels: map[string]string{deploymentLabel: d.ID, deploymentSpecLabel: deploymentFingerprint(d), sourceImageLabel: d.Image}}
 	host := &container.HostConfig{NetworkMode: "host", RestartPolicy: container.RestartPolicy{Name: "unless-stopped"}}
-	bind := func(name, target string, readOnly bool) {
-		mode := ":rw"
-		if readOnly {
-			mode = ":ro"
-		}
-		host.Binds = append(host.Binds, filepath.Join(d.Directory, name)+":"+target+mode)
+	if guarded {
+		host.RestartPolicy.Name = "no"
+	}
+	for _, b := range deploymentBinds(d, dataDir) {
+		host.Mounts = append(host.Mounts, mount.Mount{Type: mount.TypeBind, Source: b.Source, Target: b.Target, ReadOnly: b.ReadOnly})
 	}
 	if d.Kind == "galera" {
-		bind("data", "/var/lib/mysql", false)
-		bind("database.cnf", "/etc/mysql/conf.d/opsd.cnf", true)
-		bind("init.sql", "/docker-entrypoint-initdb.d/opsd.sql", true)
-		bind("password", "/run/secrets/opsd-root", true)
-		bind("start.sh", "/opsd-start.sh", true)
-		bind("state", "/opsd-state", false)
-		if len(d.TLS) > 0 {
-			bind("tls", "/etc/opsd-database-tls", true)
-		}
 		config.Env = []string{"MARIADB_ROOT_PASSWORD_FILE=/run/secrets/opsd-root", "MARIADB_ROOT_HOST=127.0.0.1"}
 		config.Entrypoint = []string{"/bin/sh", "/opsd-start.sh"}
 	} else {
-		bind("data", "/var/lib/proxysql", false)
-		bind("database.cnf", "/etc/proxysql.cnf", true)
 		config.Entrypoint = []string{"/usr/bin/proxysql"}
 		config.Cmd = []string{"-f", "-c", "/etc/proxysql.cnf"}
 	}
@@ -141,6 +155,14 @@ func (m *Manager) CreateDeployment(ctx context.Context, d protocol.DatabaseDeplo
 }
 
 func (m *Manager) StartDeployment(ctx context.Context, d protocol.DatabaseDeployment) error {
+	if m.StorageDatabaseStart != nil {
+		if handled, err := m.StorageDatabaseStart(ctx, d.ID); handled || err != nil {
+			return err
+		}
+	}
+	if _, err := m.deploymentStorage(ctx, d, true); err != nil {
+		return err
+	}
 	id, state, err := m.DeploymentState(ctx, d)
 	if err != nil {
 		return err

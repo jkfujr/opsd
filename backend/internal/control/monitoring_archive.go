@@ -107,7 +107,7 @@ func (s *Server) ProbeStorageTarget(w http.ResponseWriter, r *http.Request, id s
 	s.resultError(w, r, 200, out, err)
 }
 func (s *Server) GetMonitoringConfig(w http.ResponseWriter, r *http.Request) {
-	out, err := s.node.ArchiveConfig(r.Context())
+	out, err := s.node.EffectiveArchiveConfig(r.Context())
 	if err == nil {
 		s.setETag(w, r, out.Revision)
 	}

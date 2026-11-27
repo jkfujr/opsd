@@ -222,6 +222,24 @@ root 终端先以管理员会话 `POST /nodes/{node_id}/terminal` 创建票据�
 
 序列查询要求 `metric`，可选 `node_id`、`resource_id`、UTC `from/to`、`step_seconds` 及 `aggregate=sum|avg`。令牌需要对应的监控、容器或数据库读取权限，数据库实例范围来自已授权集群。默认最近 30 天、约 1200 点；每序列最多 10000 点，总计最多 250000 点，时间范围为最近 365 天。`step_seconds` 是返回点间隔，`source_resolution_seconds` 是允许使用的来源分辨率上限，0 表示原始数据；缩放到一秒后读取原始样本。缺口值为 `null`，S3 等部分读取故障通过 `partial`、`warnings` 和 `missing` 返回。
 
+## 节点存储根
+
+`GET /nodes/{node_id}/storage-root` 返回节点的元数据目录、已登记数据根、实际组件绑定和当前申请，并附强 `ETag`。跨节点读取使用 `read_storage`，登记和迁移申请使用 `manage_storage_root`。HTTP 入口和相关回执要求管理员会话。
+
+`PUT /nodes/{node_id}/storage-root` 使用 `Origin`、`X-CSRF-Token`、`Idempotency-Key` 和原 `If-Match`。两种正文如下。
+
+```json
+{"action":"register","mount_point":"/data1","relative_dir":"opsd"}
+```
+
+```json
+{"action":"move","component":"database_data","component_id":"原部署 ID","target_root_id":"目标根 ID"}
+```
+
+`component` 支持 `archive`、`pool_data` 和 `database_data`。响应为 `202 + Operation + Location`。登记成功后读取 `roots`，迁移受理后读取 `pending.phase=pending_restart`，再到所属节点运行本机命令。路径或文件系统不符合要求返回 422，已存在迁移或绑定冲突返回 409，挂载不可用返回 503，容量不足返回 507。
+
+`GET /monitoring/config` 返回归档当前生效的 `directory` 和可用的 `storage_root_id`。首次启用可指定登记根，省略时选择 `default`。已启用的归档使用 `archive` 迁移申请改变本机目录，直接提交不同目录或根返回 `409 relocation_required`。
+
 ## Prometheus 与 Grafana
 
 指标保留根路径 `/metrics`，使用 Bearer，并按监控、容器及数据库读取授权过滤：

@@ -36,7 +36,7 @@ import (
 
 func Run(args []string) error {
 	if len(args) == 0 {
-		return fmt.Errorf("用法：opsd version | install | node | network | console | api | account | data | capability | executor | operation | recover")
+		return fmt.Errorf("用法：opsd version | install | node | network | console | api | account | data | storage-root | capability | executor | operation | recover")
 	}
 	switch args[0] {
 	case "version", "--version":
@@ -54,6 +54,8 @@ func Run(args []string) error {
 		return network(args[1:])
 	case "data":
 		return dataCommand(args[1:])
+	case "storage-root":
+		return storageRootCommand(args[1:])
 	case "capability":
 		return capabilityCommand(args[1:], os.Stdout)
 	case "executor":
@@ -71,19 +73,20 @@ func Run(args []string) error {
 func processContext() (context.Context, context.CancelFunc) {
 	return signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 }
-func fileFlags(name string, args []string) (installation.NodeFile, error) {
+func fileFlags(name string, args []string) (installation.NodeFile, string, error) {
 	set := command.Flags(name)
 	path := set.String("config", command.DefaultInstance, "")
 	if e := command.Parse(set, args); e != nil {
-		return installation.NodeFile{}, e
+		return installation.NodeFile{}, "", e
 	}
-	return installation.NodePaths(*path)
+	f, err := installation.NodePaths(*path)
+	return f, *path, err
 }
 func serveNode(args []string) error {
 	if runtime.GOOS == "linux" && os.Geteuid() == 0 {
 		return fmt.Errorf("节点服务须以普通用户运行")
 	}
-	f, e := fileFlags("node", args)
+	f, _, e := fileFlags("node", args)
 	if e != nil {
 		return e
 	}
@@ -195,7 +198,7 @@ func serveExecutor(args []string) error {
 	if e := installation.RequireLinuxRoot(); e != nil {
 		return e
 	}
-	f, e := fileFlags("executor", args)
+	f, config, e := fileFlags("executor", args)
 	if e != nil {
 		return e
 	}
@@ -224,6 +227,7 @@ func serveExecutor(args []string) error {
 	}
 	defer db.Close()
 	service := executor.NewServices(db)
+	configureStorageRoots(service, config, f)
 	service.Engine.LogDirectory = filepath.Join(f.ExecutorDir, "logs")
 	service.Engine.NativeLock = operations.NativeLock(f.ExecutorDir)
 	defer service.Terminals.Close()
@@ -305,6 +309,7 @@ func operation(args []string, recoverAll bool) error {
 	}
 	defer db.Close()
 	service := executor.NewServices(db)
+	configureStorageRoots(service, *config, f)
 	service.Engine.LogDirectory = filepath.Join(f.ExecutorDir, "logs")
 	ids := []string{*id}
 	service.Engine.NativeLock = operations.NativeLock(f.ExecutorDir)

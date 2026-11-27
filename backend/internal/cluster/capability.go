@@ -15,6 +15,7 @@ type Capability string
 const (
 	CapabilityRunTask            Capability = "run_task"
 	CapabilityWriteStorage       Capability = "write_storage"
+	CapabilityManageStorageRoot  Capability = "manage_storage_root"
 	CapabilityManageFirewall     Capability = "manage_firewall"
 	CapabilityManageDatabase     Capability = "manage_database"
 	CapabilityManageCompose      Capability = "manage_compose"
@@ -47,6 +48,7 @@ const (
 var knownCapabilities = map[Capability]bool{
 	CapabilityRunTask:            true,
 	CapabilityWriteStorage:       true,
+	CapabilityManageStorageRoot:  true,
 	CapabilityManageFirewall:     true,
 	CapabilityManageDatabase:     true,
 	CapabilityManageCompose:      true,
@@ -116,6 +118,8 @@ var methodAccess = map[string]MethodAccess{
 	"storage.probe":           {Capability: CapabilityWriteStorage},
 	"storage.credentials":     {Capability: CapabilityWriteStorage},
 	"storage.status":          {Capability: CapabilityReadStorage},
+	"storage.root":            {Capability: CapabilityReadStorage},
+	"storage_root":            {Capability: CapabilityManageStorageRoot},
 
 	// —— 防火墙 / 组件 ——
 	"firewall":                         {Capability: CapabilityManageFirewall},
@@ -178,11 +182,12 @@ var methodAccess = map[string]MethodAccess{
 	"archive.series":    {Capability: CapabilityReadArchive},
 
 	// —— 监控 ——
-	"monitoring_deploy": {Capability: CapabilityManageMonitoring},
-	"monitoring_config": {Capability: CapabilityManageMonitoring},
-	"metrics":           {Capability: CapabilityReadMonitoring},
-	"history":           {Capability: CapabilityReadMonitoring},
-	"history.local":     {Capability: CapabilityReadMonitoring},
+	"monitoring_deploy":  {Capability: CapabilityManageMonitoring},
+	"monitoring_config":  {Capability: CapabilityManageMonitoring},
+	"metrics":            {Capability: CapabilityReadMonitoring},
+	"history":            {Capability: CapabilityReadMonitoring},
+	"history.local":      {Capability: CapabilityReadMonitoring},
+	"monitoring.storage": {Capability: CapabilityReadMonitoring},
 
 	// —— 对外地址 ——
 	"public_addresses.read":    {Capability: CapabilityManagePublic},

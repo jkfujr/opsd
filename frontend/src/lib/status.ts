@@ -34,6 +34,7 @@ const subjectLabel: Record<Operation['subject'], string> = {
   firewall: '防火墙变更', component: '组件操作', config: '修改节点配置', name: '修改节点名称', account: '修改节点账号',
   firewall_config: '更新防火墙配置', container: '容器操作', database: '数据库变更', database_step: '数据库步骤',
   task_save: '保存任务', task_run: '执行任务', compose: 'Compose 操作', compose_register: '登记 Compose', shared_initialize: '初始化 OPSD 数据',
+  storage_root: '存储根操作',
 };
 
 export const containerActionLabel: Record<ContainerActionRequest['action'], string> = {
@@ -52,6 +53,7 @@ const actionLabel: Record<string, Record<string, string>> = {
   firewall: { add_rule: '添加规则', edit_rule: '修改规则', delete_rule: '删除规则', move_rule: '调整规则顺序', set_default_policy: '修改默认策略', set_enabled: '启停防火墙' },
   firewall_config: { adopt_current: '接纳当前配置', add_rule: '添加规则', edit_rule: '修改规则', delete_rule: '删除规则', move_rule: '调整规则顺序', set_default_policy: '修改默认策略' },
   component: { install: '安装防火墙组件', enable: '启用防火墙' },
+  storage_root: { register: '登记存储根', move: '申请组件迁移' },
 };
 
 export function operationTitle(op: Operation) {

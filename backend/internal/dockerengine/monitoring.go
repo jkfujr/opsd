@@ -39,6 +39,10 @@ func monitoringFingerprint(d protocol.MonitoringDeployment) string {
 
 // MonitoringFiles 只生成固定服务定义，外部参数通过 YAML 编码进入字段。
 func MonitoringFiles(d protocol.MonitoringDeployment) (map[string][]byte, error) {
+	return monitoringFiles(d, false)
+}
+
+func monitoringFiles(d protocol.MonitoringDeployment, guarded bool) (map[string][]byte, error) {
 	if err := d.Validate(); err != nil {
 		return nil, err
 	}
@@ -70,13 +74,17 @@ func MonitoringFiles(d protocol.MonitoringDeployment) (map[string][]byte, error)
 	memories := map[string]string{"receive": "2g", "query": "512m", "store": "1g", "compact": "2g"}
 	ports := map[string][]string{"receive": {"127.0.0.1:19291:19291", "127.0.0.1:19293:10902"}, "query": {"127.0.0.1:19292:10902"}, "store": {"127.0.0.1:19294:10902"}, "compact": {"127.0.0.1:19295:10902"}}
 	services := map[string]any{}
+	restart := "unless-stopped"
+	if guarded {
+		restart = "no"
+	}
 	for _, name := range monitoringNames {
-		service := map[string]any{"image": "quay.io/thanos/thanos:" + metricsstore.ThanosVersion, "container_name": monitoringProject(d) + "-" + name, "command": commands[name], "restart": "unless-stopped", "user": "65534:65534", "mem_limit": memories[name], "ports": ports[name], "labels": map[string]string{monitoringLabel: d.ClusterID, monitoringSpecLabel: monitoringFingerprint(d), "com.opsd.managed": "monitoring"}, "logging": map[string]any{"driver": "json-file", "options": map[string]string{"max-size": "10m", "max-file": "2"}}}
+		service := map[string]any{"image": "quay.io/thanos/thanos:" + metricsstore.ThanosVersion, "container_name": monitoringProject(d) + "-" + name, "command": commands[name], "restart": restart, "user": "65534:65534", "mem_limit": memories[name], "ports": ports[name], "labels": map[string]string{monitoringLabel: d.ClusterID, monitoringSpecLabel: monitoringFingerprint(d), "com.opsd.managed": "monitoring"}, "logging": map[string]any{"driver": "json-file", "options": map[string]string{"max-size": "10m", "max-file": "2"}}}
 		service["networks"] = map[string]any{"default": map[string]any{"aliases": []string{name + ".opsd.invalid"}}}
 		if name != "query" {
-			volumes := []any{map[string]any{"type": "bind", "source": filepath.Join(d.Directory, name), "target": "/data"}, map[string]any{"type": "bind", "source": filepath.Join(d.Directory, name+".yml"), "target": "/config/objstore.yml", "read_only": true}}
-			if d.Storage.CAPEM != "" {
-				volumes = append(volumes, map[string]any{"type": "bind", "source": filepath.Join(d.Directory, "s3-ca.pem"), "target": "/config/s3-ca.pem", "read_only": true})
+			volumes := []any{}
+			for _, b := range monitoringBinds(d, name) {
+				volumes = append(volumes, map[string]any{"type": "bind", "source": b.Source, "target": b.Target, "read_only": b.ReadOnly, "bind": map[string]bool{"create_host_path": false}})
 			}
 			service["volumes"] = volumes
 		}
@@ -106,6 +114,30 @@ func monitoringOwner(d protocol.MonitoringDeployment) error {
 }
 
 func (m *Manager) PrepareMonitoring(ctx context.Context, d protocol.MonitoringDeployment) error {
+	if m.StorageArchivePrepare != nil && d.StorageRootID != "" {
+		if err := m.StorageArchivePrepare(ctx, d); err != nil {
+			return err
+		}
+	}
+	d, guarded, err := m.monitoringStorage(ctx, d, true)
+	if err != nil {
+		return err
+	}
+	return m.prepareMonitoring(ctx, d, guarded)
+}
+
+func (m *Manager) monitoringStorage(ctx context.Context, d protocol.MonitoringDeployment, write bool) (protocol.MonitoringDeployment, bool, error) {
+	if m.StorageBinding == nil {
+		return d, false, nil
+	}
+	dir, err := m.StorageBinding(ctx, protocol.StorageArchive, d.ClusterID, write)
+	if dir != "" {
+		d.Directory = dir
+	}
+	return d, dir != "", err
+}
+
+func (m *Manager) prepareMonitoring(ctx context.Context, d protocol.MonitoringDeployment, guarded bool) error {
 	if err := d.Validate(); err != nil {
 		return err
 	}
@@ -137,7 +169,7 @@ func (m *Manager) PrepareMonitoring(ctx context.Context, d protocol.MonitoringDe
 			return e
 		}
 	}
-	files, err := MonitoringFiles(d)
+	files, err := monitoringFiles(d, guarded)
 	if err != nil {
 		return err
 	}
@@ -196,6 +228,15 @@ func writeMonitoringFile(path string, body []byte) error {
 	return os.Rename(name, path)
 }
 func (m *Manager) ApplyMonitoring(ctx context.Context, d protocol.MonitoringDeployment) error {
+	if m.StorageArchiveApply != nil {
+		if handled, err := m.StorageArchiveApply(ctx, d); handled || err != nil {
+			return err
+		}
+	}
+	d, _, err := m.monitoringStorage(ctx, d, d.Enabled)
+	if err != nil {
+		return err
+	}
 	if err := d.Validate(); err != nil {
 		return err
 	}
@@ -205,7 +246,20 @@ func (m *Manager) ApplyMonitoring(ctx context.Context, d protocol.MonitoringDepl
 	if err := monitoringOwner(d); err != nil {
 		return err
 	}
-	command := exec.CommandContext(ctx, "docker", "--host", "unix://"+m.Socket, "compose", "--project-name", monitoringProject(d), "--project-directory", d.Directory, "-f", filepath.Join(d.Directory, "compose.yml"), "up", "-d", "--no-build", "--pull", "never")
+	return m.monitoringCompose(ctx, d, "up", "-d", "--no-build", "--pull", "never")
+}
+
+// StageStorageArchive 保存停止状态的容器，放行写入由挂载单元控制。
+func (m *Manager) StageStorageArchive(ctx context.Context, d protocol.MonitoringDeployment, guarded bool) error {
+	if err := m.prepareMonitoring(ctx, d, guarded); err != nil {
+		return err
+	}
+	return m.monitoringCompose(ctx, d, "create", "--no-build", "--pull", "never")
+}
+
+func (m *Manager) monitoringCompose(ctx context.Context, d protocol.MonitoringDeployment, args ...string) error {
+	base := []string{"--host", "unix://" + m.Socket, "compose", "--project-name", monitoringProject(d), "--project-directory", d.Directory, "-f", filepath.Join(d.Directory, "compose.yml")}
+	command := exec.CommandContext(ctx, "docker", append(base, args...)...)
 	output, err := command.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("启动监控组件：%w：%s", err, string(output))
@@ -238,6 +292,10 @@ func (m *Manager) stopMonitoring(ctx context.Context, d protocol.MonitoringDeplo
 
 func (m *Manager) MonitoringState(ctx context.Context, d protocol.MonitoringDeployment) (protocol.MonitoringState, error) {
 	out := protocol.MonitoringState{State: "absent", CheckedAt: time.Now().UTC(), Components: []protocol.MonitoringComponent{}}
+	d, _, err := m.monitoringStorage(ctx, d, false)
+	if err != nil {
+		return out, err
+	}
 	check := d
 	check.Enabled = false
 	if err := check.Validate(); err != nil {

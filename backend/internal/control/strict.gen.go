@@ -3461,6 +3461,96 @@ func (a *strictAPI) GetStorageStatus(ctx context.Context, request httpapi.GetSto
 	return nil, fmt.Errorf("GetStorageStatus 返回未声明状态 %d", w.status())
 }
 
+func (a *strictAPI) GetStorageRoot(ctx context.Context, request httpapi.GetStorageRootRequestObject) (httpapi.GetStorageRootResponseObject, error) {
+	r := strictRequest(ctx)
+	w := newAPIResponse(r)
+	a.server.GetStorageRoot(w, r, request.NodeId)
+	a.server.prepareAPIResponse(w, r)
+	switch w.status() {
+	case 200:
+		return strictResponse[httpapi.GetStorageRoot200JSONResponse](w)
+	case 400:
+		return strictResponse[httpapi.GetStorageRoot400ApplicationProblemPlusJSONResponse](w)
+	case 401:
+		return strictResponse[httpapi.GetStorageRoot401ApplicationProblemPlusJSONResponse](w)
+	case 403:
+		return strictResponse[httpapi.GetStorageRoot403ApplicationProblemPlusJSONResponse](w)
+	case 404:
+		return strictResponse[httpapi.GetStorageRoot404ApplicationProblemPlusJSONResponse](w)
+	case 405:
+		return strictResponse[httpapi.GetStorageRoot405ApplicationProblemPlusJSONResponse](w)
+	case 406:
+		return strictResponse[httpapi.GetStorageRoot406ApplicationProblemPlusJSONResponse](w)
+	case 409:
+		return strictResponse[httpapi.GetStorageRoot409ApplicationProblemPlusJSONResponse](w)
+	case 412:
+		return strictResponse[httpapi.GetStorageRoot412ApplicationProblemPlusJSONResponse](w)
+	case 413:
+		return strictResponse[httpapi.GetStorageRoot413ApplicationProblemPlusJSONResponse](w)
+	case 415:
+		return strictResponse[httpapi.GetStorageRoot415ApplicationProblemPlusJSONResponse](w)
+	case 422:
+		return strictResponse[httpapi.GetStorageRoot422ApplicationProblemPlusJSONResponse](w)
+	case 428:
+		return strictResponse[httpapi.GetStorageRoot428ApplicationProblemPlusJSONResponse](w)
+	case 429:
+		return strictResponse[httpapi.GetStorageRoot429ApplicationProblemPlusJSONResponse](w)
+	case 500:
+		return strictResponse[httpapi.GetStorageRoot500ApplicationProblemPlusJSONResponse](w)
+	case 503:
+		return strictResponse[httpapi.GetStorageRoot503ApplicationProblemPlusJSONResponse](w)
+	case 504:
+		return strictResponse[httpapi.GetStorageRoot504ApplicationProblemPlusJSONResponse](w)
+	}
+	return nil, fmt.Errorf("GetStorageRoot 返回未声明状态 %d", w.status())
+}
+
+func (a *strictAPI) SaveStorageRoot(ctx context.Context, request httpapi.SaveStorageRootRequestObject) (httpapi.SaveStorageRootResponseObject, error) {
+	r := strictRequest(ctx)
+	w := newAPIResponse(r)
+	a.server.SaveStorageRoot(w, r, request.NodeId, request.Params)
+	a.server.prepareAPIResponse(w, r)
+	switch w.status() {
+	case 202:
+		return strictResponse[httpapi.SaveStorageRoot202JSONResponse](w)
+	case 400:
+		return strictResponse[httpapi.SaveStorageRoot400ApplicationProblemPlusJSONResponse](w)
+	case 401:
+		return strictResponse[httpapi.SaveStorageRoot401ApplicationProblemPlusJSONResponse](w)
+	case 403:
+		return strictResponse[httpapi.SaveStorageRoot403ApplicationProblemPlusJSONResponse](w)
+	case 404:
+		return strictResponse[httpapi.SaveStorageRoot404ApplicationProblemPlusJSONResponse](w)
+	case 405:
+		return strictResponse[httpapi.SaveStorageRoot405ApplicationProblemPlusJSONResponse](w)
+	case 406:
+		return strictResponse[httpapi.SaveStorageRoot406ApplicationProblemPlusJSONResponse](w)
+	case 409:
+		return strictResponse[httpapi.SaveStorageRoot409ApplicationProblemPlusJSONResponse](w)
+	case 412:
+		return strictResponse[httpapi.SaveStorageRoot412ApplicationProblemPlusJSONResponse](w)
+	case 413:
+		return strictResponse[httpapi.SaveStorageRoot413ApplicationProblemPlusJSONResponse](w)
+	case 415:
+		return strictResponse[httpapi.SaveStorageRoot415ApplicationProblemPlusJSONResponse](w)
+	case 422:
+		return strictResponse[httpapi.SaveStorageRoot422ApplicationProblemPlusJSONResponse](w)
+	case 428:
+		return strictResponse[httpapi.SaveStorageRoot428ApplicationProblemPlusJSONResponse](w)
+	case 429:
+		return strictResponse[httpapi.SaveStorageRoot429ApplicationProblemPlusJSONResponse](w)
+	case 500:
+		return strictResponse[httpapi.SaveStorageRoot500ApplicationProblemPlusJSONResponse](w)
+	case 503:
+		return strictResponse[httpapi.SaveStorageRoot503ApplicationProblemPlusJSONResponse](w)
+	case 504:
+		return strictResponse[httpapi.SaveStorageRoot504ApplicationProblemPlusJSONResponse](w)
+	case 507:
+		return strictResponse[httpapi.SaveStorageRoot507ApplicationProblemPlusJSONResponse](w)
+	}
+	return nil, fmt.Errorf("SaveStorageRoot 返回未声明状态 %d", w.status())
+}
+
 func (a *strictAPI) GetScheduledTask(ctx context.Context, request httpapi.GetScheduledTaskRequestObject) (httpapi.GetScheduledTaskResponseObject, error) {
 	r := strictRequest(ctx)
 	w := newAPIResponse(r)

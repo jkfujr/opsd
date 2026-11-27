@@ -30,7 +30,13 @@ type Fault struct{ Code, Message, State string }
 func (f *Fault) Error() string                  { return f.Message }
 func failure(code, message, state string) error { return &Fault{code, message, state} }
 
-type Manager struct{ Socket string }
+type Manager struct {
+	Socket                string
+	StorageBinding        func(context.Context, string, string, bool) (string, error)
+	StorageArchivePrepare func(context.Context, protocol.MonitoringDeployment) error
+	StorageArchiveApply   func(context.Context, protocol.MonitoringDeployment) (bool, error)
+	StorageDatabaseStart  func(context.Context, string) (bool, error)
+}
 
 func New() *Manager { return &Manager{Socket: "/var/run/docker.sock"} }
 

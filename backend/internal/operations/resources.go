@@ -10,13 +10,21 @@ import (
 )
 
 func LockResources(directory string, action protocol.OperationAction) (func(), error) {
+	return lockClaims(directory, action, protocol.ActionResources(action))
+}
+
+func LockDocker(directory string) (func(), error) {
+	return lockClaims(directory, protocol.OperationAction{}, []protocol.ResourceClaim{{Key: "docker"}})
+}
+
+func lockClaims(directory string, action protocol.OperationAction, claims []protocol.ResourceClaim) (func(), error) {
 	unlocks := []func(){}
 	release := func() {
 		for i := len(unlocks) - 1; i >= 0; i-- {
 			unlocks[i]()
 		}
 	}
-	for _, claim := range protocol.ActionResources(action) {
+	for _, claim := range claims {
 		name := fmt.Sprintf("resource-%x.lock", sha256.Sum256([]byte(claim.Key)))
 		if claim.Key == "firewall" {
 			name = "firewall-config.lock"

@@ -32,6 +32,7 @@ type Config struct {
 	Enabled         bool   `json:"enabled"`
 	NodeID          string `json:"node_id"`
 	StorageTargetID string `json:"storage_target_id"`
+	StorageRootID   string `json:"storage_root_id,omitempty"`
 	Prefix          string `json:"prefix"`
 	Directory       string `json:"directory"`
 	DiskBudgetBytes int64  `json:"disk_budget_bytes"`

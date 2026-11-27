@@ -2858,6 +2858,252 @@
         ]
       }
     },
+    "/nodes/{node_id}/storage-root": {
+      "get": {
+        "operationId": "getStorageRoot",
+        "summary": "��ȡ�ڵ�洢��",
+        "tags": [
+          "storage"
+        ],
+        "security": [
+          {
+            "SessionCookie": []
+          }
+        ],
+        "x-opsd-access": {
+          "mode": "session",
+          "level": "read"
+        },
+        "x-opsd-version": "storage-root",
+        "parameters": [
+          {
+            "name": "node_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "请求成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StorageRootView"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-ID": {
+                "schema": {
+                  "type": "string"
+                },
+                "required": true
+              },
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                },
+                "required": true
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "405": {
+            "$ref": "#/components/responses/Error405"
+          },
+          "406": {
+            "$ref": "#/components/responses/Error406"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "412": {
+            "$ref": "#/components/responses/Error412"
+          },
+          "413": {
+            "$ref": "#/components/responses/Error413"
+          },
+          "415": {
+            "$ref": "#/components/responses/Error415"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error422"
+          },
+          "428": {
+            "$ref": "#/components/responses/Error428"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          },
+          "504": {
+            "$ref": "#/components/responses/Error504"
+          }
+        }
+      },
+      "put": {
+        "operationId": "saveStorageRoot",
+        "summary": "�ǼǴ洢�����������Ǩ��",
+        "tags": [
+          "storage"
+        ],
+        "security": [
+          {
+            "SessionCookie": []
+          }
+        ],
+        "x-opsd-access": {
+          "mode": "session",
+          "level": "manage"
+        },
+        "x-opsd-version": "storage-root",
+        "x-opsd-condition": "match",
+        "x-opsd-idempotent": true,
+        "parameters": [
+          {
+            "name": "node_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StorageRootInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "请求成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Operation"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-ID": {
+                "schema": {
+                  "type": "string"
+                },
+                "required": true
+              },
+              "Location": {
+                "schema": {
+                  "type": "string"
+                },
+                "required": true
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "405": {
+            "$ref": "#/components/responses/Error405"
+          },
+          "406": {
+            "$ref": "#/components/responses/Error406"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "412": {
+            "$ref": "#/components/responses/Error412"
+          },
+          "413": {
+            "$ref": "#/components/responses/Error413"
+          },
+          "415": {
+            "$ref": "#/components/responses/Error415"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error422"
+          },
+          "428": {
+            "$ref": "#/components/responses/Error428"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          },
+          "504": {
+            "$ref": "#/components/responses/Error504"
+          },
+          "507": {
+            "$ref": "#/components/responses/Error507"
+          }
+        }
+      }
+    },
     "/nodes/{node_id}/public-addresses": {
       "get": {
         "operationId": "getPublicAddresses",
@@ -15297,7 +15543,8 @@
               "task_run",
               "compose",
               "compose_register",
-              "shared_initialize"
+              "shared_initialize",
+              "storage_root"
             ]
           },
           "state": {
@@ -20952,6 +21199,10 @@
           },
           "state": {
             "type": "string"
+          },
+          "storage_root_id": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]{1,128}$"
           }
         },
         "required": [
@@ -21001,6 +21252,10 @@
             "enum": [
               365
             ]
+          },
+          "storage_root_id": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]{1,128}$"
           }
         },
         "required": [
@@ -21008,7 +21263,6 @@
           "node_id",
           "storage_target_id",
           "prefix",
-          "directory",
           "disk_budget_bytes",
           "local_days",
           "archive_days"
@@ -21423,6 +21677,229 @@
           "wal_budget_bytes",
           "state"
         ]
+      },
+      "StorageRoot": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "root_id": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]{1,128}$"
+          },
+          "mount_point": {
+            "type": "string"
+          },
+          "relative_dir": {
+            "type": "string"
+          },
+          "fs_uuid": {
+            "type": "string"
+          },
+          "fs_type": {
+            "type": "string"
+          },
+          "base_path": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "ready",
+              "unavailable"
+            ]
+          }
+        },
+        "required": [
+          "root_id",
+          "mount_point",
+          "relative_dir",
+          "fs_uuid",
+          "fs_type",
+          "base_path",
+          "state"
+        ]
+      },
+      "StorageBinding": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "component": {
+            "type": "string",
+            "enum": [
+              "archive",
+              "pool_data",
+              "database_data"
+            ]
+          },
+          "component_id": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]{1,128}$"
+          },
+          "root_id": {
+            "type": "string"
+          },
+          "directory": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "component",
+          "component_id",
+          "root_id",
+          "directory"
+        ]
+      },
+      "StorageRootProgress": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]{1,128}$"
+          },
+          "phase": {
+            "type": "string",
+            "enum": [
+              "pending_restart",
+              "prepare",
+              "copy",
+              "verify",
+              "switch",
+              "cleanup",
+              "restore_old",
+              "needs_recovery",
+              "complete",
+              "rolled_back"
+            ]
+          },
+          "source": {
+            "$ref": "#/components/schemas/StorageBinding"
+          },
+          "target": {
+            "$ref": "#/components/schemas/StorageBinding"
+          },
+          "write_intent": {
+            "type": "boolean"
+          },
+          "error": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "phase",
+          "source",
+          "target",
+          "write_intent"
+        ]
+      },
+      "StorageRootView": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "node_id": {
+            "type": "string"
+          },
+          "revision": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "metadata_root": {
+            "type": "string"
+          },
+          "roots": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StorageRoot"
+            }
+          },
+          "bindings": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StorageBinding"
+            }
+          },
+          "pending": {
+            "$ref": "#/components/schemas/StorageRootProgress"
+          }
+        },
+        "required": [
+          "node_id",
+          "revision",
+          "metadata_root",
+          "roots",
+          "bindings"
+        ]
+      },
+      "StorageRootRegister": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "register"
+            ]
+          },
+          "mount_point": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 1024
+          },
+          "relative_dir": {
+            "type": "string",
+            "maxLength": 1024
+          }
+        },
+        "required": [
+          "action",
+          "mount_point"
+        ]
+      },
+      "StorageRootMove": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "move"
+            ]
+          },
+          "component": {
+            "type": "string",
+            "enum": [
+              "archive",
+              "pool_data",
+              "database_data"
+            ]
+          },
+          "component_id": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]{1,128}$"
+          },
+          "target_root_id": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]{1,128}$"
+          }
+        },
+        "required": [
+          "action",
+          "component",
+          "component_id",
+          "target_root_id"
+        ]
+      },
+      "StorageRootInput": {
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/StorageRootRegister"
+          },
+          {
+            "$ref": "#/components/schemas/StorageRootMove"
+          }
+        ]
       }
     },
     "responses": {
@@ -21703,6 +22180,23 @@
       },
       "Error504": {
         "description": "未取得上游处理结果",
+        "headers": {
+          "X-Request-ID": {
+            "schema": {
+              "type": "string"
+            }
+          }
+        },
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "$ref": "#/components/schemas/Problem"
+            }
+          }
+        }
+      },
+      "Error507": {
+        "description": "�洢�ռ䲻��",
         "headers": {
           "X-Request-ID": {
             "schema": {
