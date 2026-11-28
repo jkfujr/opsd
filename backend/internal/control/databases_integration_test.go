@@ -258,6 +258,7 @@ func nativeSubmit(t *testing.T, entry *apiNode, raw, id, key string, change map[
 	}
 	return op
 }
+
 // queueCount 数协调节点**自己**队列里该资源键的操作数。
 // operationCount 查的是执行器侧的 operations，两者不是一回事：
 // 受理被拒时执行器那边本来就不会有记录，必须查协调节点的 queue。
@@ -483,6 +484,18 @@ func TestDatabaseNativeClusterAPIAndDashboard(t *testing.T) {
 		t.Fatal("撤权后仍能写入业务库")
 	}
 	business.Close()
+	readHash := cluster.DatabaseRPC{InstanceID: "galera", User: "opsd_business", Host: "%", ExpectedClusterID: state.ClusterID}
+	var verified protocol.DatabaseReadResult
+	if e = b.node.Call(t.Context(), a.node.ID, "database.read", readHash, &verified); e != nil || verified.PasswordHash != databaseengine.NativePassword(newPassword) {
+		t.Fatal("已授权来源读取实际验证串失败", e)
+	}
+	readHash.ExpectedClusterID = "different"
+	if e = b.node.Call(t.Context(), a.node.ID, "database.read", readHash, nil); e == nil {
+		t.Fatal("不同 Galera 集群身份仍能读取验证串")
+	}
+	syncUser := map[string]any{"expected_revision": registered.Revision, "kind": "sync_user", "user": "opsd_business", "host": "%", "proxies": proxies}
+	op = nativeSubmit(t, c, raw, registered.ID, "sync-user", syncUser)
+	nativeOperation(t, b, raw, op.ID, protocol.Succeeded)
 	for _, path := range []string{"/api/v2/containers", "/api/v2/peer-trust", "/api/v2/nodes/" + a.node.ID + "/api-tokens"} {
 		if code := apiCall(t, http.DefaultClient, b.web.URL, "GET", path, raw, "", "", nil, nil); code != 403 {
 			t.Fatal("数据库授权越过模块边界", code)
@@ -615,4 +628,3 @@ func nativeDashboard(t *testing.T, f *nativeDatabases, node *apiNode) {
 		return checkProm(grafanaURL, "/api/datasources/proxy/uid/opsd-ci/api/v1/query?query="+url.QueryEscape("opsd_node_up"), password)
 	})
 }
-
