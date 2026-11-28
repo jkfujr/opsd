@@ -39,8 +39,13 @@ func (s *Server) storage(ctx context.Context, c protocol.StorageConfig) (protoco
 	if s.Host == nil {
 		s.Host = firewall.NativeHost{}
 	}
-	if c.Enabled && (net.ParseIP(c.Address) == nil || net.ParseIP(c.Address).IsUnspecified() || c.Port < 1 || c.Port > 65535) {
-		return protocol.Credentials{}, fmt.Errorf("数据库地址无效")
+	var endpoint *net.TCPAddr
+	if c.Enabled {
+		var err error
+		endpoint, err = storageEndpoint(c)
+		if err != nil {
+			return protocol.Credentials{}, err
+		}
 	}
 	path := filepath.Join(s.Directory, "couchdb.json")
 	var state storageIdentity
@@ -125,7 +130,7 @@ func (s *Server) storage(ctx context.Context, c protocol.StorageConfig) (protoco
 					return state.Credentials, e
 				}
 			}
-			return state.Credentials, s.waitStorage(ctx, c)
+			return state.Credentials, s.waitStorage(ctx, endpoint)
 		}
 	}
 	if !c.Enabled {
@@ -168,7 +173,7 @@ func (s *Server) storage(ctx context.Context, c protocol.StorageConfig) (protoco
 	envPath := env.Name()
 	defer os.Remove(envPath)
 	if e = env.Chmod(0600); e == nil {
-		ip := net.ParseIP(c.Address)
+		ip := endpoint.IP
 		parts := []string{}
 		if v := ip.To4(); v != nil {
 			for _, b := range v {
@@ -201,18 +206,41 @@ func (s *Server) storage(ctx context.Context, c protocol.StorageConfig) (protoco
 		}
 		e = localstate.Write(path, state, 0600)
 		if e == nil {
-			e = s.waitStorage(ctx, c)
+			e = s.waitStorage(ctx, endpoint)
 		}
 	}
 	return state.Credentials, e
 }
-func (s *Server) waitStorage(ctx context.Context, c protocol.StorageConfig) error {
-	if !s.prepare {
-		return waitDatabase(ctx, c)
+func storageEndpoint(c protocol.StorageConfig) (*net.TCPAddr, error) {
+	ip := net.ParseIP(c.Address)
+	if ip == nil || ip.IsUnspecified() || c.Port < 1 || c.Port > 65535 {
+		return nil, fmt.Errorf("数据库地址无效")
 	}
+	endpoint := &net.TCPAddr{IP: ip, Port: c.Port}
+	if ip.IsLoopback() {
+		return endpoint, nil
+	}
+	addresses, err := net.InterfaceAddrs()
+	if err != nil {
+		return nil, fmt.Errorf("读取本机数据库绑定地址：%w", err)
+	}
+	for _, address := range addresses {
+		local, _, _ := net.ParseCIDR(address.String())
+		if ip.Equal(local) {
+			return endpoint, nil
+		}
+	}
+	return nil, fmt.Errorf("数据库须绑定本机地址")
+}
+
+func (s *Server) waitStorage(ctx context.Context, endpoint *net.TCPAddr) error {
+	if !s.prepare {
+		return waitDatabase(ctx, endpoint)
+	}
+	dialer := net.Dialer{Timeout: 200 * time.Millisecond, LocalAddr: &net.TCPAddr{IP: endpoint.IP}}
 	deadline := time.Now().Add(20 * time.Second)
 	for time.Now().Before(deadline) {
-		connection, e := net.DialTimeout("tcp", net.JoinHostPort(c.Address, fmt.Sprint(c.Port)), 200*time.Millisecond)
+		connection, e := dialer.DialContext(ctx, "tcp", endpoint.String())
 		if e == nil {
 			connection.Close()
 			return nil
@@ -225,15 +253,22 @@ func (s *Server) waitStorage(ctx context.Context, c protocol.StorageConfig) erro
 	}
 	return fmt.Errorf("数据库接口未启动")
 }
-func waitDatabase(ctx context.Context, c protocol.StorageConfig) error {
+func waitDatabase(ctx context.Context, endpoint *net.TCPAddr) error {
 	ctx, cancel := context.WithTimeout(ctx, 20*time.Second)
 	defer cancel()
-	client := &http.Client{Transport: &http.Transport{}, Timeout: time.Second}
+	dialer := net.Dialer{LocalAddr: &net.TCPAddr{IP: endpoint.IP}}
+	client := &http.Client{
+		Transport: &http.Transport{DialContext: dialer.DialContext},
+		Timeout:   time.Second,
+		CheckRedirect: func(*http.Request, []*http.Request) error {
+			return http.ErrUseLastResponse
+		},
+	}
 	defer client.CloseIdleConnections()
 	ticker := time.NewTicker(200 * time.Millisecond)
 	defer ticker.Stop()
 	for {
-		request, e := http.NewRequestWithContext(ctx, "GET", "http://"+net.JoinHostPort(c.Address, fmt.Sprint(c.Port))+"/_up", nil)
+		request, e := http.NewRequestWithContext(ctx, http.MethodGet, "http://"+endpoint.String()+"/_up", nil)
 		if e != nil {
 			return e
 		}
@@ -242,6 +277,9 @@ func waitDatabase(ctx context.Context, c protocol.StorageConfig) error {
 			response.Body.Close()
 			if response.StatusCode == 200 {
 				return nil
+			}
+			if response.StatusCode >= 300 && response.StatusCode < 400 {
+				return fmt.Errorf("数据库就绪检查拒绝重定向")
 			}
 		}
 		select {

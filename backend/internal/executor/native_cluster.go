@@ -44,6 +44,9 @@ func CreateNativeIdentity(path string) error {
 func PrepareNative(ctx context.Context, directory string, c protocol.StorageConfig, id NativeIdentity) error {
 	c.Enabled = true
 	c.NativeCluster = true
+	if _, err := storageEndpoint(c); err != nil {
+		return err
+	}
 	path := filepath.Join(directory, "couchdb.json")
 	var state storageIdentity
 	e := localstate.Read(path, &state)
