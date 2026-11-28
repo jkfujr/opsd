@@ -53,8 +53,12 @@ func (n *Node) accept(w http.ResponseWriter, r *http.Request) {
 	if e != nil {
 		return
 	}
-	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
-	first, e := channel.Receive(ctx)
+	n.acceptPeer(r.Context(), r.RemoteAddr, channel, func() {})
+}
+
+func (n *Node) acceptPeer(ctx context.Context, remoteAddr string, channel *transport.Channel, admitted func()) {
+	helloCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	first, e := channel.Receive(helloCtx)
 	cancel()
 	if e != nil {
 		return
@@ -72,17 +76,18 @@ func (n *Node) accept(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if hello.ProbeFamily != "" {
-		if joining || !n.Active(r.Context(), m.ID) || m.Cluster != n.cluster {
-			n.sendFailure(r.Context(), channel, first.RequestID, fault("forbidden", "成员身份无效"))
+		if joining || !n.Active(ctx, m.ID) || m.Cluster != n.cluster {
+			n.sendFailure(ctx, channel, first.RequestID, fault("forbidden", "成员身份无效"))
 			return
 		}
-		n.probeEcho(r.Context(), w, r, channel, first, hello)
+		admitted()
+		n.probeEcho(ctx, remoteAddr, channel, first, hello)
 		return
 	}
 	if joining {
-		e = n.acceptMember(r.Context(), m, hello.Token)
+		e = n.acceptMember(ctx, m, hello.Token)
 	} else {
-		if !n.Active(r.Context(), m.ID) {
+		if !n.Active(ctx, m.ID) {
 			e = fault("forbidden", "节点未加入或已撤销")
 		} else if m.Cluster != n.cluster {
 			e = fault("forbidden", "集群身份不匹配")
@@ -92,25 +97,26 @@ func (n *Node) accept(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if e != nil {
-		n.sendFailure(r.Context(), channel, first.RequestID, e)
+		n.sendFailure(ctx, channel, first.RequestID, e)
 		return
 	}
-	self, e := n.Self(r.Context())
+	self, e := n.Self(ctx)
 	if e != nil {
 		return
 	}
 	var directoryBody json.RawMessage
 	if joining {
-		d, err := n.Directory(r.Context())
+		d, err := n.Directory(ctx)
 		if err != nil {
 			return
 		}
 		directoryBody, _ = json.Marshal(d)
 	}
 	memberBody, _ := json.Marshal(self)
-	ctx, cancel = context.WithTimeout(r.Context(), 10*time.Second)
-	e = channel.Send(ctx, protocol.Message{RequestID: identity.Random(), ReplyTo: first.RequestID, Payload: &protocol.PeerHello{Member: memberBody, Directory: directoryBody, Resident: hello.Resident}})
+	helloCtx, cancel = context.WithTimeout(ctx, 10*time.Second)
+	e = channel.Send(helloCtx, protocol.Message{RequestID: identity.Random(), ReplyTo: first.RequestID, Payload: &protocol.PeerHello{Member: memberBody, Directory: directoryBody, Resident: hello.Resident}})
 	cancel()
+	admitted()
 	if e != nil {
 		return
 	}
@@ -118,11 +124,11 @@ func (n *Node) accept(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if hello.Stream == "terminal" {
-		n.serveTerminal(r.Context(), m.ID, transport.TerminalChannel{Channel: channel})
+		n.serveTerminal(ctx, m.ID, transport.TerminalChannel{Channel: channel})
 		return
 	}
 	if hello.Stream == "monitoring" {
-		n.serveArchive(r.Context(), m.ID, channel)
+		n.serveArchive(ctx, m.ID, channel)
 		return
 	}
 	p := &peer{channel: channel, calls: transport.NewCalls(), id: m.ID, resident: hello.Resident, done: make(chan struct{}), last: n.Now()}
@@ -314,7 +320,7 @@ func (n *Node) dial(ctx context.Context, m Member, resident bool, token string) 
 	return p, nil
 }
 func (n *Node) Join(ctx context.Context, address, public, token string) error {
-	if !validAddress(address) || token == "" {
+	if !ValidPeerAddress(address) || token == "" {
 		return fault("invalid_request", "接入地址或接入码无效")
 	}
 	_, e := n.dial(ctx, Member{Address: address, Public: public}, false, token)

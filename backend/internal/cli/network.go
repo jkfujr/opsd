@@ -21,11 +21,13 @@ func network(args []string) error {
 	listen := set.String("listen", "", "")
 	mode := set.String("address-mode", "", "")
 	address := set.String("address", "", "")
+	scheme := set.String("address-scheme", "", "")
+	transport := set.String("peer-transport", "", "")
 	if err := command.Parse(set, args); err != nil {
 		return err
 	}
-	if *listen == "" && *mode == "" && *address == "" {
-		return fmt.Errorf("请提供监听地址、地址模式或通信 URL")
+	if *listen == "" && *mode == "" && *address == "" && *scheme == "" && *transport == "" {
+		return fmt.Errorf("请提供监听地址、地址模式、通信 URL、地址协议或传输模式")
 	}
 	f, err := installation.NodePaths(*config)
 	if err != nil {
@@ -68,7 +70,8 @@ func network(args []string) error {
 		return err
 	}
 	defer n.Close()
-	if err = n.ConfigureNetwork(ctx, *listen, *mode, *address); err != nil {
+	options := cluster.NetworkOptions{Listen: *listen, AddressMode: *mode, Address: *address, AddressScheme: *scheme, PeerTransport: *transport}
+	if err = n.ConfigureNetwork(ctx, options); err != nil {
 		return err
 	}
 	fmt.Println("网络配置已保存，请启动 opsd.service")

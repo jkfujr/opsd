@@ -315,5 +315,10 @@ func (m *Manager) Component(ctx context.Context, cmd, component, id string) erro
 			return fault("conflict", "受管容器 %s 的重启策略已改变", s.ID)
 		}
 	}
+	if d.Database != nil {
+		if err = dockerengine.VerifyDeploymentMounts(*d.Database, b.Directory); err != nil {
+			return err
+		}
+	}
 	return m.Docker.StartStorage(ctx, states, nil)
 }

@@ -50,6 +50,41 @@ func TestAuthorizeByOrigin(t *testing.T) {
 	}
 }
 
+func TestDatabaseReadSeparatesStateAndPasswordVerifier(t *testing.T) {
+	source, _ := openTestNode(t)
+	target, executor := deploymentNode(t)
+	joinTest(t, target, source)
+	item, err := target.saveDatabaseInstance(t.Context(), DatabaseInstanceInput{DatabaseInstance: DatabaseInstance{
+		ID: "galera", Name: "Galera", Kind: "galera", Address: "127.0.0.1:3306", Username: "root",
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	target.Capabilities[source.ID] = map[Capability]bool{CapabilityReadDatabase: true}
+	for _, request := range []DatabaseRPC{
+		{InstanceID: item.ID, Scope: "health"}, {InstanceID: item.ID}, {InstanceID: item.ID, Backups: true},
+	} {
+		if err = source.Call(t.Context(), target.ID, "database.read", request, nil); err != nil {
+			t.Fatalf("普通读取失败：%v", err)
+		}
+	}
+	// 使用不存在的实例，确认权限和集群身份先于连接凭据读取。
+	request := DatabaseRPC{InstanceID: "不存在", User: "business", Host: "%", ExpectedClusterID: "test-galera"}
+	if err = source.Call(t.Context(), target.ID, "database.read", request, nil); faultCode(err) != "forbidden" {
+		t.Fatalf("只读来源的验证串请求应被拒绝：%v", err)
+	}
+	target.Capabilities[source.ID] = map[Capability]bool{CapabilityManageDatabase: true}
+	request.ExpectedClusterID = ""
+	if err = source.Call(t.Context(), target.ID, "database.read", request, nil); faultCode(err) != "invalid_request" {
+		t.Fatalf("验证串请求缺少集群身份：%v", err)
+	}
+	executor.mu.Lock()
+	defer executor.mu.Unlock()
+	if executor.databaseReads != 3 {
+		t.Fatalf("执行器应仅收到普通读取：%d", executor.databaseReads)
+	}
+}
+
 func TestFirewallConfigOperationAuthorization(t *testing.T) {
 	for _, test := range []struct {
 		name, subject, method string

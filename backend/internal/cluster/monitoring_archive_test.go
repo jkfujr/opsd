@@ -38,8 +38,14 @@ func archiveTestConfig(t *testing.T, n, monitor *Node) metricsstore.Config {
 }
 
 func TestMonitoringAuthenticatedStreamReceiptsAndRejections(t *testing.T) {
-	monitor, _ := openTestNode(t)
-	source, _ := openTestNode(t)
+	t.Run("WebSocket", func(t *testing.T) { testMonitoringAuthenticatedStream(t, false) })
+	t.Run("TCP", func(t *testing.T) { testMonitoringAuthenticatedStream(t, true) })
+}
+
+func testMonitoringAuthenticatedStream(t *testing.T, tcp bool) {
+	t.Helper()
+	monitor := openPeerTestNode(t, tcp)
+	source := openPeerTestNode(t, tcp)
 	joinTest(t, source, monitor)
 	archiveTestConfig(t, monitor, monitor)
 	archiveTestConfig(t, source, monitor)

@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -135,12 +136,23 @@ func ValidateConfig(c Config) error {
 		return fault("invalid_request", "通信备选端点过多")
 	}
 	for _, endpoint := range c.Endpoints {
-		if !validAddress(endpoint) {
+		if !ValidPeerAddress(endpoint) {
 			return fault("invalid_request", "通信端点无效")
 		}
 	}
-	if c.Name == "" || len(c.Name) > 255 || !validAddress(c.Address) || c.IntervalMinutes < 1 || c.IntervalMinutes > 1440 || c.RetentionDays != 7 || (c.AddressMode != "" && c.AddressMode != "auto" && c.AddressMode != "manual") {
+	if c.Name == "" || len(c.Name) > 255 || !ValidPeerAddress(c.Address) || c.IntervalMinutes < 1 || c.IntervalMinutes > 1440 || c.RetentionDays != 7 || (c.AddressMode != "" && c.AddressMode != "auto" && c.AddressMode != "manual") {
 		return fault("invalid_request", "名称、地址、采集间隔或保留时间无效")
+	}
+	switch c.PeerTransport {
+	case "", "dual":
+	case "tcp":
+		for _, endpoint := range c.distinctPeerEndpoints() {
+			if !strings.HasPrefix(endpoint, "tcp://") {
+				return fault("invalid_request", "仅接收 TCP 时须公布 TCP 主地址和备用端点")
+			}
+		}
+	default:
+		return fault("invalid_request", "节点传输模式须为 dual 或 tcp")
 	}
 	return validateStorage(c.Storage)
 }

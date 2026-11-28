@@ -548,6 +548,15 @@ func (n *Node) databaseDispatch(ctx context.Context, origin, method string, body
 	case "database.cluster.get":
 		return n.DatabaseCluster(ctx, request.ResourceID)
 	case "database.read":
+		if !request.Backups && request.User != "" {
+			if origin != n.ID && !n.Capabilities.Has(origin, CapabilityManageDatabase) {
+				n.logDenied(origin, method, "来源节点无权读取数据库验证串")
+				return nil, fault("forbidden", "来源节点无权读取数据库验证串")
+			}
+			if strings.TrimSpace(request.ExpectedClusterID) == "" {
+				return nil, fault("invalid_request", "读取数据库验证串需要预期 Galera 集群身份")
+			}
+		}
 		if !request.Backups && request.User == "" && request.InstanceRevision == 0 && request.ExpectedClusterID == "" {
 			return n.cachedManagedDatabaseRead(ctx, request.InstanceID, request.Scope)
 		}

@@ -10,7 +10,6 @@ import (
 	"errors"
 	"fmt"
 	"net"
-	"net/http"
 	"net/url"
 	"reflect"
 	"slices"
@@ -19,7 +18,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/coder/websocket"
 	"github.com/jkfujr/opsd/internal/identity"
 	"github.com/jkfujr/opsd/internal/protocol"
 	"github.com/jkfujr/opsd/internal/publicaddress"
@@ -516,12 +514,17 @@ func probePublicCandidates(ctx context.Context, family protocol.AddressFamily, s
 }
 
 func publicEchoEndpoint(m Member, records []AddressRecord, family protocol.AddressFamily) string {
+	for _, endpoint := range m.peerEndpoints() {
+		u, err := url.Parse(endpoint)
+		if err == nil {
+			if a, err := publicaddress.Parse(u.Hostname()); err == nil && a.Is6() == (family == protocol.IPv6) {
+				return endpoint
+			}
+		}
+	}
 	u, err := url.Parse(m.Address)
 	if err != nil {
 		return ""
-	}
-	if a, err := publicaddress.Parse(u.Hostname()); err == nil && a.Is6() == (family == protocol.IPv6) {
-		return u.String()
 	}
 	for _, record := range records {
 		if record.NodeID != m.ID {
@@ -548,24 +551,16 @@ func publicEchoEndpoint(m Member, records []AddressRecord, family protocol.Addre
 }
 
 func (n *Node) probePublicMember(ctx context.Context, m Member, endpoint string, family protocol.AddressFamily) (string, error) {
-	client := publicaddress.Client(string(family))
-	defer client.CloseIdleConnections()
-	socket, _, err := websocket.Dial(ctx, endpoint+"/peer", &websocket.DialOptions{HTTPClient: client})
+	key, err := identity.Decode(m.Public)
+	if err != nil {
+		return "", err
+	}
+	channel, err := n.dialPeerEndpoint(ctx, endpoint, key, family)
 	if err != nil {
 		if ctx.Err() == context.DeadlineExceeded {
 			return "", fmt.Errorf("成员回显连接超时")
 		}
 		return "", fmt.Errorf("成员回显不可达")
-	}
-	key, err := identity.Decode(m.Public)
-	if err != nil {
-		socket.CloseNow()
-		return "", err
-	}
-	channel, err := transport.Handshake(ctx, socket, n.Key, key, true)
-	if err != nil {
-		socket.CloseNow()
-		return "", err
 	}
 	defer channel.Close()
 	self, err := n.Self(ctx)
@@ -588,7 +583,7 @@ func (n *Node) probePublicMember(ctx context.Context, m Member, endpoint string,
 		return "", fault(failure.Error.Code, failure.Error.Message)
 	}
 	echo, ok := reply.Payload.(*protocol.AddressEcho)
-	if !ok {
+	if !ok || echo.Family != family {
 		return "", fmt.Errorf("成员回显应答无效")
 	}
 	a, err := publicaddress.Parse(echo.Address)
@@ -1000,12 +995,12 @@ func (n *Node) TrustStatus(ctx context.Context) (TrustStatus, error) {
 }
 
 // probeEcho 只回显认证短连接的来源，不接替业务连接，不采信转发头。
-func (n *Node) probeEcho(ctx context.Context, w http.ResponseWriter, r *http.Request, channel *transport.Channel, first protocol.Message, hello *protocol.PeerHello) {
+func (n *Node) probeEcho(ctx context.Context, remoteAddr string, channel *transport.Channel, first protocol.Message, hello *protocol.PeerHello) {
 	if hello.ProbeFamily != protocol.IPv4 && hello.ProbeFamily != protocol.IPv6 {
 		n.sendFailure(ctx, channel, first.RequestID, fault("invalid_request", "地址族无效"))
 		return
 	}
-	host, _, e := net.SplitHostPort(r.RemoteAddr)
+	host, _, e := net.SplitHostPort(remoteAddr)
 	if e != nil {
 		return
 	}
@@ -1014,5 +1009,7 @@ func (n *Node) probeEcho(ctx context.Context, w http.ResponseWriter, r *http.Req
 		n.sendFailure(ctx, channel, first.RequestID, fault("dependency_unavailable", "连接来源未取得公网地址"))
 		return
 	}
-	_ = channel.Send(ctx, protocol.Message{RequestID: identity.Random(), ReplyTo: first.RequestID, Payload: &protocol.AddressEcho{Family: hello.ProbeFamily, Address: a.String(), ObservedAt: n.Now().UTC()}})
+	writeCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	_ = channel.Send(writeCtx, protocol.Message{RequestID: identity.Random(), ReplyTo: first.RequestID, Payload: &protocol.AddressEcho{Family: hello.ProbeFamily, Address: a.String(), ObservedAt: n.Now().UTC()}})
 }

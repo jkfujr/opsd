@@ -11,6 +11,10 @@ import (
 	"strconv"
 )
 
+type NetworkOptions struct {
+	Listen, AddressMode, Address, AddressScheme, PeerTransport string
+}
+
 func networkConfigurationChangeError(before, next Config) error {
 	endpointsChanged := next.Address != before.Address || !slices.Equal(next.Endpoints, before.Endpoints)
 	if endpointsChanged && len(next.distinctPeerEndpoints()) > maxPeerEndpoints {
@@ -78,7 +82,7 @@ func networkEndpointError(bind netip.Addr, endpoint string) error {
 }
 
 // ConfigureNetwork 由持有 node.lock 的本机命令调用，节点服务须先停止。
-func (n *Node) ConfigureNetwork(ctx context.Context, listen, mode, address string) error {
+func (n *Node) ConfigureNetwork(ctx context.Context, options NetworkOptions) error {
 	c, err := n.Config(ctx)
 	if err != nil {
 		return err
@@ -90,27 +94,33 @@ func (n *Node) ConfigureNetwork(ctx context.Context, listen, mode, address strin
 	if pending != 0 {
 		return fault("node_busy", "节点存在未结束操作")
 	}
-	if mode != "" && mode != "auto" && mode != "manual" {
+	if mode := options.AddressMode; mode != "" && mode != "auto" && mode != "manual" {
 		return fault("invalid_request", "地址模式须为 auto 或 manual")
 	}
-	if listen != "" {
-		c.Listen = listen
+	if options.Address != "" && options.AddressScheme != "" {
+		return fault("invalid_request", "通信 URL 与地址协议只能指定一项")
+	}
+	if options.Listen != "" {
+		c.Listen = options.Listen
+	}
+	if options.PeerTransport != "" {
+		c.PeerTransport = options.PeerTransport
 	}
 	bind, err := net.ResolveTCPAddr("tcp", c.Listen)
 	if err != nil || bind.Port == 0 {
 		return fault("invalid_request", "节点通信监听地址无效")
 	}
-	if mode != "" {
-		c.AddressMode = mode
+	if options.AddressMode != "" {
+		c.AddressMode = options.AddressMode
 	}
-	if address != "" {
+	if options.Address != "" {
 		if c.AddressMode == "auto" {
 			return fault("invalid_request", "自动公网模式请省略手工地址")
 		}
-		c.Address = address
+		c.Address = options.Address
 		c.AddressMode = "manual"
 	}
-	if c.AddressMode == "auto" {
+	if c.AddressMode == "auto" && (options.Listen != "" || options.AddressMode != "") {
 		public, err := n.RefreshPublic(ctx)
 		if err != nil {
 			return err
@@ -135,6 +145,23 @@ func (n *Node) ConfigureNetwork(ctx context.Context, listen, mode, address strin
 		}
 		u.Host = net.JoinHostPort(ip, fmt.Sprint(bind.Port))
 		c.Address = u.String()
+	}
+	if scheme := options.AddressScheme; scheme != "" {
+		switch scheme {
+		case "http", "https", "tcp":
+		default:
+			return fault("invalid_request", "通信地址协议须为 http、https 或 tcp")
+		}
+		c.Address, err = peerAddressScheme(c.Address, scheme, bind.Port)
+		if err != nil {
+			return err
+		}
+		for i, endpoint := range c.Endpoints {
+			c.Endpoints[i], err = peerAddressScheme(endpoint, scheme, bind.Port)
+			if err != nil {
+				return err
+			}
+		}
 	}
 	if err := ValidateConfig(c); err != nil {
 		return err
@@ -170,4 +197,19 @@ func (n *Node) ConfigureNetwork(ctx context.Context, listen, mode, address strin
 		return err
 	}
 	return tx.Commit()
+}
+
+func peerAddressScheme(address, scheme string, listenPort int) (string, error) {
+	u, err := url.Parse(address)
+	if err != nil {
+		return "", fault("invalid_request", "节点通信地址无效")
+	}
+	u.Scheme = scheme
+	if scheme == "tcp" {
+		u.Path, u.RawPath = "", ""
+		if u.Port() == "" {
+			u.Host = net.JoinHostPort(u.Hostname(), strconv.Itoa(listenPort))
+		}
+	}
+	return u.String(), nil
 }
