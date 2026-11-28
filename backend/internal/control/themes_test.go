@@ -31,14 +31,14 @@ type themeConsole struct {
 	directory string
 }
 
-func openThemeConsole(t *testing.T, assets fs.FS) *themeConsole {
+func openThemeConsole(t *testing.T, assets fs.FS, version string) *themeConsole {
 	t.Helper()
 	directory := t.TempDir()
 	n, err := cluster.Open(t.Context(), filepath.Join(directory, "node.db"), cluster.Options{Username: "admin", Password: "test-password", Entrance: "/signin", Config: cluster.Config{Name: "主题验收节点", Console: true, API: true}})
 	if err != nil {
 		t.Fatal(err)
 	}
-	s, err := New(t.Context(), n.DB, Options{Node: n, Assets: assets, NodeVersion: "0.1.0-dev", ThemeDir: filepath.Join(directory, "themes"), EnforceListenerState: true})
+	s, err := New(t.Context(), n.DB, Options{Node: n, Assets: assets, NodeVersion: version, ThemeDir: filepath.Join(directory, "themes"), EnforceListenerState: true})
 	if err != nil {
 		n.Close()
 		t.Fatal(err)
@@ -112,7 +112,7 @@ func themeArchive(t *testing.T, id, login string) []byte {
 }
 
 func TestConsoleThemeHTTPAndAuthentication(t *testing.T) {
-	c := openThemeConsole(t, fstest.MapFS{"index.html": {Data: []byte("<html><head></head><body>内置页面</body></html>")}, "assets/builtin.js": {Data: []byte("builtin-assets")}})
+	c := openThemeConsole(t, fstest.MapFS{"index.html": {Data: []byte("<html><head></head><body>内置页面</body></html>")}, "assets/builtin.js": {Data: []byte("builtin-assets")}}, "0.1.0-dev")
 	for _, path := range []string{"/", "/custom/deep", consoletheme.BuiltinPath} {
 		if code, _, _ := c.request(t, "GET", path, "", nil, nil); code != 404 {
 			t.Fatal("未登录页面泄露", path, code)
@@ -234,7 +234,7 @@ func TestBuiltinConsoleAssetsAndRoutes(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	c := openThemeConsole(t, assets)
+	c := openThemeConsole(t, assets, "0.1.0-dev")
 	c.node.Start()
 	routes := []string{"/tools", "/tools/tasks", "/tools/tasks?view=edit&node_id=example&task_id=daily", "/tools/tasks?view=runs&node_id=example&task_id=daily", "/tools/terminal", "/tools/operations", "/terminal?node=example#session", "/tasks?view=runs&node_id=example#top", "/operations", "/monitoring", "/__opsd/builtin/tools/tasks", "/__opsd/builtin/monitoring"}
 	for _, path := range routes {

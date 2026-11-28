@@ -36,7 +36,7 @@ func TestConsoleThemeBrowser(t *testing.T) {
 	for _, name := range []string{"react", "vue", "broken"} {
 		packageThemeDirectory(t, filepath.Join(root, "artifacts", "theme-ui", name), filepath.Join(root, "artifacts", "theme-ui", name+".zip"))
 	}
-	c := openThemeConsole(t, webassets.Assets())
+	c := openThemeConsole(t, webassets.Assets(), webassets.Version())
 	c.node.Start()
 	run("check", "OPSD_THEME_URL="+c.web.URL)
 }
