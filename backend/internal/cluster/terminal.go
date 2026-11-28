@@ -3,11 +3,11 @@ package cluster
 import (
 	"context"
 	"encoding/json"
-	"github.com/coder/websocket"
+	"time"
+
 	"github.com/jkfujr/opsd/internal/identity"
 	"github.com/jkfujr/opsd/internal/protocol"
 	"github.com/jkfujr/opsd/internal/transport"
-	"time"
 )
 
 type terminalConnector interface {
@@ -35,13 +35,8 @@ func (n *Node) Terminal(ctx context.Context, target string) (protocol.TerminalSt
 	}
 	openCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
-	socket, _, err := websocket.Dial(openCtx, m.Address+"/peer", nil)
+	channel, err := n.openPeerChannel(openCtx, m, key)
 	if err != nil {
-		return nil, err
-	}
-	channel, err := transport.Handshake(openCtx, socket, n.Key, key, true)
-	if err != nil {
-		socket.CloseNow()
 		return nil, err
 	}
 	fail := func(e error) (protocol.TerminalStream, error) { channel.Close(); return nil, e }

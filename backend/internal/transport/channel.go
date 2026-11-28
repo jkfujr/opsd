@@ -19,8 +19,14 @@ const RecordBytes = 60 * 1024
 
 var ErrAuthentication = errors.New("身份或协议不匹配")
 
+type recordStream interface {
+	read(context.Context) ([]byte, error)
+	write(context.Context, []byte) error
+	close()
+}
+
 type Channel struct {
-	socket        *websocket.Conn
+	socket        recordStream
 	send, receive *noise.CipherState
 	readMu        sync.Mutex
 	writeSlot     chan struct{}
@@ -37,6 +43,10 @@ type fragment struct {
 
 func Handshake(ctx context.Context, socket *websocket.Conn, key identity.Key, peer []byte, initiator bool) (*Channel, error) {
 	socket.SetReadLimit(65535)
+	return handshake(ctx, webSocketRecords{socket}, key, peer, initiator)
+}
+
+func handshake(ctx context.Context, socket recordStream, key identity.Key, peer []byte, initiator bool) (*Channel, error) {
 	state, err := noise.NewHandshakeState(noise.Config{
 		CipherSuite: noise.NewCipherSuite(noise.DH25519, noise.CipherChaChaPoly, noise.HashSHA256),
 		Pattern:     noise.HandshakeIK, Initiator: initiator, Prologue: []byte("OPSD/node/v2"),
@@ -53,14 +63,11 @@ func Handshake(ctx context.Context, socket *websocket.Conn, key identity.Key, pe
 		if e != nil {
 			return nil, e
 		}
-		if err = socket.Write(ctx, websocket.MessageBinary, data); err != nil {
+		if err = socket.write(ctx, data); err != nil {
 			return nil, err
 		}
-		data, e = readBinary(ctx, socket)
+		data, e = socket.read(ctx)
 		if e != nil {
-			if websocket.CloseStatus(e) == websocket.StatusPolicyViolation {
-				return nil, ErrAuthentication
-			}
 			return nil, e
 		}
 		payload, a, b, e := state.ReadMessage(nil, data)
@@ -69,7 +76,7 @@ func Handshake(ctx context.Context, socket *websocket.Conn, key identity.Key, pe
 		}
 		first, second = a, b
 	} else {
-		data, e := readBinary(ctx, socket)
+		data, e := socket.read(ctx)
 		if e != nil {
 			return nil, e
 		}
@@ -81,7 +88,7 @@ func Handshake(ctx context.Context, socket *websocket.Conn, key identity.Key, pe
 		if e != nil {
 			return nil, e
 		}
-		if err = socket.Write(ctx, websocket.MessageBinary, data); err != nil {
+		if err = socket.write(ctx, data); err != nil {
 			return nil, err
 		}
 	}
@@ -92,9 +99,14 @@ func Handshake(ctx context.Context, socket *websocket.Conn, key identity.Key, pe
 	return channel, nil
 }
 
-func readBinary(ctx context.Context, socket *websocket.Conn) ([]byte, error) {
-	kind, data, err := socket.Read(ctx)
+type webSocketRecords struct{ *websocket.Conn }
+
+func (r webSocketRecords) read(ctx context.Context) ([]byte, error) {
+	kind, data, err := r.Read(ctx)
 	if err != nil {
+		if websocket.CloseStatus(err) == websocket.StatusPolicyViolation {
+			return nil, ErrAuthentication
+		}
 		return nil, err
 	}
 	if kind != websocket.MessageBinary {
@@ -103,7 +115,13 @@ func readBinary(ctx context.Context, socket *websocket.Conn) ([]byte, error) {
 	return data, nil
 }
 
-func (c *Channel) Close() { c.socket.CloseNow() }
+func (r webSocketRecords) write(ctx context.Context, data []byte) error {
+	return r.Write(ctx, websocket.MessageBinary, data)
+}
+
+func (r webSocketRecords) close() { _ = r.CloseNow() }
+
+func (c *Channel) Close() { c.socket.close() }
 
 func (c *Channel) Send(ctx context.Context, message protocol.Message) error {
 	data, err := protocol.Encode(message)
@@ -132,7 +150,7 @@ func (c *Channel) Send(ctx context.Context, message protocol.Message) error {
 		}
 		record, e := c.send.Encrypt(nil, nil, plain)
 		if e == nil {
-			e = c.socket.Write(ctx, websocket.MessageBinary, record)
+			e = c.socket.write(ctx, record)
 		}
 		<-c.writeSlot
 		if e != nil {
@@ -193,7 +211,7 @@ func (c *Channel) Receive(ctx context.Context) (protocol.Message, error) {
 }
 
 func (c *Channel) readRecord(ctx context.Context) ([]byte, error) {
-	data, err := readBinary(ctx, c.socket)
+	data, err := c.socket.read(ctx)
 	if err != nil {
 		c.Close()
 		return nil, err

@@ -10,9 +10,13 @@ import (
 func TestNodeAddressUsesPublicAddressAndListenPort(t *testing.T) {
 	old := discoverAddress
 	t.Cleanup(func() { discoverAddress = old })
-	for _, test := range []struct{ ip, want string }{{"8.8.8.8", "http://8.8.8.8:9444"}, {"2606:4700::1111", "http://[2606:4700::1111]:9444"}} {
+	for _, test := range []struct{ ip, seed, want string }{
+		{"8.8.8.8", "http://1.1.1.1:8444", "http://8.8.8.8:9444"},
+		{"2606:4700::1111", "http://1.1.1.1:8444", "http://[2606:4700::1111]:9444"},
+		{"2606:4700::1111", "tcp://[2606:4700::1001]:8444", "tcp://[2606:4700::1111]:9444"},
+	} {
 		discoverAddress = func(context.Context) (string, error) { return test.ip, nil }
-		got, e := NodeAddress(t.Context(), cluster.Config{Listen: ":9444"}, "http://1.1.1.1:8444")
+		got, e := NodeAddress(t.Context(), cluster.Config{Listen: ":9444"}, test.seed)
 		if e != nil || got != test.want {
 			t.Fatal(got, e)
 		}

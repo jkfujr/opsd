@@ -107,7 +107,7 @@ func TestRejectDamagedTruncatedAndOversizedRecords(t *testing.T) {
 			if item.corrupt {
 				encrypted[len(encrypted)-1] ^= 1
 			}
-			if err := channel.socket.Write(t.Context(), websocket.MessageBinary, encrypted); err != nil {
+			if err := channel.socket.write(t.Context(), encrypted); err != nil {
 				t.Fatal(err)
 			}
 			if item.name == "截断" {
@@ -149,7 +149,7 @@ func TestSmallReplyPassesIncompleteLargeMessage(t *testing.T) {
 		if e != nil {
 			t.Fatal(e)
 		}
-		if e = c.socket.Write(t.Context(), websocket.MessageBinary, record); e != nil {
+		if e = c.socket.write(t.Context(), record); e != nil {
 			t.Fatal(e)
 		}
 	}

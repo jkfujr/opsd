@@ -137,9 +137,9 @@ func serveNode(args []string) error {
 	if e != nil {
 		return e
 	}
-	peerServer := &http.Server{Handler: n.PeerHandler(), ReadHeaderTimeout: 10 * time.Second}
-	go peerServer.Serve(listener)
-	defer peerServer.Close()
+	defer listener.Close()
+	peerDone := make(chan error, 1)
+	go func() { peerDone <- n.ServePeers(listener, c.PeerTransport == "tcp") }()
 	var web *http.Server
 	var listen string
 	var webMu sync.Mutex
@@ -200,8 +200,15 @@ func serveNode(args []string) error {
 	if e = installation.NotifyReady(); e != nil {
 		return e
 	}
-	<-ctx.Done()
-	return nil
+	select {
+	case <-ctx.Done():
+		return nil
+	case err := <-peerDone:
+		if ctx.Err() != nil {
+			return nil
+		}
+		return err
+	}
 }
 func serveExecutor(args []string) error {
 	if e := installation.RequireLinuxRoot(); e != nil {

@@ -60,6 +60,7 @@ type Config struct {
 	AddressMode          string          `json:"address_mode,omitempty"`
 	Region               string          `json:"region"`
 	Listen               string          `json:"listen"`
+	PeerTransport        string          `json:"peer_transport,omitempty"`
 	Console              bool            `json:"console"`
 	API                  bool            `json:"api"`
 	ConsoleListen        string          `json:"console_listen"`
@@ -111,7 +112,6 @@ type Request struct {
 	Kind             string          `json:"kind"`
 	Payload          json.RawMessage `json:"payload"`
 	Key              string          `json:"key,omitempty"`
-
 }
 type Operation struct {
 	Coordinator       string                   `json:"coordinator,omitempty"`
@@ -126,7 +126,7 @@ type Operation struct {
 	SupportsLogs      *bool                    `json:"supports_logs,omitempty"`
 	Key               string                   `json:"idempotency_key,omitempty"`
 	// Origin 是**已认证来源**，与声明操作者分开记录；授权只认 Origin。
-	Origin            string                   `json:"origin,omitempty"`
+	Origin string `json:"origin,omitempty"`
 	protocol.OperationRecord
 	NodeID            string    `json:"node_id"`
 	Sequence          uint64    `json:"queue_sequence"`
@@ -178,13 +178,13 @@ func validateMember(m Member) error {
 		return fmt.Errorf("节点通信端点过多")
 	}
 	for _, endpoint := range m.Endpoints {
-		if !validAddress(endpoint) {
+		if !ValidPeerAddress(endpoint) {
 			return fmt.Errorf("节点通信端点无效")
 		}
 	}
 	p, e := identity.Decode(m.Public)
 	signing, e2 := identity.Decode(m.Signing)
-	if e != nil || e2 != nil || nodeID(p) != m.ID || len(signing) != ed25519.PublicKeySize || m.Cluster == "" || m.Version == 0 || m.Name == "" || len(m.Name) > 255 || !validAddress(m.Address) {
+	if e != nil || e2 != nil || nodeID(p) != m.ID || len(signing) != ed25519.PublicKeySize || m.Cluster == "" || m.Version == 0 || m.Name == "" || len(m.Name) > 255 || !ValidPeerAddress(m.Address) {
 		return fmt.Errorf("节点目录无效")
 	}
 	if m.Storage != "" && !validAddress(m.Storage) {

@@ -47,8 +47,8 @@ func (e *echoTerminal) Receive(ctx context.Context) (protocol.TerminalFrame, err
 func (e *echoTerminal) Close() { e.once.Do(func() { close(e.closed) }) }
 
 func TestTerminalRejectsSourceWithoutGrant(t *testing.T) {
-	a, _ := openTestNode(t)
-	b, _ := openTestNode(t)
+	a := openPeerTestNode(t, true)
+	b := openPeerTestNode(t, true)
 	joinTest(t, b, a)
 	delete(b.Capabilities[a.ID], CapabilityTerminal)
 	x := &echoTerminal{frames: make(chan protocol.TerminalFrame, 1), closed: make(chan struct{})}
@@ -69,8 +69,14 @@ func TestTerminalRejectsSourceWithoutGrant(t *testing.T) {
 }
 
 func TestTerminalUsesIndependentAuthenticatedStreamAndStopsWithNode(t *testing.T) {
-	a, _ := openTestNode(t)
-	b, _ := openTestNode(t)
+	t.Run("WebSocket", func(t *testing.T) { testTerminalStream(t, false) })
+	t.Run("TCP", func(t *testing.T) { testTerminalStream(t, true) })
+}
+
+func testTerminalStream(t *testing.T, tcp bool) {
+	t.Helper()
+	a := openPeerTestNode(t, tcp)
+	b := openPeerTestNode(t, tcp)
 	joinTest(t, b, a)
 	b.Capabilities[a.ID] = map[Capability]bool{CapabilityTerminal: true}
 	x := &echoTerminal{frames: make(chan protocol.TerminalFrame, 1), closed: make(chan struct{})}

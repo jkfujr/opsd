@@ -14,6 +14,28 @@ git push origin v0.1.0-dev
 
 Release 作业验证公开安装与重复安装；生产部署另按明确指令执行。源码与发布验证结果写入 VALIDATION.md。
 
+## 节点通信切换
+
+先核对控制台接入命令对应的发布工件，确保安装器能下载支持私有 TCP 的版本。逐台更新到兼容版本后，读取节点和执行器的启动状态，确认原地址及备用端点继续公告。兼容版本默认同时接收 WebSocket 与私有 TCP。全部有效成员都具备两种接收能力后，再逐台更改已公布地址。先确认原端点对应的主机及端口也接收私有 TCP；端口经 HTTP 代理的端点须换成可直连地址。
+
+```bash
+sudo systemctl stop opsd.service
+sudo /opt/opsd/bin/opsd network --address-scheme tcp
+sudo systemctl start opsd.service
+```
+
+切换后读取签名成员目录和实时概览。生产顺序为 C091、C041，随后 C001、C052，最后 C054。检查 C091 读取 C041 的实时结果，再扩大范围。五台通过 TCP 互读、接入和访问授权终端后，逐台关闭旧接收入口。
+
+```bash
+sudo systemctl stop opsd.service
+sudo /opt/opsd/bin/opsd network --peer-transport tcp
+sudo systemctl start opsd.service
+```
+
+从 C091 浏览器检查概览请求的目标，只应看到入口 C091。通过节点通信核对四个远端数据来源。入口使用标准 HTTP 时，会话及 Bearer 流量仍有告警 #21、#22 记录的明文传输风险。
+
+单节点恢复兼容监听时，在停止节点服务后使用 `opsd network --peer-transport dual`。需要回退旧程序时，先用兼容程序恢复全部原 WebSocket 主地址和备用端点，在各有效节点读回公告，再更换程序工件。整组旧地址使用同一协议时可用 `--address-scheme http` 或 `--address-scheme https` 恢复。写入结果未知时，先查原请求或操作 ID。
+
 ## I7 生产工件重建
 
 五节点工件 `44bc74bcf69a` 的源码提交为 `ffaccfd3913127170aea002ee72491867a088240`。2026-11-28 在独立 WSL `OPSD-CI` 干净检出该提交，按锁文件重新生成内置前端和 Swagger UI。生成的追踪文件无差异，二进制及 xz 压缩件均与发布时的字节一致。

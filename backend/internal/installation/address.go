@@ -3,11 +3,11 @@ package installation
 import (
 	"context"
 	"fmt"
-	"github.com/jkfujr/opsd/internal/publicaddress"
 	"net"
 	"net/url"
 
 	"github.com/jkfujr/opsd/internal/cluster"
+	"github.com/jkfujr/opsd/internal/publicaddress"
 )
 
 var discoverAddress = publicaddress.Discover
@@ -25,15 +25,19 @@ func NodeAddress(ctx context.Context, config cluster.Config, peer string) (strin
 	if err != nil || bind.Port == 0 {
 		return "", fmt.Errorf("节点监听地址无效")
 	}
+	scheme := "http"
 	if peer != "" {
-		u, err := url.Parse(peer)
-		if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Hostname() == "" {
+		if !cluster.ValidPeerAddress(peer) {
 			return "", fmt.Errorf("接入地址无效")
+		}
+		u, _ := url.Parse(peer)
+		if u.Scheme == "tcp" {
+			scheme = u.Scheme
 		}
 	}
 	address, err := discoverAddress(ctx)
 	if err != nil {
 		return "", err
 	}
-	return "http://" + net.JoinHostPort(address, fmt.Sprint(bind.Port)), nil
+	return scheme + "://" + net.JoinHostPort(address, fmt.Sprint(bind.Port)), nil
 }
