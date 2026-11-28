@@ -53,7 +53,7 @@ func (s *Server) CreateNodeTerminal(w http.ResponseWriter, r *http.Request, id s
 }
 
 func (s *Server) AttachTerminal(w http.ResponseWriter, r *http.Request, ticket string) {
-	if !sameOrigin(r) || current(r).session.Id == "" || access(r.Context()) != nil {
+	if !s.sameOrigin(r) || current(r).session.Id == "" || access(r.Context()) != nil {
 		s.fail(w, r, 403, "forbidden", "终端连接校验失败")
 		return
 	}

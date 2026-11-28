@@ -15,8 +15,8 @@ import (
 	"github.com/jkfujr/opsd/internal/identity"
 )
 
-func (s *Server) clearCookie(w http.ResponseWriter) {
-	http.SetCookie(w, &http.Cookie{Name: s.cookieName(), Path: "/", HttpOnly: true, SameSite: http.SameSiteLaxMode, MaxAge: -1})
+func (s *Server) clearCookie(w http.ResponseWriter, r *http.Request) {
+	http.SetCookie(w, &http.Cookie{Name: s.cookieName(), Path: "/", HttpOnly: true, Secure: s.secureRequest(r), SameSite: http.SameSiteLaxMode, MaxAge: -1})
 }
 
 func (s *Server) Login(w http.ResponseWriter, r *http.Request) {
@@ -38,7 +38,7 @@ func (s *Server) Login(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, r, 404, "not_found", "页面不存在")
 		return
 	}
-	if !sameOrigin(r) {
+	if !s.sameOrigin(r) {
 		s.fail(w, r, 403, "csrf_rejected", "请求来源无效")
 		return
 	}
@@ -100,7 +100,7 @@ func (s *Server) Login(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, r, 409, "conflict", "凭据已变更，请重新登录")
 		return
 	}
-	http.SetCookie(w, &http.Cookie{Name: s.cookieName(), Value: token, Path: "/", HttpOnly: true, SameSite: http.SameSiteLaxMode, MaxAge: 7 * 24 * 60 * 60, Expires: expires})
+	http.SetCookie(w, &http.Cookie{Name: s.cookieName(), Value: token, Path: "/", HttpOnly: true, Secure: s.secureRequest(r), SameSite: http.SameSiteLaxMode, MaxAge: 7 * 24 * 60 * 60, Expires: expires})
 	w.Header().Set("Location", httpapi.APIBasePath+"/auth/sessions/current")
 	write(w, 201, httpapi.CurrentSession{LocalNodeId: s.node.ID, CsrfToken: csrf, LoginAddress: entrance, Session: httpapi.Session{Id: id, Username: username, CreatedAt: now, ExpiresAt: expires, LastSeenAt: now, RemoteAddress: ip, Current: true}})
 }
@@ -117,7 +117,7 @@ func (s *Server) Logout(w http.ResponseWriter, r *http.Request, _ httpapi.Logout
 		return
 	}
 	s.revokeStreams(id)
-	s.clearCookie(w)
+	s.clearCookie(w, r)
 	w.WriteHeader(204)
 }
 
@@ -164,7 +164,7 @@ func (s *Server) RevokeSession(w http.ResponseWriter, r *http.Request, id string
 	}
 	s.revokeStreams(id)
 	if current(r).session.Id == id {
-		s.clearCookie(w)
+		s.clearCookie(w, r)
 	}
 	w.WriteHeader(204)
 }
@@ -265,7 +265,7 @@ func (s *Server) finishAccountChange(w http.ResponseWriter, r *http.Request, op 
 		}
 	}
 	s.revokeStreams("")
-	s.clearCookie(w)
+	s.clearCookie(w, r)
 	a, e := s.node.ReadAccount(r.Context(), s.node.ID)
 	if e != nil {
 		s.operationError(w, r, e)

@@ -10,6 +10,7 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
+	"net/netip"
 	"net/url"
 	"os"
 	"strings"
@@ -25,6 +26,7 @@ func (s *Server) cookieName() string { return "opsd_session_" + s.node.ID }
 
 type Options struct {
 	EnforceListenerState bool
+	TrustedProxyIP       netip.Addr
 	Assets               fs.FS
 	Node                 *cluster.Node
 	NodeVersion          string
@@ -84,10 +86,22 @@ func New(ctx context.Context, db *sql.DB, options Options) (*Server, error) {
 	return s, nil
 }
 
-func sameOrigin(r *http.Request) bool {
+func (s *Server) secureRequest(r *http.Request) bool {
+	if r.TLS != nil {
+		return true
+	}
+	if !s.options.TrustedProxyIP.IsValid() {
+		return false
+	}
+	peer, err := netip.ParseAddr(remoteIP(r))
+	proto := r.Header.Values("X-Forwarded-Proto")
+	return err == nil && peer.Unmap() == s.options.TrustedProxyIP.Unmap() && len(proto) == 1 && proto[0] == "https"
+}
+
+func (s *Server) sameOrigin(r *http.Request) bool {
 	origin, err := url.Parse(r.Header.Get("Origin"))
 	scheme := "http"
-	if r.TLS != nil {
+	if s.secureRequest(r) {
 		scheme = "https"
 	}
 	return err == nil && origin.Scheme == scheme && strings.EqualFold(origin.Host, r.Host) && origin.User == nil && origin.Path == "" && origin.RawQuery == "" && origin.Fragment == ""

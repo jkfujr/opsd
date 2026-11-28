@@ -185,7 +185,7 @@ func (s *Server) serveAPI(w http.ResponseWriter, r *http.Request, route httpapi.
 			return
 		}
 		if r.Method != http.MethodGet && r.Method != http.MethodHead {
-			if !sameOrigin(r) || r.Header.Get("X-CSRF-Token") != session.csrf {
+			if !s.sameOrigin(r) || r.Header.Get("X-CSRF-Token") != session.csrf {
 				s.fail(w, r, 403, "csrf_rejected", "请求校验失败，请刷新页面")
 				return
 			}

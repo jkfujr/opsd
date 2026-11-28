@@ -51,6 +51,8 @@ curl -fsS -b cookies.txt "$OPSD_API_URL/auth/sessions"
 
 登录成功为 `201 + Set-Cookie`。Cookie 名包含所属节点 ID，客户端保存服务端返回的完整 Cookie；浏览器使用 `credentials: 'same-origin'`，不读取 HttpOnly 值。会话写入同时要求同源 `Origin` 和 `X-CSRF-Token`。退出使用 `DELETE /auth/sessions/current`；撤销其他会话使用 `DELETE /auth/sessions/{session_id}`。账号修改保留当前密码检查及原有会话撤销行为。
 
+HTTPS 请求的会话 Cookie 带 `Secure`。由反向代理终止 TLS 时，在节点服务的环境中设置 `OPSD_TRUSTED_PROXY_IP` 为代理连接 OPSD 时的单个源 IP。代理须保留原始 `Host`，并用实际请求协议覆盖 `X-Forwarded-Proto`。同源校验与 Cookie 使用同一协议判断。直连 HTTP 沿用 HTTP 会话。
+
 ## HTTP 类型、错误与并发
 
 GET 保持只读，可采集当前状态。配置与运行状态使用独立资源；PUT 提交完整可写定义，PATCH 使用 `application/merge-patch+json`。省略字段默认保持原值，数组整体替换，`null` 只允许移除声明为可空或可省略的字段；删除必填字段返回 422。ID、观测时间和运行字段不进入写入类型，未知字段被拒绝。时间使用 RFC3339 UTC，ID 为不透明字符串。

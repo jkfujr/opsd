@@ -10,6 +10,7 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
+	"net/netip"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -32,6 +33,7 @@ import (
 	"github.com/jkfujr/opsd/internal/protocol"
 	"github.com/jkfujr/opsd/internal/storage"
 	"github.com/jkfujr/opsd/internal/webassets"
+	"golang.org/x/term"
 )
 
 func Run(args []string) error {
@@ -115,7 +117,14 @@ func serveNode(args []string) error {
 	n.Log = func(format string, args ...any) {
 		slog.Info(fmt.Sprintf(format, args...), "component", "cluster")
 	}
-	s, e := control.New(ctx, n.DB, control.Options{EnforceListenerState: true, Node: n, Assets: webassets.Assets(), NodeVersion: buildinfo.Version, FrontendVersion: webassets.Version(), ThemeDir: filepath.Join(f.DataDir, "themes")})
+	var trustedProxy netip.Addr
+	if value := os.Getenv("OPSD_TRUSTED_PROXY_IP"); value != "" {
+		trustedProxy, e = netip.ParseAddr(value)
+		if e != nil || trustedProxy.IsUnspecified() || trustedProxy.IsMulticast() || trustedProxy.Zone() != "" {
+			return fmt.Errorf("OPSD_TRUSTED_PROXY_IP 须为反向代理的明确 IP 地址")
+		}
+	}
+	s, e := control.New(ctx, n.DB, control.Options{EnforceListenerState: true, TrustedProxyIP: trustedProxy, Node: n, Assets: webassets.Assets(), NodeVersion: buildinfo.Version, FrontendVersion: webassets.Version(), ThemeDir: filepath.Join(f.DataDir, "themes")})
 	if e != nil {
 		return e
 	}
@@ -401,7 +410,7 @@ func install(args []string) error {
 	set.StringVar(token, "t", *token, "")
 	set.StringVar(name, "n", "", "")
 	set.StringVar(region, "r", "", "")
-	_ = set.Bool("non-interactive", false, "")
+	nonInteractive := set.Bool("non-interactive", false, "")
 	allowArbitraryCode := set.Bool("allow-arbitrary-code", false, "")
 	fixConfigPermissions := set.Bool("fix-config-permissions", false, "")
 	if e := command.Parse(set, args); e != nil {
@@ -413,7 +422,8 @@ func install(args []string) error {
 	if *fixConfigPermissions {
 		return installation.FixNodeConfigPermissions(*config)
 	}
-	if *password == "" {
+	generatedPassword := *password == ""
+	if generatedPassword {
 		*password = identity.Random()
 	}
 	if *entrance == "" {
@@ -433,8 +443,18 @@ func install(args []string) error {
 		fmt.Println("节点已安装")
 		return nil
 	}
-	fmt.Printf("节点已安装\n账号：%s\n密码：%s\n登录入口：%s\n", actual.Username, actual.Password, actual.Entrance)
+	printInitialAccount(os.Stdout, actual, generatedPassword, !*nonInteractive && term.IsTerminal(int(os.Stdout.Fd())))
 	return nil
+}
+
+func printInitialAccount(out io.Writer, account cluster.AccountChange, generated, terminal bool) {
+	fmt.Fprintf(out, "节点已安装\n账号：%s\n登录入口：%s\n", account.Username, account.Entrance)
+	switch {
+	case generated && terminal:
+		fmt.Fprintf(out, "密码：%s\n", account.Password)
+	case generated:
+		fmt.Fprintln(out, "请使用 opsd account 设置登录密码")
+	}
 }
 func localChange(kind string, args []string) error {
 	set := command.Flags(kind)
