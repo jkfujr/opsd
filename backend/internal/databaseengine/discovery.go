@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -70,8 +71,16 @@ func CompleteDiscovered(items []protocol.DatabaseCandidate) []protocol.DatabaseC
 }
 func BackupStatus(ctx context.Context, root string) []protocol.DatabaseBackup {
 	out := []protocol.DatabaseBackup{}
-	if root == "" || runtime.GOOS != "linux" {
+	if !filepath.IsAbs(root) || runtime.GOOS != "linux" {
 		return out
+	}
+	root = filepath.Clean(root)
+	if root == string(filepath.Separator) {
+		return out
+	}
+	dir, err := os.OpenRoot(root)
+	if err == nil {
+		defer dir.Close()
 	}
 	for _, tier := range []string{"hourly", "daily", "weekly"} {
 		item := protocol.DatabaseBackup{Name: tier, State: "unknown", Artifacts: []string{}}
@@ -103,11 +112,15 @@ func BackupStatus(ctx context.Context, root string) []protocol.DatabaseBackup {
 		if b, e := exec.CommandContext(ctx, "systemctl", "show", unit+".timer", "--property=TimersCalendar", "--value").Output(); e == nil {
 			item.Schedule = strings.TrimSpace(string(b))
 		}
-		if info, e := os.Stat(filepath.Join(root, "status", tier+".success")); e == nil {
+		if dir == nil {
+			out = append(out, item)
+			continue
+		}
+		if info, e := dir.Stat(filepath.Join("status", tier+".success")); e == nil && info.Mode().IsRegular() {
 			t := info.ModTime().UTC()
 			item.LastSuccess = &t
 		}
-		entries, e := os.ReadDir(filepath.Join(root, tier))
+		entries, e := fs.ReadDir(dir.FS(), tier)
 		if e == nil {
 			names := []string{}
 			for _, entry := range entries {
@@ -117,9 +130,9 @@ func BackupStatus(ctx context.Context, root string) []protocol.DatabaseBackup {
 			}
 			sort.Sort(sort.Reverse(sort.StringSlice(names)))
 			if len(names) > 0 {
-				files, _ := os.ReadDir(filepath.Join(root, tier, names[0]))
+				files, _ := fs.ReadDir(dir.FS(), filepath.Join(tier, names[0]))
 				for _, f := range files {
-					if !f.IsDir() {
+					if f.Type().IsRegular() {
 						item.Artifacts = append(item.Artifacts, filepath.Join(root, tier, names[0], f.Name()))
 					}
 				}

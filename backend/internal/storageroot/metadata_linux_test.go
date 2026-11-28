@@ -15,6 +15,44 @@ import (
 	"github.com/jkfujr/opsd/internal/storage"
 )
 
+func TestTrustedStoragePathOwnership(t *testing.T) {
+	if os.Geteuid() != 0 {
+		t.Skip("目录所有权验收需要 root")
+	}
+	dir, err := os.MkdirTemp("/srv", "opsd-storage-path-")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.RemoveAll(dir) })
+	if err := trustedDir(dir); err != nil {
+		t.Fatal("合法的绝对目录被拒绝", err)
+	}
+	for name, mode := range map[string]os.FileMode{"foreign-owner": 0700, "group-writable": 0770} {
+		path := filepath.Join(dir, name)
+		if err := os.Mkdir(path, 0700); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Chmod(path, mode); err != nil {
+			t.Fatal(err)
+		}
+		if name == "foreign-owner" {
+			if err := os.Chown(path, 65534, 0); err != nil {
+				t.Fatal(err)
+			}
+		}
+		if err := trustedDir(filepath.Join(path, "child")); err == nil {
+			t.Fatal("接受了不受信任的父目录", name)
+		}
+	}
+	link := filepath.Join(dir, "link")
+	if err := os.Symlink(dir, link); err != nil {
+		t.Fatal(err)
+	}
+	if err := trustedDir(filepath.Join(link, "child")); err == nil {
+		t.Fatal("接受了含符号链接的绝对目录")
+	}
+}
+
 func TestCompletedMetadataRollbackOnSystemd(t *testing.T) {
 	bin := os.Getenv("OPSD_TEST_BINARY")
 	if os.Getenv("OPSD_TEST_STORAGE_ROOT") != "1" || bin == "" || os.Geteuid() != 0 {

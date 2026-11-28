@@ -4,6 +4,8 @@ package dockerengine
 
 import (
 	"encoding/json"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -11,6 +13,57 @@ import (
 	"github.com/jkfujr/opsd/internal/protocol"
 	"go.yaml.in/yaml/v3"
 )
+
+func TestMonitoringReadsStayUnderDeploymentDirectory(t *testing.T) {
+	d := protocol.MonitoringDeployment{ClusterID: "cluster", NodeID: "node", Directory: t.TempDir()}
+	outside := filepath.Join(t.TempDir(), "external.json")
+	marker := filepath.Join(d.Directory, ".opsd-monitoring.json")
+	block := filepath.Join(d.Directory, "receive", "opsd", strings.Repeat("0", 26))
+	if err := os.MkdirAll(block, 0700); err != nil {
+		t.Fatal(err)
+	}
+	metadata := filepath.Join(block, "meta.json")
+	owner := []byte(`{"cluster_id":"cluster","node_id":"node"}`)
+	if err := os.WriteFile(outside, owner, 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(outside, marker); err != nil {
+		t.Fatal(err)
+	}
+	if err := monitoringOwner(d); err == nil {
+		t.Fatal("读取了目录外的归属标记")
+	}
+	if err := os.Remove(marker); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(marker, owner, 0600); err != nil {
+		t.Fatal(err)
+	}
+	root, err := openMonitoringDirectory(d.Directory)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer root.Close()
+	if err := verifyMonitoringOwner(root, d); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(metadata, []byte(`{"minTime":1000}`), 0600); err != nil {
+		t.Fatal(err)
+	}
+	var state protocol.MonitoringState
+	if err := readMonitoringArchive(root, &state); err != nil || state.ArchivePendingBlocks != 1 || state.OldestUnshippedAt == nil || state.OldestUnshippedAt.UnixMilli() != 1000 {
+		t.Fatal("归档块未读回", err)
+	}
+	if err := os.Remove(metadata); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(outside, metadata); err != nil {
+		t.Fatal(err)
+	}
+	if err := readMonitoringArchive(root, &protocol.MonitoringState{}); err == nil {
+		t.Fatal("读取了目录外的归档块元数据")
+	}
+}
 
 func TestMonitoringFixedComponentsAndCredentialIsolation(t *testing.T) {
 	d := protocol.MonitoringDeployment{ClusterID: strings.Repeat("a", 43), NodeID: strings.Repeat("b", 32), Enabled: true, Directory: "/var/lib/opsd-monitoring", Prefix: "opsd/metrics/cluster/", DiskBudgetBytes: 80 << 30, Storage: protocol.S3Connection{Endpoint: "https://s3.example.test", Bucket: "metrics", AccessStyle: "path"}, Credentials: protocol.S3Credentials{Receive: protocol.S3Credential{AccessKey: "receive-key", SecretKey: "receive-secret"}, Store: protocol.S3Credential{AccessKey: "store-key", SecretKey: "store-secret"}, Compact: protocol.S3Credential{AccessKey: "compact-key", SecretKey: "compact-secret"}}}

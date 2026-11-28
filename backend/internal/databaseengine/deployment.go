@@ -124,11 +124,13 @@ func (m Manager) CheckDeployment(ctx context.Context, d protocol.DatabaseDeploym
 		if out.FreeBytes < 512*1024*1024 {
 			out.Problems = append(out.Problems, "数据库目录可用空间不足 512 MiB")
 		}
-	}
-	if entries, err := os.ReadDir(d.Directory); err == nil && len(entries) > 0 {
-		out.Problems = append(out.Problems, "数据库目录非空，请选择新的空目录")
-	} else if err != nil && !os.IsNotExist(err) {
-		out.Problems = append(out.Problems, "数据库目录不可读")
+		if parent == d.Directory {
+			if entries, readErr := os.ReadDir(parent); readErr == nil && len(entries) > 0 {
+				out.Problems = append(out.Problems, "数据库目录非空，请选择新的空目录")
+			} else if readErr != nil && !os.IsNotExist(readErr) {
+				out.Problems = append(out.Problems, "数据库目录不可读")
+			}
+		}
 	}
 	for _, c := range state.Containers {
 		if c.Name == d.ContainerName() || c.Name == d.LegacyContainerName() {

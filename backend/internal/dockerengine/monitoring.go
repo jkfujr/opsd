@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"io/fs"
 	"net/http"
 	"net/url"
 	"os"
@@ -99,11 +100,31 @@ func monitoringFiles(d protocol.MonitoringDeployment, guarded bool) (map[string]
 }
 
 func monitoringOwner(d protocol.MonitoringDeployment) error {
+	root, err := openMonitoringDirectory(d.Directory)
+	if err != nil {
+		return err
+	}
+	defer root.Close()
+	return verifyMonitoringOwner(root, d)
+}
+
+func openMonitoringDirectory(directory string) (*os.Root, error) {
+	resolved, err := filepath.EvalSymlinks(directory)
+	if err != nil {
+		return nil, err
+	}
+	if resolved != directory {
+		return nil, fmt.Errorf("监控目录及父目录须为真实目录")
+	}
+	return os.OpenRoot(directory)
+}
+
+func verifyMonitoringOwner(root *os.Root, d protocol.MonitoringDeployment) error {
 	var owner struct {
 		Cluster string `json:"cluster_id"`
 		Node    string `json:"node_id"`
 	}
-	b, err := os.ReadFile(filepath.Join(d.Directory, ".opsd-monitoring.json"))
+	b, err := root.ReadFile(".opsd-monitoring.json")
 	if err != nil {
 		return err
 	}
@@ -351,55 +372,63 @@ func (m *Manager) MonitoringState(ctx context.Context, d protocol.MonitoringDepl
 	if ready == 4 {
 		out.State = "ready"
 	}
-	if _, err = os.Stat(d.Directory); os.IsNotExist(err) {
+	root, err := openMonitoringDirectory(d.Directory)
+	if os.IsNotExist(err) {
 		return out, nil
 	} else if err != nil {
 		return out, err
 	}
-	if err = monitoringOwner(d); err != nil {
+	defer root.Close()
+	if err = verifyMonitoringOwner(root, d); err != nil {
 		return out, err
 	}
 	out.DiskUsedBytes, out.DiskAvailableBytes, err = monitoringDisk(ctx, d.Directory)
 	if err != nil {
 		return out, err
 	}
+	err = readMonitoringArchive(root, &out)
+	return out, err
+}
+
+func readMonitoringArchive(root *os.Root, out *protocol.MonitoringState) error {
+	const receiveDir = "receive/opsd"
 	var shipper struct {
 		Uploaded []string `json:"uploaded"`
 	}
-	if data, e := os.ReadFile(filepath.Join(d.Directory, "receive", "opsd", "thanos.shipper.json")); e == nil {
+	if data, e := root.ReadFile(filepath.Join(receiveDir, "thanos.shipper.json")); e == nil {
 		if e = json.Unmarshal(data, &shipper); e != nil {
-			return out, e
+			return e
 		}
 	} else if !os.IsNotExist(e) {
-		return out, e
+		return e
 	}
 	shipped := map[string]bool{}
 	for _, id := range shipper.Uploaded {
 		shipped[id] = true
 	}
-	entries, err := os.ReadDir(filepath.Join(d.Directory, "receive", "opsd"))
+	entries, err := fs.ReadDir(root.FS(), receiveDir)
 	if os.IsNotExist(err) {
-		return out, nil
+		return nil
 	}
 	if err != nil {
-		return out, err
+		return err
 	}
 	for _, entry := range entries {
 		if !entry.IsDir() || len(entry.Name()) != 26 || shipped[entry.Name()] {
 			continue
 		}
-		data, e := os.ReadFile(filepath.Join(d.Directory, "receive", "opsd", entry.Name(), "meta.json"))
+		data, e := root.ReadFile(filepath.Join(receiveDir, entry.Name(), "meta.json"))
 		if os.IsNotExist(e) {
 			continue
 		}
 		if e != nil {
-			return out, e
+			return e
 		}
 		var meta struct {
 			MinTime int64 `json:"minTime"`
 		}
 		if e = json.Unmarshal(data, &meta); e != nil {
-			return out, e
+			return e
 		}
 		out.ArchivePendingBlocks++
 		at := time.UnixMilli(meta.MinTime).UTC()
@@ -407,5 +436,5 @@ func (m *Manager) MonitoringState(ctx context.Context, d protocol.MonitoringDepl
 			out.OldestUnshippedAt = &at
 		}
 	}
-	return out, nil
+	return nil
 }

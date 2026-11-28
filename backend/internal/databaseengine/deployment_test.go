@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/jkfujr/opsd/internal/dockerengine"
 	"github.com/jkfujr/opsd/internal/protocol"
 )
 
@@ -75,5 +76,32 @@ func TestDeploymentValidation(t *testing.T) {
 				t.Fatal("接受了无效部署参数")
 			}
 		})
+	}
+}
+
+func TestDeploymentPreviewSkipsRejectedDirectory(t *testing.T) {
+	if runtime.GOOS != "linux" {
+		t.Skip("部署目录验收需要 Linux")
+	}
+	directory := t.TempDir()
+	if err := os.WriteFile(filepath.Join(directory, "existing"), nil, 0600); err != nil {
+		t.Fatal(err)
+	}
+	link := filepath.Join(t.TempDir(), "alias")
+	if err := os.Symlink(directory, link); err != nil {
+		t.Fatal(err)
+	}
+	m := Manager{Docker: &dockerengine.Manager{Socket: filepath.Join(t.TempDir(), "docker.sock")}}
+	d := deploymentExample()
+	for _, path := range []string{directory, link} {
+		d.Directory = path
+		result, err := m.CheckDeployment(t.Context(), d)
+		if err != nil {
+			t.Fatal(err)
+		}
+		problems := strings.Join(result.Problems, "\n")
+		if strings.Contains(problems, "数据库目录非空") != (path == directory) || strings.Contains(problems, "目录包含链接") != (path == link) {
+			t.Fatal("部署预览目录检查结果不符", problems)
+		}
 	}
 }
