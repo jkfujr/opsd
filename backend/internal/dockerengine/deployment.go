@@ -5,11 +5,14 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"os"
 	"path/filepath"
 	"time"
 
 	"github.com/containerd/errdefs"
+	"github.com/jkfujr/opsd/internal/deploymentdir"
 	"github.com/jkfujr/opsd/internal/protocol"
 	"github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/api/types/mount"
@@ -18,6 +21,10 @@ import (
 
 const deploymentLabel = "com.opsd.database-deployment"
 const deploymentSpecLabel = "com.opsd.database-spec"
+
+func IsDatabaseDeployment(raw container.InspectResponse) bool {
+	return raw.Config != nil && raw.Config.Labels[deploymentLabel] != ""
+}
 
 func deploymentFingerprint(d protocol.DatabaseDeployment) string {
 	// 集群身份在首次启动后取得，不改变已经批准的容器定义。
@@ -31,6 +38,13 @@ func (m *Manager) DeploymentState(ctx context.Context, d protocol.DatabaseDeploy
 	path, err := m.deploymentStorage(ctx, d, false)
 	if err != nil {
 		return "", "", err
+	}
+	return m.deploymentState(ctx, d, path)
+}
+
+func (m *Manager) deploymentState(ctx context.Context, d protocol.DatabaseDeployment, path string) (id, state string, err error) {
+	if path == "" {
+		path = filepath.Join(d.Directory, "data")
 	}
 	c, _, _, err := m.connect(ctx)
 	if err != nil {
@@ -50,13 +64,18 @@ func (m *Manager) DeploymentState(ctx context.Context, d protocol.DatabaseDeploy
 		if raw.Config == nil || raw.Config.Labels[deploymentLabel] != d.ID || raw.Config.Labels[deploymentSpecLabel] != deploymentFingerprint(d) {
 			return "", "", fmt.Errorf("同名容器已存在或部署配置已经变化")
 		}
-		if path != "" && !storageMatches(raw, StorageDatabaseSpec(d, path)[0]) {
+		if !storageMatches(raw, StorageDatabaseSpec(d, path)[0]) {
 			return "", "", fmt.Errorf("数据库存储绑定不同")
 		}
 		if id != "" || raw.State == nil {
 			return "", "", fmt.Errorf("部署容器重复或状态缺失")
 		}
 		id, state = raw.ID, string(raw.State.Status)
+	}
+	if id != "" {
+		if err := VerifyDeploymentMounts(d, path); err != nil {
+			return "", "", err
+		}
 	}
 	return id, state, nil
 }
@@ -150,6 +169,9 @@ func (m *Manager) StageStorageDatabase(ctx context.Context, d protocol.DatabaseD
 		config.Entrypoint = []string{"/usr/bin/proxysql"}
 		config.Cmd = []string{"-f", "-c", "/etc/proxysql.cnf"}
 	}
+	if err = VerifyDeploymentMounts(d, dataDir); err != nil {
+		return err
+	}
 	_, err = c.ContainerCreate(ctx, client.ContainerCreateOptions{Name: d.ContainerName(), Config: config, HostConfig: host})
 	return err
 }
@@ -160,10 +182,11 @@ func (m *Manager) StartDeployment(ctx context.Context, d protocol.DatabaseDeploy
 			return err
 		}
 	}
-	if _, err := m.deploymentStorage(ctx, d, true); err != nil {
+	dataDir, err := m.deploymentStorage(ctx, d, true)
+	if err != nil {
 		return err
 	}
-	id, state, err := m.DeploymentState(ctx, d)
+	id, state, err := m.deploymentState(ctx, d, dataDir)
 	if err != nil {
 		return err
 	}
@@ -175,8 +198,65 @@ func (m *Manager) StartDeployment(ctx context.Context, d protocol.DatabaseDeploy
 		return err
 	}
 	defer c.Close()
+	if err = VerifyDeploymentMounts(d, dataDir); err != nil {
+		return err
+	}
 	_, err = c.ContainerStart(ctx, id, client.ContainerStartOptions{})
 	return err
+}
+
+// VerifyDeploymentMounts 校验交给 Docker 的实际主机路径，包括登记存储根的 data 绑定。
+func VerifyDeploymentMounts(d protocol.DatabaseDeployment, dataDir string) error {
+	if dataDir == "" {
+		dataDir = filepath.Join(d.Directory, "data")
+	}
+	root, err := deploymentdir.Open(d.Directory, deploymentdir.Existing)
+	if err != nil {
+		return err
+	}
+	defer root.Close()
+	data, err := deploymentdir.Open(dataDir, deploymentdir.Existing, deploymentdir.GaleraUID)
+	if err != nil {
+		return err
+	}
+	data.Close()
+	for _, bind := range deploymentBinds(d, dataDir)[1:] {
+		name := filepath.Base(bind.Source)
+		switch name {
+		case "state", "tls":
+			var owners []uint32
+			var names []string
+			if name == "tls" {
+				owners = []uint32{deploymentdir.GaleraUID}
+				names = []string{"ca.pem", "cert.pem", "key.pem"}
+			} else {
+				names = []string{"bootstrap.started", "seeds"}
+			}
+			dir, err := deploymentdir.OpenDirectory(root, name, 0, owners...)
+			if err != nil {
+				return err
+			}
+			for _, fileName := range names {
+				file, err := deploymentdir.OpenFile(dir, fileName, os.O_RDONLY, owners...)
+				if err != nil {
+					if name == "state" && errors.Is(err, os.ErrNotExist) {
+						continue
+					}
+					dir.Close()
+					return err
+				}
+				file.Close()
+			}
+			dir.Close()
+		default:
+			file, err := deploymentdir.OpenFile(root, name, os.O_RDONLY, deploymentdir.GaleraUID)
+			if err != nil {
+				return err
+			}
+			file.Close()
+		}
+	}
+	return nil
 }
 
 // DeploymentContainer 只供本机执行器提取部署资料，环境变量不返回浏览器。

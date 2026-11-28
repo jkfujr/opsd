@@ -37,6 +37,8 @@ func TestDatabaseDeploymentNative(t *testing.T) {
 		return
 	}
 	t.Run("已有文件与首次启动", TestDeploymentKeepsExistingFilesAndBootstrapIntent)
+	t.Run("不安全路径和恢复", TestDeploymentRejectsUnsafePathsOnRecovery)
+	t.Run("预览目录", TestDeploymentPreviewSkipsRejectedDirectory)
 	addresses, err := net.InterfaceAddrs()
 	if err != nil {
 		t.Fatal(err)
@@ -134,7 +136,7 @@ func TestDatabaseDeploymentNative(t *testing.T) {
 	for index := range 3 {
 		d := base
 		d.ID = fmt.Sprintf("%s_%d", base.ID, index)
-		d.Directory = filepath.Join(t.TempDir(), "database")
+		d.Directory = filepath.Join(deploymentTestDir(t), "database")
 		d.SQLPort, d.ReplicationPort, d.ISTPort, d.SSTPort = port(), port(), port(), port()
 		d.Connection.Address = fmt.Sprintf("127.0.0.1:%d", d.SQLPort)
 		d.Bootstrap = index == 0
@@ -226,7 +228,7 @@ func TestDatabaseDeploymentNative(t *testing.T) {
 	if err != nil || len(profile.Problems) > 0 || profile.Deployment.Image != GaleraImage || profile.Deployment.SSTPassword != base.SSTPassword || profile.Deployment.ReplicationPort != first.ReplicationPort {
 		t.Fatal("扩容资料不完整", profile.Problems, err)
 	}
-	proxy := protocol.DatabaseDeployment{ID: base.ID + "_proxy", Kind: "proxysql", Image: ProxyImage, Directory: filepath.Join(t.TempDir(), "proxy"), Address: address, SQLPort: port(), AdminPort: port(), InstallDocker: true, MonitorUser: base.MonitorUser, MonitorPassword: base.MonitorPassword}
+	proxy := protocol.DatabaseDeployment{ID: base.ID + "_proxy", Kind: "proxysql", Image: ProxyImage, Directory: filepath.Join(deploymentTestDir(t), "proxy"), Address: address, SQLPort: port(), AdminPort: port(), InstallDocker: true, MonitorUser: base.MonitorUser, MonitorPassword: base.MonitorPassword}
 	proxy.Connection = protocol.DatabaseConnection{Kind: "proxysql", Address: fmt.Sprintf("127.0.0.1:%d", proxy.AdminPort), Username: "opsdadmin", Password: identity.Random()}
 	for _, d := range members {
 		proxy.Backends = append(proxy.Backends, protocol.ProxyEndpoint{Host: address, Port: d.SQLPort})

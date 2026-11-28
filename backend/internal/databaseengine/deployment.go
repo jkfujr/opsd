@@ -5,16 +5,17 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"net/netip"
 	"os"
-	"path/filepath"
 	"runtime"
 	"slices"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/jkfujr/opsd/internal/deploymentdir"
 	"github.com/jkfujr/opsd/internal/dockerengine"
 	"github.com/jkfujr/opsd/internal/protocol"
 )
@@ -64,30 +65,6 @@ func VerifyDeploymentRecord(d protocol.DatabaseDeployment) error {
 	return nil
 }
 
-func deploymentParent(path string) (string, error) {
-	for {
-		info, err := os.Lstat(path)
-		if err == nil {
-			if info.Mode()&os.ModeSymlink != 0 || !info.IsDir() {
-				return "", fmt.Errorf("数据库目录包含链接或非目录对象")
-			}
-			resolved, err := filepath.EvalSymlinks(path)
-			if err != nil || filepath.Clean(resolved) != filepath.Clean(path) {
-				return "", fmt.Errorf("数据库目录不能经过符号链接")
-			}
-			return path, nil
-		}
-		if !os.IsNotExist(err) {
-			return "", err
-		}
-		next := filepath.Dir(path)
-		if next == path {
-			return "", fmt.Errorf("数据库目录父路径不存在")
-		}
-		path = next
-	}
-}
-
 func (m Manager) CheckDeployment(ctx context.Context, d protocol.DatabaseDeployment) (protocol.DatabaseDeploymentEnvironment, error) {
 	out := protocol.DatabaseDeploymentEnvironment{Architecture: runtime.GOARCH, Problems: []string{}}
 	if err := d.Validate(); err != nil {
@@ -113,21 +90,22 @@ func (m Manager) CheckDeployment(ctx context.Context, d protocol.DatabaseDeploym
 	} else if state.State != "ready" {
 		out.Problems = append(out.Problems, "Docker 服务不可用，请先恢复原服务")
 	}
-	parent, err := deploymentParent(d.Directory)
+	parent, err := deploymentdir.Open(d.Directory, deploymentdir.ExistingParent)
 	if err != nil {
 		out.Problems = append(out.Problems, err.Error())
 	} else {
-		out.FreeBytes, err = deploymentFreeBytes(parent)
+		defer parent.Close()
+		out.FreeBytes, err = deploymentdir.FreeBytes(parent)
 		if err != nil {
 			out.Problems = append(out.Problems, "磁盘可用空间读取失败")
 		}
 		if out.FreeBytes < 512*1024*1024 {
 			out.Problems = append(out.Problems, "数据库目录可用空间不足 512 MiB")
 		}
-		if parent == d.Directory {
-			if entries, readErr := os.ReadDir(parent); readErr == nil && len(entries) > 0 {
+		if parent.Name() == d.Directory {
+			if entries, readErr := parent.ReadDir(1); len(entries) > 0 {
 				out.Problems = append(out.Problems, "数据库目录非空，请选择新的空目录")
-			} else if readErr != nil && !os.IsNotExist(readErr) {
+			} else if readErr != nil && readErr != io.EOF {
 				out.Problems = append(out.Problems, "数据库目录不可读")
 			}
 		}
@@ -322,29 +300,65 @@ func deploymentFilesMatch(d protocol.DatabaseDeployment) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	if _, err = deploymentParent(d.Directory); err != nil {
+	dir, err := deploymentdir.Open(d.Directory, deploymentdir.Existing)
+	if errors.Is(err, os.ErrNotExist) {
+		return false, nil
+	}
+	if err != nil {
 		return false, err
 	}
+	defer dir.Close()
+	return checkDeploymentFiles(dir, files)
+}
+
+func checkDeploymentFiles(dir *os.File, files map[string]string) (bool, error) {
 	all := true
 	for name, expected := range files {
-		path := filepath.Join(d.Directory, name)
-		info, err := os.Lstat(path)
-		if os.IsNotExist(err) {
+		file, err := openDeploymentFile(dir, name, os.O_RDONLY, 0)
+		if errors.Is(err, os.ErrNotExist) {
 			all = false
 			continue
 		}
 		if err != nil {
 			return false, err
 		}
-		if !info.Mode().IsRegular() || info.Size() > int64(len(expected)) {
-			return false, fmt.Errorf("部署文件已经变化：%s", name)
-		}
-		actual, err := os.ReadFile(path)
+		actual, err := io.ReadAll(io.LimitReader(file, int64(len(expected))+1))
+		file.Close()
 		if err != nil || string(actual) != expected {
 			return false, fmt.Errorf("部署文件已经变化：%s", name)
 		}
 	}
+	for _, name := range []string{"data", "state"} {
+		var owners []uint32
+		if name == "data" {
+			owners = []uint32{deploymentdir.GaleraUID}
+		}
+		child, err := deploymentdir.OpenDirectory(dir, name, 0, owners...)
+		if errors.Is(err, os.ErrNotExist) {
+			all = false
+			continue
+		}
+		if err != nil {
+			return false, err
+		}
+		child.Close()
+	}
 	return all, nil
+}
+
+func openDeploymentFile(dir *os.File, name string, flags int, perm os.FileMode) (*os.File, error) {
+	if base, ok := strings.CutPrefix(name, "tls/"); ok {
+		tls, err := deploymentdir.OpenDirectory(dir, "tls", perm, deploymentdir.GaleraUID)
+		if err != nil {
+			return nil, err
+		}
+		defer tls.Close()
+		return deploymentdir.OpenFile(tls, base, flags, deploymentdir.GaleraUID)
+	}
+	if name == "deployment.json" {
+		return deploymentdir.OpenFile(dir, name, flags)
+	}
+	return deploymentdir.OpenFile(dir, name, flags, deploymentdir.GaleraUID)
 }
 
 func writeDeploymentFiles(d protocol.DatabaseDeployment) error {
@@ -352,20 +366,27 @@ func writeDeploymentFiles(d protocol.DatabaseDeployment) error {
 	if err != nil {
 		return err
 	}
-	if _, err = deploymentFilesMatch(d); err != nil {
+	dir, err := deploymentdir.Open(d.Directory, deploymentdir.Create)
+	if err != nil {
 		return err
 	}
-	if _, err = os.Stat(filepath.Join(d.Directory, "deployment.json")); os.IsNotExist(err) {
-		entries, readErr := os.ReadDir(d.Directory)
-		if readErr != nil && !os.IsNotExist(readErr) {
+	defer dir.Close()
+	if _, err = checkDeploymentFiles(dir, files); err != nil {
+		return err
+	}
+	manifest, err := deploymentdir.OpenFile(dir, "deployment.json", os.O_RDONLY)
+	if errors.Is(err, os.ErrNotExist) {
+		entries, readErr := dir.ReadDir(1)
+		if readErr != nil && readErr != io.EOF {
 			return readErr
 		}
 		if len(entries) > 0 {
 			return fmt.Errorf("数据库目录已被其他内容占用")
 		}
-	}
-	if err = os.MkdirAll(d.Directory, 0700); err != nil {
+	} else if err != nil {
 		return err
+	} else {
+		manifest.Close()
 	}
 	// 先登记所属操作；部分文件写入后，恢复只补充仍缺失且内容一致的文件。
 	names := []string{"deployment.json"}
@@ -376,11 +397,7 @@ func writeDeploymentFiles(d protocol.DatabaseDeployment) error {
 	}
 	slices.Sort(names[1:])
 	for _, name := range names {
-		path := filepath.Join(d.Directory, name)
-		if err = os.MkdirAll(filepath.Dir(path), 0750); err != nil {
-			return err
-		}
-		file, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
+		file, err := openDeploymentFile(dir, name, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0750)
 		if errors.Is(err, os.ErrExist) {
 			continue
 		}
@@ -388,6 +405,9 @@ func writeDeploymentFiles(d protocol.DatabaseDeployment) error {
 			return err
 		}
 		_, err = file.WriteString(files[name])
+		if err == nil && d.Kind == "galera" && name != "deployment.json" {
+			err = file.Chown(deploymentdir.GaleraUID, deploymentdir.GaleraUID)
+		}
 		if err == nil {
 			err = file.Sync()
 		}
@@ -398,19 +418,37 @@ func writeDeploymentFiles(d protocol.DatabaseDeployment) error {
 		if closeErr != nil {
 			return closeErr
 		}
-		if d.Kind == "galera" && name != "deployment.json" && runtime.GOOS == "linux" {
-			if err = os.Chown(path, 999, 999); err != nil {
-				return err
-			}
-		}
 	}
 	for _, name := range []string{"data", "state"} {
-		if err = os.Mkdir(filepath.Join(d.Directory, name), 0750); err != nil && !os.IsExist(err) {
+		var owners []uint32
+		if name == "data" {
+			owners = []uint32{deploymentdir.GaleraUID}
+		}
+		child, err := deploymentdir.OpenDirectory(dir, name, 0750, owners...)
+		if err != nil {
+			return err
+		}
+		child.Close()
+	}
+	if len(d.TLS) > 0 {
+		tls, err := deploymentdir.OpenDirectory(dir, "tls", 0, deploymentdir.GaleraUID)
+		if err != nil {
+			return err
+		}
+		defer tls.Close()
+		if err = tls.Chown(deploymentdir.GaleraUID, deploymentdir.GaleraUID); err != nil {
+			return err
+		}
+		if err = tls.Sync(); err != nil {
 			return err
 		}
 	}
-	if len(d.TLS) > 0 && runtime.GOOS == "linux" {
-		return os.Chown(filepath.Join(d.Directory, "tls"), 999, 999)
+	match, err := checkDeploymentFiles(dir, files)
+	if err != nil {
+		return err
 	}
-	return nil
+	if !match {
+		return fmt.Errorf("数据库部署文件写入后与预期不符")
+	}
+	return dir.Sync()
 }

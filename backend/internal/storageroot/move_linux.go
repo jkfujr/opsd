@@ -547,6 +547,11 @@ func (m *Manager) restoreSource(ctx context.Context, reg *registry, r *record) e
 				return err
 			}
 		}
+		if r.Definition.Database != nil {
+			if err = dockerengine.VerifyDeploymentMounts(*r.Definition.Database, r.From.Directory); err != nil {
+				return err
+			}
+		}
 		err = m.Docker.StartStorage(ctx, source, r.Before)
 	}
 	if err != nil {

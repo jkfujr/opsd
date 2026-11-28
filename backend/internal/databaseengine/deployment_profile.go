@@ -2,14 +2,12 @@ package databaseengine
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"net"
-	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
 
+	"github.com/jkfujr/opsd/internal/dockerengine"
 	"github.com/jkfujr/opsd/internal/protocol"
 )
 
@@ -23,26 +21,18 @@ func (m Manager) DeploymentProfile(ctx context.Context, request protocol.Databas
 	out.State = state
 	d := protocol.DatabaseDeployment{Kind: "galera", Connection: request.Connection, ClusterName: state.ClusterName, ClusterID: state.ClusterID, Address: state.MemberAddress, SQLPort: 3306, ReplicationPort: 4567, ISTPort: 4568, SSTPort: 4444}
 	if request.ContainerID != "" && m.Docker != nil {
-		if _, err := m.managedDeployment(ctx, request.ContainerID); err == nil {
-			out.Managed, out.ContainerID = true, request.ContainerID
-		}
 		container, e := m.Docker.DeploymentContainer(ctx, request.ContainerID)
 		if e != nil {
 			return out, e
 		}
-		if container.Config != nil {
-			d.Image = container.Config.Image
-		}
-		for _, mount := range container.Mounts {
-			if mount.Destination == "/etc/mysql/conf.d/opsd.cnf" {
-				path := filepath.Join(filepath.Dir(mount.Source), "profile.json")
-				if info, e := os.Stat(path); e == nil && info.Mode().IsRegular() && info.Size() <= 256*1024 {
-					data, e := os.ReadFile(path)
-					if e == nil {
-						_ = json.Unmarshal(data, &d)
-					}
-				}
+		if dockerengine.IsDatabaseDeployment(container) {
+			d, e = m.managedDeployment(ctx, container)
+			if e != nil {
+				return out, e
 			}
+			out.Managed, out.ContainerID = true, request.ContainerID
+		} else if container.Config != nil {
+			d.Image = container.Config.Image
 		}
 	}
 	s, err := connect(ctx, request.Connection)
