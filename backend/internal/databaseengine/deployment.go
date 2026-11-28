@@ -102,7 +102,7 @@ func (m Manager) CheckDeployment(ctx context.Context, d protocol.DatabaseDeploym
 		if out.FreeBytes < 512*1024*1024 {
 			out.Problems = append(out.Problems, "数据库目录可用空间不足 512 MiB")
 		}
-		if parent.Name() == d.Directory {
+		if parent.Path() == d.Directory {
 			if entries, readErr := parent.ReadDir(1); len(entries) > 0 {
 				out.Problems = append(out.Problems, "数据库目录非空，请选择新的空目录")
 			} else if readErr != nil && readErr != io.EOF {
@@ -311,7 +311,7 @@ func deploymentFilesMatch(d protocol.DatabaseDeployment) (bool, error) {
 	return checkDeploymentFiles(dir, files)
 }
 
-func checkDeploymentFiles(dir *os.File, files map[string]string) (bool, error) {
+func checkDeploymentFiles(dir *deploymentdir.Directory, files map[string]string) (bool, error) {
 	all := true
 	for name, expected := range files {
 		file, err := openDeploymentFile(dir, name, os.O_RDONLY, 0)
@@ -346,7 +346,7 @@ func checkDeploymentFiles(dir *os.File, files map[string]string) (bool, error) {
 	return all, nil
 }
 
-func openDeploymentFile(dir *os.File, name string, flags int, perm os.FileMode) (*os.File, error) {
+func openDeploymentFile(dir *deploymentdir.Directory, name string, flags int, perm os.FileMode) (*os.File, error) {
 	if base, ok := strings.CutPrefix(name, "tls/"); ok {
 		tls, err := deploymentdir.OpenDirectory(dir, "tls", perm, deploymentdir.GaleraUID)
 		if err != nil {

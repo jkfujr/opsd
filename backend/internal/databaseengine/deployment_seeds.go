@@ -56,7 +56,7 @@ func (m Manager) managedDeployment(ctx context.Context, raw container.InspectRes
 	return d, fmt.Errorf("此实例缺少本系统的部署资料，保留原启动配置")
 }
 
-func (m Manager) deploymentSeedDirectory(ctx context.Context, u protocol.DatabaseSeedUpdate) (*os.File, error) {
+func (m Manager) deploymentSeedDirectory(ctx context.Context, u protocol.DatabaseSeedUpdate) (*deploymentdir.Directory, error) {
 	if err := u.Validate(); err != nil {
 		return nil, err
 	}
@@ -74,7 +74,7 @@ func (m Manager) deploymentSeedDirectory(ctx context.Context, u protocol.Databas
 	return deploymentdir.Open(filepath.Join(d.Directory, "state"), deploymentdir.Existing)
 }
 
-func readDeploymentSeeds(dir *os.File) ([]byte, error) {
+func readDeploymentSeeds(dir *deploymentdir.Directory) ([]byte, error) {
 	file, err := deploymentdir.OpenFile(dir, "seeds", os.O_RDONLY)
 	if errors.Is(err, os.ErrNotExist) {
 		return nil, nil
