@@ -317,3 +317,28 @@ func TestQueryLimitsPermissionsAndGaps(t *testing.T) {
 		}
 	}
 }
+
+func TestQueryPointBudget(t *testing.T) {
+	now := time.Now().UTC().Truncate(time.Second)
+	node := strings.Repeat("a", 32)
+	q := Query{Metric: "opsd_node_cpu_usage_percent", From: now.Add(-(MaxQueryPoints - 1) * time.Second), To: now, StepSeconds: 1, Targets: []QueryTarget{{NodeID: node}}, Aggregate: "sum"}
+	const maxSeries = 250000 / MaxQueryPoints
+	series := map[string]any{"metric": map[string]string{"cluster_id": "cluster", "node_id": node}, "values": [][]any{}}
+	for _, count := range []int{maxSeries, maxSeries + 1} {
+		items := make([]map[string]any, count)
+		for i := range items {
+			items[i] = series
+		}
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			json.NewEncoder(w).Encode(map[string]any{"status": "success", "data": map[string]any{"resultType": "matrix", "result": items}})
+		}))
+		result, err := QueryRange(t.Context(), server.Client(), server.URL, "cluster", q, now)
+		server.Close()
+		if count == maxSeries && (err != nil || len(result.Items) != 1 || len(result.Items[0].Points) != MaxQueryPoints) {
+			t.Fatal("总点数刚好达到上限应成功", err)
+		}
+		if count > maxSeries && (err == nil || len(result.Items) != 0) {
+			t.Fatal("超量结果应在分配前拒绝", err)
+		}
+	}
+}

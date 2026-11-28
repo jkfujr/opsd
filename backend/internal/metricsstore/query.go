@@ -178,11 +178,11 @@ func QueryRange(ctx context.Context, client *http.Client, endpoint, cluster stri
 	out.Warnings = append(out.Warnings, result.Warnings...)
 	out.Partial = len(out.Warnings) > 0
 	count := int(q.To.Sub(q.From)/time.Second)/q.StepSeconds + 1
-	if len(result.Data.Result)*count > 250000 {
+	if count < 1 || count > MaxQueryPoints || len(result.Data.Result) > 250000/count {
 		return out, fmt.Errorf("查询总点数超过 250000，请减少资源或增加步长")
 	}
 	for _, raw := range result.Data.Result {
-		item := Series{NodeID: raw.Metric["node_id"], ResourceID: raw.Metric["resource_id"], Backend: raw.Metric["backend"], Points: make([]Point, count)}
+		item := Series{NodeID: raw.Metric["node_id"], ResourceID: raw.Metric["resource_id"], Backend: raw.Metric["backend"]}
 		allowed := false
 		for _, target := range q.Targets {
 			if target.NodeID == item.NodeID && (len(target.ResourceIDs) == 0 || slices.Contains(target.ResourceIDs, item.ResourceID)) {
@@ -193,6 +193,7 @@ func QueryRange(ctx context.Context, client *http.Client, endpoint, cluster stri
 		if raw.Metric["cluster_id"] != cluster || !allowed {
 			return out, fmt.Errorf("查询结果包含未授权资源")
 		}
+		item.Points = make([]Point, count)
 		for i := range item.Points {
 			item.Points[i].At = q.From.Add(time.Duration(i*q.StepSeconds) * time.Second)
 		}
